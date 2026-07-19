@@ -1,0 +1,59 @@
+{
+  "live": {
+    "asOf": "2026-07-17",
+    "totals": {
+      "countCurrent": 102,
+      "countReturned": 75,
+      "carryCurrent": 66610000,
+      "carryReturned": 89915000,
+      "grossCurrent": 112606899,
+      "grossReturned": 105375000,
+      "pastDueCurrent": 115307899,
+      "pastDueReturned": 129515000,
+      "futureBilled": 34630000,
+      "penaltyCount": 105,
+      "overpayCount": 63,
+      "vehicleCount": 163,
+      "activeCount": 118,
+      "loanCount": 157
+    },
+    "warnings": [],
+    "contractCount": 177,
+    "contractsByKind": {
+      "current": 102,
+      "returned": 75
+    },
+    "carrySum": 156525000,
+    "carryUnpaidSum": 156525000,
+    "vehicleCount": 163,
+    "loanCount": 157,
+    "activePlatesLength": 118
+  },
+  "jbo": {
+    "totals": {
+      "count": 2721,
+      "deposit": 1671437823,
+      "withdraw": 1572106329,
+      "sweepDeposit": 588011858,
+      "sweepWithdraw": 589291634,
+      "realDeposit": 1083425965,
+      "realWithdraw": 982814695,
+      "accounts": 3,
+      "subjects": 64,
+      "dateFrom": "2026-01-01",
+      "dateTo": "2026-07-09"
+    },
+    "warnings": [],
+    "txCount": 2721
+  },
+  "frozen": {
+    "asOf": "2026-06-30",
+    "contractCount": 147,
+    "contractsByKind": {
+      "current": 102,
+      "returned": 45
+    },
+    "carrySum": 150685700,
+    "liveMinusFrozenCarry": 5839300
+  }
+}

@@ -1,0 +1,20 @@
+const { chromium } = require('C:/dev/_cap/node_modules/playwright-core');
+(async () => {
+  const b = await chromium.launch({ executablePath: 'C:/Program Files/Google/Chrome/Application/chrome.exe', headless: true });
+  const p = await (await b.newContext({ viewport: { width: 1600, height: 1000 } })).newPage();
+  const errs = [];
+  p.on('console', m => { if (m.type()==='error') errs.push(m.text().slice(0,160)); });
+  await p.goto('http://localhost:7502/', { waitUntil: 'domcontentloaded' });
+  await p.waitForTimeout(1500);
+  await p.getByPlaceholder('name@company.com').fill('pyh@teamjpk.com');
+  await p.getByPlaceholder('비밀번호 입력').fill('00000');
+  console.log('email val:', await p.getByPlaceholder('name@company.com').inputValue());
+  await p.getByRole('button', { name: '로그인' }).click();
+  await p.waitForTimeout(8000);
+  console.log('url:', p.url());
+  const txt = (await p.locator('body').innerText()).replace(/\s+/g,' ').slice(0, 300);
+  console.log('body:', txt);
+  console.log('console errors:', errs.slice(0,6));
+  await p.screenshot({ path: 'C:/dev/jpkerp6-app/docs/j5-postlogin.png' });
+  await b.close();
+})().catch(e => { console.error(e.message); process.exit(1); });

@@ -1,0 +1,279 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>jpkerp6 설계서 — v5 전기능 × 모던</title>
+<link rel="preconnect" href="https://cdn.jsdelivr.net" />
+<link href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" rel="stylesheet" />
+<style>
+  :root{ --ink:#0f172a; --mute:#64748b; --faint:#94a3b8; --line:#e2e8f0; --line2:#f1f5f9; --bg:#f8fafc;
+         --accent:#2563eb; --ok:#16a34a; --warn:#ca8a04; --danger:#dc2626; --maxw:1180px; }
+  *{ box-sizing:border-box; }
+  body{ margin:0; font-family:'Pretendard',system-ui,sans-serif; color:var(--ink); background:var(--bg);
+        line-height:1.65; -webkit-font-smoothing:antialiased; }
+  .wrap{ max-width:var(--maxw); margin:0 auto; padding:48px 28px 120px; }
+  header.hero{ border-bottom:1px solid var(--line); padding-bottom:22px; margin-bottom:14px; }
+  h1{ font-size:30px; font-weight:800; letter-spacing:-0.03em; margin:0 0 6px; }
+  .sub{ color:var(--mute); font-size:14.5px; }
+  .tag{ display:inline-block; font-size:11.5px; font-weight:700; padding:2px 9px; border-radius:999px; background:#e0e7ff; color:#3730a3; margin-right:6px; }
+  h2{ font-size:21px; font-weight:800; letter-spacing:-0.02em; margin:44px 0 10px; padding-top:14px; border-top:2px solid var(--line); }
+  h2 .n{ color:var(--faint); font-weight:700; margin-right:8px; }
+  h3{ font-size:15.5px; font-weight:800; margin:24px 0 8px; }
+  p{ margin:8px 0; }
+  .lead{ font-size:15px; color:#334155; }
+  b,strong{ font-weight:700; }
+  code{ background:#eef2f7; padding:1px 6px; border-radius:5px; font-size:12.5px; font-family:'Pretendard',monospace; color:#0f172a; }
+  ul{ margin:8px 0 8px 2px; padding-left:18px; } li{ margin:3px 0; }
+  table{ width:100%; border-collapse:collapse; font-size:13px; margin:14px 0; background:#fff; border:1px solid var(--line); border-radius:12px; overflow:hidden; }
+  th,td{ text-align:left; padding:9px 12px; border-bottom:1px solid var(--line2); vertical-align:top; }
+  th{ background:#f8fafc; font-size:11.5px; color:var(--mute); font-weight:700; text-transform:uppercase; letter-spacing:.04em; white-space:nowrap; }
+  tr:last-child td{ border-bottom:none; }
+  .pill{ display:inline-block; font-size:11px; font-weight:700; padding:2px 8px; border-radius:999px; white-space:nowrap; }
+  .p-have{ background:#dcfce7; color:#166534; } .p-part{ background:#ffedd5; color:#9a3412; } .p-new{ background:#e0e7ff; color:#3730a3; }
+  .grid2{ display:grid; grid-template-columns:1fr 1fr; gap:14px; } @media(max-width:760px){ .grid2{ grid-template-columns:1fr; } }
+  .card{ background:#fff; border:1px solid var(--line); border-radius:14px; padding:16px 18px; }
+  .card h3{ margin-top:0; }
+  .callout{ background:#fff; border:1px solid var(--line); border-left:4px solid var(--accent); border-radius:10px; padding:14px 18px; margin:14px 0; }
+  .muted{ color:var(--mute); font-size:13px; }
+  .legend{ font-size:12px; color:var(--mute); margin:6px 0 0; }
+  .domain{ font-weight:800; color:var(--accent); }
+  .flow{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; font-weight:700; font-size:14px; margin:10px 0; }
+  .flow .step{ background:#fff; border:1px solid var(--line); border-radius:10px; padding:8px 12px; }
+  .flow .arr{ color:var(--faint); }
+  footer{ margin-top:60px; padding-top:18px; border-top:1px solid var(--line); color:var(--faint); font-size:12.5px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="hero">
+  <div><span class="tag">설계서</span><span class="tag" style="background:#dcfce7;color:#166534;">v5 전기능 × 모던</span></div>
+  <h1>jpkerp6 — 렌터카 통합 ERP 설계서</h1>
+  <p class="sub">목표: <b>jpkerp5의 모든 기능을 빠짐없이 담되, 현행 트렌드 UX로.</b> · 독립 데이터모델(v5는 ETL 이관) · 멀티테넌트(운영자/위탁사) · 2026-06</p>
+</header>
+
+<p class="lead">v6는 v5 기능의 <b>복제가 아니라 재구성</b>입니다. v5가 페이지마다 흩어 두었던 계산·상태·디자인을 <b>한 곳(엔진·키트)</b>에 모으고, 사람은 <b>사실</b>만 넣으면 상태·미수·장부가·리스크는 <b>엔진이 파생</b>합니다. 화면은 그 결과를 얇게 보여줄 뿐입니다.</p>
+
+<!-- 0 핵심 전략 -->
+<h2 style="border-top:none;margin-top:30px;"><span class="n">★</span>제품 전략 — 점진적 채택 & 마이그레이션 우선</h2>
+<p class="lead">모든 업체에 풀 ERP를 강요하지 않는다. <b>베이스 2개(운영현황·리스크)만으로 엑셀을 대체</b>하고, 더 깊게 쓰고 싶은 업체만 심화 도메인으로 내려간다. 진입장벽을 최소화해 “필요에 의해” 자연스럽게 ERP로 들어오게 만든다.</p>
+<table>
+  <thead><tr><th style="width:90px">티어</th><th>구성</th><th>누가·무엇</th></tr></thead>
+  <tbody>
+    <tr><td><span class="pill p-have">베이스</span><br><span class="muted">필수·누구나</span></td>
+        <td><b>운영현황 + 리스크</b></td>
+        <td>최소 레코드만으로 “누가 어떤 차를 언제~언제, 얼마에, 몇 세로 쓰는지” 관리 + 안 맞으면 경고. <b>이 2개만 써도 충분.</b></td></tr>
+    <tr><td><span class="pill p-new">심화</span><br><span class="muted">필요한 업체만</span></td>
+        <td><b>자산 · 계약 · 재무 · 일반</b></td>
+        <td>자산=차량 생애주기 전부(등록증·스펙·수익·증권·할부·정비/수리/비용) · 계약=계약의 모든것 · 재무=재무의 모든것 · 일반=회사의 모든것. <b>사실을 더 넣으면 자동 활성.</b></td></tr>
+  </tbody>
+</table>
+
+<div class="grid2">
+  <div class="card">
+    <h3>베이스 최소 레코드 (한 줄 = 한 대여)</h3>
+    <ul>
+      <li>차량번호 · 임차인(누가)</li>
+      <li>계약 시작일 ~ 종료일</li>
+      <li>월 금액 · 입금액(낸 돈)</li>
+      <li>운전자 연령 · 보험 허용연령</li>
+    </ul>
+    <p class="muted">그 외 모든 필드는 optional. 베이스만 채워도 운영현황·리스크가 <b>완전히 동작</b>해야 한다.</p>
+  </div>
+  <div class="card">
+    <h3>리스크 = 정합성 경고 3종 (베이스의 가치)</h3>
+    <ul>
+      <li><b>미수</b> — 월금액 × 경과 − 입금 &gt; 0 (돈 내야 하는데 안 냄)</li>
+      <li><b>보험 불일치</b> — 운전자 연령 &lt; 보험 허용연령 (보험 안 맞음)</li>
+      <li><b>반납 지남</b> — 오늘 &gt; 종료일 · 미반납</li>
+    </ul>
+    <p class="muted">전부 베이스 레코드에서 <b>파생</b>. 추가 입력 없이 경고가 뜬다.</p>
+  </div>
+</div>
+
+<div class="callout">
+  <b>마이그레이션 우선 — 엑셀 1시트로 즉시 전환.</b> 기존 엑셀로 관리하던 업체가 <b>베이스 컬럼(차량번호·임차인·시작·종료·월금액·입금·운전자연령·보험연령)</b> 1시트를 업로드하면 곧바로 운영현황 + 리스크 경고가 살아난다. 별도 학습·셋업 없이 “기본값만으로” 전환. → 이게 v6의 첫 사용자 경험이자 GTM.
+</div>
+
+<!-- 1 -->
+<h2><span class="n">01</span>정체성 & 모던 원칙</h2>
+<div class="grid2">
+  <div class="card">
+    <h3>아키텍처 원칙</h3>
+    <ul>
+      <li><b>사실 → 파생</b>: 사실 최소 저장, 상태·미수·장부가·리스크는 저장하지 않고 엔진이 매번 계산 → 한 곳 바꾸면 전 화면 자동 일치</li>
+      <li><b>SSOT 엔진·키트</b>: 도메인 로직은 <code>*-ops.ts</code> 한 모듈, UI는 공용 키트(<code>ui.tsx</code>)만 사용. 인라인·페이지별 중복 금지</li>
+      <li><b>멀티테넌트</b>: 운영자=전 회사 합본, 위탁사=자기 회사. Firestore Rules로 서버 강제</li>
+      <li><b>감사·소프트삭제</b>: 모든 변경 누가·언제·무엇 + 휴지통 복구 + OCR 원본 보존</li>
+    </ul>
+  </div>
+  <div class="card">
+    <h3>모던 UX 원칙</h3>
+    <ul>
+      <li><b>좌측 사이드바 5센터</b> (탑네비 X) · lucide 아이콘(이모지 X)</li>
+      <li><b>목록이 본체</b>: 밀도 높은 테이블 · 필터칩 · 인라인 액션 · 벌크 선택</li>
+      <li><b>공통 상세 드로어</b>: 모든 상세/편집/워크플로가 우측 드로어 하나 재사용 · ↑↓ 연속 이동 · URL 동기화 · ↗전체화면</li>
+      <li><b>커맨드 팔레트(⌘K)</b>: 전역 검색·이동·액션</li>
+      <li><b>반응형 단일 코드</b>: 데스크톱/모바일 동일 코드, 드로어→풀스크린 시트</li>
+      <li>토스트·스켈레톤·낙관적 업데이트</li>
+    </ul>
+  </div>
+</div>
+
+<!-- 2 -->
+<h2><span class="n">02</span>정보구조 (사이드바 → 도메인 → 하위뷰)</h2>
+<p class="muted">v5의 47개 페이지를 5센터로 압축. 세부 기능은 별도 페이지가 아니라 <b>도메인 안의 탭·필터·드로어</b>로 흡수(트렌드 + 목록본체).</p>
+<p class="legend"><span class="pill p-have">베이스</span> 운영센터(운영현황·리스크) — 누구나 필수 · <span class="pill p-new">심화</span> 관리센터(자산·계약·재무)+일반센터 — 필요한 업체만 opt-in. 데이터센터·설정은 공통.</p>
+<table>
+  <thead><tr><th>센터</th><th>메뉴</th><th>하위뷰(탭/필터)</th></tr></thead>
+  <tbody>
+    <tr><td rowspan="2"><b>운영센터</b></td><td>대시보드</td><td>KPI(가동률·미수율·수금률·반납지연·신규·확정대기·과태료) · 일정 캘린더 · 공지 · 업무카드</td></tr>
+    <tr><td>운영현황</td><td>전체/대기/운행/만기임박/만기경과/반납예정/휴차/미수 · 인도·반납·연장 워크플로 · SMS · 엑셀</td></tr>
+    <tr><td><b>운영센터</b></td><td>리스크 관리</td><td>미수aging(90+)/시동제어/내용증명/채권/검사지연 · 시동제어 ON·OFF · 내용증명 PDF · 채권화 · 연락기록 · 정합성점검</td></tr>
+    <tr><td rowspan="3"><b>관리센터</b></td><td>자산 관리</td><td>현황/등록자산 · 탭: 매입·정비·보험·할부·검사·GPS·감가장부·매각 · 차량 드로어(360)</td></tr>
+    <tr><td>계약 관리</td><td>전체/만기/미수/반납/휴차/수납스케줄 · 인도/반납/연장/해지 · 계약서 PDF</td></tr>
+    <tr><td>재무 관리</td><td>거래장부(계좌·카드) · CMS 자동매칭 · 정산서 · 세금계산서 · 일일수금 · GL(차변/대변)</td></tr>
+    <tr><td rowspan="2"><b>일반센터</b></td><td>일반관리</td><td>탭: 법인·직원·임대인·시설·차고지·증차·코드체계·공문·손익</td></tr>
+    <tr><td>과태료 처리</td><td>OCR등록 · 중복제거 · 책임자매칭 · 변경부과/최고/독촉 PDF · 진행중/완료</td></tr>
+    <tr><td><b>공통</b></td><td>데이터센터·감사로그·설정</td><td>3방식 인제스천 · 입력함/감사로그 · 휴지통 · 메뉴/권한/알림 설정 · 회계마감</td></tr>
+  </tbody>
+</table>
+<p class="legend">협업성 기능(디스패치·근태·활동피드·공지)은 운영센터/대시보드에 위젯·탭으로 흡수. 모바일은 별도 메뉴 없이 반응형으로.</p>
+
+<!-- 3 -->
+<h2><span class="n">03</span>v5 전기능 → v6 커버리지 매트릭스</h2>
+<p class="muted">“다 담겼는가”의 증명. v5의 8도메인 50+기능을 v6 위치·모던패턴·엔진으로 매핑. <span class="pill p-have">있음</span> 구현됨 · <span class="pill p-part">부분</span> 일부/개선필요 · <span class="pill p-new">신규</span> 미구현.</p>
+
+<h3>운영 / 리스크</h3>
+<table>
+  <thead><tr><th>v5 기능</th><th>v6 위치 · 패턴</th><th>사실/파생 · 엔진</th><th>상태</th></tr></thead>
+  <tbody>
+    <tr><td>운영현황 7필터·자동정렬</td><td>운영현황 · 필터칩+테이블</td><td>파생: 상태·우선순위 / <code>contract-ops</code></td><td><span class="pill p-have">있음</span></td></tr>
+    <tr><td>인도/반납/연장/해지 + 일할정산</td><td>계약·운영 드로어 워크플로</td><td>반납 일할 / <code>returned-proration</code></td><td><span class="pill p-have">있음</span></td></tr>
+    <tr><td>대시보드 KPI 7종·일정달력·업무카드</td><td>대시보드 · 위젯</td><td>파생 KPI / 집계</td><td><span class="pill p-part">부분</span></td></tr>
+    <tr><td>미수 aging(90+)·SLA 단계</td><td>리스크 · 필터</td><td>파생: 연체일·단계 / <code>risk-ops</code>(신규)</td><td><span class="pill p-new">신규</span></td></tr>
+    <tr><td>시동제어 ON/OFF·채권화</td><td>리스크 드로어 워크플로</td><td>사실: 제어상태·사유 / 감사</td><td><span class="pill p-new">신규</span></td></tr>
+    <tr><td>내용증명(최고서) 개별·일괄 PDF</td><td>리스크 · PDF 생성</td><td>템플릿 렌더 / pdf 엔진</td><td><span class="pill p-new">신규</span></td></tr>
+    <tr><td>연락기록·SMS 발송</td><td>드로어 액션 · SMS</td><td>사실: 기록 / API</td><td><span class="pill p-new">신규</span></td></tr>
+    <tr><td>정합성 점검</td><td>리스크 · 점검</td><td>파생: 누락·만기·고아 / integrity</td><td><span class="pill p-have">있음</span></td></tr>
+  </tbody>
+</table>
+
+<h3>자산</h3>
+<table>
+  <thead><tr><th>v5 기능</th><th>v6 위치 · 패턴</th><th>사실/파생 · 엔진</th><th>상태</th></tr></thead>
+  <tbody>
+    <tr><td>차량 마스터(등록증 OCR·엑셀·수동)</td><td>데이터센터 3방식 + 자산 목록</td><td>사실: 등록증·취득·금융 / SSOT entities</td><td><span class="pill p-have">있음</span></td></tr>
+    <tr><td>감가상각 장부(장부가)</td><td>자산 · 감가 탭 / 드로어</td><td>파생: 장부가 / <code>asset-ledger</code></td><td><span class="pill p-have">있음</span></td></tr>
+    <tr><td>매입·정비·보험·할부·검사·GPS·매각</td><td>자산 탭/필터 + 차량 드로어</td><td>사실: 약정·이력 / 파생: 만기 D-day</td><td><span class="pill p-part">부분</span></td></tr>
+    <tr><td>차량 이력(정비/사고/검사/위반)</td><td>차량 드로어 · 이력 섹션</td><td>사실: history 엔티티</td><td><span class="pill p-have">있음</span></td></tr>
+    <tr><td>상태 라이프사이클 17상태·일괄변경</td><td>자산 · 벌크 액션</td><td>사실: status / 파생 전이규칙</td><td><span class="pill p-part">부분</span></td></tr>
+    <tr><td>첨부(등록증·증권·계약서)·사진</td><td>드로어 · 파일첨부</td><td>Storage / OCR 원본 보존</td><td><span class="pill p-new">신규</span></td></tr>
+  </tbody>
+</table>
+
+<h3>계약 / 재무 / 과태료</h3>
+<table>
+  <thead><tr><th>v5 기능</th><th>v6 위치 · 패턴</th><th>사실/파생 · 엔진</th><th>상태</th></tr></thead>
+  <tbody>
+    <tr><td>계약 마스터·만기/미수/반납/휴차</td><td>계약 · 필터칩</td><td>파생: 상태·D-day / <code>contract-ops</code></td><td><span class="pill p-have">있음</span></td></tr>
+    <tr><td>수납스케줄(회차)·미수</td><td>계약 드로어 · 회차표</td><td>파생: 회차·미수 / <code>payment-schedule</code></td><td><span class="pill p-have">있음</span></td></tr>
+    <tr><td>계약서 PDF 자동생성</td><td>계약 드로어 · PDF</td><td>템플릿 렌더 / pdf 엔진</td><td><span class="pill p-new">신규</span></td></tr>
+    <tr><td>거래내역 수집(계좌·카드)</td><td>데이터센터 엑셀 + 재무</td><td>사실: bank_tx·card_tx</td><td><span class="pill p-have">있음</span></td></tr>
+    <tr><td>CMS 자동매칭(입금→회차 FIFO)</td><td>재무·수납 · 매칭</td><td>파생 매칭 / <code>receipt-match</code></td><td><span class="pill p-part">부분</span></td></tr>
+    <tr><td>정산서·세금계산서·GL(차변/대변)</td><td>재무 · 리포트/탭</td><td>파생: 회계분개 / gl 엔진(신규)</td><td><span class="pill p-new">신규</span></td></tr>
+    <tr><td>과태료 책임자 매칭</td><td>과태료 · 자동매칭</td><td>파생 / <code>penalty-match</code></td><td><span class="pill p-have">있음</span></td></tr>
+    <tr><td>과태료 중복제거·변경부과/최고/독촉 PDF</td><td>과태료 · 액션/PDF</td><td>dedup + pdf 엔진</td><td><span class="pill p-new">신규</span></td></tr>
+  </tbody>
+</table>
+
+<h3>일반관리 / 공통 / 크로스커팅</h3>
+<table>
+  <thead><tr><th>v5 기능</th><th>v6 위치 · 패턴</th><th>비고</th><th>상태</th></tr></thead>
+  <tbody>
+    <tr><td>법인·직원·임대인·시설·차고지·증차</td><td>일반관리 · 탭(마스터)</td><td>엔티티 신설 + 코드 scoped</td><td><span class="pill p-new">신규</span></td></tr>
+    <tr><td>코드체계(법인/차량/계약/회차/과태료 상태)</td><td>일반관리 · 코드 탭</td><td>select 옵션 SSOT화</td><td><span class="pill p-part">부분</span></td></tr>
+    <tr><td>손익 / 공문</td><td>일반관리 · 탭</td><td>파생 손익 / 문서</td><td><span class="pill p-new">신규</span></td></tr>
+    <tr><td>입력함 / 감사로그 조회</td><td>감사로그 페이지 + 드로어 탭</td><td>audit_logs 노드</td><td><span class="pill p-new">신규</span></td></tr>
+    <tr><td>RBAC(Master/Staff/SUPER)</td><td>전역 · 라우트/액션 게이팅</td><td>운영자/위탁사 + 직원역할</td><td><span class="pill p-part">부분</span></td></tr>
+    <tr><td>회계 마감(월/분기/연)</td><td>설정/재무 · 마감</td><td>기간 잠금 / 30원칙</td><td><span class="pill p-new">신규</span></td></tr>
+    <tr><td>휴지통·소프트삭제·OCR원본보존</td><td>데이터센터 · 휴지통</td><td>전 엔티티 공통</td><td><span class="pill p-have">있음</span></td></tr>
+    <tr><td>SMS·알림 / 파일첨부·스토리지</td><td>드로어 액션 / 첨부</td><td>API·Storage 연동</td><td><span class="pill p-new">신규</span></td></tr>
+    <tr><td>모바일(/m 인도·반납·면허OCR·근태)</td><td>반응형 단일코드로 흡수</td><td>드로어→풀스크린 시트</td><td><span class="pill p-new">신규</span></td></tr>
+    <tr><td>전역검색 / 커맨드팔레트(⌘K)</td><td>상단 · 전역</td><td>검색 있음 → 팔레트로 승격</td><td><span class="pill p-part">부분</span></td></tr>
+  </tbody>
+</table>
+
+<!-- 4 -->
+<h2><span class="n">04</span>백본: 도메인별 사실 / 파생</h2>
+<table>
+  <thead><tr><th>도메인</th><th>사실 (입력: 사람·OCR·엑셀)</th><th>파생 (엔진 계산, 저장 안 함)</th></tr></thead>
+  <tbody>
+    <tr><td><b>계약</b></td><td>임차인·차량·기간·요율·보증금 · 인도일·반납일</td><td>상태 · 회차표 · 도래미수 · 반납 일할</td></tr>
+    <tr><td><b>차량</b></td><td>등록증·취득가·취득일 · 할부약정 · GPS · 이력</td><td>자산상태 · 장부가(감가) · 검사·보험 만기 D-day · 리스크 플래그</td></tr>
+    <tr><td><b>수납</b></td><td>계약 회차(파생) · 은행입금 사실(bank_tx)</td><td>FIFO 매칭 · 회차 납부상태 · 순미수</td></tr>
+    <tr><td><b>리스크</b></td><td>(없음 — 전부 위에서 파생) · 시동제어·연락 사실만</td><td>미수 aging · 시동제어 후보 · 만기/검사/보험 임박</td></tr>
+    <tr><td><b>재무</b></td><td>계좌·카드 거래 · 매칭 사실</td><td>입출금 원장 · 정산 · 회계분개(GL)</td></tr>
+  </tbody>
+</table>
+<div class="callout"><b>핵심 규칙.</b> 상태·미수·장부가·리스크·KPI는 <b>절대 DB에 저장하지 않는다.</b> 사실만 저장하고 엔진이 매번 파생 → 어느 화면에서 보든 같은 값, 어느 사실을 바꿔도 전 화면 자동 일치. (v5의 “페이지마다 따로 계산” 문제 제거)</div>
+
+<!-- 5 -->
+<h2><span class="n">05</span>모던 UX 컴포넌트 (한 곳에서 뿌림)</h2>
+<div class="grid2">
+  <div class="card"><h3>공통 상세 드로어</h3><p class="muted">모든 목록의 상세/편집/워크플로가 우측 드로어 하나 재사용. ↑↓ 연속 이동 · Esc · URL 동기화 · ↗전체화면 승격 · 모바일은 풀스크린 시트.</p></div>
+  <div class="card"><h3>목록 키트</h3><p class="muted">DataTable · 필터칩(카운트) · 저장된 뷰 · 벌크 선택/액션 · 정렬 · 빈/로딩 상태. 전 도메인 동일.</p></div>
+  <div class="card"><h3>커맨드 팔레트 ⌘K</h3><p class="muted">전역 검색(차량·계약·손님) + 빠른 이동 + 액션(인도/반납/SMS). 현행 트렌드 핵심.</p></div>
+  <div class="card"><h3>워크플로 = 상태머신</h3><p class="muted">상태 전이 버튼은 엔진의 허용 전이만 노출 + 자동 감사 기록. 사람이 임의 상태 못 만듦.</p></div>
+</div>
+
+<!-- 6 -->
+<h2><span class="n">06</span>빌드 순서 — 베이스 → 수직 슬라이스 → 복제</h2>
+<div class="flow">
+  <span class="step" style="border-color:var(--ok);color:var(--ok)">베이스: 최소레코드 + 엑셀 마이그레이션 + 운영현황 + 리스크 경고3종</span>
+</div>
+<p class="muted">먼저 <b>베이스(엑셀 1시트 → 운영현황 + 리스크)</b> 를 완성 = 엑셀 쓰던 업체가 바로 전환 가능한 최소 제품. 그 위에 심화 슬라이스를 깊게:</p>
+<div class="flow">
+  <span class="step">계약</span><span class="arr">→</span><span class="step">차량</span><span class="arr">→</span><span class="step">수납</span><span class="arr">→</span><span class="step">리스크</span>
+  <span class="arr">⇒</span><span class="step" style="border-color:var(--accent);color:var(--accent)">한 바퀴 실데이터 데모</span>
+</div>
+<p>한 줄기를 <b>실데이터로 깊게</b> 끝내 패턴(엔진·드로어·키트)을 확정한 뒤, 나머지 도메인은 <b>같은 패턴 복제</b>. 도메인마다 루프: <b>① 파생 엔진(<code>*-ops.ts</code>) 작성 → 헤드리스 검증 → ② 얇은 목록 + 공통 드로어 연결.</b></p>
+<p class="muted"><b>데모 성공 기준</b>: 계약 1건을 인도→운행→은행입금 자동매칭→반납(일할 자동)→미납 시 리스크 등장까지 클릭하면, 같은 사실에서 <b>운영·차량·수납·리스크 4화면이 동시 자동 갱신</b>.</p>
+<h3>복제 순서(슬라이스 후)</h3>
+<ol>
+  <li>공통 드로어 전 목록 확산 (운영·자산·손님·보험·과태료)</li>
+  <li>수납 매칭 실데이터화 (은행 → 회차 FIFO, 감사)</li>
+  <li>리스크 엔진 (aging·시동제어·만기 통합) + 채권/내용증명 워크플로</li>
+  <li>자산 서브도메인 8종 (탭/드로어)</li>
+  <li>마스터(직원/거래처/코드) · 감사로그 · RBAC · 회계마감</li>
+  <li>PDF(계약서·내용증명·정산서) · SMS · 첨부 · ⌘K · 반응형 모바일</li>
+</ol>
+
+<!-- 7 -->
+<h2><span class="n">07</span>크로스커팅 (처음부터 박는 것)</h2>
+<div class="grid2">
+  <div class="card"><h3>멀티테넌트</h3><p class="muted">운영자=합본, 위탁사=자기회사. 회사 태그 + Firestore Rules 서버 강제. 회사별 코드 scoped.</p></div>
+  <div class="card"><h3>RBAC</h3><p class="muted">역할: 운영자/위탁사 + 직원(Master/Staff). 라우트·액션·드로어 버튼 게이팅.</p></div>
+  <div class="card"><h3>감사 · 소프트삭제</h3><p class="muted">create/update/delete/restore 추적(누가·언제·무엇) + 휴지통 + OCR 원본 영구보존.</p></div>
+  <div class="card"><h3>회계 마감 · 백업</h3><p class="muted">월/분기/연 기간 잠금(마감 후 변경 차단) + Firestore 자동 백업.</p></div>
+</div>
+
+<!-- 8 -->
+<h2><span class="n">08</span>로드맵 & 투자/B2C 트랙</h2>
+<ul>
+  <li><b>Phase 0 — 베이스 + 마이그레이션</b>: 최소레코드 · 엑셀 1시트 업로드 · 운영현황 · 리스크 경고3종. <b>엑셀 대체 MVP</b>(누구나 즉시 전환)</li>
+  <li><b>Phase A — 수직 슬라이스</b>: 계약→차량→수납→리스크 실데이터 데모 (투자용 “살아있는 한 바퀴”)</li>
+  <li><b>Phase B — 전 도메인 복제</b>: 자산 서브·재무 GL·과태료 PDF·마스터·감사·RBAC·마감</li>
+  <li><b>Phase C — 연동</b>: SMS·PDF·파일첨부·⌘K·반응형 모바일·v5 데이터 ETL 이관</li>
+  <li><b>Phase D — 플랫폼</b>: GPS/시동제어 실연동 · 렌터카 예약 B2C ERP 확장</li>
+</ul>
+<div class="callout"><b>투자 내러티브.</b> “데이터 한 곳 → 실시간 파생 → 회사별 격리 → 전부 추적 → 모바일·B2C로 확장.” 슬라이스 한 바퀴가 이 서사를 <b>작동하는 데모</b>로 증명한다.</div>
+
+<footer>
+  jpkerp6 설계서 · 결정: 진행=수직 슬라이스, 웹·모바일=반응형 단일, 백본=사실→파생 · 본 문서는 “보면서 다듬는” 살아있는 설계서 (변경 시 갱신).
+</footer>
+
+</div>
+</body>
+</html>

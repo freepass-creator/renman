@@ -1,0 +1,33 @@
+rules_version = '2';
+// Firebase Storage — 문서 원본(등록증·증권·계약·고지서). path = docs/{companyId}/…
+// Firestore users/{uid}.role·companyId 와 동일 테넌트 규칙.
+service firebase.storage {
+  match /b/{bucket}/o {
+    function isSignedIn() { return request.auth != null; }
+    function userDoc() {
+      return firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data;
+    }
+    function hasUserDoc() {
+      return firestore.exists(/databases/(default)/documents/users/$(request.auth.uid));
+    }
+    function isMaster() {
+      return isSignedIn() && request.auth.token.email != null
+        && request.auth.token.email.lower() == 'pyh@teamjpk.com';
+    }
+    function isHQ() {
+      return isMaster() || (isSignedIn() && hasUserDoc()
+        && (userDoc().role == '본사' || userDoc().role == '운영자'));
+    }
+    function myCompany() { return hasUserDoc() ? userDoc().companyId : null; }
+    function tenantOK(companyId) {
+      return isHQ() || (isSignedIn() && myCompany() == companyId);
+    }
+
+    match /docs/{companyId}/{allPaths=**} {
+      allow read: if isSignedIn() && tenantOK(companyId);
+      allow write: if isSignedIn() && tenantOK(companyId)
+        && request.resource.size < 20 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*|application/pdf|application/octet-stream');
+    }
+  }
+}

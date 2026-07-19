@@ -1,0 +1,194 @@
+{
+  "removed": 37,
+  "samples": [
+    {
+      "path": "contract:52수7832|손영태",
+      "field": "endDate",
+      "was": "1930-05-24"
+    },
+    {
+      "path": "contract:52수7832|손영태",
+      "field": "returnScheduledDate",
+      "was": "1930-05-24"
+    },
+    {
+      "path": "contract:36머9150|장현주",
+      "field": "endDate",
+      "was": "1930-04-22"
+    },
+    {
+      "path": "contract:36머9150|장현주",
+      "field": "returnScheduledDate",
+      "was": "1930-04-22"
+    },
+    {
+      "path": "contract:311마8929|김태원",
+      "field": "endDate",
+      "was": "1930-05-02"
+    },
+    {
+      "path": "contract:311마8929|김태원",
+      "field": "returnScheduledDate",
+      "was": "1930-05-02"
+    },
+    {
+      "path": "contract:57나3382|김대훈",
+      "field": "endDate",
+      "was": "1930-05-18"
+    },
+    {
+      "path": "contract:57나3382|김대훈",
+      "field": "returnScheduledDate",
+      "was": "1930-05-18"
+    },
+    {
+      "path": "contract:172수8945|박형주",
+      "field": "endDate",
+      "was": "1930-05-26"
+    },
+    {
+      "path": "contract:172수8945|박형주",
+      "field": "returnScheduledDate",
+      "was": "1930-05-26"
+    },
+    {
+      "path": "contract:66소6317|카스파",
+      "field": "endDate",
+      "was": "1930-05-19"
+    },
+    {
+      "path": "contract:66소6317|카스파",
+      "field": "returnScheduledDate",
+      "was": "1930-05-19"
+    },
+    {
+      "path": "contract:149조6163|한상관",
+      "field": "endDate",
+      "was": "1930-03-21"
+    },
+    {
+      "path": "contract:149조6163|한상관",
+      "field": "returnScheduledDate",
+      "was": "1930-03-21"
+    },
+    {
+      "path": "contract:236로9998|유승",
+      "field": "endDate",
+      "was": "1930-05-20"
+    },
+    {
+      "path": "contract:236로9998|유승",
+      "field": "returnScheduledDate",
+      "was": "1930-05-20"
+    },
+    {
+      "path": "contract:143조2022|김현민",
+      "field": "endDate",
+      "was": "1930-03-07"
+    },
+    {
+      "path": "contract:143조2022|김현민",
+      "field": "returnScheduledDate",
+      "was": "1930-03-07"
+    },
+    {
+      "path": "contract:163조9326|유혁",
+      "field": "endDate",
+      "was": "1930-05-05"
+    },
+    {
+      "path": "contract:163조9326|유혁",
+      "field": "returnScheduledDate",
+      "was": "1930-05-05"
+    },
+    {
+      "path": "contract:244루2757|홍이삭",
+      "field": "endDate",
+      "was": "1930-03-16"
+    },
+    {
+      "path": "contract:244루2757|홍이삭",
+      "field": "returnScheduledDate",
+      "was": "1930-03-16"
+    },
+    {
+      "path": "contract:181조8459|배성호",
+      "field": "endDate",
+      "was": "1930-04-18"
+    },
+    {
+      "path": "contract:181조8459|배성호",
+      "field": "returnScheduledDate",
+      "was": "1930-04-18"
+    },
+    {
+      "path": "contract:41호8303|또바기",
+      "field": "endDate",
+      "was": "1930-02-24"
+    },
+    {
+      "path": "contract:41호8303|또바기",
+      "field": "returnScheduledDate",
+      "was": "1930-02-24"
+    },
+    {
+      "path": "contract:41호8306|정선기",
+      "field": "endDate",
+      "was": "1930-03-09"
+    },
+    {
+      "path": "contract:41호8306|정선기",
+      "field": "returnScheduledDate",
+      "was": "1930-03-09"
+    },
+    {
+      "path": "contract:41호8307|박진용",
+      "field": "endDate",
+      "was": "1930-03-08"
+    },
+    {
+      "path": "contract:41호8307|박진용",
+      "field": "returnScheduledDate",
+      "was": "1930-03-08"
+    },
+    {
+      "path": "contract:17하3915|천설",
+      "field": "endDate",
+      "was": "1930-04-13"
+    },
+    {
+      "path": "contract:17하3915|천설",
+      "field": "returnScheduledDate",
+      "was": "1930-04-13"
+    },
+    {
+      "path": "contract:17하3922|김상호",
+      "field": "endDate",
+      "was": "1930-02-25"
+    },
+    {
+      "path": "contract:17하3922|김상호",
+      "field": "returnScheduledDate",
+      "was": "1930-02-25"
+    },
+    {
+      "path": "contract:163조9326|김영환",
+      "field": "endDate",
+      "was": "1930-01-03"
+    },
+    {
+      "path": "contract:41호8304|권현근",
+      "field": "endDate",
+      "was": "1930-02-10"
+    },
+    {
+      "path": "contract:41호8306|김용빈",
+      "field": "endDate",
+      "was": "1930-03-09"
+    }
+  ],
+  "byField": {
+    "endDate": 20,
+    "returnScheduledDate": 17
+  }
+}

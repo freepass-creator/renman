@@ -1,0 +1,720 @@
+'use client';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useSession } from '@/lib/session';
+import { getStore } from '@/lib/store';
+import { type EntityRecord } from '@/lib/intake/entities';
+import { generateSchedules, recalcContract } from '@/lib/payments/payment-schedule';
+import type { Contract } from '@/lib/payments/types';
+import { Sec, Cards, Metric, ObjCard, Stepper, Btn, Badge, FormGrid, KV, HiddenSecs, EmptyState, th, thR, td, tdR, won, C, PageLoading, type Step, type KVRow } from '@/components/ui';
+import { InfoDoc, type DocReplacePayload } from '@/components/InfoDoc';
+import { docHistory, pushDocVersion, latestDoc } from '@/lib/docs';
+import { deriveLocation, locationLabel } from '@/lib/vehicle-location';
+import { contractSchedules, computeContractView, effectiveEndDate, patchDeliver, patchReturn, patchTerminate, patchExtend, earlyTerminationFee, isReturnable } from '@/lib/contract-ops';
+import { FUEL_LEVELS } from '@/lib/domain/fuel';
+import { normPlate } from '@/lib/plate';
+import { linkFleet, handoverHistory, recommendNextRent } from '@/lib/domain/model';
+import { loanSchedule, loanSummary } from '@/lib/loan';
+import { assetEconomics } from '@/lib/asset-econ';
+import { depositView } from '@/lib/deposit';
+import { matchDriver, penaltyStatus, penaltyTone } from '@/lib/penalty-reassign';
+import { companyLabel } from '@/lib/companies';
+import { loadMaster } from '@/lib/company-master';
+import { openIngest, notifySaved, openPrintDoc } from '@/lib/ui-bus';
+import { toast } from '@/lib/toast';
+import { QuickLogForm } from '@/components/QuickLogForm';
+import { WorkForm } from '@/components/WorkForm';
+import { isWorkRecord, workSummary, workCategoryTone, workStatusTone } from '@/lib/work-ops';
+import { saveIntake } from '@/lib/intake';
+import { TODAY, dday } from '@/lib/dashboard-consts';
+
+// 날짜 표시 = yy-mm-dd (2자리 연도). 2023-11-21 → 23-11-21
+const yy = (s: unknown) => { const t = String(s || ''); return /^\d{4}-\d{2}-\d{2}/.test(t) ? t.slice(2, 10) : (t || '—'); };
+// 남은 기간 = "1년 2개월 3일 남음/지남" (일수 대신 사람이 읽는 단위)
+function remainText(endStr: unknown, today: string): string {
+  const e = String(endStr || ''); if (!/^\d{4}-\d{2}-\d{2}/.test(e)) return '—';
+  const from = new Date(today + 'T00:00:00'), to = new Date(e.slice(0, 10) + 'T00:00:00');
+  const past = to.getTime() < from.getTime();
+  const a = past ? to : from, b = past ? from : to;
+  let y = b.getFullYear() - a.getFullYear(), m = b.getMonth() - a.getMonth(), dd = b.getDate() - a.getDate();
+  if (dd < 0) { m -= 1; dd += new Date(b.getFullYear(), b.getMonth(), 0).getDate(); }
+  if (m < 0) { y -= 1; m += 12; }
+  const parts: string[] = [];
+  if (y) parts.push(`${y}년`); if (m) parts.push(`${m}개월`); if (dd) parts.push(`${dd}일`);
+  return `${parts.length ? parts.join(' ') : '0일'} ${past ? '지남' : '남음'}`;
+}
+function scheduleTone(s: string): 'red' | 'amber' | 'gray' | 'green' {
+  return s === '연체' ? 'red' : s === '부분납' ? 'amber' : s === '완료' ? 'green' : 'gray';
+}
+const fLab: React.CSSProperties = { display: 'flex', flexDirection: 'column', gap: 3 };
+const fLl: React.CSSProperties = { fontSize: 11, color: C.mute };
+// 컨트롤 규격 SSOT — Btn과 같은 32px+box-sizing:border-box라 같은 폼 줄의 버튼과 상하 높이 일치.
+const fInp: React.CSSProperties = { height: 32, boxSizing: 'border-box', padding: '0 10px', border: `1px solid ${C.line}`, borderRadius: 'var(--radius)', fontSize: 12.5, background: '#fff', color: C.ink, fontFamily: 'inherit' };
+function unpaidOf(rec: EntityRecord): number {
+  const rent = Number(rec.monthlyRent) || 0, term = Number(rec.rentalMonths) || 0, start = String(rec.startDate || '');
+  if (!rent || !term || !start) return 0;
+  const sch = generateSchedules({ contractDate: start, termMonths: term, monthlyRent: rent, paymentDay: 25 }).map((s) => ({ ...s, id: 's' + s.seq, contractId: 'c' }));
+  return recalcContract({ id: 'c', monthlyRent: rent, termMonths: term, status: '운행', schedules: sch } as unknown as Contract, TODAY).unpaidAmount || 0;
+}
+function lifecycleSteps(v: EntityRecord | null, contracts: EntityRecord[], today: string): Step[] {
+  const status = String(v?.status || '');
+  const active = contracts.find(isReturnable) || null;   // 운행중(인도완료·미반납) SSOT — /field 반납대상과 동일 집합
+  const firstDeliver = String(active?.deliveredDate || active?.startDate || contracts[0]?.startDate || '');
+  const lastReturned = contracts.map((c) => String(c.returnedDate || '')).filter(Boolean).sort().slice(-1)[0] || '';
+  const sold = String(v?.saleDate || '');
+  const extend = Math.max(0, contracts.length - 1);
+  let cur = 0;
+  if (['매각', '말소', '매각대기'].includes(status) || sold) cur = 3;
+  else if (status === '운행' || active) cur = 1;
+  else if (lastReturned) cur = 2;
+  const st = (i: number): Step['state'] => (i < cur ? 'done' : i === cur ? 'current' : 'todo');
+  return [
+    { label: '출고', date: firstDeliver || undefined, state: st(0) },
+    { label: '운행', date: active ? String(active.startDate || '') : undefined, state: st(1), note: extend > 0 ? `연장·재계약 ${extend}회` : undefined },
+    { label: '반납', date: (lastReturned || String(active?.endDate || '')) || undefined, state: st(2) },
+    { label: '매각', date: sold || undefined, state: st(3) },
+  ];
+}
+const Add = ({ type, plate, label }: { type: string; plate: string; label: string }) => <Btn variant="ghost" onClick={() => openIngest(type, plate)}>{label}</Btn>;
+
+/** 한 자산(차)의 360 — 카드 언어. 편집=이벤트/담기(수정·추가), 파생은 읽기전용. */
+export function Vehicle360({ plate, focus }: { plate: string; focus?: string }) {
+  const { companyId, user } = useSession();
+  const [v, setV] = useState<EntityRecord | null>(null);
+  const [contracts, setContracts] = useState<EntityRecord[]>([]);
+  const [allVehicles, setAllVehicles] = useState<EntityRecord[]>([]);  // 함대 전체 — 손바뀜 인하율(재렌트 추천 근거) 산출용
+  const [allContracts, setAllContracts] = useState<EntityRecord[]>([]);
+  const [insurances, setInsurances] = useState<EntityRecord[]>([]);
+  const [penalties, setPenalties] = useState<EntityRecord[]>([]);
+  const [history, setHistory] = useState<EntityRecord[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [tick, setTick] = useState(0);
+  const [editInfo, setEditInfo] = useState(false);
+  const [form, setForm] = useState<EntityRecord>({});
+  const [recMode, setRecMode] = useState<'pay' | 'disc' | null>(null);
+  const [recForm, setRecForm] = useState({ seq: '1', date: TODAY, amount: '', method: '계좌', reason: '기타' });
+  const [editIns, setEditIns] = useState(false);          // 보험(증권) 인라인 편집
+  const [insForm, setInsForm] = useState<EntityRecord>({});
+  const [logOpen, setLogOpen] = useState(false);          // 빠른 기록 — 그 자리에서 인라인 펼침(팝업 X)
+  const [workOpen, setWorkOpen] = useState(false);        // 수선/작업 — 그 자리에서 인라인 펼침(팝업 X)
+  // 상태전이(반납·연장·해지) — 버튼 클릭 시 즉시 처리 X, 아래로 인라인 확장해 상세 입력·확인 후 확정
+  const [txMode, setTxMode] = useState<'return' | 'extend' | 'terminate' | null>(null);
+  const [txForm, setTxForm] = useState({ date: TODAY, mileage: '', fuel: FUEL_LEVELS[0] as string, settleNote: '', months: '1', reason: '고객요청', penaltyNote: '' });
+  const [dlvOpen, setDlvOpen] = useState(false); // 출고(인도) 캡처 패널
+  const [dlvForm, setDlvForm] = useState({ date: TODAY, mileage: '', fuel: FUEL_LEVELS[0] as string });
+  const loadedKey = useRef<string | null>(null);
+
+  useEffect(() => {
+    function onSaved() { setTick((t) => t + 1); }
+    window.addEventListener('jpk:saved', onSaved);
+    return () => window.removeEventListener('jpk:saved', onSaved);
+  }, []);
+  useEffect(() => {
+    const store = getStore();
+    // 최초·차량전환만 스피너 게이트. 저장(tick) 갱신은 콘텐츠 유지 → 인라인 액션 후 패널이 접혔다 펴지지 않음.
+    const key = `${plate}|${companyId}`;
+    if (loadedKey.current !== key) setLoading(true);
+    Promise.all([
+      store.get('vehicle', companyId, plate), store.list('contract', companyId),
+      store.list('insurance', companyId), store.list('penalty', companyId), store.list('history', companyId),
+      store.list('vehicle', companyId),
+    ]).then(([veh, cs, ins, pen, his, vehs]) => {
+      setV(veh);
+      const np = normPlate(plate); // 접착제 원자 — 표기차·번호변경·OCR오차 흡수해 이 차의 계약·보험·과태료·이력을 모음
+      setContracts(cs.filter((c) => normPlate(c.plate) === np));
+      setAllContracts(cs); setAllVehicles(vehs);
+      setInsurances(ins.filter((c) => normPlate(c.plate) === np));
+      setPenalties(pen.filter((c) => normPlate(c.plate) === np));
+      setHistory(his.filter((h) => normPlate(h.plate) === np).sort((a, b) => (String(a.date) < String(b.date) ? 1 : -1)));
+      setLoading(false); loadedKey.current = key;
+    }).catch(() => setLoading(false));
+  }, [plate, companyId, tick]);
+
+  // 카드 클릭 → 상세는 항상 맨 위(기본정보 + 미결/리스크)부터 보여준다. 특정 섹션으로 자동 스크롤·자동 펼침 안 함.
+  //   (미결/리스크가 상단에 이미 요약돼 있어, 필요한 건 거기서 바로 처리)
+
+  // 앱바 '수정' 버튼(openEdit) → 그 자리에서 차량정보 인라인 편집 진입
+  useEffect(() => {
+    function onEdit(e: Event) {
+      if (String((e as CustomEvent).detail?.plate) !== plate) return;
+      setForm({ plate, ...(v || {}) });
+      setEditInfo(true);
+      window.setTimeout(() => document.getElementById('v-info')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80);
+    }
+    window.addEventListener('jpk:edit-vehicle', onEdit);
+    return () => window.removeEventListener('jpk:edit-vehicle', onEdit);
+  }, [plate, v]);
+
+  // 손바뀜·재렌트 — loading 게이트 전에 hooks 고정(Rules of Hooks).
+  const fleet = useMemo(() => linkFleet(allVehicles, allContracts, TODAY), [allVehicles, allContracts]);
+  const myNode = fleet.byPlate.get(normPlate(plate)) || null;
+  const hist = handoverHistory(myNode?.contracts ?? []);
+  const reco = myNode ? recommendNextRent(myNode, fleet.vehicles) : null;
+
+  if (loading) return <PageLoading />;
+
+  const active = contracts.find(isReturnable) || null;   // 운행중(인도완료·미반납) SSOT — /field 반납대상·overdue 반납 처리 노출
+  const totalUnpaid = contracts.reduce((s, c) => s + computeContractView(c, TODAY).net, 0);
+  const d = active ? dday(effectiveEndDate(active)) : null;
+  const schedule = active ? contractSchedules(active, TODAY) : []; // 계약중 → 회차별 수납스케줄
+  const master = v ? loadMaster(String(v.companyId || '')) : {}; // 법인 마스터(법인번호·소재지)
+  // 차량 소프트삭제 — 잘못 등록한 차. 매각·처분은 삭제 아니라 상태. store.remove(deletedAt)→/trash 복구.
+  async function delVehicle() {
+    if (!v || !window.confirm(`차량 ${plate}을(를) 삭제할까요? (휴지통에서 복구 가능)\n※ 매각·처분은 삭제가 아니라 상태(매각/말소)로 처리하세요.`)) return;
+    await getStore().remove('vehicle', String(v.companyId || companyId), plate, '수기 삭제');
+    notifySaved(); toast('차량 삭제 — 휴지통에서 복구 가능', 'info');
+  }
+  const status = String(v?.status || (active ? '운행' : '대기'));
+  const statusTone: 'green' | 'amber' | 'gray' | 'blue' = status === '운행' ? 'green' : (['정비', '사고'].includes(status) ? 'amber' : (['매각', '말소', '매각대기'].includes(status) ? 'gray' : 'blue'));
+  const loan = (v && v.loanCashOnly !== '예' && (Number(v.loanPrincipal) || Number(v.loanRemainingPrincipal)) && Number(v.loanMonths))
+    ? loanSchedule(Number(v.loanPrincipal || v.loanRemainingPrincipal) || 0, Number(v.loanRate) || 0, Number(v.loanMonths) || 0, String(v.loanStartDate || ''))
+    : [];
+  const loanSum = loan.length ? loanSummary(loan, TODAY) : null;
+  // 대기(비운행) 차량용 — 얼마나 놀았나·최종 반납·위치
+  const lastReturn = contracts.filter((c) => c.returnedDate).map((c) => String(c.returnedDate)).sort().slice(-1)[0] || '';
+  const idleFrom = (lastReturn || String(v?.acquisitionDate || v?.firstReg || '')).slice(0, 10);
+  const idleDays = /^\d{4}-\d{2}-\d{2}/.test(idleFrom) ? Math.max(0, Math.round((new Date(TODAY).getTime() - new Date(idleFrom).getTime()) / 86400000)) : null;
+  // 위치(현재 소재) 통일 — 대여중=계약자, 유휴=최근 '이동' 로그/차상태. /asset 표기와 동일 규칙.
+  const loc = deriveLocation(v, contracts, history, TODAY);
+  const locStr = locationLabel(loc);
+  const target = String(v?.companyId || companyId);
+  // 수선(정비·사고수리·상품화·세차) = history(_kind:'work'). 목록은 이미 최신순 정렬된 history에서 추림.
+  const workList = history.filter(isWorkRecord);
+  // 현재 보험(증권) = 만기 최신 1건. 나머지는 '이전 증권'으로.
+  const curIns = insurances.slice().sort((a, b) => String(b.endDate || '').localeCompare(String(a.endDate || '')))[0] || null;
+  const olderIns = curIns ? insurances.filter((i) => i !== curIns) : [];
+  // 자산 손익 — 이 차가 벌어온 돈 vs 비용(감가·보험·정비). 운영 지표(재무제표 아님).
+  const econ = v ? assetEconomics(v, contracts, insurances, history, TODAY) : null;
+  // 보증금 미반환 — 종료됐는데 정산 안 된 계약(가장 최근 것). 반환/충당 처리 대상.
+  const pendDeposit = contracts.map((c) => ({ c, d: depositView(c, TODAY) })).filter((x) => x.d.pendingRefund)
+    .sort((a, b) => String(b.c.returnedDate || '').localeCompare(String(a.c.returnedDate || '')))[0] || null;
+  const waiting = !active ? (contracts.find((cc) => !cc.returnedDate && String(cc.status || '') !== '운행') || null) : null;
+  const doTransition = async (patch: EntityRecord, key: string) => { if (!key) return; await getStore().update('contract', target, key, patch); notifySaved(); };
+  // 반납/연장/해지 확정 — 인라인 폼 입력값으로 패치 조립 후 커밋. 완료 시 패널 닫고 이력·현황에 반영.
+  const commitTx = async () => {
+    if (!active?._key) return; const key = String(active._key);
+    if (txMode === 'return') {
+      await doTransition(patchReturn(active, txForm.date, { returnMileage: txForm.mileage ? Number(txForm.mileage) : '', fuelIn: txForm.fuel, returnSettleNote: txForm.settleNote }), key);
+    } else if (txMode === 'extend') {
+      const m = Number(txForm.months); if (!m || m <= 0) return;
+      await doTransition(patchExtend(active, m), key);
+    } else if (txMode === 'terminate') {
+      const et = earlyTerminationFee(active, txForm.date);
+      await doTransition(patchTerminate(active, txForm.date, { terminateReason: txForm.reason, terminatePenaltyNote: txForm.penaltyNote, earlyTerminationFee: et.fee, earlyTerminationRemainingMonths: et.remainingMonths }), key);
+    }
+    setTxMode(null);
+  };
+  // 인도(출고) 확정 — 반납과 대칭: 출고 시점 주행거리·연료(원점) 캡처 + 인도 활동 이벤트 기록 + 상태 운행 전이.
+  const commitDeliver = async () => {
+    if (!waiting?._key) return; const key = String(waiting._key);
+    await doTransition(patchDeliver(waiting, dlvForm.date, { mileageOut: dlvForm.mileage ? Number(dlvForm.mileage) : '', fuelOut: dlvForm.fuel }), key);
+    await saveIntake('history', target, [{ plate, category: '인도', title: `출고(인도)${dlvForm.mileage ? ' · ' + dlvForm.mileage + 'km' : ''} · 연료 ${dlvForm.fuel}`, date: dlvForm.date, author: user.name, customer: String(waiting.contractorName || ''), contractNo: String(waiting.contractNo || ''), companyId: target, _kind: 'activity' }]);
+    setDlvOpen(false);
+  };
+  // 시동제어 액션 로깅 — 제어/해제 이벤트를 이력에 남김(사유·미납액·담당자) + 차량 gpsControl 상태 갱신
+  const logIgnition = async (action: '제어' | '해제') => {
+    await saveIntake('history', target, [{ plate, category: '시동제어', title: `시동 ${action}`, date: TODAY, author: user.name, memo: totalUnpaid > 0 ? `미납 ${won(totalUnpaid)}` : '', companyId: target, _kind: 'activity' }]);
+    if (v?._key) await getStore().update('vehicle', target, String(v._key), { gpsControl: action === '제어' ? '제어중' : '해제됨' });
+    notifySaved();
+  };
+  // 보증금 반환/충당 처리 — 정산완료 도장(depositSettledDate) + 이력 기록
+  const settleDeposit = async () => {
+    if (!pendDeposit?.c._key) return;
+    const { d } = pendDeposit;
+    await getStore().update('contract', target, String(pendDeposit.c._key), { depositSettledDate: TODAY });
+    await saveIntake('history', target, [{ plate, category: '보증금', title: d.addCharge > 0 ? `보증금 충당 후 추가청구 ${won(d.addCharge)}` : `보증금 반환 ${won(d.refund)}`, date: TODAY, author: user.name, companyId: target, _kind: 'activity' }]);
+    notifySaved();
+  };
+  // 차량정보(제조사·등록증·매입할부) 공유 인라인 편집
+  const chg = (k: string, val: string) => setForm((f) => ({ ...f, [k]: val }));
+  const startEdit = () => { setForm({ plate, ...(v || {}) }); setEditInfo(true); };
+  const cancelEdit = () => setEditInfo(false);
+  const saveInfo = async () => {
+    // 기존 차량 = update(merge). save()는 자연키 중복이면 skip → 편집이 저장 안 됨(앱 전역 편집 규약=update).
+    if (v?._key) await getStore().update('vehicle', target, String(v._key), { ...form, plate });
+    else await getStore().save('vehicle', target, [{ ...form, plate }]);
+    notifySaved(); setEditInfo(false);
+  };
+  // 보험(증권) 인라인 편집
+  const insChg = (k: string, val: string) => setInsForm((f) => ({ ...f, [k]: val }));
+  const startEditIns = () => { setInsForm({ ...(curIns || {}) }); setEditIns(true); };
+  const saveIns = async () => {
+    if (curIns?._key) await getStore().update('insurance', target, String(curIns._key), insForm);
+    else await getStore().save('insurance', target, [{ ...insForm, plate }]);
+    notifySaved(); setEditIns(false);
+  };
+  // 서류 교체·재발급 — 파일 URL + OCR 병합 + 새 DocVersion 푸시 → 엔티티 저장. _ocrOriginal 보존.
+  const onReplaceReg = async ({ url, ocr, ocrOriginal, fields, reason }: DocReplacePayload) => {
+    const base = v || { plate };
+    const nextDocs = pushDocVersion(base, { type: 'vehicle', url, ocr, reason });
+    const patch: EntityRecord = { ...fields, _docs: nextDocs, ...(ocrOriginal ? { _ocrOriginal: ocrOriginal } : {}) };
+    if (v?._key) await getStore().update('vehicle', target, String(v._key), patch);
+    else await getStore().save('vehicle', target, [{ ...base, ...patch, plate }]);
+    notifySaved();
+  };
+  const onReplaceIns = async ({ url, ocr, ocrOriginal, fields, reason }: DocReplacePayload) => {
+    const base = curIns || { plate };
+    const nextDocs = pushDocVersion(base, { type: 'insurance', url, ocr, reason });
+    const patch: EntityRecord = { ...fields, _docs: nextDocs, ...(ocrOriginal ? { _ocrOriginal: ocrOriginal } : {}) };
+    if (curIns?._key) await getStore().update('insurance', target, String(curIns._key), patch);
+    else await getStore().save('insurance', target, [{ ...base, ...patch, plate }]);
+    notifySaved();
+  };
+  const saveRecord = async () => {
+    if (!active?._key || !recForm.amount) return;
+    const target = String(active.companyId || companyId), key = String(active._key);
+    if (recMode === 'pay') {
+      const list = Array.isArray(active._payments) ? (active._payments as unknown[]) : [];
+      await getStore().update('contract', target, key, { _payments: [...list, { seq: Number(recForm.seq), date: recForm.date, amount: Number(recForm.amount), source: recForm.method }] });
+    } else {
+      const list = Array.isArray(active._discounts) ? (active._discounts as unknown[]) : [];
+      await getStore().update('contract', target, key, { _discounts: [...list, { seq: Number(recForm.seq), date: recForm.date, amount: Number(recForm.amount), reason: recForm.reason }] });
+    }
+    notifySaved(); setRecMode(null); setRecForm((r) => ({ ...r, amount: '' }));
+  };
+
+  // ── 미결·리스크 요약 (누적 데이터와 별개로, "지금 문제"만 위로) ──
+  const cv = active ? computeContractView(active, TODAY) : null;
+  const issues: { label: string; detail: string; tone: 'red' | 'amber' | 'gray' }[] = [];
+  if (totalUnpaid > 0) issues.push({ label: '미수', detail: `${won(totalUnpaid)}${cv && cv.overdueDays > 0 ? ` · ${cv.overdueDays}일 연체` : ''}`, tone: cv && cv.overdueDays >= 30 ? 'red' : 'amber' });
+  const openPen = penalties.filter((p) => penaltyStatus(p) !== '변경부과완료'); // 변경부과완료=처리됨, 그 외=미처리
+  if (openPen.length) issues.push({ label: '과태료', detail: `미처리 ${openPen.length}건`, tone: 'amber' });
+  const inspDday = dday(v?.inspectionTo);
+  if (inspDday != null && inspDday < 0) issues.push({ label: '검사 지연', detail: `${yy(v?.inspectionTo)} · ${-inspDday}일 경과`, tone: 'red' });
+  else if (inspDday != null && inspDday <= 30) issues.push({ label: '검사 임박', detail: `${yy(v?.inspectionTo)} · D-${inspDday}`, tone: 'amber' });
+  const insExp = curIns?.endDate || v?.insuranceExpiryDate;
+  const insDday = dday(insExp);
+  if (insDday != null && insDday < 0) issues.push({ label: '보험 만료', detail: `${yy(insExp)} · ${-insDday}일 경과`, tone: 'red' });
+  else if (insDday != null && insDday <= 30) issues.push({ label: '보험 임박', detail: `${yy(insExp)} · D-${insDday}`, tone: 'amber' });
+  if (active) {
+    const rd = dday(active.returnScheduledDate || active.endDate);
+    if (rd != null && rd < 0) issues.push({ label: '반납 지남', detail: `${-rd}일 · ${yy(active.returnScheduledDate || active.endDate)}`, tone: 'red' });
+    else if (rd != null && rd <= 7) issues.push({ label: '반납 임박', detail: `D-${rd}`, tone: 'amber' });
+  }
+  if (String(v?.gpsControl) === '제어중') issues.push({ label: '시동제어 중', detail: '원격 시동잠금', tone: 'gray' });
+  if (pendDeposit) issues.push({ label: '보증금 미정산', detail: '반환/충당 필요', tone: 'amber' });
+
+  return (
+    <div>
+      {/* 차량번호는 DetailShell title(모바일=상단바·웹=h1). 여기는 상태·법인·핵심수치만. */}
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap', marginBottom: 14 }}>
+        <Badge tone={statusTone}>{status}</Badge>
+        {v?.companyId ? <span style={{ fontSize: 12.5, color: C.faint }}>{companyLabel(String(v.companyId))}</span> : null}
+        <span style={{ flex: 1 }} />
+        {totalUnpaid > 0 && <span style={{ fontSize: 13.5, color: C.danger, fontWeight: 800, fontFamily: 'var(--font-mono)', fontVariantNumeric: 'tabular-nums' }}>미수 {won(totalUnpaid)}</span>}
+        {d != null && d < 0 && <span style={{ fontSize: 13.5, color: C.danger, fontWeight: 800, fontFamily: 'var(--font-mono)', fontVariantNumeric: 'tabular-nums' }}>반납 {-d}일 지남</span>}
+      </div>
+
+      {/* 미결·리스크 — 누적 데이터와 별개로 "지금 문제"만 맨 위에(관리 by exception). 이슈 없으면 숨김. */}
+      {issues.length > 0 && (
+        <div style={{ marginBottom: 14, border: `1px solid ${C.line}`, borderRadius: 'var(--radius)', background: '#fff', overflow: 'hidden' }}>
+          <div style={{ padding: '8px 13px', borderBottom: `1px solid ${C.line}`, background: 'var(--bg-header)', fontSize: 12.5, fontWeight: 700, color: C.ink, display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ width: 7, height: 7, borderRadius: '50%', background: issues.some((i) => i.tone === 'red') ? C.danger : C.warn }} />
+            미결 · 리스크 <span style={{ color: C.faint, fontWeight: 500 }}>{issues.length}건</span>
+          </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, padding: '11px 13px' }}>
+            {issues.map((it, i) => {
+              const c = it.tone === 'red' ? C.danger : it.tone === 'amber' ? C.warn : C.mute;
+              const bg = it.tone === 'red' ? 'rgba(220,38,38,0.05)' : it.tone === 'amber' ? 'rgba(217,119,6,0.05)' : 'var(--bg-stripe)';
+              return (
+                <div key={i} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, padding: '5px 11px', borderRadius: 'var(--radius)', border: `1px solid ${c}`, background: bg }}>
+                  <span style={{ fontSize: 12.5, fontWeight: 800, color: c }}>{it.label}</span>
+                  <span style={{ fontSize: 12, color: C.mute }}>{it.detail}</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* 상태 전이 액션 — 클릭 시 즉시처리 X, 아래로 인라인 확장해 상세 입력·확인 후 확정. "어떻게 반납/연장됐는지" */}
+      {active ? <>
+        <div style={{ display: 'flex', gap: 6, marginBottom: txMode ? 8 : 14, flexWrap: 'wrap' }}>
+          <span className={focus === 'return' ? 'attn-btn' : undefined}><Btn variant={txMode === 'return' ? 'solid' : 'ghost'} onClick={() => setTxMode(txMode === 'return' ? null : 'return')}>반납 처리</Btn></span>
+          <Btn variant={txMode === 'extend' ? 'solid' : 'ghost'} onClick={() => setTxMode(txMode === 'extend' ? null : 'extend')}>연장</Btn>
+          <Btn variant={txMode === 'terminate' ? 'solid' : 'ghost'} onClick={() => setTxMode(txMode === 'terminate' ? null : 'terminate')}>중도해지</Btn>
+        </div>
+        {txMode && <div style={{ padding: 12, border: `1px solid ${C.accent}`, borderRadius: 'var(--radius)', background: 'var(--bg-card)', marginBottom: 14 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+            <span style={{ fontSize: 12.5, fontWeight: 700, color: C.ink }}>{txMode === 'return' ? '반납 처리' : txMode === 'extend' ? '연장 처리' : '중도해지'}</span>
+            <span style={{ flex: 1 }} />
+            <Btn size="sm" variant="ghost" onClick={() => setTxMode(null)}>닫기</Btn>
+          </div>
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+            {txMode === 'return' && <>
+              <label style={fLab}><span style={fLl}>반납일</span><input type="date" value={txForm.date} onChange={(e) => setTxForm((f) => ({ ...f, date: e.target.value }))} style={fInp} /></label>
+              <label style={fLab}><span style={fLl}>주행거리(km)</span><input inputMode="numeric" value={txForm.mileage} onChange={(e) => setTxForm((f) => ({ ...f, mileage: e.target.value.replace(/[^\d]/g, '') }))} placeholder="예: 45000" style={{ ...fInp, width: 110 }} /></label>
+              <label style={fLab}><span style={fLl}>연료</span><select value={txForm.fuel} onChange={(e) => setTxForm((f) => ({ ...f, fuel: e.target.value }))} style={fInp}>{FUEL_LEVELS.map((x) => <option key={x} value={x}>{x}</option>)}</select></label>
+              <label style={{ ...fLab, flex: 1, minWidth: 170 }}><span style={fLl}>정산 메모(연체·손상·환급 등)</span><input value={txForm.settleNote} onChange={(e) => setTxForm((f) => ({ ...f, settleNote: e.target.value }))} placeholder="예: 스크래치 2건, 미납 1회차 정산" style={fInp} /></label>
+              {reco ? <div style={{ flexBasis: '100%', fontSize: 12, color: C.mute, paddingTop: 2 }}>반납 후 다음 임차인 추천 대여료 <b style={{ color: C.ink, fontFamily: 'var(--font-mono)' }}>{won(reco.recommended)}</b> <span style={{ color: C.faint }}>(현재 {won(reco.currentRent)} · 함대 손바뀜 {reco.dropPct}%↓ · 밴드 {won(reco.low)}~{won(reco.high)})</span></div> : null}
+            </>}
+            {txMode === 'extend' && <>
+              <label style={fLab}><span style={fLl}>연장 개월</span><input inputMode="numeric" value={txForm.months} onChange={(e) => setTxForm((f) => ({ ...f, months: e.target.value.replace(/[^\d]/g, '') }))} style={{ ...fInp, width: 80 }} /></label>
+              <div style={{ fontSize: 12.5, color: C.mute, paddingBottom: 7 }}>종료일 <b style={{ color: C.faint }}>{yy(active.endDate)}</b> → <b style={{ color: C.ink }}>{yy(patchExtend(active, Number(txForm.months) || 0).endDate)}</b><span style={{ marginLeft: 8, color: C.faint }}>총 {(Number(active.rentalMonths) || 0) + (Number(txForm.months) || 0)}개월</span></div>
+            </>}
+            {txMode === 'terminate' && <>
+              <label style={fLab}><span style={fLl}>해지일</span><input type="date" value={txForm.date} onChange={(e) => setTxForm((f) => ({ ...f, date: e.target.value }))} style={fInp} /></label>
+              <label style={fLab}><span style={fLl}>사유</span><select value={txForm.reason} onChange={(e) => setTxForm((f) => ({ ...f, reason: e.target.value }))} style={fInp}>{['고객요청', '연체', '차량회수', '사고전손', '기타'].map((x) => <option key={x} value={x}>{x}</option>)}</select></label>
+              <label style={{ ...fLab, flex: 1, minWidth: 170 }}><span style={fLl}>정산 메모</span><input value={txForm.penaltyNote} onChange={(e) => setTxForm((f) => ({ ...f, penaltyNote: e.target.value }))} placeholder="예: 손상·미납 정산" style={fInp} /></label>
+              {(() => { const et = earlyTerminationFee(active, txForm.date); return (
+                <div style={{ flexBasis: '100%', fontSize: 12.5, color: C.mute, paddingTop: 2 }}>중도해지 위약금 {et.isEarly ? <>잔여 <b style={{ color: C.ink }}>{et.remainingMonths}개월</b> × 월 {won(et.monthlyRent)} × <b style={{ color: C.ink }}>{et.rate}%</b> = <b style={{ color: et.fee > 0 ? C.danger : C.ink, fontFamily: 'var(--font-mono)' }}>{won(et.fee)}</b></> : <b style={{ color: C.ink }}>만기 도래 · 위약금 없음</b>}{!active.earlyTerminationRate ? <span style={{ marginLeft: 8, color: C.faint }}>(요율 미설정 — 계약조건에서 입력)</span> : null}</div>
+              ); })()}
+            </>}
+            <Btn variant={txMode === 'terminate' ? 'danger' : 'solid'} onClick={commitTx}>{txMode === 'return' ? '반납 확정' : txMode === 'extend' ? '연장 확정' : '해지 확정'}</Btn>
+          </div>
+        </div>}
+      </> : waiting ? <div style={{ marginBottom: 14 }}>
+        {!dlvOpen
+          ? <Btn onClick={() => setDlvOpen(true)}>인도(출고) 처리</Btn>
+          : <div style={{ padding: 12, border: `1px solid ${C.accent}`, borderRadius: 'var(--radius)', background: 'var(--bg-card)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+                <span style={{ fontSize: 12.5, fontWeight: 700, color: C.ink }}>인도(출고) 처리</span>
+                <span style={{ fontSize: 11.5, color: C.faint }}>출고 시점 원점 — 반납 정산·손상판정의 기준</span>
+                <span style={{ flex: 1 }} />
+                <Btn size="sm" variant="ghost" onClick={() => setDlvOpen(false)}>닫기</Btn>
+              </div>
+              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+                <label style={fLab}><span style={fLl}>인도일</span><input type="date" value={dlvForm.date} onChange={(e) => setDlvForm((f) => ({ ...f, date: e.target.value }))} style={fInp} /></label>
+                <label style={fLab}><span style={fLl}>출고 주행거리(km)</span><input inputMode="numeric" value={dlvForm.mileage} onChange={(e) => setDlvForm((f) => ({ ...f, mileage: e.target.value.replace(/[^\d]/g, '') }))} placeholder="계기판 km" style={{ ...fInp, width: 120 }} /></label>
+                <label style={fLab}><span style={fLl}>출고 연료</span><select value={dlvForm.fuel} onChange={(e) => setDlvForm((f) => ({ ...f, fuel: e.target.value }))} style={fInp}>{FUEL_LEVELS.map((x) => <option key={x} value={x}>{x}</option>)}</select></label>
+                <Btn onClick={commitDeliver}>인도 확정</Btn>
+              </div>
+            </div>}
+      </div> : null}
+
+      {/* 생애주기 Stepper 제거 — 상태는 헤딩 배지 하나로 충분(중복 제거) */}
+
+      {/* 현황 = 한눈 요약(읽기전용 파생). 대여 중이면 계약자·기간·대여료·보증금·반납까지 */}
+      <Sec id="v-status" title="현황" desc="한눈 요약">
+        <Cards min={128} fit>
+          <Metric label="상태" value={status} tone={statusTone === 'green' ? 'ok' : statusTone === 'amber' ? 'warn' : 'ink'} />
+          {active ? <>
+            <Metric label="계약자" value={String(active.contractorName || '—')} />
+            <Metric label="계약시작" value={yy(active.startDate)} />
+            <Metric label="계약기간" value={(() => { const t = Number(active.rentalMonths) || 0; if (!t) return '—'; const y = Math.floor(t / 12), m = t % 12; return (y ? `${y}년` : '') + (m ? `${y ? ' ' : ''}${m}개월` : '') || `${t}개월`; })()} />
+            <Metric label="월 대여료" value={won(active.monthlyRent)} />
+            <Metric label="보증금" value={won(active.deposit)} />
+            <Metric label="미수" value={won(totalUnpaid)} tone={totalUnpaid > 0 ? 'danger' : 'ink'} />
+          </> : <>
+            <Metric label="위치" value={locStr} tone={loc.work === '정비' || loc.work === '사고' ? 'warn' : 'ink'} />
+            <Metric label="대기 일수" value={idleDays != null ? `${idleDays}일` : '—'} tone={idleDays != null && idleDays > 180 ? 'danger' : idleDays != null && idleDays > 60 ? 'warn' : 'ink'} />
+            <Metric label="최종 반납" value={lastReturn ? yy(lastReturn) : '—'} />
+            {v?.inspectionTo ? <Metric label="검사만기" value={yy(v.inspectionTo)} tone={(() => { const id = dday(v.inspectionTo); return id != null && id < 0 ? 'danger' : id != null && id <= 30 ? 'warn' : 'ink'; })()} /> : null}
+            {totalUnpaid > 0 ? <Metric label="미수(과거 채권)" value={won(totalUnpaid)} tone="danger" /> : null}
+          </>}
+        </Cards>
+      </Sec>
+
+      {!v && <div style={{ marginTop: 12, padding: 12, background: '#fffbeb', color: '#92400e', borderRadius: 'var(--radius)', fontSize: 12.5 }}>등록증이 아직 안 들어왔습니다. 계약·보험·과태료만 표시. <b>정보 담기</b>로 등록하세요.</div>}
+
+      {/* 차량 정보 = 제조사 스펙(등록증에 없음 · 직접입력/차종마스터). 인라인 수정(값칸만). */}
+      <Sec id="v-info" title={editInfo ? '차량 정보 · 편집 중' : '차량 정보'} tone={editInfo ? 'ok' : undefined} desc="제조사 스펙 · 직접입력" right={
+        editInfo
+          ? <span style={{ display: 'inline-flex', gap: 6 }}><Btn onClick={saveInfo}>저장</Btn><Btn variant="ghost" onClick={cancelEdit}>취소</Btn></span>
+          : <Btn variant="ghost" onClick={startEdit}>{v ? '수정' : '+ 등록'}</Btn>
+      }>
+        {(v || editInfo)
+          ? <KV editing={editInfo} form={form} onChange={chg} rows={[
+              ['제조사', 'maker', String(v?.maker ?? '')],
+              ['차명', 'carName', String(v?.carName ?? '')],
+              ['차종', 'vehicleType', String(v?.vehicleType ?? '')],
+              ['배기량', 'displacement', String(v?.displacement ?? '')],
+              ['연료', 'fuel', String(v?.fuel ?? '')],
+            ] as KVRow[]} />
+          : <EmptyState variant="sec">차량 미등록</EmptyState>}
+      </Sec>
+
+      {/* 등록증 = 정보 + 자동차등록증 원본 + 재발급 이력(InfoDoc). 인라인 수정은 차량정보와 공유. */}
+      <InfoDoc id="v-reg" title="등록증" desc="자동차등록증 원본과 한 몸"
+        editing={editInfo} form={form} onChange={chg}
+        onEditToggle={() => (editInfo ? cancelEdit() : startEdit())} onSave={saveInfo}
+        docType="vehicle" docLabel="자동차등록증" docs={docHistory(v, 'vehicle')}
+        companyId={target} recordKey={plate} onReplaceDoc={onReplaceReg}
+        fields={[
+          ['차량번호', null, plate],
+          ['차대번호', 'vin', String(v?.vin ?? '')],
+          ['최초등록', 'firstReg', String(v?.firstReg ?? '')],
+          ['검사만기', 'inspectionTo', String(v?.inspectionTo ?? '')],
+          ['법인번호', null, String(master.bizNo ?? '')],
+        ] as KVRow[]} />
+
+      {/* 보험 = 정보 + 증권 원본 + 재발급 이력(InfoDoc). 차량정보와 별도 섹션·별도 편집. */}
+      <InfoDoc id="v-insurance" title="보험" desc={curIns ? `${String(curIns.insurer || '')} ${String(curIns.policyNo || '')}`.trim() || '자동차보험 증권' : '자동차보험 증권'}
+        editing={editIns} form={insForm} onChange={insChg}
+        onEditToggle={() => (editIns ? setEditIns(false) : startEditIns())} onSave={saveIns}
+        docType="insurance" docLabel="자동차보험증권" docs={docHistory(curIns, 'insurance')}
+        companyId={target} recordKey={String(curIns?._key || curIns?.policyNo || '')} onReplaceDoc={onReplaceIns}
+        fields={[
+          ['보험사', 'insurer', String(curIns?.insurer ?? '')],
+          ['증권번호', 'policyNo', String(curIns?.policyNo ?? '')],
+          ['시작일', 'startDate', String(curIns?.startDate ?? '')],
+          ['만기일', 'endDate', String(curIns?.endDate ?? '')],
+          ['운전범위', 'driverScope', String(curIns?.driverScope ?? '')],
+          ['물적할증(만원)', 'deductibleMan', String(curIns?.deductibleMan ?? '')],
+        ] as KVRow[]} />
+      {curIns ? (() => {
+        const covs: [string, string][] = ([
+          ['대인Ⅰ', curIns.cov_personal_1], ['대인Ⅱ', curIns.cov_personal_2], ['대물', curIns.cov_property],
+          ['자손/자상', curIns.cov_self_accident], ['무보험', curIns.cov_uninsured], ['자차', curIns.cov_self_vehicle], ['긴급출동', curIns.cov_emergency],
+        ] as [string, unknown][]).map(([l, v]) => [l, String(v ?? '')] as [string, string]).filter(([, v]) => v);
+        return covs.length ? <div style={{ marginTop: 10, padding: '10px 12px', border: `1px solid ${C.line}`, borderRadius: 'var(--radius)', background: 'var(--bg-card)' }}>
+          <div style={{ fontSize: 11.5, color: C.faint, marginBottom: 7, fontWeight: 700 }}>가입담보 · 보상한도</div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(210px, 1fr))', gap: '5px 14px' }}>
+            {covs.map(([l, v]) => <div key={l} style={{ display: 'flex', gap: 6, fontSize: 12, minWidth: 0 }}><span style={{ color: C.mute, flex: '0 0 70px' }}>{l}</span><span style={{ color: C.ink, flex: 1, minWidth: 0 }}>{v}</span></div>)}
+          </div>
+        </div> : null;
+      })() : null}
+      {olderIns.length > 0 ? <div style={{ marginTop: 10 }}>
+        <div style={{ fontSize: 11.5, color: C.faint, marginBottom: 6 }}>이전 증권 ({olderIns.length})</div>
+        <Cards min={340}>{olderIns.map((ins, i) => { const id = dday(ins.endDate); return <ObjCard key={i} badge="이전" badgeTone="gray" name={String(ins.insurer || '보험')} carType={ins.policyNo ? String(ins.policyNo) : undefined} right={id == null ? undefined : <span style={{ color: C.faint }}>{id < 0 ? `만료 ${-id}일` : `D-${id}`}</span>} fields={[['기간', `${ins.startDate || ''}~${ins.endDate || ''}`], ['보험료', ins.totalPremium ? won(ins.totalPremium) : '—']]} />; })}</Cards>
+      </div> : null}
+
+      {/* 매입 · 할부 = 자산 취득/부채측(직접입력). 인라인 수정은 차량정보와 공유. */}
+      {(v || editInfo) ? <Sec id="v-purchase" title="매입 · 할부" desc="취득가·매입처·할부" tone={editInfo ? 'ok' : undefined} right={
+        editInfo
+          ? <span style={{ display: 'inline-flex', gap: 6 }}><Btn onClick={saveInfo}>저장</Btn><Btn variant="ghost" onClick={cancelEdit}>취소</Btn></span>
+          : <Btn variant="ghost" onClick={startEdit}>수정</Btn>
+      }>
+        <KV editing={editInfo} form={form} onChange={chg} rows={[
+          ['매입가', 'acquisitionPrice', v?.acquisitionPrice ? won(v.acquisitionPrice) : ''],
+          ['매입처', 'supplier', String(v?.supplier ?? '')],
+          ['할부/리스사', 'loanCompany', String(v?.loanCompany ?? '')],
+          ['잔여원금', 'loanRemainingPrincipal', v?.loanRemainingPrincipal ? won(v.loanRemainingPrincipal) : ''],
+        ] as KVRow[]} />
+      </Sec> : null}
+
+      {/* 자산 손익 — 이 차가 벌어온 돈 vs 비용. 매입·할부처럼 조용한 행 리스트(재무 대시보드화 금지). */}
+      {econ ? <Sec id="v-econ" title="자산 손익" desc="이 차가 벌어온 돈 · 회수율">
+        <KV rows={[
+          ['수입(수금)', '', won(econ.revenue)],
+          ['감가', '', won(econ.depreciation)],
+          ['보험료', '', won(econ.insuranceCost)],
+          ['정비·수리', '', won(econ.maintCost)],
+          ['손익', '', won(econ.profit)],
+          ...(econ.acquisition ? ([['회수율', '', `${Math.round(econ.recoveryRate * 100)}%`]] as KVRow[]) : []),
+          ...(econ.bookValue != null ? ([['장부가', '', won(econ.bookValue)]] as KVRow[]) : []),
+        ] as KVRow[]} />
+      </Sec> : null}
+
+      {/* 할부 상환 스케줄 — 차량 매입 부채측(원리금균등) */}
+      {loan.length > 0 ? <Sec id="v-loan" title="할부 상환 스케줄" n={loan.length} desc={`${String(v?.loanCompany || '')} · 월 ${won(loanSum?.monthlyPayment || 0)} · 잔여원금 ${won(loanSum?.remainPrincipal || 0)} · 남은 ${loanSum?.remainSeq || 0}회`}>
+        <div style={{ border: `1px solid ${C.line}`, borderRadius: 'var(--radius)', overflow: 'hidden', background: '#fff' }}>
+          <div style={{ maxHeight: 400, overflowY: 'auto', overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', whiteSpace: 'nowrap' }}>
+              <thead><tr><th style={th}>회차</th><th style={th}>상환일</th><th style={thR}>원금</th><th style={thR}>이자</th><th style={thR}>상환액</th><th style={thR}>잔액</th></tr></thead>
+              <tbody>{loan.map((l) => <tr key={l.seq} style={{ background: loanSum && l.seq <= loanSum.paidSeq ? 'var(--bg-stripe)' : undefined }}>
+                <td style={td}>{l.seq}</td><td style={td}>{l.date}</td><td style={tdR}>{won(l.principal)}</td><td style={tdR}>{won(l.interest)}</td><td style={tdR}>{won(l.payment)}</td><td style={tdR}>{won(l.balance)}</td>
+              </tr>)}</tbody>
+            </table>
+          </div>
+        </div>
+      </Sec> : null}
+
+      {/* GPS · 관제 (시동제어 연동) */}
+      {v && (v.gpsDeviceId || v.gpsProvider) ? <Sec id="v-gps" title="GPS · 관제" desc="미납 원격 시동제어 연동" right={<span style={{ display: 'inline-flex', gap: 6 }}><Btn variant="danger" onClick={() => logIgnition('제어')}>시동 제어</Btn><Btn variant="ghost" onClick={() => logIgnition('해제')}>시동 해제</Btn></span>}>
+        <KV rows={[
+          ['공급사', null, String(v.gpsProvider ?? '')],
+          ['단말번호', null, String(v.gpsDeviceId ?? '')],
+          ['설치일', null, String(v.gpsInstalledDate ?? '')],
+          ['시동제어', null, String(v.gpsControl ?? '')],
+        ] as [string, string | null, React.ReactNode][]} />
+      </Sec> : null}
+
+      {/* 계약 조건 — 계약서상 조건(어떤 조건으로 나갔는지). 미수는 아래 수납스케줄. */}
+      <Sec id="v-contract" title="계약 조건" desc="계약서상 조건" right={active ? <span style={{ display: 'inline-flex', gap: 6 }}><Btn variant="ghost" onClick={() => openPrintDoc('contract', plate)}>계약서 출력</Btn><Btn variant="ghost" onClick={() => openPrintDoc('settlement', plate)}>정산서</Btn><Add type="contract" plate={plate} label="수정" /></span> : <Add type="contract" plate={plate} label="+ 계약" />}>
+        {active ? <KV rows={[
+          ['계약번호', null, String(active.contractNo ?? '')],
+          ['임차인', null, `${String(active.contractorName ?? '')}${active.contractorPhone ? ' · ' + String(active.contractorPhone) : ''}`],
+          ['면허', null, `${String(active.contractorLicenseNo ?? '')}${active.licenseType ? ' (' + String(active.licenseType) + ')' : ''}`],
+          ['추가운전자', null, String(active.additionalDrivers ?? '')],
+          ['계약기간', null, `${active.startDate || ''} ~ ${effectiveEndDate(active) || '미정'}${active.rentalMonths ? `  (${active.rentalMonths}개월)` : ''}`],
+          ['인수/반환장소', null, `${String(active.pickupPlace ?? '')}${active.returnPlace ? ' → ' + String(active.returnPlace) : ''}`],
+          ['월 대여료', null, active.monthlyRent ? won(active.monthlyRent) : ''],
+          ['자동이체일', null, active.paymentDay ? `매월 ${active.paymentDay}일${active.paymentTiming ? ` (${active.paymentTiming})` : ''}` : ''],
+          ['보증금 / 예약금', null, `${active.deposit ? won(active.deposit) : '—'}${active.reservationFee ? ' / ' + won(active.reservationFee) : ''}`],
+          ['자차보험(CDW)', null, `${String(active.cdw ?? '')}${active.deductible ? ' · 면책 ' + won(active.deductible) : ''}${active.superCover === '있음' ? ' · 완전면책' : ''}`],
+          ['지연손해금율', null, active.lateFeeRate ? `${active.lateFeeRate}%` : ''],
+          ['중도해지 위약금율', null, active.earlyTerminationRate ? `${active.earlyTerminationRate}%` : ''],
+          ['기사포함', null, String(active.withDriver ?? '')],
+          ['연료(인수→반납)', null, (active.fuelOut || active.fuelIn) ? `${active.fuelOut || '?'} → ${active.fuelIn || '?'}` : ''],
+          ['주행거리(출고→반납)', null, (active.mileageOut || active.returnMileage) ? `${active.mileageOut || '?'} → ${active.returnMileage || '?'} km` : ''],
+        ] as [string, string | null, React.ReactNode][]} /> : <EmptyState variant="sec">진행 중 계약 없음</EmptyState>}
+        {active && (() => {
+          const hd = docHistory(active, 'handover');   // 현장 인도·반납 위저드가 첨부한 출차/입고 사진·서명(분쟁 물증)
+          return hd.length ? (
+            <div style={{ marginTop: 10, paddingTop: 10, borderTop: `1px solid ${C.line}` }}>
+              <div style={{ fontSize: 11.5, fontWeight: 700, color: C.mute, marginBottom: 6 }}>인도·반납 증거 (사진·서명)</div>
+              <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap' }}>
+                {hd.map((d, i) => d.url ? (
+                  <button key={i} onClick={() => window.open(d.url, '_blank')} style={{ fontSize: 11.5, padding: '5px 10px', borderRadius: 'var(--radius)', border: `1px solid ${C.line}`, background: 'var(--bg-card)', color: C.accent, cursor: 'pointer', fontWeight: 700 }}>
+                    {d.reason || '인도 증거'} · {String(d.uploadedAt || '').slice(0, 10)} 열기
+                  </button>
+                ) : null)}
+              </div>
+            </div>
+          ) : null;
+        })()}
+      </Sec>
+
+      {/* 손바뀜 이력 · 재렌트 추천 — 계약이력 SSOT(linkFleet). 손이 바뀔수록 대여료↓. 반납/유휴 차는 다음 대여료 추천(함대 손바뀜 인하율 시뮬레이션). */}
+      {hist.count > 0 ? <Sec id="v-handover" title="손바뀜 이력" n={hist.count}
+        desc={hist.count >= 2 ? `${hist.count}손 · 첫 ${won(hist.firstRent)} → 현재 ${won(hist.lastRent)}${hist.totalDropPct > 0 ? ` · 누적 ${hist.totalDropPct}%↓` : ''}` : '첫 대여 · 손바뀜 없음'}
+        right={hist.count > 1 ? <a href={`/contract-history?plate=${encodeURIComponent(plate)}`} style={{ fontSize: 11.5, color: C.accent, fontWeight: 700, textDecoration: 'none' }}>계약이력 →</a> : undefined}>
+        {/* 반납/유휴 차 → 다음 임차인 적정 대여료 추천 (시뮬레이션 데이터 활용) */}
+        {!active && reco ? <div style={{ marginBottom: 12, padding: '12px 14px', border: `1px solid ${C.accent}`, borderRadius: 'var(--radius)', background: 'var(--bg-card)' }}>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap' }}>
+            <span style={{ fontSize: 11.5, fontWeight: 800, color: C.accent, letterSpacing: '0.02em' }}>재렌트 추천</span>
+            <span style={{ fontSize: 21, fontWeight: 800, color: C.ink, fontFamily: 'var(--font-mono)', fontVariantNumeric: 'tabular-nums' }}>{won(reco.recommended)}</span>
+            <span style={{ fontSize: 12.5, color: C.mute }}>현재 {won(reco.currentRent)} · <b style={{ color: C.danger }}>{reco.dropPct}%↓</b></span>
+            <span style={{ flex: 1 }} />
+            <span style={{ fontSize: 12, color: C.faint, fontFamily: 'var(--font-mono)' }}>밴드 {won(reco.low)}~{won(reco.high)}</span>
+          </div>
+          <div style={{ fontSize: 11.5, color: C.faint, marginTop: 6 }}>{reco.basis}</div>
+        </div> : null}
+        {/* 손바뀜 타임라인 — 각 손: 계약자·대여료·인하폭 */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          {hist.steps.map((s, i) => (
+            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '9px 12px', borderRadius: 'var(--radius)', background: s.phase === '운행' ? 'var(--bg-card)' : 'var(--bg-stripe)', border: `1px solid ${s.phase === '운행' ? C.accent : C.line}` }}>
+              <span style={{ fontSize: 12, fontWeight: 800, color: s.phase === '운행' ? C.accent : C.mute, minWidth: 26 }}>{s.seq}손</span>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: C.ink, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{s.customer || '—'}</div>
+                <div style={{ fontSize: 11, color: C.faint }}>{yy(s.start)}{s.phase === '운행' ? ' · 운행중' : ' · 종료'}{s.net > 0 ? ` · 미수 ${won(s.net)}` : ''}</div>
+              </div>
+              <div style={{ textAlign: 'right' }}>
+                <div style={{ fontSize: 13.5, fontWeight: 700, color: C.ink, fontFamily: 'var(--font-mono)', fontVariantNumeric: 'tabular-nums' }}>{won(s.rent)}</div>
+                {s.drop > 0 ? <div style={{ fontSize: 11, color: C.danger, fontWeight: 700 }}>-{won(s.drop)} · {s.dropPct}%↓</div> : <div style={{ fontSize: 11, color: C.faint }}>{i === 0 ? '첫 대여' : '동결'}</div>}
+              </div>
+            </div>
+          ))}
+        </div>
+      </Sec> : null}
+
+      {/* 보증금 정산 — 종료 계약의 보증금 반환/충당 미처리 시. 정산서와 같은 셈 + 반환 처리 도장. */}
+      {pendDeposit ? <Sec id="v-deposit" title="보증금 정산" n={1} tone="warn" desc={`${String(pendDeposit.c.contractorName || '')} · 반납 ${String(pendDeposit.c.returnedDate || '')} · 미정산`}
+        right={<span style={{ display: 'inline-flex', gap: 6 }}><Btn variant="ghost" onClick={() => openPrintDoc('settlement', plate)}>정산서</Btn><Btn onClick={settleDeposit}>보증금 반환 처리</Btn></span>}>
+        <KV rows={[
+          ['예치 보증금', '', won(pendDeposit.d.deposit)],
+          ['미납 대여료(일할)', '', pendDeposit.d.unpaid ? won(pendDeposit.d.unpaid) : '—'],
+          ['보증금 충당', '', pendDeposit.d.offset ? '-' + won(pendDeposit.d.offset) : '—'],
+          pendDeposit.d.addCharge > 0
+            ? ['추가 청구액', '', won(pendDeposit.d.addCharge)] as KVRow
+            : ['반환액', '', won(pendDeposit.d.refund)] as KVRow,
+        ] as KVRow[]} />
+      </Sec> : null}
+
+      {/* 수납 스케줄 — 계약중인 차의 계약기간 회차별. 미수관리의 근거. */}
+      {active ? <Sec id="v-schedule" title="수납 스케줄" n={schedule.length} desc="회차별 청구·미납 · 미수관리"
+        right={<span style={{ display: 'inline-flex', gap: 6 }}>
+          <Btn variant="ghost" onClick={() => openPrintDoc('receipt', plate)}>영수증</Btn>
+          {totalUnpaid > 0 ? <Btn variant="ghost" onClick={() => openPrintDoc('notice', plate)}>내용증명</Btn> : null}
+          <Btn variant="ghost" onClick={() => setRecMode(recMode === 'pay' ? null : 'pay')}>+ 입금</Btn>
+          <Btn variant="ghost" onClick={() => setRecMode(recMode === 'disc' ? null : 'disc')}>+ 청구할인</Btn>
+        </span>}>
+        {recMode ? <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'flex-end', padding: '10px 12px', border: `1px solid ${C.accent}`, borderRadius: 'var(--radius)', background: 'var(--bg-card)', marginBottom: 10 }}>
+          <label style={fLab}><span style={fLl}>회차</span><select value={recForm.seq} onChange={(e) => setRecForm((r) => ({ ...r, seq: e.target.value }))} style={fInp}>{schedule.map((s) => <option key={s.seq} value={s.seq}>{s.seq} · {s.dueDate}</option>)}</select></label>
+          <label style={fLab}><span style={fLl}>일자</span><input type="date" value={recForm.date} onChange={(e) => setRecForm((r) => ({ ...r, date: e.target.value }))} style={fInp} /></label>
+          <label style={fLab}><span style={fLl}>금액</span><input type="number" value={recForm.amount} onChange={(e) => setRecForm((r) => ({ ...r, amount: e.target.value }))} style={fInp} placeholder="0" /></label>
+          {recMode === 'pay'
+            ? <label style={fLab}><span style={fLl}>수단</span><select value={recForm.method} onChange={(e) => setRecForm((r) => ({ ...r, method: e.target.value }))} style={fInp}>{['계좌', 'CMS', '카드', '현금', '수동'].map((m) => <option key={m} value={m}>{m}</option>)}</select></label>
+            : <label style={fLab}><span style={fLl}>사유</span><select value={recForm.reason} onChange={(e) => setRecForm((r) => ({ ...r, reason: e.target.value }))} style={fInp}>{['자가조치', '보상', '사은품', '캠페인', '기타'].map((m) => <option key={m} value={m}>{m}</option>)}</select></label>}
+          <Btn onClick={saveRecord}>{recMode === 'pay' ? '입금 저장' : '할인 저장'}</Btn>
+          <Btn variant="ghost" onClick={() => setRecMode(null)}>취소</Btn>
+        </div> : null}
+        {schedule.length === 0 ? <EmptyState variant="sec">스케줄 없음 (계약기간·월대여료 확인)</EmptyState> :
+          <div style={{ border: `1px solid ${C.line}`, borderRadius: 'var(--radius)', overflow: 'hidden', background: '#fff' }}>
+            <div style={{ maxHeight: 460, overflowY: 'auto', overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', whiteSpace: 'nowrap' }}>
+                <thead><tr>
+                  <th style={th}>회차</th><th style={th}>납부기일</th><th style={thR}>청구</th><th style={thR}>할인</th><th style={thR}>납부</th><th style={thR}>미납</th><th style={th}>납부일</th><th style={th}>수단</th><th style={{ ...th, textAlign: 'center' }}>상태</th>
+                </tr></thead>
+                <tbody>
+                  {schedule.map((s) => (
+                    <tr key={s.seq}>
+                      <td style={td}>{s.seq}</td>
+                      <td style={td}>{s.dueDate}</td>
+                      <td style={tdR}>{won(s.amount)}</td>
+                      <td style={tdR}>{s.discount > 0 ? <span style={{ color: C.warn }}>-{won(s.discount)}</span> : '—'}</td>
+                      <td style={tdR}>{s.paid > 0 ? <span style={{ color: 'var(--green-text)' }}>{won(s.paid)}</span> : '—'}</td>
+                      <td style={tdR}>{s.balance > 0 ? <span style={{ color: C.danger, fontWeight: 700 }}>{won(s.balance)}</span> : '—'}</td>
+                      <td style={td}>{s.paidAt || '—'}</td>
+                      <td style={td}>{s.method || '—'}</td>
+                      <td style={{ ...td, textAlign: 'center' }}><Badge tone={scheduleTone(String(s.status))}>{String(s.status)}</Badge></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>}
+      </Sec> : null}
+
+      {/* 활동 · 이력 — 이동·통화·문자·방문·메모 + 정비·사고·검사. 빠른 기록으로 소소하게. */}
+      <Sec id="v-history" title="활동 · 이력" n={history.length} tone={logOpen ? 'ok' : undefined} right={<Btn variant="ghost" onClick={() => setLogOpen((o) => !o)}>{logOpen ? '닫기' : '+ 기록'}</Btn>}>
+        {logOpen ? <QuickLogForm ctx={{ plate }} onDone={() => setLogOpen(false)} onCancel={() => setLogOpen(false)} style={{ marginBottom: 12 }} /> : null}
+        {history.length ? <Cards min={340}>{history.map((h, i) => { const cat = String(h.category || '이력'); const tone = (cat === '사고' ? 'red' : cat === '이동' ? 'blue' : (cat === '통화' || cat === '문자') ? 'green' : (cat === '방문' || cat === '상담') ? 'purple' : cat === '메모' ? 'gray' : cat === '검사' ? 'teal' : 'amber') as 'red' | 'blue' | 'green' | 'purple' | 'gray' | 'teal' | 'amber'; return <ObjCard key={i} badge={cat} badgeTone={tone} title={String(h.title || '—')} right={h.cost ? won(h.cost) : (h.nextDate ? <span style={{ color: C.warn, fontSize: 11.5 }}>후속 {String(h.nextDate)}</span> : undefined)} fields={[['일자', String(h.date || '—')], [h.author ? '작성' : '업체', String(h.author || h.vendor || '—')]]} />; })}</Cards> : <EmptyState variant="sec">기록 없음 · 오른쪽 “+ 기록”으로 남기세요</EmptyState>}
+      </Sec>
+
+      {/* 차량 수선 · 정비·사고 — 모든 차에 항상 노출(대여중이어도 사고/정비 가능). history(_kind:'work').
+          유휴차면 저장과 함께 자산상태 파생 전이(→ 휴차 워크벤치 자동 반영). 대여중이면 기록만(운행 유지). */}
+      <Sec id="v-work" title="차량 수선 · 정비·사고" n={workList.length} tone={workOpen ? 'ok' : undefined}
+        desc="정비·사고수리·상품화·세차 — 유휴차는 작업상태가 휴차 워크벤치에 자동 반영"
+        right={<Btn variant="ghost" onClick={() => setWorkOpen((o) => !o)}>{workOpen ? '닫기' : '+ 수선/작업'}</Btn>}>
+        {workOpen ? <WorkForm plate={plate} companyId={target} vehicle={v} idle={!active} onDone={() => setWorkOpen(false)} onCancel={() => setWorkOpen(false)} style={{ marginBottom: 12 }} /> : null}
+        {workList.length ? <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>{workList.map((h, i) => {
+          const cat = String(h.category || '수선'); const ws = String(h.work_status || ''); const doc = latestDoc(h); const amt = Number(h.amount) || 0;
+          return (
+            <div key={i} style={{ border: `1px solid ${C.line}`, borderRadius: 'var(--radius)', background: '#fff', padding: '10px 13px', boxShadow: '0 1px 2px rgba(15,23,42,0.05)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                <Badge tone={workCategoryTone(cat)}>{cat}</Badge>
+                {ws ? <Badge tone={workStatusTone(ws)}>{ws}</Badge> : null}
+                <span style={{ fontSize: 12.5, fontWeight: 600, color: C.ink }}>{workSummary(h)}</span>
+                <span style={{ flex: 1 }} />
+                {amt > 0 ? <span style={{ fontSize: 12.5, fontWeight: 700, color: C.ink, fontVariantNumeric: 'tabular-nums' }}>{won(amt)}</span> : null}
+              </div>
+              <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', marginTop: 7, fontSize: 11.5, color: C.mute }}>
+                <span>일자 <b style={{ color: C.ink }}>{yy(h.date)}</b></span>
+                {h.vendor ? <span>업체 <b style={{ color: C.ink }}>{String(h.vendor)}</b></span> : null}
+                {cat === '사고수리' && Number(h.insurance_amount) > 0 ? <span>보험처리 <b style={{ color: C.ink }}>{won(h.insurance_amount)}</b></span> : null}
+                {cat === '사고수리' && Number(h.self_pay) > 0 ? <span>자기부담 <b style={{ color: C.ink }}>{won(h.self_pay)}</b></span> : null}
+                {cat === '사고수리' && h.repair_out_date ? <span>출고예정 <b style={{ color: C.warn }}>{yy(h.repair_out_date)}</b></span> : null}
+                {cat === '정비' && h.next_maint_date ? <span>다음정비 <b style={{ color: C.warn }}>{yy(h.next_maint_date)}</b></span> : null}
+                {h.author ? <span>작성 <b style={{ color: C.ink }}>{String(h.author)}</b></span> : null}
+                <span style={{ flex: 1 }} />
+                {doc
+                  ? (doc.url
+                      ? <button onClick={() => window.open(doc.url, '_blank')} style={{ border: 'none', background: 'none', cursor: 'pointer', padding: 0, fontSize: 11.5, fontWeight: 700, color: C.accent }}>{doc.type || '서류'} 열기</button>
+                      : <span style={{ color: C.faint }}>{doc.type || '서류'} · 미첨부</span>)
+                  : <span style={{ color: C.faint }}>서류 미첨부</span>}
+              </div>
+            </div>
+          );
+        })}</div> : <EmptyState variant="sec">수선/작업 이력 없음 · 오른쪽 “+ 수선/작업”으로 남기세요</EmptyState>}
+      </Sec>
+
+      {/* 과태료 · 변경부과 — 위반일시로 실운전자(임차인) 자동매칭 */}
+      <Sec id="v-penalty" title="과태료 · 변경부과" n={penalties.length} right={<span style={{ display: 'inline-flex', gap: 6 }}>{penalties.length ? <Btn variant="ghost" onClick={() => openPrintDoc('penalty', plate)}>변경부과 공문</Btn> : null}<Add type="penalty" plate={plate} label="+ 추가" /></span>}>
+        {penalties.length ? <Cards min={360}>{penalties.map((p, i) => {
+          const drv = matchDriver(p, contracts); const st = penaltyStatus(p);
+          const NEXT: Record<string, string | null> = { '접수': '임차인확인', '임차인확인': '변경부과신청', '변경부과신청': '변경부과완료', '변경부과완료': '종결', '종결': null };
+          const next = NEXT[st] || null;
+          const advance = async () => {
+            if (!p._key) return;
+            const patch: EntityRecord = { reassignStatus: next };
+            if (next === '임차인확인' && drv) { patch.driverName = drv.contractorName; patch.driverPhone = drv.contractorPhone; patch.billedToRenter = true; patch.reassignDate = TODAY; }
+            await getStore().update('penalty', target, String(p._key), patch); notifySaved();
+          };
+          return <div key={i} style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+            <div style={{ flex: 1, minWidth: 0 }}><ObjCard badge={st} badgeTone={penaltyTone(st)} title={String(p.description || p.docType || '과태료')} right={p.amount ? won(p.amount) : undefined} fields={[['위반', String(p.violationDate || '—')], ['실운전자', drv ? String(drv.contractorName || '—') : '미매칭'], ['기한', String(p.dueDate || '—')]]} /></div>
+            {next ? <Btn variant="ghost" onClick={advance}>{next} →</Btn> : null}
+          </div>;
+        })}</Cards> : <EmptyState variant="sec">과태료 없음</EmptyState>}
+      </Sec>
+
+      {/* 숨긴 섹션 복구 바 — 눈 아이콘으로 숨긴 섹션을 맨 아래에서 다시 켜기 */}
+      <HiddenSecs />
+      <div style={{ marginTop: 24, paddingTop: 14, borderTop: `1px solid ${C.line}`, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+        <span style={{ fontSize: 11.5, color: C.faint }}>잘못 등록한 차량이면 삭제(휴지통에서 복구 가능). 매각·처분은 상태로 처리하세요.</span>
+        <span style={{ flex: 1 }} />
+        <Btn size="sm" variant="danger" onClick={delVehicle}>차량 삭제</Btn>
+      </div>
+    </div>
+  );
+}

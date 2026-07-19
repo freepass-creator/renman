@@ -1,0 +1,173 @@
+{
+  "generatedAt": "2026-07-17T02:01:50.420Z",
+  "contracts": [
+    {
+      "file": "김찬일 133가8292 모하비 셀렉션_최종확정.pdf",
+      "path": "C:\\dev\\jpkerp6-마이그레이션\\switchplan_스위치플랜\\계약서\\김찬일 133가8292 모하비 셀렉션_최종확정.pdf",
+      "error": null,
+      "pages": 21,
+      "textLen": 10379,
+      "parsed": {
+        "plate": "133가8292",
+        "customer": "김찬일",
+        "carModel": "모하비",
+        "start": "2024-05-04",
+        "end": "2028-05-03",
+        "months": 48,
+        "company": "제이피케이오토셀렉션주식회사"
+      },
+      "xlsxMatch": {
+        "코드명": "김찬일",
+        "대여료": 840000,
+        "보증금": 3450000,
+        "시작": "2024-05-03",
+        "종료": "2028-05-02",
+        "_from고객기준": false
+      },
+      "dateMatch": {
+        "startEq": false,
+        "endEq": false
+      }
+    },
+    {
+      "file": "01도9893 모닝 김효은[셀렉션].pdf",
+      "path": "C:\\dev\\jpkerp6-마이그레이션\\switchplan_스위치플랜\\계약서\\01도9893 모닝 김효은[셀렉션].pdf",
+      "error": null,
+      "pages": 12,
+      "textLen": 26949,
+      "parsed": {
+        "plate": "01도9893",
+        "customer": "김효은",
+        "carModel": "모닝",
+        "start": "2025-10-13",
+        "end": "2026-10-12",
+        "months": 12,
+        "company": "제이피케이오토셀렉션주식회사"
+      },
+      "xlsxMatch": {
+        "코드명": "김효은",
+        "대여료": 450000,
+        "보증금": 480000,
+        "시작": "2024-10-13",
+        "종료": "2026-10-11",
+        "_from고객기준": false
+      },
+      "dateMatch": {
+        "startEq": false,
+        "endEq": false
+      }
+    },
+    {
+      "file": "02마4731 모닝 하정만[셀렉션].pdf",
+      "path": "C:\\dev\\jpkerp6-마이그레이션\\switchplan_스위치플랜\\계약서\\02마4731 모닝 하정만[셀렉션].pdf",
+      "error": null,
+      "pages": 19,
+      "textLen": 27050,
+      "parsed": {
+        "plate": "02마4731",
+        "customer": "하정만",
+        "carModel": "모닝",
+        "start": "2025-03-17",
+        "end": "2029-03-16",
+        "months": 48,
+        "company": "제이피케이오토셀렉션주식회사"
+      },
+      "xlsxMatch": {
+        "코드명": "하정만",
+        "대여료": 330000,
+        "보증금": 1000000,
+        "시작": "2025-03-16",
+        "종료": "2029-03-15",
+        "_from고객기준": false
+      },
+      "dateMatch": {
+        "startEq": false,
+        "endEq": false
+      }
+    }
+  ],
+  "insurance": [
+    {
+      "file": "01도9893.pdf",
+      "path": "C:\\dev\\jpkerp6-마이그레이션\\switchplan_스위치플랜\\보험증권\\DB보험증권\\01도9893.pdf",
+      "error": null,
+      "pages": 1,
+      "textLen": 1696,
+      "parsed": {
+        "plate": "01도9893",
+        "start": "2025-10-10",
+        "end": "2026-10-10",
+        "policyNo": "2-2025-5499263-000",
+        "insurer": "DB손해보험",
+        "carName": "올뉴모닝(2017) 정원 5.0 명"
+      },
+      "xlsxMatch": {
+        "시작일": "2025-10-10",
+        "만기일": "2026-10-10",
+        "증권번호": "2-2025-5499263-000",
+        "보험사": "DB손해보험",
+        "차명": "모닝"
+      },
+      "match": {
+        "startEq": true,
+        "endEq": true,
+        "policyEq": true
+      }
+    },
+    {
+      "file": "02마4731.pdf",
+      "path": "C:\\dev\\jpkerp6-마이그레이션\\switchplan_스위치플랜\\보험증권\\DB보험증권\\02마4731.pdf",
+      "error": null,
+      "pages": 1,
+      "textLen": 1642,
+      "parsed": {
+        "plate": "02마4731",
+        "start": "2025-12-13",
+        "end": "2026-12-13",
+        "policyNo": "2-2025-6800623-000",
+        "insurer": "DB손해보험",
+        "carName": "올뉴모닝(2017) 정원 5.0 명"
+      },
+      "xlsxMatch": {
+        "시작일": "2025-12-13",
+        "만기일": "2026-12-13",
+        "증권번호": "2-2025-6800623-000",
+        "보험사": "DB손해보험",
+        "차명": "모닝"
+      },
+      "match": {
+        "startEq": true,
+        "endEq": true,
+        "policyEq": true
+      }
+    }
+  ],
+  "contractPdfCoverage": {
+    "nameFirstCount": 1,
+    "stillMissingActivePlates": [
+      "369두9464",
+      "26구0535",
+      "20다0220",
+      "36머9150",
+      "46누4225",
+      "158수3389",
+      "89너4007",
+      "32어3092",
+      "204거7383",
+      "135수5711",
+      "163조9326",
+      "155라6311",
+      "41호8300",
+      "41호8301",
+      "41호8304",
+      "161허1751"
+    ],
+    "totalPdfs": 102,
+    "activePlateCount": 118
+  },
+  "regRender": {
+    "ok": true,
+    "path": "C:\\dev\\jpkerp6-app\\tmp\\reg-01도9893.png",
+    "error": null
+  }
+}

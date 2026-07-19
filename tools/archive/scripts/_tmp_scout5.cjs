@@ -1,0 +1,10 @@
+const XLSX = require('xlsx');
+const D = 'C:/Users/admin/Documents/카카오톡 받은 파일/';
+const wb = XLSX.readFile(D+'대여료계좌 총합.xlsx');
+console.log('시트:', wb.SheetNames.join(' | '));
+const sn = wb.SheetNames[0];
+const R = XLSX.utils.sheet_to_json(wb.Sheets[sn], {header:1, defval:''});
+console.log('행수', R.length);
+for(let i=0;i<6;i++) console.log(i, JSON.stringify(R[i].slice(0,16)));
+console.log('...last rows...');
+for(let i=R.length-3;i<R.length;i++) console.log(i, JSON.stringify(R[i].slice(0,16)));

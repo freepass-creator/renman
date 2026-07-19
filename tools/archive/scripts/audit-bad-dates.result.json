@@ -1,0 +1,2660 @@
+{
+  "scannedAt": "2026-07-17T02:57:23.590Z",
+  "files": [
+    "C:\\dev\\jpkerp6-마이그레이션\\switchplan_스위치플랜\\사업현황.xlsx",
+    "C:\\dev\\jpkerp6-마이그레이션\\switchplan_스위치플랜\\채권현황.xlsx"
+  ],
+  "filterNote": "Date objects + YYYY-MM-DD strings always; numeric Excel serials only when column header looks date-related (avoids money/cc/연식 false positives). cellDates:true used; rawExcelSerial from cellDates:false pass.",
+  "summary": {
+    "suspiciousExcelCells": 79,
+    "byKind": {
+      "Date": 78,
+      "string": 0,
+      "excelSerial": 1
+    },
+    "bondReturnBadRows": 16,
+    "jsonBadContractDates": 37,
+    "jsonByField": {
+      "endDate": 20,
+      "returnScheduledDate": 17
+    },
+    "jsonYearDist": {
+      "1930": 37
+    },
+    "yearDistribution": {
+      "1900": 1,
+      "1930": 66,
+      "1931": 2,
+      "1932": 10
+    },
+    "epochHypothesis": {
+      "zeros": 0,
+      "ones": 0,
+      "smallSerialCount": 0,
+      "date1899": 0,
+      "date1900": 1,
+      "date1930": 66,
+      "conclusion": "No serial 0/1 → 1899-12-30 pattern in date columns; 1930 appears as real Date objects (not Excel epoch empty)"
+    }
+  },
+  "groupedBySheetColumn": [
+    {
+      "file": "사업현황.xlsx",
+      "sheet": "계약",
+      "header": "종료일자",
+      "count": 24
+    },
+    {
+      "file": "사업현황.xlsx",
+      "sheet": "채권",
+      "header": "COL_11",
+      "count": 19
+    },
+    {
+      "file": "채권현황.xlsx",
+      "sheet": "채권",
+      "header": "종료",
+      "count": 11
+    },
+    {
+      "file": "사업현황.xlsx",
+      "sheet": "자산",
+      "header": "차령만료일",
+      "count": 10
+    },
+    {
+      "file": "사업현황.xlsx",
+      "sheet": "상환합계",
+      "header": "만기일",
+      "count": 9
+    },
+    {
+      "file": "사업현황.xlsx",
+      "sheet": "반납",
+      "header": "종료",
+      "count": 5
+    },
+    {
+      "file": "사업현황.xlsx",
+      "sheet": "계약",
+      "header": "인도일자",
+      "count": 1
+    }
+  ],
+  "workbooks": [
+    {
+      "file": "사업현황.xlsx",
+      "sheets": {
+        "자산": {
+          "headerRow": 0,
+          "suspiciousCellCount": 10,
+          "kindCounts": {
+            "Date": 10,
+            "string": 0,
+            "excelSerial": 0
+          },
+          "groupCounts": [
+            {
+              "sheet": "자산",
+              "header": "차령만료일",
+              "count": 10
+            }
+          ]
+        },
+        "계약": {
+          "headerRow": 0,
+          "suspiciousCellCount": 25,
+          "kindCounts": {
+            "Date": 24,
+            "string": 0,
+            "excelSerial": 1
+          },
+          "groupCounts": [
+            {
+              "sheet": "계약",
+              "header": "종료일자",
+              "count": 24
+            },
+            {
+              "sheet": "계약",
+              "header": "인도일자",
+              "count": 1
+            }
+          ]
+        },
+        "고객(기준)": {
+          "headerRow": 0,
+          "suspiciousCellCount": 0,
+          "kindCounts": {
+            "Date": 0,
+            "string": 0,
+            "excelSerial": 0
+          },
+          "groupCounts": []
+        },
+        "채권": {
+          "headerRow": 0,
+          "suspiciousCellCount": 19,
+          "kindCounts": {
+            "Date": 19,
+            "string": 0,
+            "excelSerial": 0
+          },
+          "groupCounts": [
+            {
+              "sheet": "채권",
+              "header": "COL_11",
+              "count": 19
+            }
+          ]
+        },
+        "반납": {
+          "headerRow": 0,
+          "suspiciousCellCount": 5,
+          "kindCounts": {
+            "Date": 5,
+            "string": 0,
+            "excelSerial": 0
+          },
+          "groupCounts": [
+            {
+              "sheet": "반납",
+              "header": "종료",
+              "count": 5
+            }
+          ]
+        },
+        "상환합계": {
+          "headerRow": 1,
+          "suspiciousCellCount": 9,
+          "kindCounts": {
+            "Date": 9,
+            "string": 0,
+            "excelSerial": 0
+          },
+          "groupCounts": [
+            {
+              "sheet": "상환합계",
+              "header": "만기일",
+              "count": 9
+            }
+          ]
+        },
+        "상환원금": {
+          "headerRow": 1,
+          "suspiciousCellCount": 0,
+          "kindCounts": {
+            "Date": 0,
+            "string": 0,
+            "excelSerial": 0
+          },
+          "groupCounts": []
+        },
+        "상환이자": {
+          "headerRow": 1,
+          "suspiciousCellCount": 0,
+          "kindCounts": {
+            "Date": 0,
+            "string": 0,
+            "excelSerial": 0
+          },
+          "groupCounts": []
+        },
+        "상환수수료": {
+          "headerRow": 1,
+          "suspiciousCellCount": 0,
+          "kindCounts": {
+            "Date": 0,
+            "string": 0,
+            "excelSerial": 0
+          },
+          "groupCounts": []
+        },
+        "신구대비표": {
+          "headerRow": 0,
+          "suspiciousCellCount": 0,
+          "kindCounts": {
+            "Date": 0,
+            "string": 0,
+            "excelSerial": 0
+          },
+          "groupCounts": []
+        },
+        "대여료 인하 관리": {
+          "headerRow": 1,
+          "suspiciousCellCount": 0,
+          "kindCounts": {
+            "Date": 0,
+            "string": 0,
+            "excelSerial": 0
+          },
+          "groupCounts": []
+        },
+        "지우지마세요": {
+          "headerRow": 0,
+          "suspiciousCellCount": 0,
+          "kindCounts": {
+            "Date": 0,
+            "string": 0,
+            "excelSerial": 0
+          },
+          "groupCounts": []
+        },
+        "면책금": {
+          "headerRow": 0,
+          "suspiciousCellCount": 0,
+          "kindCounts": {
+            "Date": 0,
+            "string": 0,
+            "excelSerial": 0
+          },
+          "groupCounts": []
+        },
+        "채권추심": {
+          "headerRow": 0,
+          "suspiciousCellCount": 0,
+          "kindCounts": {
+            "Date": 0,
+            "string": 0,
+            "excelSerial": 0
+          },
+          "groupCounts": []
+        }
+      }
+    },
+    {
+      "file": "채권현황.xlsx",
+      "sheets": {
+        "채권": {
+          "headerRow": 1,
+          "suspiciousCellCount": 11,
+          "kindCounts": {
+            "Date": 11,
+            "string": 0,
+            "excelSerial": 0
+          },
+          "groupCounts": [
+            {
+              "sheet": "채권",
+              "header": "종료",
+              "count": 11
+            }
+          ]
+        },
+        "지우지마세요": {
+          "headerRow": 0,
+          "suspiciousCellCount": 0,
+          "kindCounts": {
+            "Date": 0,
+            "string": 0,
+            "excelSerial": 0
+          },
+          "groupCounts": []
+        },
+        "채권추심": {
+          "headerRow": 0,
+          "suspiciousCellCount": 0,
+          "kindCounts": {
+            "Date": 0,
+            "string": 0,
+            "excelSerial": 0
+          },
+          "groupCounts": []
+        }
+      }
+    }
+  ],
+  "bondReturnDetail": [
+    {
+      "file": "사업현황.xlsx",
+      "sheet": "반납",
+      "row": 87,
+      "plate": "163조9326",
+      "코드명": "김영환",
+      "badDates": [
+        {
+          "header": "종료",
+          "raw": "1930-01-03T14:59:08.000Z",
+          "typeof": "Date",
+          "kind": "Date",
+          "getTime": -1262077252000,
+          "ISO": "1930-01-03T14:59:08.000Z",
+          "year": 1930,
+          "rawExcelSerial": 10962
+        }
+      ]
+    },
+    {
+      "file": "사업현황.xlsx",
+      "sheet": "반납",
+      "row": 90,
+      "plate": "41호8304",
+      "코드명": "권현근",
+      "badDates": [
+        {
+          "header": "종료",
+          "raw": "1930-02-10T14:59:08.000Z",
+          "typeof": "Date",
+          "kind": "Date",
+          "getTime": -1258794052000,
+          "ISO": "1930-02-10T14:59:08.000Z",
+          "year": 1930,
+          "rawExcelSerial": 11000
+        }
+      ]
+    },
+    {
+      "file": "사업현황.xlsx",
+      "sheet": "반납",
+      "row": 96,
+      "plate": "41호8306",
+      "코드명": "김용빈",
+      "badDates": [
+        {
+          "header": "종료",
+          "raw": "1930-03-09T14:59:08.000Z",
+          "typeof": "Date",
+          "kind": "Date",
+          "getTime": -1256461252000,
+          "ISO": "1930-03-09T14:59:08.000Z",
+          "year": 1930,
+          "rawExcelSerial": 11027
+        }
+      ]
+    },
+    {
+      "file": "사업현황.xlsx",
+      "sheet": "반납",
+      "row": 108,
+      "plate": "36머9150",
+      "코드명": "장현주",
+      "badDates": [
+        {
+          "header": "종료",
+          "raw": "1930-04-22T14:59:08.000Z",
+          "typeof": "Date",
+          "kind": "Date",
+          "getTime": -1252659652000,
+          "ISO": "1930-04-22T14:59:08.000Z",
+          "year": 1930,
+          "rawExcelSerial": 11071
+        }
+      ]
+    },
+    {
+      "file": "사업현황.xlsx",
+      "sheet": "반납",
+      "row": 118,
+      "plate": "163조9326",
+      "코드명": "유혁",
+      "badDates": [
+        {
+          "header": "종료",
+          "raw": "1930-05-05T14:59:08.000Z",
+          "typeof": "Date",
+          "kind": "Date",
+          "getTime": -1251536452000,
+          "ISO": "1930-05-05T14:59:08.000Z",
+          "year": 1930,
+          "rawExcelSerial": 11084
+        }
+      ]
+    },
+    {
+      "file": "채권현황.xlsx",
+      "sheet": "채권",
+      "row": 65,
+      "plate": "149조6163",
+      "코드명": "한상관",
+      "badDates": [
+        {
+          "header": "종료",
+          "raw": "1930-03-21T14:59:08.000Z",
+          "typeof": "Date",
+          "kind": "Date",
+          "getTime": -1255424452000,
+          "ISO": "1930-03-21T14:59:08.000Z",
+          "year": 1930,
+          "rawExcelSerial": 11039
+        }
+      ]
+    },
+    {
+      "file": "채권현황.xlsx",
+      "sheet": "채권",
+      "row": 84,
+      "plate": "143조2022",
+      "코드명": "김현민",
+      "badDates": [
+        {
+          "header": "종료",
+          "raw": "1930-03-07T14:59:08.000Z",
+          "typeof": "Date",
+          "kind": "Date",
+          "getTime": -1256634052000,
+          "ISO": "1930-03-07T14:59:08.000Z",
+          "year": 1930,
+          "rawExcelSerial": 11025
+        }
+      ]
+    },
+    {
+      "file": "채권현황.xlsx",
+      "sheet": "채권",
+      "row": 93,
+      "plate": "163조9326",
+      "코드명": "김영환",
+      "badDates": [
+        {
+          "header": "종료",
+          "raw": "1930-01-03T14:59:08.000Z",
+          "typeof": "Date",
+          "kind": "Date",
+          "getTime": -1262077252000,
+          "ISO": "1930-01-03T14:59:08.000Z",
+          "year": 1930,
+          "rawExcelSerial": 10962
+        }
+      ]
+    },
+    {
+      "file": "채권현황.xlsx",
+      "sheet": "채권",
+      "row": 108,
+      "plate": "244루2757",
+      "코드명": "홍이삭",
+      "badDates": [
+        {
+          "header": "종료",
+          "raw": "1930-03-16T14:59:08.000Z",
+          "typeof": "Date",
+          "kind": "Date",
+          "getTime": -1255856452000,
+          "ISO": "1930-03-16T14:59:08.000Z",
+          "year": 1930,
+          "rawExcelSerial": 11034
+        }
+      ]
+    },
+    {
+      "file": "채권현황.xlsx",
+      "sheet": "채권",
+      "row": 124,
+      "plate": "41호8302",
+      "코드명": "김성은",
+      "badDates": [
+        {
+          "header": "종료",
+          "raw": "1930-03-15T14:59:08.000Z",
+          "typeof": "Date",
+          "kind": "Date",
+          "getTime": -1255942852000,
+          "ISO": "1930-03-15T14:59:08.000Z",
+          "year": 1930,
+          "rawExcelSerial": 11033
+        }
+      ]
+    },
+    {
+      "file": "채권현황.xlsx",
+      "sheet": "채권",
+      "row": 125,
+      "plate": "41호8303",
+      "코드명": "또바기",
+      "badDates": [
+        {
+          "header": "종료",
+          "raw": "1930-02-24T14:59:08.000Z",
+          "typeof": "Date",
+          "kind": "Date",
+          "getTime": -1257584452000,
+          "ISO": "1930-02-24T14:59:08.000Z",
+          "year": 1930,
+          "rawExcelSerial": 11014
+        }
+      ]
+    },
+    {
+      "file": "채권현황.xlsx",
+      "sheet": "채권",
+      "row": 126,
+      "plate": "41호8304",
+      "코드명": "권현근",
+      "badDates": [
+        {
+          "header": "종료",
+          "raw": "1930-02-10T14:59:08.000Z",
+          "typeof": "Date",
+          "kind": "Date",
+          "getTime": -1258794052000,
+          "ISO": "1930-02-10T14:59:08.000Z",
+          "year": 1930,
+          "rawExcelSerial": 11000
+        }
+      ]
+    },
+    {
+      "file": "채권현황.xlsx",
+      "sheet": "채권",
+      "row": 127,
+      "plate": "41호8306",
+      "코드명": "김용빈",
+      "badDates": [
+        {
+          "header": "종료",
+          "raw": "1930-03-09T14:59:08.000Z",
+          "typeof": "Date",
+          "kind": "Date",
+          "getTime": -1256461252000,
+          "ISO": "1930-03-09T14:59:08.000Z",
+          "year": 1930,
+          "rawExcelSerial": 11027
+        }
+      ]
+    },
+    {
+      "file": "채권현황.xlsx",
+      "sheet": "채권",
+      "row": 128,
+      "plate": "41호8307",
+      "코드명": "박진용",
+      "badDates": [
+        {
+          "header": "종료",
+          "raw": "1930-03-08T14:59:08.000Z",
+          "typeof": "Date",
+          "kind": "Date",
+          "getTime": -1256547652000,
+          "ISO": "1930-03-08T14:59:08.000Z",
+          "year": 1930,
+          "rawExcelSerial": 11026
+        }
+      ]
+    },
+    {
+      "file": "채권현황.xlsx",
+      "sheet": "채권",
+      "row": 129,
+      "plate": "17하3915",
+      "코드명": "천설",
+      "badDates": [
+        {
+          "header": "종료",
+          "raw": "1930-04-13T14:59:08.000Z",
+          "typeof": "Date",
+          "kind": "Date",
+          "getTime": -1253437252000,
+          "ISO": "1930-04-13T14:59:08.000Z",
+          "year": 1930,
+          "rawExcelSerial": 11062
+        }
+      ]
+    },
+    {
+      "file": "채권현황.xlsx",
+      "sheet": "채권",
+      "row": 130,
+      "plate": "17하3922",
+      "코드명": "김상호",
+      "badDates": [
+        {
+          "header": "종료",
+          "raw": "1930-02-25T14:59:08.000Z",
+          "typeof": "Date",
+          "kind": "Date",
+          "getTime": -1257498052000,
+          "ISO": "1930-02-25T14:59:08.000Z",
+          "year": 1930,
+          "rawExcelSerial": 11015
+        }
+      ]
+    }
+  ],
+  "jsonBad": [
+    {
+      "index": 7,
+      "id": null,
+      "plate": "52수7832",
+      "코드명": null,
+      "field": "endDate",
+      "year": 1930,
+      "raw": "1930-05-24",
+      "typeof": "string",
+      "ISO": "1930-05-24",
+      "contractSnippet": {
+        "startDate": "2026-05-25",
+        "endDate": "1930-05-24",
+        "returnScheduledDate": "1930-05-24"
+      }
+    },
+    {
+      "index": 7,
+      "id": null,
+      "plate": "52수7832",
+      "코드명": null,
+      "field": "returnScheduledDate",
+      "year": 1930,
+      "raw": "1930-05-24",
+      "typeof": "string",
+      "ISO": "1930-05-24",
+      "contractSnippet": {
+        "startDate": "2026-05-25",
+        "endDate": "1930-05-24",
+        "returnScheduledDate": "1930-05-24"
+      }
+    },
+    {
+      "index": 8,
+      "id": null,
+      "plate": "36머9150",
+      "코드명": null,
+      "field": "endDate",
+      "year": 1930,
+      "raw": "1930-04-22",
+      "typeof": "string",
+      "ISO": "1930-04-22",
+      "contractSnippet": {
+        "startDate": "2026-04-23",
+        "endDate": "1930-04-22",
+        "returnScheduledDate": "1930-04-22"
+      }
+    },
+    {
+      "index": 8,
+      "id": null,
+      "plate": "36머9150",
+      "코드명": null,
+      "field": "returnScheduledDate",
+      "year": 1930,
+      "raw": "1930-04-22",
+      "typeof": "string",
+      "ISO": "1930-04-22",
+      "contractSnippet": {
+        "startDate": "2026-04-23",
+        "endDate": "1930-04-22",
+        "returnScheduledDate": "1930-04-22"
+      }
+    },
+    {
+      "index": 20,
+      "id": null,
+      "plate": "311마8929",
+      "코드명": null,
+      "field": "endDate",
+      "year": 1930,
+      "raw": "1930-05-02",
+      "typeof": "string",
+      "ISO": "1930-05-02",
+      "contractSnippet": {
+        "startDate": "2026-05-03",
+        "endDate": "1930-05-02",
+        "returnScheduledDate": "1930-05-02"
+      }
+    },
+    {
+      "index": 20,
+      "id": null,
+      "plate": "311마8929",
+      "코드명": null,
+      "field": "returnScheduledDate",
+      "year": 1930,
+      "raw": "1930-05-02",
+      "typeof": "string",
+      "ISO": "1930-05-02",
+      "contractSnippet": {
+        "startDate": "2026-05-03",
+        "endDate": "1930-05-02",
+        "returnScheduledDate": "1930-05-02"
+      }
+    },
+    {
+      "index": 22,
+      "id": null,
+      "plate": "57나3382",
+      "코드명": null,
+      "field": "endDate",
+      "year": 1930,
+      "raw": "1930-05-18",
+      "typeof": "string",
+      "ISO": "1930-05-18",
+      "contractSnippet": {
+        "startDate": "2026-05-19",
+        "endDate": "1930-05-18",
+        "returnScheduledDate": "1930-05-18"
+      }
+    },
+    {
+      "index": 22,
+      "id": null,
+      "plate": "57나3382",
+      "코드명": null,
+      "field": "returnScheduledDate",
+      "year": 1930,
+      "raw": "1930-05-18",
+      "typeof": "string",
+      "ISO": "1930-05-18",
+      "contractSnippet": {
+        "startDate": "2026-05-19",
+        "endDate": "1930-05-18",
+        "returnScheduledDate": "1930-05-18"
+      }
+    },
+    {
+      "index": 29,
+      "id": null,
+      "plate": "172수8945",
+      "코드명": null,
+      "field": "endDate",
+      "year": 1930,
+      "raw": "1930-05-26",
+      "typeof": "string",
+      "ISO": "1930-05-26",
+      "contractSnippet": {
+        "startDate": "2026-05-27",
+        "endDate": "1930-05-26",
+        "returnScheduledDate": "1930-05-26"
+      }
+    },
+    {
+      "index": 29,
+      "id": null,
+      "plate": "172수8945",
+      "코드명": null,
+      "field": "returnScheduledDate",
+      "year": 1930,
+      "raw": "1930-05-26",
+      "typeof": "string",
+      "ISO": "1930-05-26",
+      "contractSnippet": {
+        "startDate": "2026-05-27",
+        "endDate": "1930-05-26",
+        "returnScheduledDate": "1930-05-26"
+      }
+    },
+    {
+      "index": 34,
+      "id": null,
+      "plate": "66소6317",
+      "코드명": null,
+      "field": "endDate",
+      "year": 1930,
+      "raw": "1930-05-19",
+      "typeof": "string",
+      "ISO": "1930-05-19",
+      "contractSnippet": {
+        "startDate": "2026-05-20",
+        "endDate": "1930-05-19",
+        "returnScheduledDate": "1930-05-19"
+      }
+    },
+    {
+      "index": 34,
+      "id": null,
+      "plate": "66소6317",
+      "코드명": null,
+      "field": "returnScheduledDate",
+      "year": 1930,
+      "raw": "1930-05-19",
+      "typeof": "string",
+      "ISO": "1930-05-19",
+      "contractSnippet": {
+        "startDate": "2026-05-20",
+        "endDate": "1930-05-19",
+        "returnScheduledDate": "1930-05-19"
+      }
+    },
+    {
+      "index": 44,
+      "id": null,
+      "plate": "149조6163",
+      "코드명": null,
+      "field": "endDate",
+      "year": 1930,
+      "raw": "1930-03-21",
+      "typeof": "string",
+      "ISO": "1930-03-21",
+      "contractSnippet": {
+        "startDate": "2026-03-22",
+        "endDate": "1930-03-21",
+        "returnScheduledDate": "1930-03-21"
+      }
+    },
+    {
+      "index": 44,
+      "id": null,
+      "plate": "149조6163",
+      "코드명": null,
+      "field": "returnScheduledDate",
+      "year": 1930,
+      "raw": "1930-03-21",
+      "typeof": "string",
+      "ISO": "1930-03-21",
+      "contractSnippet": {
+        "startDate": "2026-03-22",
+        "endDate": "1930-03-21",
+        "returnScheduledDate": "1930-03-21"
+      }
+    },
+    {
+      "index": 57,
+      "id": null,
+      "plate": "236로9998",
+      "코드명": null,
+      "field": "endDate",
+      "year": 1930,
+      "raw": "1930-05-20",
+      "typeof": "string",
+      "ISO": "1930-05-20",
+      "contractSnippet": {
+        "startDate": "2026-05-21",
+        "endDate": "1930-05-20",
+        "returnScheduledDate": "1930-05-20"
+      }
+    },
+    {
+      "index": 57,
+      "id": null,
+      "plate": "236로9998",
+      "코드명": null,
+      "field": "returnScheduledDate",
+      "year": 1930,
+      "raw": "1930-05-20",
+      "typeof": "string",
+      "ISO": "1930-05-20",
+      "contractSnippet": {
+        "startDate": "2026-05-21",
+        "endDate": "1930-05-20",
+        "returnScheduledDate": "1930-05-20"
+      }
+    },
+    {
+      "index": 59,
+      "id": null,
+      "plate": "143조2022",
+      "코드명": null,
+      "field": "endDate",
+      "year": 1930,
+      "raw": "1930-03-07",
+      "typeof": "string",
+      "ISO": "1930-03-07",
+      "contractSnippet": {
+        "startDate": "2026-03-08",
+        "endDate": "1930-03-07",
+        "returnScheduledDate": "1930-03-07"
+      }
+    },
+    {
+      "index": 59,
+      "id": null,
+      "plate": "143조2022",
+      "코드명": null,
+      "field": "returnScheduledDate",
+      "year": 1930,
+      "raw": "1930-03-07",
+      "typeof": "string",
+      "ISO": "1930-03-07",
+      "contractSnippet": {
+        "startDate": "2026-03-08",
+        "endDate": "1930-03-07",
+        "returnScheduledDate": "1930-03-07"
+      }
+    },
+    {
+      "index": 68,
+      "id": null,
+      "plate": "163조9326",
+      "코드명": null,
+      "field": "endDate",
+      "year": 1930,
+      "raw": "1930-05-05",
+      "typeof": "string",
+      "ISO": "1930-05-05",
+      "contractSnippet": {
+        "startDate": "2026-05-06",
+        "endDate": "1930-05-05",
+        "returnScheduledDate": "1930-05-05"
+      }
+    },
+    {
+      "index": 68,
+      "id": null,
+      "plate": "163조9326",
+      "코드명": null,
+      "field": "returnScheduledDate",
+      "year": 1930,
+      "raw": "1930-05-05",
+      "typeof": "string",
+      "ISO": "1930-05-05",
+      "contractSnippet": {
+        "startDate": "2026-05-06",
+        "endDate": "1930-05-05",
+        "returnScheduledDate": "1930-05-05"
+      }
+    },
+    {
+      "index": 81,
+      "id": null,
+      "plate": "244루2757",
+      "코드명": null,
+      "field": "endDate",
+      "year": 1930,
+      "raw": "1930-03-16",
+      "typeof": "string",
+      "ISO": "1930-03-16",
+      "contractSnippet": {
+        "startDate": "2026-03-17",
+        "endDate": "1930-03-16",
+        "returnScheduledDate": "1930-03-16"
+      }
+    },
+    {
+      "index": 81,
+      "id": null,
+      "plate": "244루2757",
+      "코드명": null,
+      "field": "returnScheduledDate",
+      "year": 1930,
+      "raw": "1930-03-16",
+      "typeof": "string",
+      "ISO": "1930-03-16",
+      "contractSnippet": {
+        "startDate": "2026-03-17",
+        "endDate": "1930-03-16",
+        "returnScheduledDate": "1930-03-16"
+      }
+    },
+    {
+      "index": 85,
+      "id": null,
+      "plate": "181조8459",
+      "코드명": null,
+      "field": "endDate",
+      "year": 1930,
+      "raw": "1930-04-18",
+      "typeof": "string",
+      "ISO": "1930-04-18",
+      "contractSnippet": {
+        "startDate": "2026-04-19",
+        "endDate": "1930-04-18",
+        "returnScheduledDate": "1930-04-18"
+      }
+    },
+    {
+      "index": 85,
+      "id": null,
+      "plate": "181조8459",
+      "코드명": null,
+      "field": "returnScheduledDate",
+      "year": 1930,
+      "raw": "1930-04-18",
+      "typeof": "string",
+      "ISO": "1930-04-18",
+      "contractSnippet": {
+        "startDate": "2026-04-19",
+        "endDate": "1930-04-18",
+        "returnScheduledDate": "1930-04-18"
+      }
+    },
+    {
+      "index": 95,
+      "id": null,
+      "plate": "41호8303",
+      "코드명": null,
+      "field": "endDate",
+      "year": 1930,
+      "raw": "1930-02-24",
+      "typeof": "string",
+      "ISO": "1930-02-24",
+      "contractSnippet": {
+        "startDate": "2026-02-25",
+        "endDate": "1930-02-24",
+        "returnScheduledDate": "1930-02-24"
+      }
+    },
+    {
+      "index": 95,
+      "id": null,
+      "plate": "41호8303",
+      "코드명": null,
+      "field": "returnScheduledDate",
+      "year": 1930,
+      "raw": "1930-02-24",
+      "typeof": "string",
+      "ISO": "1930-02-24",
+      "contractSnippet": {
+        "startDate": "2026-02-25",
+        "endDate": "1930-02-24",
+        "returnScheduledDate": "1930-02-24"
+      }
+    },
+    {
+      "index": 96,
+      "id": null,
+      "plate": "41호8306",
+      "코드명": null,
+      "field": "endDate",
+      "year": 1930,
+      "raw": "1930-03-09",
+      "typeof": "string",
+      "ISO": "1930-03-09",
+      "contractSnippet": {
+        "startDate": "2026-05-07",
+        "endDate": "1930-03-09",
+        "returnScheduledDate": "1930-03-09"
+      }
+    },
+    {
+      "index": 96,
+      "id": null,
+      "plate": "41호8306",
+      "코드명": null,
+      "field": "returnScheduledDate",
+      "year": 1930,
+      "raw": "1930-03-09",
+      "typeof": "string",
+      "ISO": "1930-03-09",
+      "contractSnippet": {
+        "startDate": "2026-05-07",
+        "endDate": "1930-03-09",
+        "returnScheduledDate": "1930-03-09"
+      }
+    },
+    {
+      "index": 97,
+      "id": null,
+      "plate": "41호8307",
+      "코드명": null,
+      "field": "endDate",
+      "year": 1930,
+      "raw": "1930-03-08",
+      "typeof": "string",
+      "ISO": "1930-03-08",
+      "contractSnippet": {
+        "startDate": "2026-03-09",
+        "endDate": "1930-03-08",
+        "returnScheduledDate": "1930-03-08"
+      }
+    },
+    {
+      "index": 97,
+      "id": null,
+      "plate": "41호8307",
+      "코드명": null,
+      "field": "returnScheduledDate",
+      "year": 1930,
+      "raw": "1930-03-08",
+      "typeof": "string",
+      "ISO": "1930-03-08",
+      "contractSnippet": {
+        "startDate": "2026-03-09",
+        "endDate": "1930-03-08",
+        "returnScheduledDate": "1930-03-08"
+      }
+    },
+    {
+      "index": 98,
+      "id": null,
+      "plate": "17하3915",
+      "코드명": null,
+      "field": "endDate",
+      "year": 1930,
+      "raw": "1930-04-13",
+      "typeof": "string",
+      "ISO": "1930-04-13",
+      "contractSnippet": {
+        "startDate": "2026-04-14",
+        "endDate": "1930-04-13",
+        "returnScheduledDate": "1930-04-13"
+      }
+    },
+    {
+      "index": 98,
+      "id": null,
+      "plate": "17하3915",
+      "코드명": null,
+      "field": "returnScheduledDate",
+      "year": 1930,
+      "raw": "1930-04-13",
+      "typeof": "string",
+      "ISO": "1930-04-13",
+      "contractSnippet": {
+        "startDate": "2026-04-14",
+        "endDate": "1930-04-13",
+        "returnScheduledDate": "1930-04-13"
+      }
+    },
+    {
+      "index": 99,
+      "id": null,
+      "plate": "17하3922",
+      "코드명": null,
+      "field": "endDate",
+      "year": 1930,
+      "raw": "1930-02-25",
+      "typeof": "string",
+      "ISO": "1930-02-25",
+      "contractSnippet": {
+        "startDate": "2026-02-26",
+        "endDate": "1930-02-25",
+        "returnScheduledDate": "1930-02-25"
+      }
+    },
+    {
+      "index": 99,
+      "id": null,
+      "plate": "17하3922",
+      "코드명": null,
+      "field": "returnScheduledDate",
+      "year": 1930,
+      "raw": "1930-02-25",
+      "typeof": "string",
+      "ISO": "1930-02-25",
+      "contractSnippet": {
+        "startDate": "2026-02-26",
+        "endDate": "1930-02-25",
+        "returnScheduledDate": "1930-02-25"
+      }
+    },
+    {
+      "index": 136,
+      "id": null,
+      "plate": "163조9326",
+      "코드명": null,
+      "field": "endDate",
+      "year": 1930,
+      "raw": "1930-01-03",
+      "typeof": "string",
+      "ISO": "1930-01-03",
+      "contractSnippet": {
+        "startDate": "2026-01-14",
+        "endDate": "1930-01-03"
+      }
+    },
+    {
+      "index": 139,
+      "id": null,
+      "plate": "41호8304",
+      "코드명": null,
+      "field": "endDate",
+      "year": 1930,
+      "raw": "1930-02-10",
+      "typeof": "string",
+      "ISO": "1930-02-10",
+      "contractSnippet": {
+        "startDate": "2026-02-11",
+        "endDate": "1930-02-10"
+      }
+    },
+    {
+      "index": 145,
+      "id": null,
+      "plate": "41호8306",
+      "코드명": null,
+      "field": "endDate",
+      "year": 1930,
+      "raw": "1930-03-09",
+      "typeof": "string",
+      "ISO": "1930-03-09",
+      "contractSnippet": {
+        "startDate": "2026-03-10",
+        "endDate": "1930-03-09"
+      }
+    }
+  ],
+  "sampleBadCells": [
+    {
+      "file": "사업현황.xlsx",
+      "sheet": "자산",
+      "row": 109,
+      "col": 6,
+      "header": "차령만료일",
+      "year": 1932,
+      "kind": "Date",
+      "raw": "1932-06-23T14:59:08.000Z",
+      "typeof": "Date",
+      "getTime": -1184144452000,
+      "ISO": "1932-06-23T14:59:08.000Z",
+      "rawExcelSerial": 11864
+    },
+    {
+      "file": "사업현황.xlsx",
+      "sheet": "자산",
+      "row": 110,
+      "col": 6,
+      "header": "차령만료일",
+      "year": 1932,
+      "kind": "Date",
+      "raw": "1932-06-23T14:59:08.000Z",
+      "typeof": "Date",
+      "getTime": -1184144452000,
+      "ISO": "1932-06-23T14:59:08.000Z",
+      "rawExcelSerial": 11864
+    },
+    {
+      "file": "사업현황.xlsx",
+      "sheet": "자산",
+      "row": 111,
+      "col": 6,
+      "header": "차령만료일",
+      "year": 1932,
+      "kind": "Date",
+      "raw": "1932-06-23T14:59:08.000Z",
+      "typeof": "Date",
+      "getTime": -1184144452000,
+      "ISO": "1932-06-23T14:59:08.000Z",
+      "rawExcelSerial": 11864
+    },
+    {
+      "file": "사업현황.xlsx",
+      "sheet": "자산",
+      "row": 112,
+      "col": 6,
+      "header": "차령만료일",
+      "year": 1932,
+      "kind": "Date",
+      "raw": "1932-06-23T14:59:08.000Z",
+      "typeof": "Date",
+      "getTime": -1184144452000,
+      "ISO": "1932-06-23T14:59:08.000Z",
+      "rawExcelSerial": 11864
+    },
+    {
+      "file": "사업현황.xlsx",
+      "sheet": "자산",
+      "row": 113,
+      "col": 6,
+      "header": "차령만료일",
+      "year": 1932,
+      "kind": "Date",
+      "raw": "1932-06-23T14:59:08.000Z",
+      "typeof": "Date",
+      "getTime": -1184144452000,
+      "ISO": "1932-06-23T14:59:08.000Z",
+      "rawExcelSerial": 11864
+    },
+    {
+      "file": "사업현황.xlsx",
+      "sheet": "자산",
+      "row": 114,
+      "col": 6,
+      "header": "차령만료일",
+      "year": 1932,
+      "kind": "Date",
+      "raw": "1932-06-23T14:59:08.000Z",
+      "typeof": "Date",
+      "getTime": -1184144452000,
+      "ISO": "1932-06-23T14:59:08.000Z",
+      "rawExcelSerial": 11864
+    },
+    {
+      "file": "사업현황.xlsx",
+      "sheet": "자산",
+      "row": 115,
+      "col": 6,
+      "header": "차령만료일",
+      "year": 1932,
+      "kind": "Date",
+      "raw": "1932-06-23T14:59:08.000Z",
+      "typeof": "Date",
+      "getTime": -1184144452000,
+      "ISO": "1932-06-23T14:59:08.000Z",
+      "rawExcelSerial": 11864
+    },
+    {
+      "file": "사업현황.xlsx",
+      "sheet": "자산",
+      "row": 116,
+      "col": 6,
+      "header": "차령만료일",
+      "year": 1932,
+      "kind": "Date",
+      "raw": "1932-06-23T14:59:08.000Z",
+      "typeof": "Date",
+      "getTime": -1184144452000,
+      "ISO": "1932-06-23T14:59:08.000Z",
+      "rawExcelSerial": 11864
+    },
+    {
+      "file": "사업현황.xlsx",
+      "sheet": "자산",
+      "row": 117,
+      "col": 6,
+      "header": "차령만료일",
+      "year": 1932,
+      "kind": "Date",
+      "raw": "1932-06-23T14:59:08.000Z",
+      "typeof": "Date",
+      "getTime": -1184144452000,
+      "ISO": "1932-06-23T14:59:08.000Z",
+      "rawExcelSerial": 11864
+    },
+    {
+      "file": "사업현황.xlsx",
+      "sheet": "자산",
+      "row": 119,
+      "col": 6,
+      "header": "차령만료일",
+      "year": 1932,
+      "kind": "Date",
+      "raw": "1932-09-06T14:59:08.000Z",
+      "typeof": "Date",
+      "getTime": -1177664452000,
+      "ISO": "1932-09-06T14:59:08.000Z",
+      "rawExcelSerial": 11939
+    },
+    {
+      "file": "사업현황.xlsx",
+      "sheet": "계약",
+      "row": 12,
+      "col": 10,
+      "header": "종료일자",
+      "year": 1930,
+      "kind": "Date",
+      "raw": "1930-05-24T14:59:08.000Z",
+      "typeof": "Date",
+      "getTime": -1249894852000,
+      "ISO": "1930-05-24T14:59:08.000Z",
+      "rawExcelSerial": 11103
+    },
+    {
+      "file": "사업현황.xlsx",
+      "sheet": "계약",
+      "row": 13,
+      "col": 18,
+      "header": "종료일자",
+      "year": 1930,
+      "kind": "Date",
+      "raw": "1930-04-22T14:59:08.000Z",
+      "typeof": "Date",
+      "getTime": -1252659652000,
+      "ISO": "1930-04-22T14:59:08.000Z",
+      "rawExcelSerial": 11071
+    },
+    {
+      "file": "사업현황.xlsx",
+      "sheet": "계약",
+      "row": 27,
+      "col": 10,
+      "header": "종료일자",
+      "year": 1930,
+      "kind": "Date",
+      "raw": "1930-05-02T14:59:08.000Z",
+      "typeof": "Date",
+      "getTime": -1251795652000,
+      "ISO": "1930-05-02T14:59:08.000Z",
+      "rawExcelSerial": 11081
+    },
+    {
+      "file": "사업현황.xlsx",
+      "sheet": "계약",
+      "row": 30,
+      "col": 10,
+      "header": "종료일자",
+      "year": 1930,
+      "kind": "Date",
+      "raw": "1930-05-18T14:59:08.000Z",
+      "typeof": "Date",
+      "getTime": -1250413252000,
+      "ISO": "1930-05-18T14:59:08.000Z",
+      "rawExcelSerial": 11097
+    },
+    {
+      "file": "사업현황.xlsx",
+      "sheet": "계약",
+      "row": 37,
+      "col": 10,
+      "header": "종료일자",
+      "year": 1930,
+      "kind": "Date",
+      "raw": "1930-05-26T14:59:08.000Z",
+      "typeof": "Date",
+      "getTime": -1249722052000,
+      "ISO": "1930-05-26T14:59:08.000Z",
+      "rawExcelSerial": 11105
+    },
+    {
+      "file": "사업현황.xlsx",
+      "sheet": "계약",
+      "row": 43,
+      "col": 10,
+      "header": "종료일자",
+      "year": 1930,
+      "kind": "Date",
+      "raw": "1930-05-19T14:59:08.000Z",
+      "typeof": "Date",
+      "getTime": -1250326852000,
+      "ISO": "1930-05-19T14:59:08.000Z",
+      "rawExcelSerial": 11098
+    },
+    {
+      "file": "사업현황.xlsx",
+      "sheet": "계약",
+      "row": 53,
+      "col": 10,
+      "header": "종료일자",
+      "year": 1930,
+      "kind": "Date",
+      "raw": "1930-06-02T14:59:08.000Z",
+      "typeof": "Date",
+      "getTime": -1249117252000,
+      "ISO": "1930-06-02T14:59:08.000Z",
+      "rawExcelSerial": 11112
+    },
+    {
+      "file": "사업현황.xlsx",
+      "sheet": "계약",
+      "row": 55,
+      "col": 10,
+      "header": "종료일자",
+      "year": 1930,
+      "kind": "Date",
+      "raw": "1930-03-21T14:59:08.000Z",
+      "typeof": "Date",
+      "getTime": -1255424452000,
+      "ISO": "1930-03-21T14:59:08.000Z",
+      "rawExcelSerial": 11039
+    },
+    {
+      "file": "사업현황.xlsx",
+      "sheet": "계약",
+      "row": 72,
+      "col": 10,
+      "header": "종료일자",
+      "year": 1930,
+      "kind": "Date",
+      "raw": "1930-05-20T14:59:08.000Z",
+      "typeof": "Date",
+      "getTime": -1250240452000,
+      "ISO": "1930-05-20T14:59:08.000Z",
+      "rawExcelSerial": 11099
+    },
+    {
+      "file": "사업현황.xlsx",
+      "sheet": "계약",
+      "row": 74,
+      "col": 10,
+      "header": "종료일자",
+      "year": 1930,
+      "kind": "Date",
+      "raw": "1930-03-07T14:59:08.000Z",
+      "typeof": "Date",
+      "getTime": -1256634052000,
+      "ISO": "1930-03-07T14:59:08.000Z",
+      "rawExcelSerial": 11025
+    },
+    {
+      "file": "사업현황.xlsx",
+      "sheet": "계약",
+      "row": 82,
+      "col": 18,
+      "header": "종료일자",
+      "year": 1930,
+      "kind": "Date",
+      "raw": "1930-05-05T14:59:08.000Z",
+      "typeof": "Date",
+      "getTime": -1251536452000,
+      "ISO": "1930-05-05T14:59:08.000Z",
+      "rawExcelSerial": 11084
+    },
+    {
+      "file": "사업현황.xlsx",
+      "sheet": "계약",
+      "row": 82,
+      "col": 26,
+      "header": "종료일자",
+      "year": 1930,
+      "kind": "Date",
+      "raw": "1930-01-13T14:59:08.000Z",
+      "typeof": "Date",
+      "getTime": -1261213252000,
+      "ISO": "1930-01-13T14:59:08.000Z",
+      "rawExcelSerial": 10972
+    },
+    {
+      "file": "사업현황.xlsx",
+      "sheet": "계약",
+      "row": 91,
+      "col": 10,
+      "header": "종료일자",
+      "year": 1930,
+      "kind": "Date",
+      "raw": "1930-05-02T14:59:08.000Z",
+      "typeof": "Date",
+      "getTime": -1251795652000,
+      "ISO": "1930-05-02T14:59:08.000Z",
+      "rawExcelSerial": 11081
+    },
+    {
+      "file": "사업현황.xlsx",
+      "sheet": "계약",
+      "row": 95,
+      "col": 10,
+      "header": "종료일자",
+      "year": 1930,
+      "kind": "Date",
+      "raw": "1930-03-16T14:59:08.000Z",
+      "typeof": "Date",
+      "getTime": -1255856452000,
+      "ISO": "1930-03-16T14:59:08.000Z",
+      "rawExcelSerial": 11034
+    },
+    {
+      "file": "사업현황.xlsx",
+      "sheet": "계약",
+      "row": 99,
+      "col": 10,
+      "header": "종료일자",
+      "year": 1930,
+      "kind": "Date",
+      "raw": "1930-04-18T14:59:08.000Z",
+      "typeof": "Date",
+      "getTime": -1253005252000,
+      "ISO": "1930-04-18T14:59:08.000Z",
+      "rawExcelSerial": 11067
+    },
+    {
+      "file": "사업현황.xlsx",
+      "sheet": "계약",
+      "row": 106,
+      "col": 10,
+      "header": "종료일자",
+      "year": 1931,
+      "kind": "Date",
+      "raw": "1931-06-14T14:59:08.000Z",
+      "typeof": "Date",
+      "getTime": -1216544452000,
+      "ISO": "1931-06-14T14:59:08.000Z",
+      "rawExcelSerial": 11489
+    },
+    {
+      "file": "사업현황.xlsx",
+      "sheet": "계약",
+      "row": 111,
+      "col": 10,
+      "header": "종료일자",
+      "year": 1930,
+      "kind": "Date",
+      "raw": "1930-03-15T14:59:08.000Z",
+      "typeof": "Date",
+      "getTime": -1255942852000,
+      "ISO": "1930-03-15T14:59:08.000Z",
+      "rawExcelSerial": 11033
+    },
+    {
+      "file": "사업현황.xlsx",
+      "sheet": "계약",
+      "row": 112,
+      "col": 10,
+      "header": "종료일자",
+      "year": 1930,
+      "kind": "Date",
+      "raw": "1930-02-24T14:59:08.000Z",
+      "typeof": "Date",
+      "getTime": -1257584452000,
+      "ISO": "1930-02-24T14:59:08.000Z",
+      "rawExcelSerial": 11014
+    },
+    {
+      "file": "사업현황.xlsx",
+      "sheet": "계약",
+      "row": 113,
+      "col": 18,
+      "header": "종료일자",
+      "year": 1930,
+      "kind": "Date",
+      "raw": "1930-02-10T14:59:08.000Z",
+      "typeof": "Date",
+      "getTime": -1258794052000,
+      "ISO": "1930-02-10T14:59:08.000Z",
+      "rawExcelSerial": 11000
+    },
+    {
+      "file": "사업현황.xlsx",
+      "sheet": "계약",
+      "row": 114,
+      "col": 10,
+      "header": "종료일자",
+      "year": 1930,
+      "kind": "Date",
+      "raw": "1930-03-09T14:59:08.000Z",
+      "typeof": "Date",
+      "getTime": -1256461252000,
+      "ISO": "1930-03-09T14:59:08.000Z",
+      "rawExcelSerial": 11027
+    },
+    {
+      "file": "사업현황.xlsx",
+      "sheet": "계약",
+      "row": 114,
+      "col": 18,
+      "header": "종료일자",
+      "year": 1930,
+      "kind": "Date",
+      "raw": "1930-03-09T14:59:08.000Z",
+      "typeof": "Date",
+      "getTime": -1256461252000,
+      "ISO": "1930-03-09T14:59:08.000Z",
+      "rawExcelSerial": 11027
+    },
+    {
+      "file": "사업현황.xlsx",
+      "sheet": "계약",
+      "row": 115,
+      "col": 10,
+      "header": "종료일자",
+      "year": 1930,
+      "kind": "Date",
+      "raw": "1930-03-08T14:59:08.000Z",
+      "typeof": "Date",
+      "getTime": -1256547652000,
+      "ISO": "1930-03-08T14:59:08.000Z",
+      "rawExcelSerial": 11026
+    },
+    {
+      "file": "사업현황.xlsx",
+      "sheet": "계약",
+      "row": 116,
+      "col": 10,
+      "header": "종료일자",
+      "year": 1930,
+      "kind": "Date",
+      "raw": "1930-04-13T14:59:08.000Z",
+      "typeof": "Date",
+      "getTime": -1253437252000,
+      "ISO": "1930-04-13T14:59:08.000Z",
+      "rawExcelSerial": 11062
+    },
+    {
+      "file": "사업현황.xlsx",
+      "sheet": "계약",
+      "row": 117,
+      "col": 10,
+      "header": "종료일자",
+      "year": 1930,
+      "kind": "Date",
+      "raw": "1930-02-25T14:59:08.000Z",
+      "typeof": "Date",
+      "getTime": -1257498052000,
+      "ISO": "1930-02-25T14:59:08.000Z",
+      "rawExcelSerial": 11015
+    },
+    {
+      "file": "사업현황.xlsx",
+      "sheet": "계약",
+      "row": 148,
+      "col": 17,
+      "header": "인도일자",
+      "year": 1900,
+      "kind": "excelSerial",
+      "raw": 74,
+      "typeof": "number",
+      "asExcelDate": "1900-03-14T00:00:00.000Z",
+      "excelSerial": 74,
+      "smallSerial": false,
+      "rawExcelSerial": 74
+    },
+    {
+      "file": "사업현황.xlsx",
+      "sheet": "채권",
+      "row": 13,
+      "col": 11,
+      "header": "COL_11",
+      "year": 1930,
+      "kind": "Date",
+      "raw": "1930-05-24T14:59:08.000Z",
+      "typeof": "Date",
+      "getTime": -1249894852000,
+      "ISO": "1930-05-24T14:59:08.000Z",
+      "rawExcelSerial": 11103
+    },
+    {
+      "file": "사업현황.xlsx",
+      "sheet": "채권",
+      "row": 28,
+      "col": 11,
+      "header": "COL_11",
+      "year": 1930,
+      "kind": "Date",
+      "raw": "1930-05-02T14:59:08.000Z",
+      "typeof": "Date",
+      "getTime": -1251795652000,
+      "ISO": "1930-05-02T14:59:08.000Z",
+      "rawExcelSerial": 11081
+    },
+    {
+      "file": "사업현황.xlsx",
+      "sheet": "채권",
+      "row": 31,
+      "col": 11,
+      "header": "COL_11",
+      "year": 1930,
+      "kind": "Date",
+      "raw": "1930-05-18T14:59:08.000Z",
+      "typeof": "Date",
+      "getTime": -1250413252000,
+      "ISO": "1930-05-18T14:59:08.000Z",
+      "rawExcelSerial": 11097
+    },
+    {
+      "file": "사업현황.xlsx",
+      "sheet": "채권",
+      "row": 38,
+      "col": 11,
+      "header": "COL_11",
+      "year": 1930,
+      "kind": "Date",
+      "raw": "1930-05-26T14:59:08.000Z",
+      "typeof": "Date",
+      "getTime": -1249722052000,
+      "ISO": "1930-05-26T14:59:08.000Z",
+      "rawExcelSerial": 11105
+    },
+    {
+      "file": "사업현황.xlsx",
+      "sheet": "채권",
+      "row": 44,
+      "col": 11,
+      "header": "COL_11",
+      "year": 1930,
+      "kind": "Date",
+      "raw": "1930-05-19T14:59:08.000Z",
+      "typeof": "Date",
+      "getTime": -1250326852000,
+      "ISO": "1930-05-19T14:59:08.000Z",
+      "rawExcelSerial": 11098
+    },
+    {
+      "file": "사업현황.xlsx",
+      "sheet": "채권",
+      "row": 54,
+      "col": 11,
+      "header": "COL_11",
+      "year": 1930,
+      "kind": "Date",
+      "raw": "1930-06-02T14:59:08.000Z",
+      "typeof": "Date",
+      "getTime": -1249117252000,
+      "ISO": "1930-06-02T14:59:08.000Z",
+      "rawExcelSerial": 11112
+    },
+    {
+      "file": "사업현황.xlsx",
+      "sheet": "채권",
+      "row": 56,
+      "col": 11,
+      "header": "COL_11",
+      "year": 1930,
+      "kind": "Date",
+      "raw": "1930-03-21T14:59:08.000Z",
+      "typeof": "Date",
+      "getTime": -1255424452000,
+      "ISO": "1930-03-21T14:59:08.000Z",
+      "rawExcelSerial": 11039
+    },
+    {
+      "file": "사업현황.xlsx",
+      "sheet": "채권",
+      "row": 73,
+      "col": 11,
+      "header": "COL_11",
+      "year": 1930,
+      "kind": "Date",
+      "raw": "1930-05-20T14:59:08.000Z",
+      "typeof": "Date",
+      "getTime": -1250240452000,
+      "ISO": "1930-05-20T14:59:08.000Z",
+      "rawExcelSerial": 11099
+    },
+    {
+      "file": "사업현황.xlsx",
+      "sheet": "채권",
+      "row": 75,
+      "col": 11,
+      "header": "COL_11",
+      "year": 1930,
+      "kind": "Date",
+      "raw": "1930-03-07T14:59:08.000Z",
+      "typeof": "Date",
+      "getTime": -1256634052000,
+      "ISO": "1930-03-07T14:59:08.000Z",
+      "rawExcelSerial": 11025
+    },
+    {
+      "file": "사업현황.xlsx",
+      "sheet": "채권",
+      "row": 92,
+      "col": 11,
+      "header": "COL_11",
+      "year": 1930,
+      "kind": "Date",
+      "raw": "1930-05-02T14:59:08.000Z",
+      "typeof": "Date",
+      "getTime": -1251795652000,
+      "ISO": "1930-05-02T14:59:08.000Z",
+      "rawExcelSerial": 11081
+    },
+    {
+      "file": "사업현황.xlsx",
+      "sheet": "채권",
+      "row": 96,
+      "col": 11,
+      "header": "COL_11",
+      "year": 1930,
+      "kind": "Date",
+      "raw": "1930-03-16T14:59:08.000Z",
+      "typeof": "Date",
+      "getTime": -1255856452000,
+      "ISO": "1930-03-16T14:59:08.000Z",
+      "rawExcelSerial": 11034
+    },
+    {
+      "file": "사업현황.xlsx",
+      "sheet": "채권",
+      "row": 100,
+      "col": 11,
+      "header": "COL_11",
+      "year": 1930,
+      "kind": "Date",
+      "raw": "1930-04-18T14:59:08.000Z",
+      "typeof": "Date",
+      "getTime": -1253005252000,
+      "ISO": "1930-04-18T14:59:08.000Z",
+      "rawExcelSerial": 11067
+    },
+    {
+      "file": "사업현황.xlsx",
+      "sheet": "채권",
+      "row": 107,
+      "col": 11,
+      "header": "COL_11",
+      "year": 1931,
+      "kind": "Date",
+      "raw": "1931-06-14T14:59:08.000Z",
+      "typeof": "Date",
+      "getTime": -1216544452000,
+      "ISO": "1931-06-14T14:59:08.000Z",
+      "rawExcelSerial": 11489
+    },
+    {
+      "file": "사업현황.xlsx",
+      "sheet": "채권",
+      "row": 112,
+      "col": 11,
+      "header": "COL_11",
+      "year": 1930,
+      "kind": "Date",
+      "raw": "1930-03-15T14:59:08.000Z",
+      "typeof": "Date",
+      "getTime": -1255942852000,
+      "ISO": "1930-03-15T14:59:08.000Z",
+      "rawExcelSerial": 11033
+    },
+    {
+      "file": "사업현황.xlsx",
+      "sheet": "채권",
+      "row": 113,
+      "col": 11,
+      "header": "COL_11",
+      "year": 1930,
+      "kind": "Date",
+      "raw": "1930-02-24T14:59:08.000Z",
+      "typeof": "Date",
+      "getTime": -1257584452000,
+      "ISO": "1930-02-24T14:59:08.000Z",
+      "rawExcelSerial": 11014
+    }
+  ],
+  "epochSamples": [
+    {
+      "file": "사업현황.xlsx",
+      "sheet": "계약",
+      "row": 12,
+      "col": 10,
+      "header": "종료일자",
+      "year": 1930,
+      "kind": "Date",
+      "raw": "1930-05-24T14:59:08.000Z",
+      "typeof": "Date",
+      "getTime": -1249894852000,
+      "ISO": "1930-05-24T14:59:08.000Z",
+      "rawExcelSerial": 11103,
+      "note": "year1930"
+    },
+    {
+      "file": "사업현황.xlsx",
+      "sheet": "계약",
+      "row": 13,
+      "col": 18,
+      "header": "종료일자",
+      "year": 1930,
+      "kind": "Date",
+      "raw": "1930-04-22T14:59:08.000Z",
+      "typeof": "Date",
+      "getTime": -1252659652000,
+      "ISO": "1930-04-22T14:59:08.000Z",
+      "rawExcelSerial": 11071,
+      "note": "year1930"
+    },
+    {
+      "file": "사업현황.xlsx",
+      "sheet": "계약",
+      "row": 27,
+      "col": 10,
+      "header": "종료일자",
+      "year": 1930,
+      "kind": "Date",
+      "raw": "1930-05-02T14:59:08.000Z",
+      "typeof": "Date",
+      "getTime": -1251795652000,
+      "ISO": "1930-05-02T14:59:08.000Z",
+      "rawExcelSerial": 11081,
+      "note": "year1930"
+    },
+    {
+      "file": "사업현황.xlsx",
+      "sheet": "계약",
+      "row": 30,
+      "col": 10,
+      "header": "종료일자",
+      "year": 1930,
+      "kind": "Date",
+      "raw": "1930-05-18T14:59:08.000Z",
+      "typeof": "Date",
+      "getTime": -1250413252000,
+      "ISO": "1930-05-18T14:59:08.000Z",
+      "rawExcelSerial": 11097,
+      "note": "year1930"
+    },
+    {
+      "file": "사업현황.xlsx",
+      "sheet": "계약",
+      "row": 37,
+      "col": 10,
+      "header": "종료일자",
+      "year": 1930,
+      "kind": "Date",
+      "raw": "1930-05-26T14:59:08.000Z",
+      "typeof": "Date",
+      "getTime": -1249722052000,
+      "ISO": "1930-05-26T14:59:08.000Z",
+      "rawExcelSerial": 11105,
+      "note": "year1930"
+    },
+    {
+      "file": "사업현황.xlsx",
+      "sheet": "계약",
+      "row": 43,
+      "col": 10,
+      "header": "종료일자",
+      "year": 1930,
+      "kind": "Date",
+      "raw": "1930-05-19T14:59:08.000Z",
+      "typeof": "Date",
+      "getTime": -1250326852000,
+      "ISO": "1930-05-19T14:59:08.000Z",
+      "rawExcelSerial": 11098,
+      "note": "year1930"
+    },
+    {
+      "file": "사업현황.xlsx",
+      "sheet": "계약",
+      "row": 53,
+      "col": 10,
+      "header": "종료일자",
+      "year": 1930,
+      "kind": "Date",
+      "raw": "1930-06-02T14:59:08.000Z",
+      "typeof": "Date",
+      "getTime": -1249117252000,
+      "ISO": "1930-06-02T14:59:08.000Z",
+      "rawExcelSerial": 11112,
+      "note": "year1930"
+    },
+    {
+      "file": "사업현황.xlsx",
+      "sheet": "계약",
+      "row": 55,
+      "col": 10,
+      "header": "종료일자",
+      "year": 1930,
+      "kind": "Date",
+      "raw": "1930-03-21T14:59:08.000Z",
+      "typeof": "Date",
+      "getTime": -1255424452000,
+      "ISO": "1930-03-21T14:59:08.000Z",
+      "rawExcelSerial": 11039,
+      "note": "year1930"
+    },
+    {
+      "file": "사업현황.xlsx",
+      "sheet": "계약",
+      "row": 72,
+      "col": 10,
+      "header": "종료일자",
+      "year": 1930,
+      "kind": "Date",
+      "raw": "1930-05-20T14:59:08.000Z",
+      "typeof": "Date",
+      "getTime": -1250240452000,
+      "ISO": "1930-05-20T14:59:08.000Z",
+      "rawExcelSerial": 11099,
+      "note": "year1930"
+    },
+    {
+      "file": "사업현황.xlsx",
+      "sheet": "계약",
+      "row": 74,
+      "col": 10,
+      "header": "종료일자",
+      "year": 1930,
+      "kind": "Date",
+      "raw": "1930-03-07T14:59:08.000Z",
+      "typeof": "Date",
+      "getTime": -1256634052000,
+      "ISO": "1930-03-07T14:59:08.000Z",
+      "rawExcelSerial": 11025,
+      "note": "year1930"
+    },
+    {
+      "file": "사업현황.xlsx",
+      "sheet": "계약",
+      "row": 82,
+      "col": 18,
+      "header": "종료일자",
+      "year": 1930,
+      "kind": "Date",
+      "raw": "1930-05-05T14:59:08.000Z",
+      "typeof": "Date",
+      "getTime": -1251536452000,
+      "ISO": "1930-05-05T14:59:08.000Z",
+      "rawExcelSerial": 11084,
+      "note": "year1930"
+    },
+    {
+      "file": "사업현황.xlsx",
+      "sheet": "계약",
+      "row": 82,
+      "col": 26,
+      "header": "종료일자",
+      "year": 1930,
+      "kind": "Date",
+      "raw": "1930-01-13T14:59:08.000Z",
+      "typeof": "Date",
+      "getTime": -1261213252000,
+      "ISO": "1930-01-13T14:59:08.000Z",
+      "rawExcelSerial": 10972,
+      "note": "year1930"
+    },
+    {
+      "file": "사업현황.xlsx",
+      "sheet": "계약",
+      "row": 91,
+      "col": 10,
+      "header": "종료일자",
+      "year": 1930,
+      "kind": "Date",
+      "raw": "1930-05-02T14:59:08.000Z",
+      "typeof": "Date",
+      "getTime": -1251795652000,
+      "ISO": "1930-05-02T14:59:08.000Z",
+      "rawExcelSerial": 11081,
+      "note": "year1930"
+    },
+    {
+      "file": "사업현황.xlsx",
+      "sheet": "계약",
+      "row": 95,
+      "col": 10,
+      "header": "종료일자",
+      "year": 1930,
+      "kind": "Date",
+      "raw": "1930-03-16T14:59:08.000Z",
+      "typeof": "Date",
+      "getTime": -1255856452000,
+      "ISO": "1930-03-16T14:59:08.000Z",
+      "rawExcelSerial": 11034,
+      "note": "year1930"
+    },
+    {
+      "file": "사업현황.xlsx",
+      "sheet": "계약",
+      "row": 99,
+      "col": 10,
+      "header": "종료일자",
+      "year": 1930,
+      "kind": "Date",
+      "raw": "1930-04-18T14:59:08.000Z",
+      "typeof": "Date",
+      "getTime": -1253005252000,
+      "ISO": "1930-04-18T14:59:08.000Z",
+      "rawExcelSerial": 11067,
+      "note": "year1930"
+    },
+    {
+      "file": "사업현황.xlsx",
+      "sheet": "계약",
+      "row": 111,
+      "col": 10,
+      "header": "종료일자",
+      "year": 1930,
+      "kind": "Date",
+      "raw": "1930-03-15T14:59:08.000Z",
+      "typeof": "Date",
+      "getTime": -1255942852000,
+      "ISO": "1930-03-15T14:59:08.000Z",
+      "rawExcelSerial": 11033,
+      "note": "year1930"
+    },
+    {
+      "file": "사업현황.xlsx",
+      "sheet": "계약",
+      "row": 112,
+      "col": 10,
+      "header": "종료일자",
+      "year": 1930,
+      "kind": "Date",
+      "raw": "1930-02-24T14:59:08.000Z",
+      "typeof": "Date",
+      "getTime": -1257584452000,
+      "ISO": "1930-02-24T14:59:08.000Z",
+      "rawExcelSerial": 11014,
+      "note": "year1930"
+    },
+    {
+      "file": "사업현황.xlsx",
+      "sheet": "계약",
+      "row": 113,
+      "col": 18,
+      "header": "종료일자",
+      "year": 1930,
+      "kind": "Date",
+      "raw": "1930-02-10T14:59:08.000Z",
+      "typeof": "Date",
+      "getTime": -1258794052000,
+      "ISO": "1930-02-10T14:59:08.000Z",
+      "rawExcelSerial": 11000,
+      "note": "year1930"
+    },
+    {
+      "file": "사업현황.xlsx",
+      "sheet": "계약",
+      "row": 114,
+      "col": 10,
+      "header": "종료일자",
+      "year": 1930,
+      "kind": "Date",
+      "raw": "1930-03-09T14:59:08.000Z",
+      "typeof": "Date",
+      "getTime": -1256461252000,
+      "ISO": "1930-03-09T14:59:08.000Z",
+      "rawExcelSerial": 11027,
+      "note": "year1930"
+    },
+    {
+      "file": "사업현황.xlsx",
+      "sheet": "계약",
+      "row": 114,
+      "col": 18,
+      "header": "종료일자",
+      "year": 1930,
+      "kind": "Date",
+      "raw": "1930-03-09T14:59:08.000Z",
+      "typeof": "Date",
+      "getTime": -1256461252000,
+      "ISO": "1930-03-09T14:59:08.000Z",
+      "rawExcelSerial": 11027,
+      "note": "year1930"
+    },
+    {
+      "file": "사업현황.xlsx",
+      "sheet": "계약",
+      "row": 115,
+      "col": 10,
+      "header": "종료일자",
+      "year": 1930,
+      "kind": "Date",
+      "raw": "1930-03-08T14:59:08.000Z",
+      "typeof": "Date",
+      "getTime": -1256547652000,
+      "ISO": "1930-03-08T14:59:08.000Z",
+      "rawExcelSerial": 11026,
+      "note": "year1930"
+    },
+    {
+      "file": "사업현황.xlsx",
+      "sheet": "계약",
+      "row": 116,
+      "col": 10,
+      "header": "종료일자",
+      "year": 1930,
+      "kind": "Date",
+      "raw": "1930-04-13T14:59:08.000Z",
+      "typeof": "Date",
+      "getTime": -1253437252000,
+      "ISO": "1930-04-13T14:59:08.000Z",
+      "rawExcelSerial": 11062,
+      "note": "year1930"
+    },
+    {
+      "file": "사업현황.xlsx",
+      "sheet": "계약",
+      "row": 117,
+      "col": 10,
+      "header": "종료일자",
+      "year": 1930,
+      "kind": "Date",
+      "raw": "1930-02-25T14:59:08.000Z",
+      "typeof": "Date",
+      "getTime": -1257498052000,
+      "ISO": "1930-02-25T14:59:08.000Z",
+      "rawExcelSerial": 11015,
+      "note": "year1930"
+    },
+    {
+      "file": "사업현황.xlsx",
+      "sheet": "채권",
+      "row": 13,
+      "col": 11,
+      "header": "COL_11",
+      "year": 1930,
+      "kind": "Date",
+      "raw": "1930-05-24T14:59:08.000Z",
+      "typeof": "Date",
+      "getTime": -1249894852000,
+      "ISO": "1930-05-24T14:59:08.000Z",
+      "rawExcelSerial": 11103,
+      "note": "year1930"
+    },
+    {
+      "file": "사업현황.xlsx",
+      "sheet": "채권",
+      "row": 28,
+      "col": 11,
+      "header": "COL_11",
+      "year": 1930,
+      "kind": "Date",
+      "raw": "1930-05-02T14:59:08.000Z",
+      "typeof": "Date",
+      "getTime": -1251795652000,
+      "ISO": "1930-05-02T14:59:08.000Z",
+      "rawExcelSerial": 11081,
+      "note": "year1930"
+    },
+    {
+      "file": "사업현황.xlsx",
+      "sheet": "채권",
+      "row": 31,
+      "col": 11,
+      "header": "COL_11",
+      "year": 1930,
+      "kind": "Date",
+      "raw": "1930-05-18T14:59:08.000Z",
+      "typeof": "Date",
+      "getTime": -1250413252000,
+      "ISO": "1930-05-18T14:59:08.000Z",
+      "rawExcelSerial": 11097,
+      "note": "year1930"
+    },
+    {
+      "file": "사업현황.xlsx",
+      "sheet": "채권",
+      "row": 38,
+      "col": 11,
+      "header": "COL_11",
+      "year": 1930,
+      "kind": "Date",
+      "raw": "1930-05-26T14:59:08.000Z",
+      "typeof": "Date",
+      "getTime": -1249722052000,
+      "ISO": "1930-05-26T14:59:08.000Z",
+      "rawExcelSerial": 11105,
+      "note": "year1930"
+    },
+    {
+      "file": "사업현황.xlsx",
+      "sheet": "채권",
+      "row": 44,
+      "col": 11,
+      "header": "COL_11",
+      "year": 1930,
+      "kind": "Date",
+      "raw": "1930-05-19T14:59:08.000Z",
+      "typeof": "Date",
+      "getTime": -1250326852000,
+      "ISO": "1930-05-19T14:59:08.000Z",
+      "rawExcelSerial": 11098,
+      "note": "year1930"
+    },
+    {
+      "file": "사업현황.xlsx",
+      "sheet": "채권",
+      "row": 54,
+      "col": 11,
+      "header": "COL_11",
+      "year": 1930,
+      "kind": "Date",
+      "raw": "1930-06-02T14:59:08.000Z",
+      "typeof": "Date",
+      "getTime": -1249117252000,
+      "ISO": "1930-06-02T14:59:08.000Z",
+      "rawExcelSerial": 11112,
+      "note": "year1930"
+    },
+    {
+      "file": "사업현황.xlsx",
+      "sheet": "채권",
+      "row": 56,
+      "col": 11,
+      "header": "COL_11",
+      "year": 1930,
+      "kind": "Date",
+      "raw": "1930-03-21T14:59:08.000Z",
+      "typeof": "Date",
+      "getTime": -1255424452000,
+      "ISO": "1930-03-21T14:59:08.000Z",
+      "rawExcelSerial": 11039,
+      "note": "year1930"
+    },
+    {
+      "file": "사업현황.xlsx",
+      "sheet": "채권",
+      "row": 73,
+      "col": 11,
+      "header": "COL_11",
+      "year": 1930,
+      "kind": "Date",
+      "raw": "1930-05-20T14:59:08.000Z",
+      "typeof": "Date",
+      "getTime": -1250240452000,
+      "ISO": "1930-05-20T14:59:08.000Z",
+      "rawExcelSerial": 11099,
+      "note": "year1930"
+    },
+    {
+      "file": "사업현황.xlsx",
+      "sheet": "채권",
+      "row": 75,
+      "col": 11,
+      "header": "COL_11",
+      "year": 1930,
+      "kind": "Date",
+      "raw": "1930-03-07T14:59:08.000Z",
+      "typeof": "Date",
+      "getTime": -1256634052000,
+      "ISO": "1930-03-07T14:59:08.000Z",
+      "rawExcelSerial": 11025,
+      "note": "year1930"
+    },
+    {
+      "file": "사업현황.xlsx",
+      "sheet": "채권",
+      "row": 92,
+      "col": 11,
+      "header": "COL_11",
+      "year": 1930,
+      "kind": "Date",
+      "raw": "1930-05-02T14:59:08.000Z",
+      "typeof": "Date",
+      "getTime": -1251795652000,
+      "ISO": "1930-05-02T14:59:08.000Z",
+      "rawExcelSerial": 11081,
+      "note": "year1930"
+    },
+    {
+      "file": "사업현황.xlsx",
+      "sheet": "채권",
+      "row": 96,
+      "col": 11,
+      "header": "COL_11",
+      "year": 1930,
+      "kind": "Date",
+      "raw": "1930-03-16T14:59:08.000Z",
+      "typeof": "Date",
+      "getTime": -1255856452000,
+      "ISO": "1930-03-16T14:59:08.000Z",
+      "rawExcelSerial": 11034,
+      "note": "year1930"
+    },
+    {
+      "file": "사업현황.xlsx",
+      "sheet": "채권",
+      "row": 100,
+      "col": 11,
+      "header": "COL_11",
+      "year": 1930,
+      "kind": "Date",
+      "raw": "1930-04-18T14:59:08.000Z",
+      "typeof": "Date",
+      "getTime": -1253005252000,
+      "ISO": "1930-04-18T14:59:08.000Z",
+      "rawExcelSerial": 11067,
+      "note": "year1930"
+    },
+    {
+      "file": "사업현황.xlsx",
+      "sheet": "채권",
+      "row": 112,
+      "col": 11,
+      "header": "COL_11",
+      "year": 1930,
+      "kind": "Date",
+      "raw": "1930-03-15T14:59:08.000Z",
+      "typeof": "Date",
+      "getTime": -1255942852000,
+      "ISO": "1930-03-15T14:59:08.000Z",
+      "rawExcelSerial": 11033,
+      "note": "year1930"
+    },
+    {
+      "file": "사업현황.xlsx",
+      "sheet": "채권",
+      "row": 113,
+      "col": 11,
+      "header": "COL_11",
+      "year": 1930,
+      "kind": "Date",
+      "raw": "1930-02-24T14:59:08.000Z",
+      "typeof": "Date",
+      "getTime": -1257584452000,
+      "ISO": "1930-02-24T14:59:08.000Z",
+      "rawExcelSerial": 11014,
+      "note": "year1930"
+    },
+    {
+      "file": "사업현황.xlsx",
+      "sheet": "채권",
+      "row": 115,
+      "col": 11,
+      "header": "COL_11",
+      "year": 1930,
+      "kind": "Date",
+      "raw": "1930-03-09T14:59:08.000Z",
+      "typeof": "Date",
+      "getTime": -1256461252000,
+      "ISO": "1930-03-09T14:59:08.000Z",
+      "rawExcelSerial": 11027,
+      "note": "year1930"
+    },
+    {
+      "file": "사업현황.xlsx",
+      "sheet": "채권",
+      "row": 116,
+      "col": 11,
+      "header": "COL_11",
+      "year": 1930,
+      "kind": "Date",
+      "raw": "1930-03-08T14:59:08.000Z",
+      "typeof": "Date",
+      "getTime": -1256547652000,
+      "ISO": "1930-03-08T14:59:08.000Z",
+      "rawExcelSerial": 11026,
+      "note": "year1930"
+    },
+    {
+      "file": "사업현황.xlsx",
+      "sheet": "채권",
+      "row": 117,
+      "col": 11,
+      "header": "COL_11",
+      "year": 1930,
+      "kind": "Date",
+      "raw": "1930-04-13T14:59:08.000Z",
+      "typeof": "Date",
+      "getTime": -1253437252000,
+      "ISO": "1930-04-13T14:59:08.000Z",
+      "rawExcelSerial": 11062,
+      "note": "year1930"
+    },
+    {
+      "file": "채권현황.xlsx",
+      "sheet": "채권",
+      "row": 65,
+      "col": 11,
+      "header": "종료",
+      "year": 1930,
+      "kind": "Date",
+      "raw": "1930-03-21T14:59:08.000Z",
+      "typeof": "Date",
+      "getTime": -1255424452000,
+      "ISO": "1930-03-21T14:59:08.000Z",
+      "rawExcelSerial": 11039,
+      "note": "year1930"
+    },
+    {
+      "file": "채권현황.xlsx",
+      "sheet": "채권",
+      "row": 84,
+      "col": 11,
+      "header": "종료",
+      "year": 1930,
+      "kind": "Date",
+      "raw": "1930-03-07T14:59:08.000Z",
+      "typeof": "Date",
+      "getTime": -1256634052000,
+      "ISO": "1930-03-07T14:59:08.000Z",
+      "rawExcelSerial": 11025,
+      "note": "year1930"
+    },
+    {
+      "file": "채권현황.xlsx",
+      "sheet": "채권",
+      "row": 93,
+      "col": 11,
+      "header": "종료",
+      "year": 1930,
+      "kind": "Date",
+      "raw": "1930-01-03T14:59:08.000Z",
+      "typeof": "Date",
+      "getTime": -1262077252000,
+      "ISO": "1930-01-03T14:59:08.000Z",
+      "rawExcelSerial": 10962,
+      "note": "year1930"
+    },
+    {
+      "file": "채권현황.xlsx",
+      "sheet": "채권",
+      "row": 108,
+      "col": 11,
+      "header": "종료",
+      "year": 1930,
+      "kind": "Date",
+      "raw": "1930-03-16T14:59:08.000Z",
+      "typeof": "Date",
+      "getTime": -1255856452000,
+      "ISO": "1930-03-16T14:59:08.000Z",
+      "rawExcelSerial": 11034,
+      "note": "year1930"
+    },
+    {
+      "file": "채권현황.xlsx",
+      "sheet": "채권",
+      "row": 124,
+      "col": 11,
+      "header": "종료",
+      "year": 1930,
+      "kind": "Date",
+      "raw": "1930-03-15T14:59:08.000Z",
+      "typeof": "Date",
+      "getTime": -1255942852000,
+      "ISO": "1930-03-15T14:59:08.000Z",
+      "rawExcelSerial": 11033,
+      "note": "year1930"
+    },
+    {
+      "file": "채권현황.xlsx",
+      "sheet": "채권",
+      "row": 125,
+      "col": 11,
+      "header": "종료",
+      "year": 1930,
+      "kind": "Date",
+      "raw": "1930-02-24T14:59:08.000Z",
+      "typeof": "Date",
+      "getTime": -1257584452000,
+      "ISO": "1930-02-24T14:59:08.000Z",
+      "rawExcelSerial": 11014,
+      "note": "year1930"
+    },
+    {
+      "file": "채권현황.xlsx",
+      "sheet": "채권",
+      "row": 126,
+      "col": 11,
+      "header": "종료",
+      "year": 1930,
+      "kind": "Date",
+      "raw": "1930-02-10T14:59:08.000Z",
+      "typeof": "Date",
+      "getTime": -1258794052000,
+      "ISO": "1930-02-10T14:59:08.000Z",
+      "rawExcelSerial": 11000,
+      "note": "year1930"
+    },
+    {
+      "file": "채권현황.xlsx",
+      "sheet": "채권",
+      "row": 127,
+      "col": 11,
+      "header": "종료",
+      "year": 1930,
+      "kind": "Date",
+      "raw": "1930-03-09T14:59:08.000Z",
+      "typeof": "Date",
+      "getTime": -1256461252000,
+      "ISO": "1930-03-09T14:59:08.000Z",
+      "rawExcelSerial": 11027,
+      "note": "year1930"
+    },
+    {
+      "file": "채권현황.xlsx",
+      "sheet": "채권",
+      "row": 128,
+      "col": 11,
+      "header": "종료",
+      "year": 1930,
+      "kind": "Date",
+      "raw": "1930-03-08T14:59:08.000Z",
+      "typeof": "Date",
+      "getTime": -1256547652000,
+      "ISO": "1930-03-08T14:59:08.000Z",
+      "rawExcelSerial": 11026,
+      "note": "year1930"
+    },
+    {
+      "file": "채권현황.xlsx",
+      "sheet": "채권",
+      "row": 129,
+      "col": 11,
+      "header": "종료",
+      "year": 1930,
+      "kind": "Date",
+      "raw": "1930-04-13T14:59:08.000Z",
+      "typeof": "Date",
+      "getTime": -1253437252000,
+      "ISO": "1930-04-13T14:59:08.000Z",
+      "rawExcelSerial": 11062,
+      "note": "year1930"
+    }
+  ],
+  "smallSerials": []
+}

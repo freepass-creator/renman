@@ -1,0 +1,275 @@
+/**
+ * 계약 라이프사이클 — 순수 로직(SSOT). 페이지는 여기서 도출/전이만 따다 쓴다.
+ * 검증 엔진 위에 올림: generateSchedules/recalcContract(미수) + applyReturnedProration(반납 일할).
+ *   상태전이: 대기 →(인도)→ 운행 →(반납/해지)→ 반납/해지. 연장은 기간 증가.
+ *   반납 시 마지막 회차 일할정산 자동 → 순미수 자동 차감.
+ */
+import type { EntityRecord } from './intake/entities';
+import type { Contract, PaymentEntry, DiscountEntry } from './payments/types';
+import { generateSchedules, recalcContract, addPaymentEntry, addDiscountEntry, distributeUnpaid } from './payments/payment-schedule';
+import { applyReturnedProration } from './payments/returned-proration';
+
+export type LifeStatus = '대기' | '운행' | '반납' | '해지' | '채권';
+
+export type ContractView = {
+  rec: EntityRecord;
+  status: LifeStatus;
+  delivered: boolean;
+  ended: boolean;
+  startDate: string;
+  endDate: string;
+  monthsLeft: number | null;   // 만기까지 일수→개월 아님, D-day(일)
+  dday: number | null;         // endDate까지 일수 (음수=경과)
+  gross: number;               // 도래 미수(일할 반영 후)
+  paid: number;
+  net: number;                 // 순미수
+  count: number;               // 미납 회차수
+  refund: number;              // 반납 일할 환불(있으면)
+  monthlyRent: number;
+  overdueDays: number;         // 가장 오래된 미납 회차 경과일(0=미납없음) — 회수 SLA 단계 판정용
+};
+
+function ymd(d: unknown): string { const s = String(d || ''); return /^\d{4}-\d{2}-\d{2}/.test(s) ? s.slice(0, 10) : ''; }
+function ddayFrom(today: string, target: string): number | null {
+  if (!target) return null;
+  return Math.round((new Date(target).getTime() - new Date(today).getTime()) / 86400000);
+}
+function addMonthsIso(date: string, months: number): string {
+  const d = new Date(date); if (Number.isNaN(d.getTime())) return '';   // 손상 날짜(월13 등)=Invalid → 빈값(RangeError 방지=전 페이지 백지 방어)
+  d.setMonth(d.getMonth() + months); return d.toISOString().slice(0, 10);
+}
+
+/** 계약 레코드 → v5 Contract(스케줄 포함) 빌드. 저장된 수기 입금(_payments)·청구할인(_discounts) 적용. */
+function buildContract(rec: EntityRecord, today: string): Contract {
+  const rent = Number(rec.monthlyRent) || 0;
+  const term = Number(rec.rentalMonths) || 0;
+  const start = ymd(rec.startDate || rec.contractDate);
+  // 결제일·선/후불 = 계약 캡처값 우선(자동이체일). 없으면 25일·선불 폴백(기존 데이터 무회귀).
+  const pd = Number(rec.paymentDay);
+  const payDay = pd >= 1 && pd <= 31 ? pd : 25;
+  const timing: '선불' | '후불' = rec.paymentTiming === '후불' ? '후불' : '선불';
+  let schedules = (rent && term && start)
+    ? generateSchedules({ contractDate: start, termMonths: term, monthlyRent: rent, paymentDay: payDay, paymentTiming: timing })
+        .map((s) => ({ ...s, id: 's' + s.seq, contractId: String(rec._key || 'c') }))
+    : [];
+  const pays = Array.isArray(rec._payments) ? (rec._payments as Array<Record<string, unknown>>) : [];
+  const discs = Array.isArray(rec._discounts) ? (rec._discounts as Array<Record<string, unknown>>) : [];
+  if (schedules.length && (pays.length || discs.length)) {
+    const bySeq = new Map<number, number>(schedules.map((s, i) => [s.seq, i]));
+    for (const dsc of discs) { // 할인 먼저(effective에 반영)
+      const idx = bySeq.get(Number(dsc.seq));
+      if (idx != null) schedules[idx] = addDiscountEntry(schedules[idx], { date: String(dsc.date || ''), amount: Number(dsc.amount) || 0, reason: (dsc.reason || '기타') } as DiscountEntry, today);
+    }
+    for (const p of pays) {
+      const idx = bySeq.get(Number(p.seq));
+      if (idx != null) { const r = addPaymentEntry(schedules[idx], { date: String(p.date || ''), amount: Number(p.amount) || 0, source: (p.source || '수동') } as PaymentEntry, today); schedules[idx] = r.schedule; }
+    }
+  }
+  // 미수 반영 — 명시 실미수(_carryUnpaid = 마이그레이션 씨앗 = 직원 running balance/추심잔여) 우선,
+  //   없으면 레거시 단일 납부값(_paidTotal): 도래분−납부.
+  const paidTotal = Number(rec._paidTotal) || 0;
+  const hasCarry = rec._carryUnpaid !== undefined && rec._carryUnpaid !== null;
+  if (schedules.length && !pays.length && (hasCarry || paidTotal > 0)) {
+    // 미수 기준일 = 반납 계약이면 반납일(그 시점 정산 — 이후 회차는 recalc가 면제).
+    //   ★ today가 아닌 반납일 cutoff로 분배해야 미수가 반납前 회차에 놓여 면제로 사라지지 않음(돈 유실 방지).
+    const rd = ymd(rec.returnedDate);
+    const cutoff = rd && rd < today ? rd : today;
+    const pastDue = schedules.filter((sc) => String(sc.dueDate || '') <= cutoff).reduce((sum, sc) => sum + sc.amount, 0);
+    // carry가 있으면 그 값을 그대로 미수로(도래분 부족 시 distributeUnpaid의 期초이월 흡수가 가장 오래된 회차에 담음).
+    const unpaid = hasCarry ? Math.max(0, Number(rec._carryUnpaid) || 0) : Math.max(0, pastDue - paidTotal);
+    schedules = distributeUnpaid(schedules, unpaid, cutoff, '');
+  }
+  return { id: String(rec._key || 'c'), monthlyRent: rent, termMonths: term, status: '운행', schedules } as unknown as Contract;
+}
+
+/** 매칭용 v5 Contract — 신원(임차인·차번·입금별칭)+스케줄. 자동매칭 엔진(receipt-match) 입력용. */
+export function buildMatchContract(rec: EntityRecord, today: string): Contract {
+  const c = buildContract(rec, today);
+  const aliases = Array.isArray(rec.payerAliases) ? (rec.payerAliases as string[]) : [];
+  return {
+    ...c,
+    contractNo: String(rec.contractNo || rec._key || ''),
+    customerName: String(rec.contractorName || ''),
+    vehiclePlate: String(rec.plate || ''),
+    driverName: String(rec.driverName || ''),
+    payerAliases: aliases,
+    status: deriveStatus(rec),
+  } as unknown as Contract;
+}
+
+/** 상태 도출 — 명시 status 우선, 없으면 인도/반납 날짜로 추론. */
+export function deriveStatus(rec: EntityRecord): LifeStatus {
+  const s = String(rec.status || '') as LifeStatus;
+  if (s) return s;
+  if (rec.returnedDate) return '반납';
+  if (rec.deliveredDate) return '운행';
+  return '대기';
+}
+
+/** 표시용 유효 만기일 — startDate 이전(1930 등 소스손상 값)이면 무효('')로 처리해 계산·표시에서 배제.
+ *  재수입 안 된 라이브 데이터에도 1930이 안 보이게 하는 방어(migration 가드와 동일 규칙). */
+export function effectiveEndDate(rec: EntityRecord): string {
+  const start = ymd(rec.startDate || rec.contractDate);
+  const rawEnd = ymd(rec.endDate);
+  return rawEnd && start && rawEnd >= start ? rawEnd : '';
+}
+
+/** 계약 1건의 운영 뷰(상태·미수·일할·D-day) 산출. */
+export function computeContractView(rec: EntityRecord, today: string): ContractView {
+  const status = deriveStatus(rec);
+  const ended = status === '반납' || status === '해지' || status === '채권';
+  const delivered = !!rec.deliveredDate || status === '운행' || ended;
+  const start = ymd(rec.startDate || rec.contractDate);
+  // 1930 등 startDate 이전 만기는 무효 → start+rentalMonths로 폴백(소스손상 방어, 재수입 전에도 안전)
+  const end = effectiveEndDate(rec) || (start && Number(rec.rentalMonths) ? addMonthsIso(start, Number(rec.rentalMonths)) : '');
+  const returnedDate = ymd(rec.returnedDate);
+
+  let c = buildContract(rec, today);
+  let refund = 0;
+  // 마이그레이션 씨앗(_carryUnpaid = 직원 확정 실미수)은 이미 정산(보증금상계·과오납 등)이 반영된 값 →
+  //   일할 재정산을 다시 걸면 carry가 이중차감돼 회수 대상 금액을 놓친다 → 씨앗 계약은 일할 skip.
+  const seedCarry = rec._carryUnpaid !== undefined && rec._carryUnpaid !== null;
+  if (returnedDate && c.schedules?.length && !seedCarry) {
+    const before = recalcContract(c, today).unpaidAmount || 0;
+    c = applyReturnedProration(c, returnedDate);   // 반납 일할 entry 삽입
+    const after = recalcContract(c, today).unpaidAmount || 0;
+    refund = Math.max(0, before - after);
+  }
+  // 미수 기준일: 반납했으면 반납일까지만 도래
+  const asOf = returnedDate && returnedDate < today ? returnedDate : today;
+  const rc = recalcContract(c, asOf);
+  const overdueDue = (rc.schedules || []).filter((s) => s.status === '연체' || s.status === '부분납').map((s) => s.dueDate).filter(Boolean).sort();
+  const overdueDays = overdueDue.length ? Math.max(0, Math.round((new Date(asOf).getTime() - new Date(overdueDue[0]).getTime()) / 86400000)) : 0;
+  const schedGross = rc.unpaidAmount || 0;
+  const seedPaid = Array.isArray(rec._payments) ? (rec._payments as Array<Record<string, unknown>>).reduce((s, p) => s + (Number(p.amount) || 0), 0) : 0;
+  const seedPaidTotal = Number(rec._paidTotal) || 0;   // 씨앗 개시 역산 납부분(오픈 전 상환분)
+  const hasPerSeq = seedPaid > 0;
+  // 입금누계: 씨앗은 개시분(_paidTotal) + 오픈후 앱수납(_payments). 그 외는 _payments 또는 _paidTotal.
+  const paid = seedCarry ? seedPaidTotal + seedPaid : (hasPerSeq ? seedPaid : seedPaidTotal);
+  // 마이그레이션 씨앗 미수(전체 장부의 정확성 핵심):
+  //   · 무납부 = carry(개시 앵커, 스케줄 날짜경계·반올림 무관하게 정확).
+  //   · 앱수납 발생 후 = buildContract가 carry/_paidTotal 분배를 건너뛰어 schedGross=(전체 도래−_payments)가 됨 →
+  //     _paidTotal(개시 역산 납부분)을 빼면 net = 도래−개시납부−앱수납 = 개시미수 보존 + 오픈후 도래분 자동 가산 + 납부 차감.
+  //   ★carry−수납으로 못박으면 운행중 씨앗이 당월 대여료 납부에 개시미수가 잠식돼 과소계상(자체검증 회귀) → 반드시 schedGross 기반.
+  const carrySeed = Math.max(0, Number(rec._carryUnpaid) || 0);
+  const seedNet = seedCarry ? (hasPerSeq ? Math.max(0, schedGross - seedPaidTotal) : carrySeed) : null;
+  const gross = seedNet != null ? seedNet : schedGross;
+  const net = seedNet != null ? seedNet : schedGross;
+  const rent0 = Number(rec.monthlyRent) || 0;
+  // 미납 회차수: 씨앗은 net 기준(회차표가 carry분배 skip으로 폭증해도 헤드라인/문서 회차수는 net과 일치 → 내용증명 '11회' 오표기 방지).
+  const count = seedNet != null
+    ? (seedNet > 0 ? Math.max(1, rent0 > 0 ? Math.ceil(seedNet / rent0) : 1) : 0)
+    : (rc.unpaidSeqCount || 0);
+
+  return {
+    rec, status, delivered, ended, startDate: start, endDate: end,
+    monthsLeft: null, dday: ended ? null : ddayFrom(today, end),
+    gross, paid, net, count, refund,
+    monthlyRent: Number(rec.monthlyRent) || 0,
+    overdueDays,
+  };
+}
+
+/** 수납 스케줄(회차표) — 상세에서 사용. */
+export function contractSchedules(rec: EntityRecord, today: string) {
+  const c = buildContract(rec, today);
+  if (!c.schedules?.length) return [];
+  const rd = ymd(rec.returnedDate);
+  const seedCarry = rec._carryUnpaid !== undefined && rec._carryUnpaid !== null;
+  const prorated = rd && !seedCarry ? applyReturnedProration(c, rd) : c; // 씨앗 미수는 일할 재정산 금지(carry 유지)
+  const rc = recalcContract(prorated, rd && rd < today ? rd : today);
+  return (rc.schedules || []).map((s) => {
+    const discount = (s.discounts || []).reduce((t, d) => t + (d.amount || 0), 0);
+    const paid = s.paidAmount || 0;
+    return {
+      seq: s.seq, dueDate: s.dueDate, amount: s.amount, discount, paid,
+      balance: Math.max(0, s.amount - discount - paid), // 회차 미납 = 청구−할인−납부(분할납부 누계)
+      paidAt: s.paidAt || '', // 최근 납부일
+      payments: (s.payments || []).map((p) => ({ date: p.date, amount: p.amount, source: p.source })), // 분할납부 내역(일자·금액·수단)
+      method: (s.payments && s.payments.length) ? String(s.payments[s.payments.length - 1].source || '') : '', // 납부 수단(계좌/CMS/카드/현금)
+      status: s.status,
+    };
+  });
+}
+
+/** 인도(출고) 대기 계약 술어 — SSOT. 운영현황(deliveryPending)·입출고(/dispatch) 동일 집합 보장.
+ *  대기 상태 + 번호판 있음 + 아직 인도/반납 안 함. 손롤 필터 금지, 이 헬퍼로 통일. */
+export function isDeliveryPending(c: EntityRecord): boolean {
+  return !!c.plate && !c.deliveredDate && !c.returnedDate && String(c.status || '') === '대기';
+}
+
+/** 반납 대상 계약 술어 — SSOT. 인도 완료 + 아직 반납 안 함 + 종료(반납/해지/채권) 아님(=운행중). */
+export function isReturnable(c: EntityRecord): boolean {
+  return !!c.plate && !!c.deliveredDate && !c.returnedDate && !['반납', '해지', '채권'].includes(String(c.status || ''));
+}
+
+/** 반납 정산 — 정산서(SettlementDoc)·현장 반납폼 공용 SSOT. 손롤 금지, 이 함수로 통일.
+ *  view = computeContractView(반납일 what-if). 미납(net)을 보증금으로 충당 → 반환액/추가청구 산출. */
+export type ReturnSettlement = { deposit: number; unpaid: number; offset: number; refund: number; addCharge: number; proRefund: number };
+export function computeReturnSettlement(deposit: number, view: { net: number; refund: number }): ReturnSettlement {
+  const unpaid = Math.max(0, view.net);           // 미납 대여료(일할정산 반영)
+  return {
+    deposit,
+    unpaid,
+    offset: Math.min(deposit, unpaid),            // 보증금 충당
+    refund: Math.max(0, deposit - unpaid),        // 보증금 반환액(임차인 환급)
+    addCharge: Math.max(0, unpaid - deposit),     // 추가 청구액
+    proRefund: view.refund,                       // 반납 일할 환불(정보)
+  };
+}
+
+/* ── 상태전이 패치 (store.update 에 그대로 넘김) ── */
+// extra = 출고 실무 입력(출고 주행거리 mileageOut·연료 fuelOut). 반납정산이 비교할 원점. 기존 호출부는 {} 기본값으로 그대로 동작.
+export function patchDeliver(rec: EntityRecord, date: string, extra: EntityRecord = {}): EntityRecord {
+  return { status: '운행', deliveredDate: date || ymd(rec.startDate) || date, ...extra };
+}
+// extra = 반납 실무 입력(주행거리·연료·정산 메모 등). 기존 호출부는 {} 기본값으로 그대로 동작.
+export function patchReturn(rec: EntityRecord, date: string, extra: EntityRecord = {}): EntityRecord {
+  return { status: '반납', returnedDate: date, endReason: '정상종료', ...extra };
+}
+// extra = 해지 사유·위약금 메모 등.
+export function patchTerminate(rec: EntityRecord, date: string, extra: EntityRecord = {}): EntityRecord {
+  return { status: '해지', returnedDate: date, endReason: '중도해지', ...extra };
+}
+export function patchExtend(rec: EntityRecord, addMonths: number): EntityRecord {
+  const term = (Number(rec.rentalMonths) || 0) + addMonths;
+  const start = ymd(rec.startDate || rec.contractDate);
+  return { rentalMonths: term, endDate: start ? addMonthsIso(start, term) : rec.endDate };
+}
+
+/* ── 중도해지 위약금 상시계산 (v5 early-termination 이식) ──
+   위약금 = 잔여개월 × 월대여료 × 요율(%). 만기 도래(정상종료)면 0. 요율=계약서상 earlyTerminationRate. */
+function monthsBetweenIso(from: string, to: string): number {
+  if (!from || !to || to <= from) return 0;
+  const a = new Date(from), b = new Date(to);
+  let m = (b.getFullYear() - a.getFullYear()) * 12 + (b.getMonth() - a.getMonth());
+  if (b.getDate() < a.getDate()) m -= 1;
+  return Math.max(0, m);
+}
+export type EarlyTermCalc = { rate: number; isEarly: boolean; remainingMonths: number; monthlyRent: number; fee: number; maturity: string };
+export function earlyTerminationFee(rec: EntityRecord, asOf: string): EarlyTermCalc {
+  const rate = Number(rec.earlyTerminationRate) || 0;
+  const monthlyRent = Number(rec.monthlyRent) || 0;
+  const term = Number(rec.rentalMonths) || 0;
+  const start = ymd(rec.startDate || rec.contractDate);
+  const maturity = start && term ? addMonthsIso(start, term) : '';
+  const isEarly = !!maturity && asOf < maturity;
+  const remainingMonths = isEarly ? monthsBetweenIso(asOf, maturity) : 0;
+  const fee = Math.round(remainingMonths * monthlyRent * (rate / 100));
+  return { rate, isEarly, remainingMonths, monthlyRent, fee, maturity };
+}
+
+/* ── 운영 필터 ── */
+export type ContractFilter = '전체' | '대기' | '운행' | '만기임박' | '만기경과' | '반납예정' | '종료' | '미수';
+export function passesFilter(v: ContractView, f: ContractFilter, today: string): boolean {
+  switch (f) {
+    case '전체': return true;
+    case '대기': return v.status === '대기';
+    case '운행': return v.status === '운행';
+    case '만기임박': return v.status === '운행' && v.dday != null && v.dday >= 0 && v.dday <= 30;
+    case '만기경과': return v.status === '운행' && v.dday != null && v.dday < 0;
+    case '반납예정': return v.status === '운행' && !!ymd(v.rec.returnScheduledDate);
+    case '종료': return v.ended;
+    case '미수': return v.net > 0;
+  }
+}

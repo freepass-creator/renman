@@ -1,0 +1,65 @@
+rules_version = '2';
+// jpkerp6 법인 격리 — companyId 기반. 진짜 보안 경계는 여기(서버).
+// users/{uid} = { role: '본사'|'법인'(|레거시 운영자|위탁사), companyId: string|null }
+// 본사(companyId=null) = 전 법인. 법인 소속 직원 = 배정 companyId 문서만.
+// MASTER 이메일은 NEXT_PUBLIC_MASTER_EMAIL 과 동일하게 유지할 것(기본 pyh@teamjpk.com).
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function userDoc() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+    function hasUserDoc() {
+      return exists(/databases/$(database)/documents/users/$(request.auth.uid));
+    }
+    function isSignedIn() { return request.auth != null; }
+    function isMaster() {
+      return isSignedIn() && request.auth.token.email != null
+        && request.auth.token.email.lower() == 'pyh@teamjpk.com';
+    }
+    // 본사 = 전 법인. 레거시 '운영자' 호환.
+    function isHQ() {
+      return isMaster() || (isSignedIn() && hasUserDoc()
+        && (userDoc().role == '본사' || userDoc().role == '운영자'));
+    }
+    function myCompany() { return hasUserDoc() ? userDoc().companyId : null; }
+    function tenantOK(companyId) { return isHQ() || (isSignedIn() && myCompany() == companyId); }
+
+    match /users/{uid} {
+      allow read: if isSignedIn() && (request.auth.uid == uid || isHQ());
+      allow create: if isHQ()
+                    || (isSignedIn() && request.auth.uid == uid
+                        && !('role' in request.resource.data)
+                        && !('companyId' in request.resource.data));
+      allow update, delete: if isHQ();
+    }
+
+    // 감사로그 — append-only. byUid = 로그인 uid 강제(위조 차단).
+    match /audit_logs/{id} {
+      allow read: if isSignedIn() && tenantOK(resource.data.companyId);
+      allow create: if isSignedIn()
+                    && tenantOK(request.resource.data.companyId)
+                    && request.resource.data.companyId is string
+                    && request.resource.data.byUid == request.auth.uid;
+      allow update, delete: if false;
+    }
+
+    // 회계기간 마감 — 본사 쓰기, 소속 법인 읽기.
+    match /period_locks/{companyId} {
+      allow read: if isSignedIn() && tenantOK(companyId);
+      allow write: if isHQ();
+    }
+
+    match /{coll}/{docId} {
+      allow read: if isSignedIn() && tenantOK(resource.data.companyId);
+      allow create: if isSignedIn() && tenantOK(request.resource.data.companyId)
+                    && request.resource.data.companyId is string
+                    && coll != 'audit_logs' && coll != 'period_locks';
+      // 수정: 소유 법인이거나 본사. companyId(테넌트)는 불변 — 법인 사용자가 자기 문서를 남의 회사로 이동 금지(본사만 재배정 가능).
+      allow update: if isSignedIn() && tenantOK(resource.data.companyId)
+                    && (isHQ() || request.resource.data.companyId == resource.data.companyId)
+                    && coll != 'audit_logs';
+      // 하드삭제=본사만. 일반 삭제는 soft-delete(deletedAt=update)로 → 휴지통·감사 보존. 감사로그는 삭제 불가.
+      allow delete: if isHQ() && coll != 'audit_logs';
+    }
+  }
+}
