@@ -9,8 +9,8 @@ import { companyLabel } from '@/lib/companies';
 import { openCar } from '@/lib/ui-bus';
 import { QuickLogForm, type QuickLogCtx } from '@/components/QuickLogForm';
 import { TODAY } from '@/lib/dashboard-consts';
+import { selectCustomerComms } from '@/lib/activity-match';
 
-const COMM_KINDS = new Set(['통화', '문자', '방문', '메모', '상담']);
 function commTone(cat: string): 'green' | 'purple' | 'gray' {
   return cat === '통화' || cat === '문자' ? 'green' : cat === '방문' || cat === '상담' ? 'purple' : 'gray';
 }
@@ -29,15 +29,9 @@ export function Customer360({ ckey, onTitle }: { ckey: string; onTitle?: (name: 
   const activeV = views.filter((x) => x.v.status === '운행');
   const pastV = views.filter((x) => x.v.status !== '운행');
 
-  const custPlates = new Set(cust.vehicles);
-  const comms = history
-    .filter((h) => {
-      if (!COMM_KINDS.has(String(h.category || ''))) return false;
-      const hc = String(h.customer || '').trim();
-      if (hc) return hc === cust.name;
-      return h.plate ? custPlates.has(String(h.plate)) : false;
-    })
-    .sort((a, b) => (String(a.date) < String(b.date) ? 1 : -1));
+  // 활동↔계약 매칭은 lib/activity-match SSOT. 번호판만으로 묶으면 손바뀜 차에서
+  // 앞 임차인 통화가 다음 임차인에게 뜬다(288수6402=계약 5건).
+  const comms = selectCustomerComms(history, cust.contracts);
   const oneActive = activeV.length === 1 ? activeV[0].c : null;
   const commCtx: QuickLogCtx = { customer: cust.name, companyId: cust.companyId, ...(oneActive ? { plate: String(oneActive.plate || ''), contractNo: String(oneActive.contractNo || '') } : {}) };
 

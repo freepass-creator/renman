@@ -10,7 +10,7 @@
  * 입력 두 입구: 한곳(batch)=담기/수집함(허브 안) · 그자리(context)=360·위저드·QuickLog.
  */
 import {
-  Home, LayoutDashboard, Car, FileText, Wallet, LayoutGrid, Table2,
+  Home, LayoutDashboard, Car, FileText, Wallet, Table2,
   ArrowLeftRight, ReceiptText, BookOpen, Wrench, TriangleAlert, Upload, Inbox,
   TrendingUp, Settings, type LucideIcon,
 } from 'lucide-react';
@@ -51,13 +51,13 @@ export const PAGE_IA: PageIA[] = [
   { href: '/sheet', label: '운영시트', role: 'view', layer: 'ledger', tier: '라이트', view: '함대·계약 엑셀형 한눈', grab: 'none', grabHow: '조회→360' },
 
   // 스탠다드 — 메뉴「업무」(현장 처리). 라벨은 업무 말투(관리·일보).
-  { href: '/work', label: '업무현황', role: 'work', layer: 'event', tier: '스탠다드', view: '업무·입력 한눈', grab: 'none', grabHow: '배차·미수·자금일보·정비·과태료·자료등록·증빙' },
+  { href: '/work', label: '업무현황', role: 'work', layer: 'event', tier: '스탠다드', view: '업무·입력 한눈', grab: 'none', grabHow: '배차·미수·자금일보·정비·과태료·데이터센터·증빙' },
   { href: '/dispatch', label: '배차관리', role: 'work', layer: 'event', tier: '스탠다드', view: '출고·반납·재고·이동', grab: 'context', grabHow: '위저드·메모·자료등록' },
   { href: '/receivables', label: '미수관리', role: 'work', layer: 'event', tier: '스탠다드', view: '연체 독촉·시동·내용증명', grab: 'context', grabHow: '연락기록·독촉·시동(그자리)' },
   { href: '/payments', label: '자금일보', role: 'work', layer: 'event', tier: '스탠다드', view: '입금매칭·CMS → 재무현황 공급', grab: 'none', grabHow: '원천=자료등록·계좌 · 여기는 매칭·분류 연결' },
-  { href: '/repair', label: '정비관리', role: 'work', layer: 'event', tier: '스탠다드', view: '정비·사고·복귀', grab: 'both', grabHow: '자료등록(history)·QuickLog' },
+  { href: '/repair', label: '차량수선', role: 'work', layer: 'event', tier: '스탠다드', view: '정비·사고수리·상품화·세차·복귀', grab: 'both', grabHow: '자료등록(history)·QuickLog' },
   { href: '/penalty', label: '과태료관리', role: 'work', layer: 'event', tier: '스탠다드', view: '미매칭·진행·종결', grab: 'both', grabHow: '한곳=업로드/자료등록 · 그자리=매칭' },
-  { href: '/ingest', label: '자료등록', role: 'input', layer: 'ledger', tier: '스탠다드', view: '원장 자산 투입(OCR·엑셀·직접)', grab: 'batch', grabHow: '업무 → 자료등록' },
+  { href: '/ingest', label: '데이터센터', role: 'input', layer: 'mixed', tier: '스탠다드', view: '모든 데이터 투입(원장+이벤트 · OCR·엑셀·직접)', grab: 'batch', grabHow: '메뉴 최상단 — 모든 업무의 입력 통로' },
   { href: '/inbox', label: '증빙수집', role: 'input', layer: 'event', tier: '스탠다드', view: '현장 사진·서명 대기함', grab: 'batch', grabHow: '업무 → 증빙수집' },
 
   // 경영 지표 (상품 티어명 = 비즈니스)
@@ -85,12 +85,22 @@ export type NavGroup = { title: string; items: NavItem[] };
 
 /**
  * 햄버거 메뉴 — PAGE_IA tier 와 동기.
- * 라이트: 홈·마이·현황·설정. 스탠다드+: 「업무」그룹. 경영 티어: 손익 등.
+ * 라이트: 홈·마이·자료등록·현황·설정. 스탠다드+: 「업무」그룹. 경영 티어: 손익 등.
+ *
+ * 그룹 기준:
+ *   (최상단) 내가 있는 자리 + **데이터 투입구**(데이터센터). 데이터센터는 «업무»가 아니라
+ *            모든 업무에 물리는 입력 통로라 특정 업무 밑이 아니라 여기 산다(role:'input').
+ *   현황    = ① 원장 조회
+ *   업무    = **고유 업무 5**만 — 배차관리·차량수선·미수관리·자금일보·과태료관리.
+ *            허브 페이지(/work)는 메뉴에 안 넣는다 — 메뉴가 이미 같은 목록이라 한 겹 더 쌓일 뿐.
+ *            증빙수집(/inbox)은 «남이 올린 걸 매칭하는 큐» — 입력 통로가 아니라 처리 대상이라
+ *            업무 옆에 둔다.
  */
 export const NAV_GROUPS: NavGroup[] = [
   { title: '', items: [
     { href: '/', label: '홈', icon: Home, tier: '라이트' },
     { href: '/ops', label: '마이페이지', icon: LayoutDashboard, tier: '라이트' },
+    { href: '/ingest', label: '데이터센터', icon: Upload, tier: '스탠다드' },
   ] },
   { title: '현황', items: [
     { href: '/asset', label: '자산현황', icon: Car, tier: '라이트' },
@@ -100,13 +110,11 @@ export const NAV_GROUPS: NavGroup[] = [
   ] },
   { title: '업무', items: [
     { href: '/dispatch', label: '배차관리', icon: ArrowLeftRight, tier: '스탠다드' },
+    { href: '/repair', label: '차량수선', icon: Wrench, tier: '스탠다드' },
     { href: '/receivables', label: '미수관리', icon: ReceiptText, tier: '스탠다드' },
     { href: '/payments', label: '자금일보', icon: BookOpen, tier: '스탠다드' },
-    { href: '/repair', label: '정비관리', icon: Wrench, tier: '스탠다드' },
     { href: '/penalty', label: '과태료관리', icon: TriangleAlert, tier: '스탠다드' },
-    { href: '/ingest', label: '자료등록', icon: Upload, tier: '스탠다드' },
     { href: '/inbox', label: '증빙수집', icon: Inbox, tier: '스탠다드' },
-    { href: '/work', label: '업무현황', icon: LayoutGrid, tier: '스탠다드' },
   ] },
   { title: '경영', items: [
     { href: '/pnl', label: '손익현황', icon: TrendingUp, tier: '비즈니스' },

@@ -3,15 +3,21 @@
  *   현황(원장 보기) ≠ 업무(손대기). 생각날 때 WORK_PAGES에 추가.
  *   메뉴 라벨 = 업무 말투(○○관리 · 일보 · 등록).
  *
+ * 고유 업무 5 = 자금일보 · 미수관리 · 과태료처리 · 입출고(배차) · 차량수선.
+ *   그 외는 업무가 아니다:
+ *     · kind:'input'(자료등록·증빙수집) = 모든 업무에 물리는 «입력 통로» → 메뉴 최상단(홈 옆)
+ *     · 고객관리 = 별도 페이지 아님. 통화·이슈는 계약에 붙는다(lib/activity-match) —
+ *       독촉·반납협의·사고처리 «하는 김에» 기록하는 것이라 독립 업무로 서지 않는다.
+ *
  * Sec 파이프: WorkPipe to="…" — 손롤 <a href> 금지. PIPE SSOT.
  */
 export const WORK_PAGES = [
   { href: '/dispatch', label: '배차관리', desc: '출고·반납·재고·이동', secs: '오늘 큐 · 출고 · 반납 · 재고', kind: 'work' as const, tier: '스탠다드' as const },
   { href: '/receivables', label: '미수관리', desc: '연체·독촉·시동·내용증명', secs: '현황 · 미수 목록 · 조치', kind: 'work' as const, tier: '스탠다드' as const },
   { href: '/payments', label: '자금일보', desc: '입금↔계약 매칭 · CMS · 재무현황 공급', secs: '미매칭 · 제안 · CMS', kind: 'work' as const, tier: '스탠다드' as const },
-  { href: '/repair', label: '정비관리', desc: '정비·사고·복귀', secs: '정비·사고 · 그 밖의 상태', kind: 'work' as const, tier: '스탠다드' as const },
+  { href: '/repair', label: '차량수선', desc: '정비·사고수리·상품화·세차', secs: '정비·사고 · 그 밖의 상태', kind: 'work' as const, tier: '스탠다드' as const },
   { href: '/penalty', label: '과태료관리', desc: '고지·매칭·변경부과', secs: '미매칭 · 진행 · 종결', kind: 'work' as const, tier: '스탠다드' as const },
-  { href: '/ingest', label: '자료등록', desc: 'OCR·엑셀·직접 입력', secs: '엔티티 선택 · 검토 · 저장', kind: 'input' as const, tier: '스탠다드' as const },
+  { href: '/ingest', label: '데이터센터', desc: 'OCR·엑셀·직접 입력 — 원장+이벤트 전부', secs: '엔티티 선택 · 검토 · 저장', kind: 'input' as const, tier: '스탠다드' as const },
   { href: '/inbox', label: '증빙수집', desc: '현장 사진·서명 대기', secs: '업로드 · 대기 · 매칭', kind: 'input' as const, tier: '스탠다드' as const },
 ] as const;
 
@@ -22,9 +28,9 @@ export const PIPE = {
   dispatch: { href: '/dispatch', label: '배차관리' },
   receivables: { href: '/receivables', label: '미수관리' },
   payments: { href: '/payments', label: '자금일보' },
-  repair: { href: '/repair', label: '정비관리' },
+  repair: { href: '/repair', label: '차량수선' },
   penalty: { href: '/penalty', label: '과태료관리' },
-  ingest: { href: '/ingest', label: '자료등록' },
+  ingest: { href: '/ingest', label: '데이터센터' },
   inbox: { href: '/inbox', label: '증빙수집' },
   work: { href: '/work', label: '업무현황' },
   finance: { href: '/finance', label: '재무현황' },

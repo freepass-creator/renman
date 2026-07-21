@@ -16,8 +16,23 @@ import { toast } from '@/lib/toast';
 import { Page, Sec, Cards, Metric, Btn, FormGrid, Panel, PillTabs, Select, Input, th, td, C, Message, Loading } from '@/components/ui';
 import { WorkbenchBar } from '@/components/WorkbenchBar';
 import { WorkHubBack } from '@/components/WorkHubTabs';
+import { layerOfEntity } from '@/lib/domain/layers';
 
 type Tab = 'ocr' | 'excel' | 'manual';
+
+/* 엔티티 선택기 = 데이터 3층 순서(원장 → 이벤트). layerOf 는 ENTITY_LAYER SSOT.
+   여기가 «모든 데이터의 투입구»라는 걸 목록 구조로 보여준다 — 업무 기록(history·과태료)도 포함. */
+const LAYER_TITLE: Record<string, string> = {
+  ledger: '① 원장 — 자산이 생겼다',
+  event: '③ 이벤트 — 가동 중 쌓이는 일',
+  system: '도구',
+};
+const ENTITY_GROUPS = (['ledger', 'event', 'system'] as const)
+  .map((layer) => ({
+    title: LAYER_TITLE[layer],
+    items: ENTITY_LIST.filter((e) => layerOfEntity(e.key) === layer),
+  }))
+  .filter((g) => g.items.length > 0);
 
 export default function IngestPage() {
   const { companyId, user, scopeAll } = useSession();
@@ -124,11 +139,13 @@ export default function IngestPage() {
   }, [tab, entity.ocrType]);
 
   return (
-    <Page title="자료등록" meta="한곳 입력 · 증명서·엑셀·직접입력"
+    <Page title="데이터센터" meta="모든 데이터 투입구 · OCR·엑셀·직접입력"
       tools={<WorkbenchBar mid={<WorkHubBack />} />}
       right={<a href="/trash" style={{ fontSize: 13, color: C.mute, textDecoration: 'none', fontWeight: 600 }}>휴지통 →</a>}>
       <p style={{ color: C.mute, fontSize: 13, marginTop: 6, lineHeight: 1.6 }}>
-        서류를 <b>한곳</b>에서 넣습니다. OCR·엑셀·직접입력 3방식 → 같은 표준 레코드. 차·계약 화면에서의 <b>그자리</b> 조치(반납·입금·기록)와 역할이 다릅니다. 삭제·복구는 <a href="/trash" style={{ color: C.accent }}>휴지통</a>.
+        <b>모든 데이터</b>를 한곳에서 넣습니다 — 원장(차량·계약·고객·보험·계좌)뿐 아니라 <b>업무 기록(정비·통화·과태료)</b>까지.
+        OCR·엑셀·직접입력 3방식 → 같은 표준 레코드. 차·계약 화면에서의 <b>그자리</b> 조치(반납·입금·기록)와 역할이 다릅니다 —
+        여기는 <b>한곳에서 일괄</b>, 거기는 <b>일하면서 하나씩</b>. 삭제·복구는 <a href="/trash" style={{ color: C.accent }}>휴지통</a>.
       </p>
 
       <Sec title="수집 요약" desc="선택 엔티티·저장 대상 · 미확정(저장 전)·저장본(현재 회사)">
@@ -142,8 +159,14 @@ export default function IngestPage() {
 
       <div style={{ display: 'grid', gridTemplateColumns: 'minmax(240px, 320px) 1fr', gap: 12, alignItems: 'center', marginTop: 18 }}>
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
-          <Select value={entityKey} onChange={(e) => { setEntityKey(e.target.value); reset(); setForm({}); }} style={{ minWidth: 200 }}>
-            {ENTITY_LIST.map((e) => <option key={e.key} value={e.key}>{e.label} ← {e.source}</option>)}
+          {/* 데이터 3층으로 묶어 보여준다 — 원장뿐 아니라 «이벤트(업무 기록)»도 여기서 넣는다는 걸
+              선택기 자체가 말하게. 층 판정은 ENTITY_LAYER SSOT(lib/domain/layers). */}
+          <Select value={entityKey} onChange={(e) => { setEntityKey(e.target.value); reset(); setForm({}); }} style={{ minWidth: 220 }}>
+            {ENTITY_GROUPS.map((g) => (
+              <optgroup key={g.title} label={g.title}>
+                {g.items.map((e) => <option key={e.key} value={e.key}>{e.label} ← {e.source}</option>)}
+              </optgroup>
+            ))}
           </Select>
           <span style={{ fontSize: 12, color: C.faint }}>{entity.fields.length}개 필드 · 자연키 {entity.idFrom}</span>
         </div>

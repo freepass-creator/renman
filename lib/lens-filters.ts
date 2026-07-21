@@ -81,7 +81,7 @@ export const LENS_FILTERS: Record<string, FacetGroup[]> = {
     { dim: '기한', chips: DUE_CHIPS },
   ],
   // 비즈니스 업무 — FacetRail 상시(Sec show/hide).
-  정비관리: [
+  차량수선: [
     { dim: '구분', chips: [
       { label: '정비·사고', secs: ['s-repair'] },
       { label: '기타상태', secs: ['a-other'] },
@@ -113,18 +113,19 @@ export const LENS_FILTERS: Record<string, FacetGroup[]> = {
   콕핏: [
     { dim: '처리 기한', chips: DUE_CHIPS },
     { dim: '종류', chips: [
+      // 미수 칩 없음 — 미수는 리스크관리(r-unpaid) 소관. 정비·사고(s-repair)는 자산 그룹으로 옮김.
       { label: '반납', secs: ['s-return-over', 's-return'] },
-      { label: '미수', secs: ['s-unpaid'] },
       { label: '과태료', secs: ['s-penalty'] },
       { label: '서류', secs: ['s-docwait'] },
-      { label: '검사·보험', secs: ['s-expire', 's-repair'] },
+      { label: '검사·보험', secs: ['s-expire'] },
       { label: '자금', secs: ['s-money'] },
       { label: '할일·충돌', secs: ['s-todo', 's-overlap'] },
     ] },
   ],
   리스크: [
+    { dim: '처리 기한', chips: DUE_CHIPS },
     { dim: '종류', chips: [
-      { label: '미납', secs: ['r-unpaid'] },
+      { label: '미수', secs: ['r-unpaid'] },
       { label: '컴플라이언스', secs: ['r-compliance'] },
       { label: '보증금', secs: ['r-deposit'] },
       { label: '정합성', secs: ['r-integrity'] },

@@ -13,6 +13,7 @@ import { contractSchedules, computeContractView, effectiveEndDate, patchDeliver,
 import { isCashPurchase } from '@/lib/domain/vehicle-finance';
 import { FUEL_LEVELS } from '@/lib/domain/fuel';
 import { normPlate } from '@/lib/plate';
+import { isComm, matchesContract } from '@/lib/activity-match';
 import { linkFleet, handoverHistory, recommendNextRent } from '@/lib/domain/model';
 import { loanSchedule, loanSummary } from '@/lib/loan';
 import { assetEconomics } from '@/lib/asset-econ';
@@ -665,8 +666,14 @@ export function Vehicle360({ plate, focus }: { plate: string; focus?: string }) 
 
       {/* 활동 · 이력 — 이동·통화·문자·방문·메모 + 정비·사고·검사. 빠른 기록으로 소소하게. */}
       <Sec id="v-history" title="활동 · 이력" n={history.length} tone={logOpen ? 'ok' : undefined} right={<Btn variant="ghost" onClick={() => setLogOpen((o) => !o)}>{logOpen ? '닫기' : '+ 기록'}</Btn>}>
-        {logOpen ? <QuickLogForm ctx={{ plate }} onDone={() => setLogOpen(false)} onCancel={() => setLogOpen(false)} style={{ marginBottom: 12 }} /> : null}
-        {history.length ? <Cards min={340}>{history.map((h, i) => { const cat = String(h.category || '이력'); const tone = (cat === '사고' ? 'red' : cat === '이동' ? 'blue' : (cat === '통화' || cat === '문자') ? 'green' : (cat === '방문' || cat === '상담') ? 'purple' : cat === '메모' ? 'gray' : cat === '검사' ? 'teal' : 'amber') as 'red' | 'blue' | 'green' | 'purple' | 'gray' | 'teal' | 'amber'; return <ObjCard key={i} badge={cat} badgeTone={tone} title={String(h.title || '—')} right={h.cost ? won(h.cost) : (h.nextDate ? <span style={{ color: C.warn, fontSize: 11.5 }}>후속 {String(h.nextDate)}</span> : undefined)} fields={[['일자', String(h.date || '—')], [h.author ? '작성' : '업체', String(h.author || h.vendor || '—')]]} />; })}</Cards> : <EmptyState variant="sec">기록 없음 · 오른쪽 “+ 기록”으로 남기세요</EmptyState>}
+        {/* 운행중 계약을 함께 넘긴다 — contractNo 없이 저장하면 손바뀜 뒤 다음 임차인 이력에 섞인다(lib/activity-match). */}
+        {logOpen ? <QuickLogForm
+          ctx={{ plate, ...(active ? { contractNo: String(active.contractNo || active._key || ''), customer: String(active.contractorName || '') } : {}) }}
+          onDone={() => setLogOpen(false)} onCancel={() => setLogOpen(false)} style={{ marginBottom: 12 }} /> : null}
+        {history.length ? <Cards min={340}>{history.map((h, i) => { const cat = String(h.category || '이력'); const tone = (cat === '사고' ? 'red' : cat === '이동' ? 'blue' : (cat === '통화' || cat === '문자') ? 'green' : (cat === '방문' || cat === '상담') ? 'purple' : cat === '메모' ? 'gray' : cat === '검사' ? 'teal' : 'amber') as 'red' | 'blue' | 'green' | 'purple' | 'gray' | 'teal' | 'amber';
+          // 소통 기록은 «누구와»가 핵심 — 차 한 대에 임차인이 여러 번 바뀌므로 상대를 안 보이면 섞여 읽힌다.
+          const who = isComm(h) ? (contracts.find((c) => matchesContract(h, c))?.contractorName || h.customer || '') : '';
+          return <ObjCard key={i} badge={cat} badgeTone={tone} title={String(h.title || '—')} right={h.cost ? won(h.cost) : (h.nextDate ? <span style={{ color: C.warn, fontSize: 11.5 }}>후속 {String(h.nextDate)}</span> : undefined)} fields={[['일자', String(h.date || '—')], ...(who ? [['상대', String(who)] as [string, string]] : []), [h.author ? '작성' : '업체', String(h.author || h.vendor || '—')]]} />; })}</Cards> : <EmptyState variant="sec">기록 없음 · 오른쪽 “+ 기록”으로 남기세요</EmptyState>}
       </Sec>
 
       {/* 차량 수선 · 정비·사고 — 모든 차에 항상 노출(대여중이어도 사고/정비 가능). history(_kind:'work').

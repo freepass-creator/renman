@@ -15,13 +15,22 @@ import { WorkbenchBar } from '@/components/WorkbenchBar';
 
 const EMPTY_SET = new Set<string>(); // 안정 참조(빈 필터) — 불필요 재렌더 방지
 const goSec = (id: string) => { if (typeof document !== 'undefined') document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' }); };
-// 홈 = 회사 전체. 탭 순서: 일정 · 미결 · 운영현황 · 리스크. 개인화=/ops.
+/* 홈 = 회사 전체. 탭 순서: 일정 · 미결 업무 · 운영현황 · 리스크관리. 개인화=/ops.
+ *
+ * 탭 배치 기준 = 「오늘 끝낼 수 있는가」 (섹션을 글자로 나누지 말고 성질로 나눈다):
+ *   미결 업무   = 처리하면 큐에서 사라지는 것 (반납회수·과태료신청·서류첨부·배차조정)
+ *   리스크관리  = 처리해도 계속 관리되는 것 (미수·컴플라이언스·보증금·정합성)
+ *   운영현황    = 지표(②층·저장 없음)
+ *   일정        = 시간축
+ * 미수가 「미결」에 있으면 큐가 영원히 안 비워진다 → 리스크관리로 통합(r-unpaid).
+ * 차량 상태(정비·사고)는 업무가 아니라 자산 속성 → 자산 그룹(s-repair).
+ */
 type Lens = '일정' | '콕핏' | '운영' | '리스크';
 const LENSES: { key: Lens; label: string; short: string; desc: string }[] = [
   { key: '일정', label: '일정', short: '일정', desc: '회사 전체 일정 · 반납·검사·보험·과태료' },
-  { key: '콕핏', label: '미결 업무', short: '미결', desc: '우리가 처리할 것 · 반납·회수·검사·서류·인도·과태료' },
+  { key: '콕핏', label: '미결 업무', short: '미결', desc: '오늘 끝낼 일 · 반납회수·배차·과태료·서류·인도' },
   { key: '운영', label: '운영현황', short: '운영', desc: '회사 전체 운영 한눈 · 함대·계약·자금·현장' },
-  { key: '리스크', label: '리스크현황', short: '리스크', desc: '통제 밖 위험 · 계약자 미납·컴플라이언스' },
+  { key: '리스크', label: '리스크관리', short: '리스크', desc: '계속 관리할 위험 · 미수·컴플라이언스·보증금' },
 ];
 
 export default function Home() {
@@ -156,18 +165,20 @@ function OpsLens({ ctx, facets, setF }: { ctx: SectionCtx; facets?: Set<string>;
 
 function CockpitLens({ ctx, facets, setF }: { ctx: SectionCtx; facets?: Set<string>; setF: (labels: string[]) => void }) {
   const D = ctx.D;
-  const [order, reorder] = useSecOrder('jpk:order:cockpit-v2', ['s-return-over', 's-unpaid', 's-overlap', 's-penalty', 's-todo', 's-money', 's-docwait', 's-return', 's-expire', 's-repair']);
+  // v3 = 미수(→리스크관리)·정비사고(→자산) 빠진 순서. 키를 올려야 기존 사용자의 저장된 v2 순서가 되살아나지 않는다.
+  const [order, reorder] = useSecOrder('jpk:order:cockpit-v3', ['s-return-over', 's-overlap', 's-penalty', 's-todo', 's-money', 's-docwait', 's-return', 's-expire']);
   const vis = visibleSecs('콕핏', facets);
   const overdueReturn = D.returnFlow.filter((v: { dday: number }) => v.dday < 0).length;
   const pick = (labels: string[], sec: string) => { setF(labels); goSec(sec); };
   return (
     <>
+      {/* 지표도 「끝낼 수 있는 것」만 — 미수는 리스크관리 탭이 든다. */}
       <Sec title="현황" desc="오늘 처리할 핵심만 · 클릭하면 좌측 필터·섹션 연동">
         <Cards min={128} fit>
-          <Metric label="미수(운행중)" value={won(D.summary.misuActive)} hint="회수 대상" tone={D.summary.misuActive > 0 ? 'danger' : 'ink'} onClick={() => pick(['미수'], 's-unpaid')} />
           <Metric label="반납 지남" value={overdueReturn} hint="예정일 경과" tone={overdueReturn ? 'danger' : 'ink'} onClick={() => pick(['반납', '지남'], 's-return-over')} />
           <Metric label="과태료" value={D.penaltyPending.length} hint="변경부과" tone={D.penaltyPending.length ? 'warn' : 'ink'} onClick={() => pick(['과태료'], 's-penalty')} />
           <Metric label="서류 미첨부" value={D.ghostPlates.length} hint="등록증 없음" tone={D.ghostPlates.length ? 'warn' : 'ink'} onClick={() => pick(['서류'], 's-docwait')} />
+          <Metric label="자금 미분류" value={D.unmatchedTx?.length ?? 0} hint="매칭 안 됨" tone={(D.unmatchedTx?.length ?? 0) ? 'warn' : 'ink'} onClick={() => pick(['자금'], 's-money')} />
         </Cards>
       </Sec>
       {order.filter((id) => !vis || vis.has(id)).map((id) => SECTION_MAP[id]?.render(ctx, { onReorder: reorder }))}
@@ -175,7 +186,8 @@ function CockpitLens({ ctx, facets, setF }: { ctx: SectionCtx; facets?: Set<stri
   );
 }
 
-// 리스크현황 = 우리 통제 밖(계약자 귀책) 위험. 미납·컴플라이언스. (회수 '조치'는 미결 업무.)
+/* 리스크관리 = 처리해도 끝나지 않고 계속 관리되는 것. 미수·컴플라이언스·보증금·정합성.
+ * 미수는 여기가 SSOT(r-unpaid) — 미결 업무에 두면 큐가 영영 안 비워진다. */
 function RiskLens({ ctx, facets, setF }: { ctx: SectionCtx; facets?: Set<string>; setF: (labels: string[]) => void }) {
   const D = ctx.D;
   const [order, reorder] = useSecOrder('jpk:order:risk-v2', ['r-unpaid', 'r-compliance', 'r-deposit', 'r-integrity']);
@@ -187,10 +199,10 @@ function RiskLens({ ctx, facets, setF }: { ctx: SectionCtx; facets?: Set<string>
     <>
       <Sec title="현황" desc="통제 밖 위험 · 계약자 귀책">
         <Cards min={128} fit>
-          <Metric label="운행중 미수" value={won(D.summary.misuActive)} hint="운행중만" tone={D.summary.misuActive > 0 ? 'danger' : 'ink'} onClick={() => { setF(['미납']); goSec('r-unpaid'); }} />
-          <Metric label="미납 계약" value={D.overduePay.length} hint="연체 1회+" tone={D.overduePay.length ? 'danger' : 'ink'} onClick={() => { setF(['미납']); goSec('r-unpaid'); }} />
-          <Metric label="30일+ 연체" value={over30} hint="장기 연체" tone={over30 ? 'danger' : 'ink'} onClick={() => { setF(['미납']); goSec('r-unpaid'); }} />
-          <Metric label="시동제어 필요" value={lockNeed} hint="미납 D+3·미제어" tone={lockNeed ? 'danger' : 'ink'} onClick={() => { setF(['미납']); goSec('r-unpaid'); }} />
+          <Metric label="운행중 미수" value={won(D.summary.misuActive)} hint="운행중만" tone={D.summary.misuActive > 0 ? 'danger' : 'ink'} onClick={() => { setF(['미수']); goSec('r-unpaid'); }} />
+          <Metric label="미납 계약" value={D.overduePay.length} hint="연체 1회+" tone={D.overduePay.length ? 'danger' : 'ink'} onClick={() => { setF(['미수']); goSec('r-unpaid'); }} />
+          <Metric label="30일+ 연체" value={over30} hint="장기 연체" tone={over30 ? 'danger' : 'ink'} onClick={() => { setF(['미수']); goSec('r-unpaid'); }} />
+          <Metric label="시동제어 필요" value={lockNeed} hint="미납 D+3·미제어" tone={lockNeed ? 'danger' : 'ink'} onClick={() => { setF(['미수']); goSec('r-unpaid'); }} />
         </Cards>
       </Sec>
       {order.filter((id) => !vis || vis.has(id)).map((id) => SECTION_MAP[id]?.render(ctx, { onReorder: reorder }))}

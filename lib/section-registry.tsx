@@ -249,15 +249,6 @@ export const SECTIONS: SectionDef[] = [
     ) : null; },
   },
   {
-    id: 's-unpaid', label: '미수', group: '미결',
-    render: ({ D, dueMatch }, p) => { const rows = D.overduePay.filter((v: any) => !dueMatch || dueMatch(-(Number(v.overdueDays) || 0))); return (
-      <Sec key="s-unpaid" id="s-unpaid" title="미수" n={rows.length} tone="danger" desc="회수단계·경과 순 · 다음조치" right={<WorkPipe to="receivables" />} {...p}>
-        {rows.length === 0 ? <EmptyState variant="ok">미수 없음</EmptyState> :
-          <Cards min={280}>{rows.slice(0, 12).map((v: any, i: number) => { const cs = collectionStage(v.overdueDays); return <ObjCard key={i} onClick={() => openCar(v.rec.plate, 'unpaid')} rail="danger" co={String(v.rec.companyId || '')} badge={cs.stage} badgeTone={cs.tone} plate={String(v.rec.plate)} carType={String(v.rec.contractorName || '')} fields={[['계약자', String(v.rec.contractorName || '—')], ['연락처', String(v.rec.contractorPhone || '—')], ['경과', `${v.overdueDays}일`], ['미납', `${v.count}회`], ['다음조치', cs.nextAction || '—'], ['순미수', won(v.net)]]} sub={`${v.overdueDays}일 경과 · ${v.count}회${cs.nextAction ? ' · ' + cs.nextAction : ''}`} right={<span style={{ color: C.danger }}>{won(v.net)}</span>} />; })}</Cards>}
-      </Sec>
-    ); },
-  },
-  {
     id: 's-overlap', label: '중복 대여 (배차 충돌)', group: '미결',
     render: ({ D, dueMatch }, p) => (!dueMatch && D.doubleBooking.length ? (
       <Sec key="s-overlap" id="s-overlap" title="중복 대여 (배차 충돌)" n={D.doubleBooking.length} tone="danger" desc="같은 차 · 기간 겹치는 미반납 계약 — 즉시 확인" {...p}>
@@ -300,7 +291,7 @@ export const SECTIONS: SectionDef[] = [
     ); },
   },
   {
-    id: 's-repair', label: '정비·사고 / 보험불일치', group: '미결',
+    id: 's-repair', label: '정비·사고 / 보험불일치', group: '자산',
     render: ({ D, dueMatch }, p) => (dueMatch ? null :
       <Sec key="s-repair" id="s-repair" title="정비·사고 / 보험불일치" n={D.repair.length + D.insMismatch.length} tone="warn" desc="위험 우선" right={<WorkPipe to="repair" />} {...p}>
         {(D.repair.length + D.insMismatch.length) === 0 ? <EmptyState variant="ok">이상 없음</EmptyState> :
@@ -341,13 +332,16 @@ export const SECTIONS: SectionDef[] = [
 
   /* ── 리스크 ── */
   {
-    id: 'r-unpaid', label: '미납 (계약자 미수)', group: '리스크',
-    render: ({ D }, p) => (
-      <Sec key="r-unpaid" id="r-unpaid" title="미납 (계약자 미수)" n={D.overduePay.length} tone="danger" desc="계약자가 안 낸 돈 · 큰 금액순 · 노출 규모" right={<WorkPipe to="receivables" />} {...p}>
-        {D.overduePay.length === 0 ? <EmptyState variant="ok">미납 없음</EmptyState> :
-          <Cards min={300}>{D.overduePay.slice(0, 20).map((v: any, i: number) => { const cs = collectionStage(v.overdueDays); return <ObjCard key={i} onClick={() => openCar(v.rec.plate, 'unpaid')} rail="danger" co={String(v.rec.companyId || '')} badge={cs.stage} badgeTone={cs.tone} plate={String(v.rec.plate)} carType={String(v.rec.contractorName || '')} fields={[['연락처', String(v.rec.contractorPhone || '—')], ['연체', `${v.overdueDays}일`], ['미납', `${v.count}회`], ['월대여료', v.rec.monthlyRent ? won(v.rec.monthlyRent) : '—'], ['다음조치', cs.nextAction || '—']]} sub={`${v.overdueDays}일 연체 · ${v.count}회 미납`} right={<span style={{ color: C.danger }}>{won(v.net)}</span>} />; })}</Cards>}
+    // 미수 SSOT — 옛 s-unpaid(미결)와 통합. 미수는 처리해도 큐에서 사라지지 않는 «관리 대상»이라
+    // 미결(오늘 끝낼 일)이 아니라 여기 산다. 두 섹션이 같은 D.overduePay·collectionStage를 쓰면서
+    // 필드 순서만 달랐던 중복을 접었다. dueMatch(기한칩)는 미결에서 쓰던 필터라 유지.
+    id: 'r-unpaid', label: '미수 (계약자 미납)', group: '리스크',
+    render: ({ D, dueMatch }, p) => { const rows = D.overduePay.filter((v: any) => !dueMatch || dueMatch(-(Number(v.overdueDays) || 0))); return (
+      <Sec key="r-unpaid" id="r-unpaid" title="미수 (계약자 미납)" n={rows.length} tone="danger" desc="회수단계·경과 순 · 다음조치" right={<WorkPipe to="receivables" />} {...p}>
+        {rows.length === 0 ? <EmptyState variant="ok">미수 없음</EmptyState> :
+          <Cards min={300}>{rows.slice(0, 20).map((v: any, i: number) => { const cs = collectionStage(v.overdueDays); return <ObjCard key={i} onClick={() => openCar(v.rec.plate, 'unpaid')} rail="danger" co={String(v.rec.companyId || '')} badge={cs.stage} badgeTone={cs.tone} plate={String(v.rec.plate)} carType={String(v.rec.contractorName || '')} fields={[['계약자', String(v.rec.contractorName || '—')], ['연락처', String(v.rec.contractorPhone || '—')], ['경과', `${v.overdueDays}일`], ['미납', `${v.count}회`], ['다음조치', cs.nextAction || '—'], ['순미수', won(v.net)]]} sub={`${v.overdueDays}일 경과 · ${v.count}회${cs.nextAction ? ' · ' + cs.nextAction : ''}`} right={<span style={{ color: C.danger }}>{won(v.net)}</span>} />; })}</Cards>}
       </Sec>
-    ),
+    ); },
   },
   {
     id: 'r-compliance', label: '법령·컴플라이언스 경고', group: '리스크',

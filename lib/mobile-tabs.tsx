@@ -38,7 +38,7 @@ export const MOBILE_TAB_DEFS: MobileTabDef[] = [
   { id: 'home', label: '홈', href: '/', icon: Home, match: (p) => p === '/', group: '기본', tier: pageTier('/') },
   { id: 'mydesk', label: '마이', href: '/ops', icon: LayoutDashboard, match: (p) => p.startsWith('/ops'), group: '기본', tier: pageTier('/ops') },
   { id: 'search', label: '검색', href: '/search', icon: Search, match: (p) => p.startsWith('/search'), group: '기본', tier: pageTier('/search') },
-  { id: 'upload', label: '자료등록', href: '/ingest', icon: Upload, match: (p) => p.startsWith('/ingest'), group: '업무', tier: pageTier('/ingest') },
+  { id: 'upload', label: '데이터센터', href: '/ingest', icon: Upload, match: (p) => p.startsWith('/ingest'), group: '기본', tier: pageTier('/ingest') },
   { id: 'settings', label: '설정', href: '/settings', icon: Settings, match: (p) => p.startsWith('/settings'), group: '기본', tier: pageTier('/settings') },
   { id: 'dispatch', label: '업무', href: '/work', icon: LayoutGrid, match: (p) =>
       p === '/work' || p.startsWith('/work/') || p.startsWith('/dispatch') || p.startsWith('/receivables') || p.startsWith('/repair')

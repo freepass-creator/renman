@@ -31,13 +31,13 @@ export default function RepairPage() {
     return n;
   });
   const resetFacets = () => setFacets(new Set());
-  const vis = visibleSecs('정비관리', facets);
+  const vis = visibleSecs('차량수선', facets);
   const show = (id: string) => !vis || vis.has(id);
   const secs = REPAIR_SECS.filter((id) => show(id) && SECTION_MAP[id]);
 
   return (
     <FacetPage
-      title="정비관리"
+      title="차량수선"
       meta={`${scopeAll ? '전체 회사' : companyLabel(companyId)} · 정비·사고`}
       tools={
         <WorkbenchBar
@@ -51,7 +51,7 @@ export default function RepairPage() {
           }
         />
       }
-      rail={!loading ? <FacetRail lensKey="정비관리" facets={facets} onToggle={toggleFacet} onReset={resetFacets} /> : null}
+      rail={!loading ? <FacetRail lensKey="차량수선" facets={facets} onToggle={toggleFacet} onReset={resetFacets} /> : null}
     >
       {loading ? <PageLoading /> : (
         <>
