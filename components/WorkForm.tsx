@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { useSession } from '@/lib/session';
 import { saveIntake } from '@/lib/intake';
-import { ALL_COMPANIES, COMPANIES } from '@/lib/companies';
+import { resolveWriteCompany, NEED_COMPANY } from '@/lib/scope';
 import { uploadDoc, docPath, storageReady } from '@/lib/storage';
 import { pushDocVersion } from '@/lib/docs';
 import { callOcrExtract, type OcrOriginal } from '@/lib/ocr-client';
@@ -11,7 +11,8 @@ import {
   WORK_CATEGORIES, WORK_STATUSES, workStatusPatch, canApplyWorkStatus, workSummary,
   workCategoryTone, type WorkCategory,
 } from '@/lib/work-ops';
-import { Btn, Badge, Input, Select, C, fieldStyle } from '@/components/ui';
+import { Btn, Badge, Input, Select, C, fieldStyle, toggleStyle, ctrlH, ctrlFs } from '@/components/ui';
+import { useIsMobile } from '@/lib/use-mobile';
 import { UploadCloud } from 'lucide-react';
 
 /** 수선 폼의 작업구분별 필드 정의(jpkerp4 상품화센터 이식). wide=한 줄 전체(메모/경위). */
@@ -88,6 +89,7 @@ export function WorkForm({ plate, companyId, vehicle, idle, onDone, onCancel, st
   onDone: () => void; onCancel: () => void; style?: React.CSSProperties;
 }) {
   const { user, companyId: sessionCompany } = useSession();
+  const mobile = useIsMobile();
   const [category, setCategory] = useState<WorkCategory>('정비');
   const [workStatus, setWorkStatus] = useState('접수');
   const [date, setDate] = useState(today());
@@ -127,9 +129,8 @@ export function WorkForm({ plate, companyId, vehicle, idle, onDone, onCancel, st
     finally { setOcrBusy(false); }
   }
 
-  // 귀속 회사 — 넘어온 회사 우선(차의 회사). 전체 합본 보기면 기본 법인으로(저장 대상 모호 방지).
-  const resolved = companyId || sessionCompany;
-  const target = resolved === ALL_COMPANIES ? COMPANIES[0] : resolved;
+  // 귀속 회사 — 넘어온 회사(차의 회사) 우선, 없으면 세션 단일 스코프. 합본이라 모호하면 null → 저장 차단(임의 폴백 금지).
+  const target = resolveWriteCompany(sessionCompany, { companyId });
   const fields = FIELDS[category];
   const chg = (k: string, v: string) => setVals((s) => ({ ...s, [k]: v }));
   // 작업구분 바꾸면 작업구분별 값은 초기화(다른 필드셋). 공통(일자·첨부)은 유지.
@@ -139,6 +140,7 @@ export function WorkForm({ plate, companyId, vehicle, idle, onDone, onCancel, st
 
   async function save() {
     if (saving) return;
+    if (!target) { window.alert(NEED_COMPANY); return; }
     setSaving(true);
     try {
       // 첨부(선택) — Storage 업로드 실패/미설정이면 url '' 로 미첨부 기록(InfoDoc·과태료와 동일 관대 처리).
@@ -179,11 +181,14 @@ export function WorkForm({ plate, companyId, vehicle, idle, onDone, onCancel, st
     } finally { setSaving(false); }
   }
 
-  const chip = (on: boolean, tone: string): React.CSSProperties => ({
-    height: 32, padding: '0 13px', borderRadius: 'var(--radius)', border: `1px solid ${on ? tone : C.line}`,
-    background: on ? tone : '#fff', color: on ? '#fff' : C.mute, fontSize: 12.5, fontWeight: on ? 700 : 500, cursor: 'pointer',
-  });
+  // 칩 = toggleStyle(CTRL) · 작업구분만 카테고리 톤으로 활성색 오버라이드
+  const chip = (on: boolean, size: 'sm' | 'md' = 'md', tone?: string): React.CSSProperties => {
+    const base = toggleStyle(on, size, mobile);
+    if (on && tone) return { ...base, border: `1px solid ${tone}`, background: tone };
+    return base;
+  };
   const catToneVar: Record<WorkCategory, string> = { '정비': 'var(--amber-text)', '사고수리': 'var(--red-text)', '상품화': 'var(--text-link)', '세차': 'var(--teal-text, #0e7490)' };
+  const filePickH = ctrlH(mobile);
 
   return (
     <div style={{ border: `1px solid ${C.accent}`, borderRadius: 'var(--radius)', background: 'var(--bg-card)', boxShadow: '0 0 0 3px rgba(37,99,235,0.10)', padding: '13px 14px', boxSizing: 'border-box', ...style }}>
@@ -193,13 +198,13 @@ export function WorkForm({ plate, companyId, vehicle, idle, onDone, onCancel, st
       </div>
 
       {/* 작업구분 — 큰 칩 */}
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
-        {WORK_CATEGORIES.map((c) => <button key={c} type="button" onClick={() => pickCategory(c)} style={chip(category === c, catToneVar[c])}>{c}</button>)}
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: mobile ? 8 : 6, marginBottom: 8 }}>
+        {WORK_CATEGORIES.map((c) => <button key={c} type="button" data-ui="toggle" onClick={() => pickCategory(c)} aria-pressed={category === c} style={chip(category === c, 'md', catToneVar[c])}>{c}</button>)}
       </div>
       {/* 작업상태 — 칩 */}
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 11, alignItems: 'center' }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: mobile ? 8 : 6, marginBottom: 11, alignItems: 'center' }}>
         <span style={{ fontSize: 11, color: C.mute, marginRight: 2 }}>작업상태</span>
-        {WORK_STATUSES.map((w) => <button key={w} type="button" onClick={() => setWorkStatus(w)} style={{ ...chip(workStatus === w, C.brand), height: 28, fontSize: 12 }}>{w}</button>)}
+        {WORK_STATUSES.map((w) => <button key={w} type="button" data-ui="toggle" onClick={() => setWorkStatus(w)} aria-pressed={workStatus === w} style={chip(workStatus === w, 'sm')}>{w}</button>)}
         <span style={{ flex: 1 }} />
         {willTransition
           ? <span style={{ fontSize: 11, color: C.mute }}>저장 시 차량상태 → <Badge tone={workCategoryTone(category)}>{targetStatus}</Badge></span>
@@ -226,10 +231,10 @@ export function WorkForm({ plate, companyId, vehicle, idle, onDone, onCancel, st
       {category === '사고수리' ? (
         <div style={{ border: `1px solid ${C.line}`, borderRadius: 'var(--radius)', background: '#fff', padding: '11px 12px', marginBottom: 11 }}>
           <div style={{ fontSize: 11, color: C.mute, marginBottom: 6 }}>보험 처리 유형 <span style={{ color: C.faint }}>· 복수선택</span></div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 12 }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: mobile ? 8 : 6, marginBottom: 12 }}>
             {ACC_INS_TOGGLES.map((t) => {
               const on = vals[t.key] === 'Y';
-              return <button key={t.key} type="button" onClick={() => chg(t.key, on ? '' : 'Y')} style={{ ...chip(on, 'var(--red-text)'), height: 28, fontSize: 12 }}>{t.label}</button>;
+              return <button key={t.key} type="button" data-ui="toggle" onClick={() => chg(t.key, on ? '' : 'Y')} aria-pressed={on} style={chip(on, 'sm', 'var(--red-text)')}>{t.label}</button>;
             })}
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 }}>
@@ -257,7 +262,7 @@ export function WorkForm({ plate, companyId, vehicle, idle, onDone, onCancel, st
 
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginBottom: 11 }}>
         <Select value={docKind} onChange={(e) => { setDocKind(e.target.value); setOcrDone(false); }}>{DOC_KINDS.map((k) => <option key={k} value={k}>{k}</option>)}</Select>
-        <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: 32, padding: '0 11px', border: `1px dashed ${C.line}`, borderRadius: 'var(--radius)', background: '#fff', cursor: ocrBusy ? 'wait' : 'pointer', fontSize: 12, color: C.mute, boxSizing: 'border-box' }}>
+        <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: filePickH, padding: mobile ? '0 14px' : '0 11px', border: `1px dashed ${C.line}`, borderRadius: 'var(--radius)', background: C.taupeBg, cursor: ocrBusy ? 'wait' : 'pointer', fontSize: ctrlFs(mobile), color: C.mute, boxSizing: 'border-box' }}>
           <UploadCloud size={14} color={C.sub} /> {ocrBusy ? '분석 중…' : file ? '파일 변경' : `${docKind} 파일 선택`}
           <input type="file" accept="image/*,application/pdf" disabled={ocrBusy} onChange={(e) => onPickFile(e.target.files?.[0] || null, docKind)} style={{ display: 'none' }} />
         </label>

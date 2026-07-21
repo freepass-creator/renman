@@ -1,9 +1,8 @@
 'use client';
-import { useCallback, useEffect, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSession } from '@/lib/session';
-import { getStore, listsCached } from '@/lib/store';
-import { useReloadOnSaved } from '@/lib/use-reload-on-saved';
+import { getStore } from '@/lib/store';
 import { type EntityRecord } from '@/lib/intake/entities';
 import { matchPenalty } from '@/lib/penalty-match';
 import { dueMatcher, selectedInDim } from '@/lib/lens-filters';
@@ -19,42 +18,34 @@ import { PenaltyDocs } from '@/components/PenaltyDocs';
 import { openCar, openCustomer } from '@/lib/ui-bus';
 import { customerKey } from '@/lib/customers';
 import { Check, UploadCloud, FileText, Trash2 } from 'lucide-react';
+import { useEntityLists } from '@/lib/use-entity-lists';
 
 type Row = { p: EntityRecord; renter: string | null; contractNo: string | null };
 
 export default function PenaltyProcess() {
   const { companyId, scopeAll } = useSession();
   const router = useRouter();
-  const [rows, setRows] = useState<Row[]>([]);
+  const { data: [pens = [], cons = []], loading, reload } = useEntityLists(['penalty', 'contract']);
+  const rows = useMemo(
+    () => pens.map((p) => {
+      const m = matchPenalty(p, cons);
+      return { p, renter: m ? m.renter : null, contractNo: m ? String(m.contract.contractNo || '') : null };
+    }),
+    [pens, cons],
+  );
   const [facets, setFacets] = useState<Set<string>>(new Set());
   const [q, setQ] = useState('');
-  const [loading, setLoading] = useState(true);
   const [upload, setUpload] = useState(false);
   const [docs, setDocs] = useState(false);
   const toggleFacet = (label: string) => setFacets((s) => { const n = new Set(s); n.has(label) ? n.delete(label) : n.add(label); return n; });
   const resetFacets = () => setFacets(new Set());
   const setF = (labels: string[]) => setFacets(new Set(labels));
 
-  const load = useCallback((silent = false) => {
-    const warm = listsCached(['penalty', 'contract'], companyId);
-    if (!silent && !warm) setLoading(true);
-    const store = getStore();
-    Promise.all([store.list('penalty', companyId), store.list('contract', companyId)]).then(([pens, cons]) => {
-      setRows(pens.map((p) => {
-        const m = matchPenalty(p, cons);
-        return { p, renter: m ? m.renter : null, contractNo: m ? String(m.contract.contractNo || '') : null };
-      }));
-      setLoading(false);
-    }).catch(() => setLoading(false));
-  }, [companyId]);
-  useEffect(() => { load(); }, [load]);
-  useReloadOnSaved(useCallback(() => load(true), [load]));
-
   // 소프트삭제 — store.remove(deletedAt+사유). /trash 에서 복구. (ERP 30원칙 Soft delete·Audit)
   const del = async (r: Row) => {
     if (!window.confirm(`이 과태료를 삭제할까요? (휴지통에서 복구 가능)\n${String(r.p.plate || '')} · ${won(r.p.amount)}`)) return;
     await getStore().remove('penalty', String(r.p.companyId || companyId), String(r.p._key || ''), '수기 삭제');
-    load();
+    reload();
   };
 
   const matched = rows.filter((r) => r.renter).length;
@@ -146,8 +137,8 @@ export default function PenaltyProcess() {
             </Sec>
           </>
         )}
-      {upload && <PenaltyUpload onClose={() => setUpload(false)} onSaved={() => load()} />}
-      {docs && <PenaltyDocs penalties={rows.filter((r) => r.renter).map((r) => r.p)} companyId={companyId} onClose={() => setDocs(false)} onSubmitted={() => load()} />}
+      {upload && <PenaltyUpload onClose={() => setUpload(false)} onSaved={() => reload()} />}
+      {docs && <PenaltyDocs penalties={rows.filter((r) => r.renter).map((r) => r.p)} companyId={companyId} onClose={() => setDocs(false)} onSubmitted={() => reload()} />}
     </FacetPage>
   );
 }

@@ -3,10 +3,8 @@
  * 차량이동 — 업무. Sec: 현황 · 오늘 큐 · 출고 대기 · 반납 대상 · 재고.
  *   옛 ?tab=오늘|출고|반납 → 해당 Sec로 스크롤. /field·/m 흡수.
  */
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useReloadOnSaved } from '@/lib/use-reload-on-saved';
+import { useEffect, useMemo, useState } from 'react';
 import { useSession } from '@/lib/session';
-import { getStore, listsCached } from '@/lib/store';
 import { type EntityRecord } from '@/lib/intake/entities';
 import { openCar, openIngest, openLog } from '@/lib/ui-bus';
 import { FacetPage, Sec, Cards, Metric, ObjCard, EmptyState, Btn, won, C, SPACE_M, PageLoading } from '@/components/ui';
@@ -21,6 +19,7 @@ import { effectiveEndDate } from '@/lib/contract-ops';
 import { buildFieldQueues, filterFieldRows, fieldTodayCount } from '@/lib/field-queue';
 import { DeliveryWizard } from '@/components/DeliveryWizard';
 import { ReturnWizard } from '@/components/ReturnWizard';
+import { useEntityLists } from '@/lib/use-entity-lists';
 
 type DState = '반납지남' | '반납임박' | '운행중' | '대여가능' | '정비' | '기타';
 const ORDER: DState[] = ['반납지남', '반납임박', '대여가능', '운행중', '정비', '기타'];
@@ -106,26 +105,14 @@ function IoCards({ rows, byPlate, openIo }: {
 
 export default function DispatchPage() {
   const { companyId, scopeAll } = useSession();
-  const [vs, setVs] = useState<EntityRecord[]>([]);
-  const [cs, setCs] = useState<EntityRecord[]>([]);
+  const { data: [vs = [], cs = []], loading, reload } = useEntityLists(['vehicle', 'contract']);
   const [facets, setFacets] = useState<Set<string>>(new Set());
   const [q, setQ] = useState('');
-  const [loading, setLoading] = useState(true);
   const [wiz, setWiz] = useState<Wiz | null>(null);
 
   const toggleFacet = (label: string) => setFacets((s) => { const n = new Set(s); n.has(label) ? n.delete(label) : n.add(label); return n; });
   const resetFacets = () => setFacets(new Set());
   const setF = (labels: string[]) => setFacets(new Set(labels));
-
-  const load = useCallback((silent = false) => {
-    const warm = listsCached(['vehicle', 'contract'], companyId);
-    if (!silent && !warm) setLoading(true);
-    Promise.all([getStore().list('vehicle', companyId), getStore().list('contract', companyId)])
-      .then(([v, c]) => { setVs(v); setCs(c); setLoading(false); })
-      .catch(() => setLoading(false));
-  }, [companyId]);
-  useEffect(() => { load(); }, [load]);
-  useReloadOnSaved(useCallback(() => load(true), [load]));
 
   useEffect(() => {
     if (loading) return;
@@ -262,10 +249,10 @@ export default function DispatchPage() {
       )}
 
       {wiz?.kind === '인도' && (
-        <DeliveryWizard contract={wiz.contract} vehicle={wiz.vehicle} onClose={() => setWiz(null)} onDone={() => { setWiz(null); load(true); }} />
+        <DeliveryWizard contract={wiz.contract} vehicle={wiz.vehicle} onClose={() => setWiz(null)} onDone={() => { setWiz(null); reload(); }} />
       )}
       {wiz?.kind === '반납' && (
-        <ReturnWizard contract={wiz.contract} vehicle={wiz.vehicle} onClose={() => setWiz(null)} onDone={() => { setWiz(null); load(true); }} />
+        <ReturnWizard contract={wiz.contract} vehicle={wiz.vehicle} onClose={() => setWiz(null)} onDone={() => { setWiz(null); reload(); }} />
       )}
     </FacetPage>
   );

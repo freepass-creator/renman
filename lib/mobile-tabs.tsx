@@ -140,7 +140,6 @@ export function MobileTabsSettings() {
   const mobile = useIsMobile();
   const { ids, pickedSet, toggle, reorder, reset, max, catalog } = useMobileTabs();
   const [dragId, setDragId] = useState<string | null>(null);
-  const chipSize = mobile ? 'lg' : 'sm';
 
   return (
     <div style={{ padding: '4px 0 6px' }}>
@@ -165,7 +164,7 @@ export function MobileTabsSettings() {
               onDragOver={(e) => e.preventDefault()}
               onDrop={() => { if (dragId) reorder(dragId, id); setDragId(null); }}
               onDragEnd={() => setDragId(null)}
-              style={{ ...toggleStyle(true, chipSize), display: 'inline-flex', alignItems: 'center', gap: 6, cursor: 'grab' }}
+              style={{ ...toggleStyle(true, 'sm', mobile), display: 'inline-flex', alignItems: 'center', gap: 6, cursor: 'grab' }}
             >
               <t.icon size={13} strokeWidth={2.2} /> {t.label}
             </button>
@@ -184,7 +183,7 @@ export function MobileTabsSettings() {
                 const full = !on && ids.length >= max;
                 return (
                   <button key={t.id} type="button" onClick={() => toggle(t.id)} disabled={full}
-                    style={{ ...toggleStyle(on, chipSize), opacity: full ? 0.45 : 1, cursor: full ? 'not-allowed' : 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                    style={{ ...toggleStyle(on, 'sm', mobile), opacity: full ? 0.45 : 1, cursor: full ? 'not-allowed' : 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
                     <t.icon size={13} strokeWidth={on ? 2.2 : 1.8} /> {t.label}
                   </button>
                 );

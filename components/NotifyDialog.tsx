@@ -9,7 +9,8 @@ import { useMemo, useState } from 'react';
 import { useSession } from '@/lib/session';
 import { saveIntake } from '@/lib/intake';
 import { notifySaved } from '@/lib/ui-bus';
-import { Modal, Btn, C } from '@/components/ui';
+import { Modal, Btn, C, toggleStyle } from '@/components/ui';
+import { useIsMobile } from '@/lib/use-mobile';
 
 export type NotifyRecipient = {
   contractKey: string; companyId: string;
@@ -56,6 +57,7 @@ export function NotifyDialog({ recipients, onClose, onSent }: {
   onSent?: () => void;
 }) {
   const { user } = useSession();
+  const mobile = useIsMobile();
   const [idx, setIdx] = useState(0);
   const [body, setBody] = useState(TEMPLATES[0].body);
   const [busy, setBusy] = useState(false);
@@ -104,7 +106,6 @@ export function NotifyDialog({ recipients, onClose, onSent }: {
   }
 
   const lbl: React.CSSProperties = { fontSize: 10.5, color: C.faint, marginBottom: 6, fontWeight: 700, letterSpacing: '0.03em' };
-  const chip = (on: boolean): React.CSSProperties => ({ height: 26, padding: '0 10px', borderRadius: 6, border: `1px solid ${on ? C.accent : C.line}`, background: on ? C.accent : '#fff', color: on ? '#fff' : C.mute, fontSize: 12, fontWeight: on ? 700 : 500, cursor: 'pointer' });
 
   return (
     <Modal title="문자 발송" meta={`${targets.length}건`} width={860} onClose={onClose}
@@ -136,8 +137,8 @@ export function NotifyDialog({ recipients, onClose, onSent }: {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12, minWidth: 0 }}>
           <div>
             <div style={lbl}>템플릿</div>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
-              {TEMPLATES.map((t, i) => <button key={t.label} type="button" style={chip(idx === i)} onClick={() => applyTemplate(i)}>{t.label}</button>)}
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: mobile ? 8 : 6 }}>
+              {TEMPLATES.map((t, i) => <button key={t.label} type="button" data-ui="toggle" style={toggleStyle(idx === i, 'sm', mobile)} onClick={() => applyTemplate(i)} aria-pressed={idx === i}>{t.label}</button>)}
             </div>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>

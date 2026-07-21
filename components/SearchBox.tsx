@@ -11,7 +11,7 @@ import { type EntityRecord } from '@/lib/intake/entities';
 import { matchVehicles } from '@/lib/search-match';
 import { openCar } from '@/lib/ui-bus';
 import { useIsMobile } from '@/lib/use-mobile';
-import { C, SH, CTRL_M } from '@/components/ui';
+import { C, SH, ctrlH, ctrlInputFs } from '@/components/ui';
 import { Search } from 'lucide-react';
 
 /** 목록 인페이지 필터 입력 — 점프 검색(SearchBox)과 자리·크기 동일, 드롭다운 없음. */
@@ -25,7 +25,7 @@ export function FilterBox({
   placeholder?: string;
 }) {
   const mobile = useIsMobile();
-  const h = mobile ? CTRL_M : 32;
+  const h = ctrlH(mobile);
   return (
     <div style={{ width: mobile ? '100%' : 240 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, height: h, padding: mobile ? '0 14px' : '0 12px', border: `1px solid ${C.line}`, borderRadius: 'var(--radius)', background: '#fff', boxSizing: 'border-box', width: '100%' }}>
@@ -35,7 +35,7 @@ export function FilterBox({
           onChange={(e) => onChange(e.target.value)}
           onKeyDown={(e) => { if (e.key === 'Escape') onChange(''); }}
           placeholder={placeholder}
-          style={{ flex: 1, border: 'none', outline: 'none', fontSize: mobile ? 15 : 12.5, background: 'transparent', color: C.ink, minWidth: 0, fontFamily: 'inherit' }}
+          style={{ flex: 1, border: 'none', outline: 'none', fontSize: ctrlInputFs(mobile), background: 'transparent', color: C.ink, minWidth: 0, fontFamily: 'inherit' }}
         />
       </div>
     </div>
@@ -82,7 +82,7 @@ export function SearchBox() {
 
   return (
     <div ref={wrapRef} style={{ position: 'relative', width: mobile ? '100%' : 240 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, height: mobile ? CTRL_M : 32, padding: mobile ? '0 14px' : '0 12px', border: `1px solid ${C.line}`, borderRadius: 'var(--radius)', background: '#fff', boxSizing: 'border-box', width: '100%' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, height: ctrlH(mobile), padding: mobile ? '0 14px' : '0 12px', border: `1px solid ${C.line}`, borderRadius: 'var(--radius)', background: '#fff', boxSizing: 'border-box', width: '100%' }}>
         <Search size={mobile ? 16 : 14} color={C.faint} />
         <input
           value={q}
@@ -104,7 +104,7 @@ export function SearchBox() {
             }
           }}
           placeholder="차량번호·차명·손님 검색"
-          style={{ flex: 1, border: 'none', outline: 'none', fontSize: mobile ? 15 : 12.5, background: 'transparent', color: C.ink, minWidth: 0, fontFamily: 'inherit' }}
+          style={{ flex: 1, border: 'none', outline: 'none', fontSize: ctrlInputFs(mobile), background: 'transparent', color: C.ink, minWidth: 0, fontFamily: 'inherit' }}
         />
       </div>
       {showDrop && (

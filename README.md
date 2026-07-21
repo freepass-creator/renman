@@ -20,6 +20,10 @@ npm install
 npm run dev   # http://localhost:6006 → /ingest 에서 증명서 추출 시험
 ```
 
+## 빌드 캐시 (백업 시 중요)
+`.next`는 **프로젝트 안**에 둔다 (밖으로 빼면 Turbopack이 tailwind 등을 못 찾음).  
+백업 = 소스만 복사하고 **`node_modules`·`.next` 제외**. 상세 → **`docs/CACHE.md`**.
+
 ## 로드맵
 - **Phase 1 (지금)**: OCR 인제스천 — 증명서 → 구조화 데이터 추출
 - Phase 2: 추출 데이터 → Firebase 저장 + 멀티테넌트(companyId) 스코프 + 엔티티 매핑(차량/손님/보험/과태료/계약)

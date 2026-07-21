@@ -237,6 +237,28 @@ export function patchExtend(rec: EntityRecord, addMonths: number): EntityRecord 
   return { rentalMonths: term, endDate: start ? addMonthsIso(start, term) : rec.endDate };
 }
 
+/** 시동제어 패치 SSOT — contract.engineDisabled 정본. receivables·Vehicle360 공용. */
+export function patchEngineLock(
+  enable: boolean,
+  ctx: { today: string; actor: string; reason: string },
+): Record<string, unknown> {
+  if (enable) {
+    return {
+      engineDisabled: true,
+      engineDisabledAt: ctx.today,
+      engineDisabledReason: ctx.reason,
+      engineDisabledBy: ctx.actor,
+    };
+  }
+  return {
+    engineDisabled: false,
+    engineDisabledAt: '',
+    engineDisabledReason: '',
+    engineReleasedAt: ctx.today,
+    engineReleasedBy: ctx.actor,
+  };
+}
+
 /* ── 중도해지 위약금 상시계산 (v5 early-termination 이식) ──
    위약금 = 잔여개월 × 월대여료 × 요율(%). 만기 도래(정상종료)면 0. 요율=계약서상 earlyTerminationRate. */
 function monthsBetweenIso(from: string, to: string): number {

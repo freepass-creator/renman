@@ -98,7 +98,7 @@ export function MyDeskSettings() {
                 onDragOver={(e) => e.preventDefault()}
                 onDrop={() => { if (dragId) reorder(dragId, id); setDragId(null); }}
                 onDragEnd={() => setDragId(null)}
-                style={{ ...toggleStyle(true, chipSize), cursor: 'grab' }}
+                style={{ ...toggleStyle(true, 'sm', mobile), cursor: 'grab' }}
               >
                 {s.label}
               </button>
@@ -116,7 +116,7 @@ export function MyDeskSettings() {
               {items.map((s) => {
                 const on = pickedSet.has(s.id);
                 return (
-                  <button key={s.id} type="button" onClick={() => toggle(s.id)} aria-pressed={on} style={toggleStyle(on, chipSize)}>
+                  <button key={s.id} type="button" onClick={() => toggle(s.id)} aria-pressed={on} style={toggleStyle(on, 'sm', mobile)}>
                     {s.label}
                   </button>
                 );

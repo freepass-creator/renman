@@ -10,7 +10,8 @@ import { useSession } from '@/lib/session';
 import { getStore } from '@/lib/store';
 import { COMPANIES, ALL_COMPANIES, companyLabel } from '@/lib/companies';
 import { loadMaster } from '@/lib/company-master';
-import { Modal, Btn, C } from '@/components/ui';
+import { Modal, Btn, C, Input, Select, toggleStyle, fieldStyle } from '@/components/ui';
+import { useIsMobile } from '@/lib/use-mobile';
 import {
   listTemplates, getTemplate, renderBody, buildDocNo, computeNextSeq, fmtKDate, fmtKMoney,
   DOC_CATEGORIES, DOC_PRINT_CSS, type DocCategory,
@@ -24,9 +25,10 @@ export function DocIssueDialog({ issued, onClose, onIssued }: {
   onIssued: () => void;
 }) {
   const { user, companyId, scopeAll } = useSession();
+  const mobile = useIsMobile();
   const [category, setCategory] = useState<DocCategory>('인사');
   const [templateId, setTemplateId] = useState<string>('');
-  const [issuerId, setIssuerId] = useState<string>(scopeAll ? COMPANIES[0] : companyId);
+  const [issuerId, setIssuerId] = useState<string>(scopeAll ? '' : companyId);
   const [fieldData, setFieldData] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState('');
@@ -48,9 +50,9 @@ export function DocIssueDialog({ issued, onClose, onIssued }: {
     setFieldData(initial);
   }, [templateId]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const master = loadMaster(issuerId);
+  const master = issuerId ? loadMaster(issuerId) : {};
   const companyScope = {
-    name: companyLabel(issuerId),
+    name: issuerId ? companyLabel(issuerId) : '',
     bizRegNo: master.bizNo || '', corpRegNo: '', ceo: master.ceo || '',
     address: master.address || '', mainPhone: master.phone || '',
   };
@@ -104,8 +106,7 @@ export function DocIssueDialog({ issued, onClose, onIssued }: {
   }
 
   const lbl: React.CSSProperties = { fontSize: 11, color: C.mute, marginBottom: 4, fontWeight: 600 };
-  const inp: React.CSSProperties = { width: '100%', height: 34, boxSizing: 'border-box', padding: '0 9px', border: `1px solid ${C.line}`, borderRadius: 6, fontSize: 13, fontFamily: 'inherit', color: C.ink, background: '#fff', outline: 'none' };
-  const chip = (on: boolean): React.CSSProperties => ({ height: 26, padding: '0 11px', borderRadius: 6, border: `1px solid ${on ? C.accent : C.line}`, background: on ? C.accent : '#fff', color: on ? '#fff' : C.mute, fontSize: 12, fontWeight: on ? 700 : 500, cursor: 'pointer' });
+  const fld = { ...fieldStyle(false, mobile), width: '100%' } as React.CSSProperties;
 
   return (
     <Modal title="표준 문서 발급" meta={template?.title} width={1120} onClose={onClose}
@@ -121,44 +122,45 @@ export function DocIssueDialog({ issued, onClose, onIssued }: {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12, overflowY: 'auto', maxHeight: '68vh', paddingRight: 4 }}>
           <div>
             <div style={lbl}>분류</div>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: mobile ? 8 : 6 }}>
               {DOC_CATEGORIES.filter((c) => listTemplates({ category: c }).length > 0).map((c) => (
-                <button key={c} type="button" style={chip(category === c)} onClick={() => setCategory(c)}>{c}</button>
+                <button key={c} type="button" data-ui="toggle" style={toggleStyle(category === c, 'sm', mobile)} onClick={() => setCategory(c)} aria-pressed={category === c}>{c}</button>
               ))}
             </div>
           </div>
           <div>
             <div style={lbl}>양식</div>
-            <select value={templateId} onChange={(e) => setTemplateId(e.target.value)} style={inp}>
+            <Select value={templateId} onChange={(e) => setTemplateId(e.target.value)} style={{ width: '100%' }}>
               {listTemplates({ category }).map((t) => <option key={t.id} value={t.id}>{t.title}</option>)}
-            </select>
+            </Select>
             {template?.description && <div style={{ fontSize: 10.5, color: C.faint, marginTop: 4 }}>{template.description}</div>}
           </div>
           {scopeAll && (
             <div>
               <div style={lbl}>발급 회사</div>
-              <select value={issuerId} onChange={(e) => setIssuerId(e.target.value)} style={inp}>
+              <Select value={issuerId} onChange={(e) => setIssuerId(e.target.value)} style={{ width: '100%' }}>
+                <option value="">— 회사 선택 —</option>
                 {COMPANIES.map((c) => <option key={c} value={c}>{companyLabel(c)}</option>)}
-              </select>
+              </Select>
             </div>
           )}
           {/* 대상 (수기) */}
           {template?.target === 'staff' && (
             <div style={{ display: 'grid', gap: 6 }}>
               <div style={lbl}>대상 직원</div>
-              <input placeholder="성명" value={fieldData._targetName || ''} onChange={(e) => setF('_targetName', e.target.value)} style={inp} />
-              <input type="date" placeholder="생년월일" value={fieldData._targetBirth || ''} onChange={(e) => setF('_targetBirth', e.target.value)} style={inp} />
-              <input placeholder="주소" value={fieldData._targetAddress || ''} onChange={(e) => setF('_targetAddress', e.target.value)} style={inp} />
+              <Input placeholder="성명" value={fieldData._targetName || ''} onChange={(e) => setF('_targetName', e.target.value)} style={{ width: '100%' }} />
+              <Input type="date" placeholder="생년월일" value={fieldData._targetBirth || ''} onChange={(e) => setF('_targetBirth', e.target.value)} style={{ width: '100%' }} />
+              <Input placeholder="주소" value={fieldData._targetAddress || ''} onChange={(e) => setF('_targetAddress', e.target.value)} style={{ width: '100%' }} />
             </div>
           )}
           {template?.target === 'partner' && (
             <div style={{ display: 'grid', gap: 6 }}>
               <div style={lbl}>대상 거래처</div>
-              <input placeholder="상호(법인명)" value={fieldData._targetName || ''} onChange={(e) => setF('_targetName', e.target.value)} style={inp} />
-              <input placeholder="사업자등록번호" value={fieldData._targetBizRegNo || ''} onChange={(e) => setF('_targetBizRegNo', e.target.value)} style={inp} />
-              <input placeholder="대표자" value={fieldData._targetCeo || ''} onChange={(e) => setF('_targetCeo', e.target.value)} style={inp} />
-              <input placeholder="연락처" value={fieldData._targetPhone || ''} onChange={(e) => setF('_targetPhone', e.target.value)} style={inp} />
-              <input placeholder="주소" value={fieldData._targetAddress || ''} onChange={(e) => setF('_targetAddress', e.target.value)} style={inp} />
+              <Input placeholder="상호(법인명)" value={fieldData._targetName || ''} onChange={(e) => setF('_targetName', e.target.value)} style={{ width: '100%' }} />
+              <Input placeholder="사업자등록번호" value={fieldData._targetBizRegNo || ''} onChange={(e) => setF('_targetBizRegNo', e.target.value)} style={{ width: '100%' }} />
+              <Input placeholder="대표자" value={fieldData._targetCeo || ''} onChange={(e) => setF('_targetCeo', e.target.value)} style={{ width: '100%' }} />
+              <Input placeholder="연락처" value={fieldData._targetPhone || ''} onChange={(e) => setF('_targetPhone', e.target.value)} style={{ width: '100%' }} />
+              <Input placeholder="주소" value={fieldData._targetAddress || ''} onChange={(e) => setF('_targetAddress', e.target.value)} style={{ width: '100%' }} />
             </div>
           )}
           {/* 양식 필드 */}
@@ -166,10 +168,10 @@ export function DocIssueDialog({ issued, onClose, onIssued }: {
             <div key={f.key}>
               <div style={lbl}>{f.label}{f.required && <span style={{ color: C.danger, marginLeft: 2 }}>*</span>}</div>
               {f.type === 'textarea'
-                ? <textarea rows={3} value={fieldData[f.key] || ''} onChange={(e) => setF(f.key, e.target.value)} placeholder={f.placeholder} style={{ ...inp, height: 'auto', padding: '8px 9px', resize: 'vertical' }} />
+                ? <textarea rows={3} value={fieldData[f.key] || ''} onChange={(e) => setF(f.key, e.target.value)} placeholder={f.placeholder} style={{ ...fld, height: 'auto', padding: '8px 9px', resize: 'vertical' }} />
                 : f.type === 'select'
-                  ? <select value={fieldData[f.key] || ''} onChange={(e) => setF(f.key, e.target.value)} style={inp}>{(f.options || []).map((o) => <option key={o} value={o}>{o}</option>)}</select>
-                  : <input type={f.type === 'date' ? 'date' : f.type === 'number' ? 'number' : 'text'} value={fieldData[f.key] || ''} onChange={(e) => setF(f.key, e.target.value)} placeholder={f.placeholder} style={inp} />}
+                  ? <Select value={fieldData[f.key] || ''} onChange={(e) => setF(f.key, e.target.value)} style={{ width: '100%' }}>{(f.options || []).map((o) => <option key={o} value={o}>{o}</option>)}</Select>
+                  : <Input type={f.type === 'date' ? 'date' : f.type === 'number' ? 'number' : 'text'} value={fieldData[f.key] || ''} onChange={(e) => setF(f.key, e.target.value)} placeholder={f.placeholder} style={{ width: '100%' }} />}
             </div>
           ))}
         </div>

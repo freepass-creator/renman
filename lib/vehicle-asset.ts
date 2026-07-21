@@ -3,6 +3,7 @@
  *   새 /asset/loan URL 만들지 않음.
  */
 import { type EntityRecord } from '@/lib/intake/entities';
+import { isCashPurchase } from '@/lib/domain/vehicle-finance';
 import { loanSchedule, loanSummary, type LoanRow } from '@/lib/loan';
 import { dday, TODAY } from '@/lib/dashboard-consts';
 import { ageFromBirth } from '@/lib/compliance';
@@ -48,7 +49,7 @@ export function insuranceAgeGap(
 /** 차량 할부 스냅샷 — 현금완납·스케줄 불가 시 null. */
 export function vehicleLoanView(v: EntityRecord | null | undefined, asOf: string = TODAY): VehicleLoanView | null {
   if (!v) return null;
-  const cashOnly = String(v.loanCashOnly) === '예';
+  const cashOnly = isCashPurchase(v.loanCashOnly);
   if (cashOnly) {
     return {
       rows: [], monthlyPayment: 0, remainPrincipal: 0, remainSeq: 0, paidSeq: 0, nextDate: '',

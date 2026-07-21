@@ -6,12 +6,11 @@
  */
 import { useEffect, useMemo, useState } from 'react';
 import { useSession } from '@/lib/session';
-import { Sec, Cards, Metric, Btn, C } from '@/components/ui';
+import { Sec, Cards, Metric, Btn, Input, C } from '@/components/ui';
 import { AgendaCalendar, type CalMark } from '@/components/Agenda';
 import { TODAY } from '@/lib/dashboard-consts';
 
 type MyEvent = { id: string; date: string; title: string; memo?: string; done?: boolean };
-const inp: React.CSSProperties = { height: 34, boxSizing: 'border-box', padding: '0 10px', border: `1px solid ${C.line}`, borderRadius: 'var(--radius)', fontSize: 14, background: '#fff', color: C.ink, fontFamily: 'inherit' };
 const ddayOf = (date: string) => Math.round((new Date(date + 'T00:00:00').getTime() - new Date(TODAY + 'T00:00:00').getTime()) / 86400000);
 const toneOf = (e: MyEvent): CalMark['tone'] => e.done ? 'gray' : (() => { const d = ddayOf(e.date); return d < 0 ? 'red' : d === 0 ? 'amber' : d <= 7 ? 'green' : 'gray'; })();
 
@@ -58,7 +57,7 @@ export function MySchedule() {
 
   return (
     <>
-      <Sec title="현황" desc="내가 직접 넣는 나만의 일정" right={<Btn variant={adding ? 'solid' : 'ghost'} onClick={() => setAdding((a) => !a)}>{adding ? '닫기' : '+ 일정 추가'}</Btn>}>
+      <Sec title="내 일정" desc="내가 직접 넣는 일정 · 회사 일정과 별개" right={<Btn variant={adding ? 'solid' : 'ghost'} onClick={() => setAdding((a) => !a)}>{adding ? '닫기' : '+ 일정 추가'}</Btn>}>
         <Cards min={128} fit>
           <Metric label="지남·미완" value={overdue.length} tone={overdue.length ? 'danger' : 'ink'} />
           <Metric label="오늘" value={today.length} tone={today.length ? 'warn' : 'ink'} />
@@ -66,14 +65,14 @@ export function MySchedule() {
           <Metric label="전체" value={events.length} tone="ink" />
         </Cards>
         {adding ? <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginTop: 12, padding: '12px 14px', border: `1px solid ${C.accent}`, borderRadius: 'var(--radius)', background: 'var(--bg-card)' }}>
-          <input type="date" value={form.date} onChange={(e) => setForm((f) => ({ ...f, date: e.target.value }))} style={{ ...inp, width: 150 }} />
-          <input value={form.title} onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))} onKeyDown={(e) => { if (e.key === 'Enter') add(); }} placeholder="할 일 / 일정 제목" style={{ ...inp, flex: 1, minWidth: 160 }} autoFocus />
-          <input value={form.memo} onChange={(e) => setForm((f) => ({ ...f, memo: e.target.value }))} onKeyDown={(e) => { if (e.key === 'Enter') add(); }} placeholder="메모(선택)" style={{ ...inp, flex: 1, minWidth: 120 }} />
+          <Input type="date" value={form.date} onChange={(e) => setForm((f) => ({ ...f, date: e.target.value }))} style={{ width: 150 }} />
+          <Input value={form.title} onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))} onKeyDown={(e) => { if (e.key === 'Enter') add(); }} placeholder="할 일 / 일정 제목" style={{ flex: 1, minWidth: 160 }} autoFocus />
+          <Input value={form.memo} onChange={(e) => setForm((f) => ({ ...f, memo: e.target.value }))} onKeyDown={(e) => { if (e.key === 'Enter') add(); }} placeholder="메모(선택)" style={{ flex: 1, minWidth: 120 }} />
           <Btn onClick={add}>추가</Btn>
         </div> : null}
       </Sec>
 
-      <Sec title="달력" desc="날짜 클릭 → 그 날 내 일정">
+      <Sec title="내 달력" desc="날짜 클릭 → 그 날 내 일정">
         <AgendaCalendar marks={marks} selected={sel} onSelect={(d) => setSel((s) => s === d ? '' : d)} />
       </Sec>
 

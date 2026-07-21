@@ -2,8 +2,9 @@
 import React, { useState } from 'react';
 import { useSession } from '@/lib/session';
 import { saveIntake } from '@/lib/intake';
-import { ALL_COMPANIES, COMPANIES } from '@/lib/companies';
-import { Btn, Input, C, fieldStyle } from '@/components/ui';
+import { resolveWriteCompany, NEED_COMPANY } from '@/lib/scope';
+import { Btn, Input, C, fieldStyle, toggleStyle } from '@/components/ui';
+import { useIsMobile } from '@/lib/use-mobile';
 
 export type QuickLogCtx = { plate?: string; customer?: string; contractNo?: string; companyId?: string };
 
@@ -26,18 +27,20 @@ const today = () => new Date().toISOString().slice(0, 10);
  *  저장·취소 모두 onDone/onCancel 콜백으로 상위(펼침 상태)를 접는다. 저장 로직은 전역 QuickLog와 동일. */
 export function QuickLogForm({ ctx, onDone, onCancel, autoFocus = true, style }: { ctx: QuickLogCtx; onDone: () => void; onCancel: () => void; autoFocus?: boolean; style?: React.CSSProperties }) {
   const { user, companyId } = useSession();
+  const mobile = useIsMobile();
   const [kind, setKind] = useState<string>('메모');
   const [text, setText] = useState('');
   const [follow, setFollow] = useState(false);
   const [nextDate, setNextDate] = useState('');
   const [saving, setSaving] = useState(false);
 
-  const target = ctx.companyId || (companyId === ALL_COMPANIES ? COMPANIES[0] : companyId);
+  const target = resolveWriteCompany(companyId, { companyId: ctx.companyId });   // 임의 폴백 금지 — 모호하면 null
   const hint = HINTS[kind] || '';
   const anchor = ctx.plate || ctx.customer || '';
 
   async function save() {
     if (!text.trim()) return;
+    if (!target) { window.alert(NEED_COMPANY); return; }
     setSaving(true);
     try {
       await saveIntake('history', target, [{
@@ -55,13 +58,9 @@ export function QuickLogForm({ ctx, onDone, onCancel, autoFocus = true, style }:
         <span style={{ fontSize: 12.5, fontWeight: 800, color: C.ink }}>빠른 기록</span>
         {anchor ? <span style={{ fontSize: 11.5, color: C.faint }}>{anchor}에 남깁니다</span> : null}
       </div>
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: mobile ? 8 : 6, marginBottom: 8 }}>
         {KINDS.map((k) => (
-          <button key={k} type="button" onClick={() => setKind(k)} style={{
-            height: 28, padding: '0 11px', borderRadius: 'var(--radius)', boxSizing: 'border-box',
-            border: `1px solid ${kind === k ? C.brand : C.line}`, background: kind === k ? C.brand : '#fff',
-            color: kind === k ? '#fff' : C.mute, fontSize: 12, fontWeight: kind === k ? 700 : 500, cursor: 'pointer',
-          }}>{k}</button>
+          <button key={k} type="button" data-ui="toggle" onClick={() => setKind(k)} aria-pressed={kind === k} style={toggleStyle(kind === k, 'sm', mobile)}>{k}</button>
         ))}
       </div>
       <textarea autoFocus={autoFocus} value={text} onChange={(e) => setText(e.target.value)} placeholder={hint}

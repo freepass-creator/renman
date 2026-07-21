@@ -9,6 +9,7 @@ import { matchDriver } from './penalty-reassign';
 import { linkFleet } from './domain/model';
 import { dday, OUT } from './dashboard-consts';
 import { normPlate } from './plate';
+import { selectReceivables } from './snapshot/selectors';
 
 export type DashboardInput = {
   contracts: EntityRecord[];
@@ -44,7 +45,8 @@ export function computeDashboard(input: DashboardInput, today: string) {
   const running = rows.filter((r) => runningPlates.has(normPlate(r.v.plate)));
   const idleCars = rows.filter((r) => idlePlates.has(normPlate(r.v.plate)));
   const soldRows = rows.filter((r) => soldPlates.has(normPlate(r.v.plate)));
-  const totalUnpaid = views.reduce((s, v) => s + v.net, 0);
+  const recv = selectReceivables(contracts, today);
+  const totalUnpaid = recv.total;
 
   const overduePay = views.filter((v) => v.net > 0).sort((a, b) => b.net - a.net);
   const returnFlow = views.filter((v) => v.status === '운행' && v.dday != null && v.dday <= 7).sort((a, b) => (a.dday ?? 0) - (b.dday ?? 0));
@@ -102,10 +104,10 @@ export function computeDashboard(input: DashboardInput, today: string) {
   const endedContracts = views.filter((v) => v.ended).length;                 // 종료(반납·해지·채권 =v5 반납 75)
   const loanCount = vehicles.filter((v) => v.loanCompany != null || v.loanCashOnly != null).length; // 할부(상환합계 157)
   // 미수 분해 — 운행중 미수(직원 채권 carry)와 반납 추심잔여(carryReturned)를 구분(v5 사전점검 라인아이템).
-  const misuActive = views.filter((v) => !v.ended).reduce((s, v) => s + v.net, 0);
-  const misuReturned = views.filter((v) => v.ended).reduce((s, v) => s + v.net, 0);
-  const misuActiveCount = views.filter((v) => !v.ended && v.net > 0).length;
-  const misuReturnedCount = views.filter((v) => v.ended && v.net > 0).length;
+  const misuActive = recv.misuActive;
+  const misuReturned = recv.misuReturned;
+  const misuActiveCount = recv.misuActiveCount;
+  const misuReturnedCount = recv.misuReturnedCount;
   const summary = {
     totalVeh: vehicles.length,      // 전체 구매(자산)
     held: heldNodes.length,         // 현보유(처분 제외) — linkFleet
@@ -117,11 +119,12 @@ export function computeDashboard(input: DashboardInput, today: string) {
     endedContracts,                 // 반납·종료 계약수
     loanCount,                      // 할부(상환) 차량수
     misuTotal: totalUnpaid,         // 현재 미수 총액(운행중+반납추심)
-    misuCount: overduePay.length,   // 현재 미수 건수(net>0)
-    misuActive,                     // 운행중 미수(=carryCurrent)
+    misuCount: recv.unpaidCount,    // 현재 미수 건수(net>0)
+    misuActive,                     // 운행중 미수
     misuActiveCount,                // 운행중 미수 건수
-    misuReturned,                   // 반납 추심잔여(=carryReturned)
+    misuReturned,                   // 반납 추심잔여
     misuReturnedCount,              // 반납 추심 건수
+    overpayTotal: recv.overpayTotal, // 과오납 합
     cashIn, cashOut, cashNet: cashIn - cashOut, // 자금 입/출/순증감
     txCount: bankTx.length,         // 자금(계좌거래) 건수
     unclassified: unmatchedTx.length, // 자금 미분류(매칭 안 됨)

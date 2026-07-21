@@ -1,7 +1,23 @@
-# renman (jpkerp6) — 작업 규칙
+# renman (jpkerp6) — 작업 규칙 · Claude 진입점
 
 렌터카 ERP (Next.js 15 + TS + Firestore). **철칙: 새 화면·기능은 공용 원자/엔진으로만 만든다. 손롤 금지.**
 없으면 → 페이지에 박지 말고 **공용 원자/엔진을 먼저 만들고** 갖다 쓴다. (반복 공통은 전부 SSOT 1곳)
+
+> 짝 파일: **`RENMAN-CURSOR.md`** (Cursor 진입점). 이 파일은 Claude Code가 자동 로딩하는 규약 파일이라 이름 고정.
+> 두 파일은 진입점일 뿐 — **규격 본문은 공용 문서 하나**를 본다. 본문 복붙 금지.
+
+## 문서 지도 (작업 전 필독)
+
+| 문서 | 내용 |
+|---|---|
+| **`docs/RENMAN-WORK-ORDER.md`** | **작업지시서·규격서 본문(SSOT)** — 절대 규격 · A그룹(지금 틀린 것) · B그룹(구조 개편) · 공용 원자 표 · 안티패턴 · 완료 기준 |
+| `RENMAN-CURSOR.md` | Cursor 진입점 + **협업 규칙 · 핸드오프 로그**(작업 넘길 때 한 줄 追記) |
+| `DEPLOY.md` | 배포 · **오픈 전 필수 게이트** |
+| **`docs/CACHE.md`** | **백업 SSOT** — `.next`는 프로젝트 안 유지, 백업 시 `.next`·`node_modules` 제외 |
+| `tools/archive/architecture-cleanup-handoff.md` | Cursor Phase 0~3 이력 · Phase 4 잔여 |
+| 이 파일(아래) | 코드 규격 — UI 공용 규격 · 화면 구조 · 데이터 3층 · 기능 엔진 SSOT · 개발 제약 |
+
+**협업 3원칙**: ①동시 작업 안 함 ②넘길 땐 반드시 `tsc EXIT 0` ③바꾼 것 `RENMAN-CURSOR.md` §5 핸드오프 로그에 한 줄.
 
 ## 아키텍처 정리 (Cursor Phase 0~3 완료 — Claude 필독)
 
@@ -47,7 +63,7 @@
 | 입출고 | `/work`→`/dispatch`(Sec: 오늘·출고·반납·재고) · `/m`·`/field`=리다이렉트 | 별도「현장」·형제 탭 허브 |
 
 ## 화면 구조
-홈 = 회사(전 법인 또는 선택 법인) 전체(탭: 일정·미결·**운영현황**·리스크). 운영현황=지표 한눈(함대·계약·자금·현장) · FacetRail 동일. **마이페이지(/ops)** = 개인(탭: 일정·업무=MyDesk).
+홈 = 회사(전 법인 또는 선택 법인) 전체(탭: 일정·미결·**운영현황**·리스크). 운영현황=지표 한눈(함대·계약·자금·현장) · FacetRail 동일. **마이페이지(/ops)** = 개인(탭: 일정·업무). 일정=**회사 일정(Agenda)+내 일정(MySchedule) Sec 한 화면**(서브탭 금지) · FacetRail 상시.
 **티어:** 라이트=홈·마이·현황(+설정·검색)·그자리 처리. 스탠다드+=메뉴「비즈니스」(배차·미수·자금일보…). 경영 티어=손익 등. `BUILD_TIER`=`lib/tier`.
 계정: **본사**=전 법인 합본·전환, **법인 소속 직원**=배정된 법인만. (옛 수탁/위탁 개념 없음.)
 설정에서 초기화면(홈/마이페이지) 선택 → `jpk:landing`=`mydesk`면 /ops (세션당 1회). 일정·내업무는 홈·마이페이지가 **같은 공용 컴포넌트** 공유. **현장·이벤트 업무** = `/work` 허브 → 업무 페이지. 옛 `/m`·`/field`·landing=`field`는 `/dispatch`로 흡수.
@@ -64,14 +80,12 @@
 
 새 화면은 위 표만 따른다. 메뉴로 가는 허브에 `back={router.back}` 금지. 페이지에 이전/홈/탭을 손롤하지 말 것.
 
-**컨트롤 크기·폰트 규격 (완성도는 여기서 나온다 — 한 툴바 안 높이 절대 섞지 말 것):**
-- 웹 높이: **32px** = 기본(Btn(md)·SearchBox·Select·Input·PeriodBar·PillTabs(md)·CompanyFilter·WorkbenchBar). **28px** = 칩·sm(FilterChips·FacetRail칩·Btn(sm)·PillTabs(sm)).
-- **모바일 터치 SSOT:** `CTRL_M=40`(셸 1행·렌즈탭·검색·회사·필터) · `TOUCH=44`(시트 행·히트 최소) · `Btn lg=48`(현장 CTA). 웹 sm을 모바일에 강제하지 말 것(WorkbenchBar 렌즈탭 등).
-- **모바일 간격 SSOT (2단만):** `SPACE_M=12` = 무리 안(버튼·카드·칩·제목↔본문) · `SPACE_GROUP_M=20` = 무리끼리(섹션·업로드↔탭↔본문). 그 외 손롤 금지.
-- 폰트: 컨트롤 **12.5**(웹) / 모바일 셸·탭 **14–15**. 숫자=`var(--font-mono)`+`tabular-nums`.
-- 셸 툴바는 **`WorkbenchBar` 하나**. 모바일 1행 = `[회사(전체)][검색][필터]` (Page가 회사 중복 렌더 금지).
-- **목록 보기 = 카드 하나.** PC·모바일 동일 정책. `ObjCard` 웹=56 · 모바일=min 72(터치). 카드/리스트/엑셀 전환·`ViewBar`·`ViewMode` 금지.
-- **모바일 본문 배열:** 기능·도메인은 웹 SSOT. **배열·밀도·CTA 자리는 모바일에 맞게 재배치**(웹을 줄여 넣지 말 것). 예: ops 피드, Vehicle360 현장 CTA 상단, `KV`/`DetailGrid` 세로, `Cards` 세로스택·fit 2열, `PillTabs` lg.
+**컨트롤 크기·폰트 규격 (= freepass ERP4 `CTRL` — 페이지에서 height 숫자 금지):**
+- 웹: **md=32** · **sm=28**. 모바일: **md=40** · **sm=36**. 칩=웹28 / 모바일40 (`ctrlChipH`).
+- 헬퍼: `ctrlH` · `ctrlFs` · `ctrlInputFs` · `ctrlChipH` (`components/ui/tokens`). 모바일 입력·버튼 폰트 **16**(iOS 줌 방지).
+- 현장 CTA만 `Btn lg`/`toggleStyle lg`=48 유지.
+- 셸 툴바는 **`WorkbenchBar` 하나**. 모바일 1행 = `[회사][검색][필터]`.
+- **목록 보기 = 카드 하나.** `ObjCard` 웹=56 · 모바일=min 72.
 
 **금지 데코:** 타이틀 밑줄(`borderBottom`) · 박스 그룹(Panel/StatBar 테두리) · 가로/세로 데코선. 카드 1px 테두리·테이블 행선은 **원자라 유지**. 색·치수는 토큰(`C.*`, `var(--radius)`)만, 하드코딩 금지.
 
@@ -106,3 +120,4 @@
 - Firebase 키 있으면 **로그인 필요** / 없으면 DEV_USERS+localStorage
 - 시드: `.env.local`에 `NEXT_PUBLIC_MIGRATE_MODE=frozen` 권장 → `/dev/data`에서 스위치플랜 반영
 - OCR: `GEMINI_API_KEY` (없으면 수기 폴백)
+- **빌드 캐시:** `.next`는 프로젝트 안 (`docs/CACHE.md`). 백업 시 `.next`·`node_modules` 제외.

@@ -8,6 +8,8 @@ import { type EntityRecord } from '@/lib/intake/entities';
 import { ocrBatch, mapOcrToEntity } from '@/lib/ocr-client';
 import { uploadDoc, docPath } from '@/lib/storage';
 import { saveIntake } from '@/lib/intake';
+import { resolveWriteCompany, NEED_COMPANY } from '@/lib/scope';
+import { toast } from '@/lib/toast';
 import { matchPenalty } from '@/lib/penalty-match';
 import { Modal, Btn, Badge, Input, Select, C, won } from '@/components/ui';
 import { UploadCloud, Trash2 } from 'lucide-react';
@@ -17,7 +19,7 @@ type Row = { id: string; fileName: string; file: File; status: 'pending' | 'done
 
 export function PenaltyUpload({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) {
   const { companyId } = useSession();
-  const [co, setCo] = useState(companyId === ALL_COMPANIES ? COMPANIES[0] : companyId);
+  const [co, setCo] = useState(companyId === ALL_COMPANIES ? '' : companyId);
   const [rows, setRows] = useState<Row[]>([]);
   const [busy, setBusy] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -26,6 +28,7 @@ export function PenaltyUpload({ onClose, onSaved }: { onClose: () => void; onSav
   const [existing, setExisting] = useState<EntityRecord[]>([]);
 
   useEffect(() => {
+    if (!co) { setContracts([]); setExisting([]); return; }
     const store = getStore();
     Promise.all([store.list('contract', co), store.list('penalty', co)])
       .then(([cs, ps]) => { setContracts(cs); setExisting(ps); }).catch(() => {});
@@ -70,15 +73,17 @@ export function PenaltyUpload({ onClose, onSaved }: { onClose: () => void; onSav
   const ready = rows.filter((r) => String(r.rec.plate || '').trim());
   async function save() {
     if (!ready.length) return;
+    const target = resolveWriteCompany(companyId, { companyId: co });
+    if (!target) { toast(NEED_COMPANY, 'error'); return; }
     setSaving(true);
     try {
       const records = await Promise.all(ready.map(async (r) => {
         const { renter } = derive(r.rec);
         let fileUrl = '';
-        try { fileUrl = (await uploadDoc(r.file, docPath(co, 'penalty', String(r.rec.noticeNo || r.id), r.fileName))) || ''; } catch { /* Firebase 미설정 시 스킵 */ }
-        return { ...r.rec, companyId: co, reassignStatus: '접수', ...(renter ? { driverName: renter } : {}), ...(fileUrl ? { fileUrl } : {}), _ocrOriginal: r.ocrOriginal };
+        try { fileUrl = (await uploadDoc(r.file, docPath(target, 'penalty', String(r.rec.noticeNo || r.id), r.fileName))) || ''; } catch { /* Firebase 미설정 시 스킵 */ }
+        return { ...r.rec, companyId: target, reassignStatus: '접수', ...(renter ? { driverName: renter } : {}), ...(fileUrl ? { fileUrl } : {}), _ocrOriginal: r.ocrOriginal };
       }));
-      await saveIntake('penalty', co, records as EntityRecord[]);
+      await saveIntake('penalty', target, records as EntityRecord[]);
       onSaved(); onClose();
     } finally { setSaving(false); }
   }
@@ -97,8 +102,10 @@ export function PenaltyUpload({ onClose, onSaved }: { onClose: () => void; onSav
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, flexWrap: 'wrap' }}>
         <label style={{ fontSize: 11.5, color: C.mute, fontWeight: 700 }}>회사(법인)</label>
         <Select size="sm" value={co} onChange={(e) => setCo(e.target.value)}>
+          {companyId === ALL_COMPANIES ? <option value="">— 회사 선택 —</option> : null}
           {COMPANIES.map((c) => <option key={c} value={c}>{companyLabel(c)}</option>)}
         </Select>
+        {!co && companyId === ALL_COMPANIES ? <span style={{ fontSize: 11.5, color: C.warn }}>저장 전 회사를 선택하세요</span> : null}
         {contracts.length === 0 && <span style={{ fontSize: 11.5, color: C.warn }}>이 회사 계약이 없어 매칭이 안 됩니다 — 운영현황에서 계약 먼저 등록</span>}
       </div>
 

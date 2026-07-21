@@ -1,15 +1,13 @@
 'use client';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { useSession } from '@/lib/session';
-import { getStore, listsCached } from '@/lib/store';
-import { type EntityRecord } from '@/lib/intake/entities';
 import { computeKPI, kpiByCompany } from '@/lib/kpi';
 import { Page, Sec, Cards, Metric, won, C, th, thR, td, tdR, PageLoading } from '@/components/ui';
 import { WorkbenchBar } from '@/components/WorkbenchBar';
 import { useCashHubNav } from '@/components/CashHubTabs';
 import { COMPANIES, companyLabel } from '@/lib/companies';
 import { TODAY } from '@/lib/dashboard-consts';
-import { useReloadOnSaved } from '@/lib/use-reload-on-saved';
+import { useEntityLists } from '@/lib/use-entity-lists';
 
 const AGING_LABELS = ['0~30일', '31~60일', '61~90일', '90일+'];
 const AGING_COLORS = ['var(--green-text)', '#d97706', '#ea580c', 'var(--red-text)'];
@@ -18,19 +16,7 @@ const AGING_COLORS = ['var(--green-text)', '#d97706', '#ea580c', 'var(--red-text
 export default function ManagePage() {
   const { companyId, scopeAll } = useSession();
   const cashNav = useCashHubNav();
-  const [contracts, setContracts] = useState<EntityRecord[]>([]);
-  const [vehicles, setVehicles] = useState<EntityRecord[]>([]);
-  const [loading, setLoading] = useState(true);
-  const load = useCallback((quiet = false) => {
-    const warm = listsCached(['contract', 'vehicle'], companyId);
-    if (!quiet && !warm) setLoading(true);
-    const store = getStore();
-    Promise.all([store.list('contract', companyId), store.list('vehicle', companyId)])
-      .then(([cs, vs]) => { setContracts(cs); setVehicles(vs); setLoading(false); })
-      .catch(() => setLoading(false));
-  }, [companyId]);
-  useEffect(() => { load(); }, [load]);
-  useReloadOnSaved(useCallback(() => load(true), [load]));
+  const { data: [contracts = [], vehicles = []], loading } = useEntityLists(['contract', 'vehicle']);
   const total = useMemo(() => computeKPI(contracts, vehicles, TODAY), [contracts, vehicles]);
   const byCo = useMemo(() => (scopeAll ? kpiByCompany(contracts, vehicles, TODAY, COMPANIES) : []), [contracts, vehicles, scopeAll]);
   const agingMax = Math.max(1, ...total.aging);

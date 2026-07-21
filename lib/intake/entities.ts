@@ -77,7 +77,7 @@ export const ENTITIES: Record<string, Entity> = {
       { key: 'gpsProvider', label: 'GPS 공급사', type: 'text', manual: true },
       { key: 'gpsDeviceId', label: 'GPS 단말번호', type: 'text', manual: true },
       { key: 'gpsInstalledDate', label: 'GPS 설치일', type: 'date', manual: true },
-      { key: 'gpsControl', label: '시동제어', type: 'select', options: ['가능', '불가'], manual: true, note: '미납 원격 시동잠금' },
+      { key: 'gpsControl', label: '시동제어', type: 'select', options: ['가능', '불가'], manual: true, note: 'GPS 장비 원격잠금 능력(상태 저장 X). 적용 여부=contract.engineDisabled' },
       // ── 처분/매각 (매각계약서 → 처분손익) ──
       { key: 'saleDate', label: '매각일', type: 'date', manual: true },
       { key: 'salePrice', label: '매각가(원)', type: 'number', manual: true },

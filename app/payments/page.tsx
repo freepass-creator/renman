@@ -6,12 +6,11 @@
  *   · 적용 = 계약 _payments append(computeContractView가 흡수→미수 자동감소) + bank_tx matched 표시.
  *   · 안전: high 신뢰만 제안 · operator 체크 확인 후 적용 · 이중적용 가드 · 매칭은 미수를 줄이기만(허위미수 불가) · 감사 자동기록.
  */
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useSession } from '@/lib/session';
-import { getStore, listsCached } from '@/lib/store';
+import { getStore } from '@/lib/store';
 import { notifySaved, openCar, openCustomer } from '@/lib/ui-bus';
 import { customerKey } from '@/lib/customers';
-import { useReloadOnSaved } from '@/lib/use-reload-on-saved';
 import { companyLabel } from '@/lib/companies';
 import { type EntityRecord } from '@/lib/intake/entities';
 import { buildMatchContract, computeContractView } from '@/lib/contract-ops';
@@ -22,13 +21,17 @@ import type { BankTransaction } from '@/lib/payments/types';
 import { lockReason } from '@/lib/finance/period-lock';
 import { safeUpdate } from '@/lib/safe-update';
 import { useBusyAction } from '@/lib/use-busy-action';
-import { Page, Sec, Cards, Metric, Badge, Btn, EmptyState, ListBox, ListRow, Input, C, won, SPACE_M, type BadgeTone, PageLoading } from '@/components/ui';
+import { visibleSecs } from '@/lib/lens-filters';
+import { FacetPage, Sec, Cards, Metric, Badge, Btn, EmptyState, ListBox, ListRow, Input, C, won, SPACE_M, type BadgeTone, PageLoading } from '@/components/ui';
+import { FacetRail } from '@/components/FacetRail';
 import { WorkbenchBar } from '@/components/WorkbenchBar';
 import { WorkHubBack } from '@/components/WorkHubTabs';
 import { WorkPipe } from '@/components/WorkPipe';
 import { TODAY } from '@/lib/dashboard-consts';
+import { useEntityLists } from '@/lib/use-entity-lists';
 
 const CONF_TONE: Record<string, BadgeTone> = { high: 'green', medium: 'amber', low: 'gray' };
+const EMPTY = new Set<string>();
 
 function toBankTx(rec: EntityRecord): BankTransaction {
   const method = String(rec.method || '계좌');
@@ -54,9 +57,7 @@ function toBankTx(rec: EntityRecord): BankTransaction {
 export default function PaymentsPage() {
   const { companyId, scopeAll } = useSession();
   // work hub back only — no sibling tabs
-  const [cs, setCs] = useState<EntityRecord[]>([]);
-  const [txs, setTxs] = useState<EntityRecord[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data: [cs = [], txs = []], loading, reload } = useEntityLists(['contract', 'bank_tx']);
   const [results, setResults] = useState<AutoMatchResult[] | null>(null);
   const [cmsResults, setCmsResults] = useState<CmsMatchCandidate[] | null>(null);
   const [cmsSel, setCmsSel] = useState<Set<string>>(new Set());
@@ -66,16 +67,15 @@ export default function PaymentsPage() {
   const [msg, setMsg] = useState('');
   const [manualTx, setManualTx] = useState<BankTransaction | null>(null);
   const [mq, setMq] = useState('');
-
-  const load = useCallback((silent = false) => {
-    const warm = listsCached(['contract', 'bank_tx'], companyId);
-    if (!silent && !warm) { setLoading(true); setResults(null); setCmsResults(null); setMsg(''); }
-    Promise.all([getStore().list('contract', companyId), getStore().list('bank_tx', companyId)])
-      .then(([c, t]) => { setCs(c); setTxs(t); setLoading(false); })
-      .catch(() => setLoading(false));
-  }, [companyId]);
-  useEffect(() => { load(); }, [load]);
-  useReloadOnSaved(useCallback(() => load(true), [load]));
+  const [facets, setFacets] = useState<Set<string>>(EMPTY);
+  const toggleFacet = (label: string) => setFacets((s) => {
+    const n = new Set(s);
+    if (n.has(label)) n.delete(label); else n.add(label);
+    return n;
+  });
+  const resetFacets = () => setFacets(new Set());
+  const vis = visibleSecs('자금일보', facets);
+  const show = (id: string) => !vis || vis.has(id);
 
   const allBank = useMemo(() => txs.map(toBankTx), [txs]);
   const deposits = useMemo(() => allBank.filter((t) => t.amount > 0 && !(t.withdraw && t.withdraw > 0) && t.settlementRole !== 'deposit'), [allBank]);
@@ -131,7 +131,7 @@ export default function PaymentsPage() {
       const lockNote = locked ? ` · 마감월 ${locked}` : '';
       setMsg(`CMS 집금정산 ${applied}건${skipped ? ` · 건너뜀 ${skipped}${lockNote}` : ''}`);
       toast(`CMS 집금정산 ${applied}건${skipped ? ` · 건너뜀 ${skipped}${lockNote}` : ''}`, applied ? 'success' : 'info');
-      load();
+      reload();
     });
   }
 
@@ -163,7 +163,7 @@ export default function PaymentsPage() {
       const lockNote = locked ? ` · 마감월 ${locked}` : '';
       setMsg(`매칭 적용 ${applied}건${skipped ? ` · 건너뜀 ${skipped}${lockNote}` : ''} — 미수에 반영됨`);
       toast(`매칭 적용 ${applied}건${skipped ? ` · 건너뜀 ${skipped}${lockNote}` : ''} — 미수 반영`, applied ? 'success' : 'info');
-      load();
+      reload();
     });
   }
 
@@ -180,7 +180,7 @@ export default function PaymentsPage() {
       }
       await getStore().update('bank_tx', String(trec.companyId || companyId), String(trec._key), { matchedContractId: '', matchedScheduleSeq: '', matchedAt: '', subject: '', category: '' });
     });
-    notifySaved(); toast('매칭 해제 — 미수 원복', 'info'); load();
+    notifySaved(); toast('매칭 해제 — 미수 원복', 'info'); reload();
   }
 
   async function manualMatch(t: BankTransaction, crec: EntityRecord) {
@@ -200,7 +200,7 @@ export default function PaymentsPage() {
       notifySaved();
       toast(`${String(crec.contractorName || '')} · ${won(t.amount)} 연결 — 미수 반영`, 'success');
     } catch { toast('연결 실패', 'error'); }
-    setManualTx(null); setMq(''); load();
+    setManualTx(null); setMq(''); reload();
   }
   const mNorm = (s: unknown) => String(s || '').replace(/\s/g, '');
   const mCands = (manualTx && mq.trim())
@@ -211,14 +211,21 @@ export default function PaymentsPage() {
   const cmsSelCount = cmsResults ? cmsResults.filter((c) => cmsSel.has(c.depositId)).length : 0;
 
   return (
-    <Page title="자금일보" meta={`${scopeAll ? '전체 회사' : companyLabel(companyId)} · 입금→계약 · 재무현황 공급`}
-      tools={<WorkbenchBar mid={<WorkHubBack />} actions={
+    <FacetPage
+      title="자금일보"
+      meta={`${scopeAll ? '전체 회사' : companyLabel(companyId)} · 입금→계약 · 재무현황 공급`}
+      tools={<WorkbenchBar mid={<WorkHubBack />} search actions={
         <>
           <Btn variant="ghost" onClick={runCms} disabled={loading || busy || applying}>CMS 집금정산</Btn>
           <Btn onClick={run} disabled={loading || pending.length === 0 || busy || applying}>자동매칭 실행</Btn>
         </>
-      } />}>
-      <Sec title="현황" desc="미매칭 입금→계약 · CMS 명세→통장 집금 묶음" right={<WorkPipe to="finance" />}>
+      } />}
+      rail={!loading ? <FacetRail lensKey="자금일보" facets={facets} onToggle={toggleFacet} onReset={resetFacets} /> : null}
+    >
+      {loading ? <PageLoading /> : (
+        <>
+      {show('pay-status') && (
+      <Sec id="pay-status" title="현황" desc="미매칭 입금→계약 · CMS 명세→통장 집금 묶음" right={<WorkPipe to="finance" />}>
         <Cards min={128} fit>
           <Metric label="입금 거래" value={`${deposits.length}건`} tone="ink" />
           <Metric label="미매칭 입금" value={`${pending.length}건`} tone={pending.length ? 'warn' : 'ok'} />
@@ -228,9 +235,10 @@ export default function PaymentsPage() {
         </Cards>
         {msg && <div style={{ marginTop: SPACE_M, fontSize: 12.5, color: msg.startsWith('매칭 적용') || msg.startsWith('CMS') ? C.ok : C.mute }}>{msg}</div>}
       </Sec>
+      )}
 
-      {cmsResults && cmsResults.length > 0 && (
-        <Sec title="CMS 집금 후보" n={cmsResults.length} desc="통장 입금 1건 ↔ 자동이체 N건 · 수수료=합계−집금 · high만 기본선택 · 구성건은 자금원장에서 제외(이중계상 방지)" hideable={false}
+      {show('pay-cms') && cmsResults && cmsResults.length > 0 && (
+        <Sec id="pay-cms" title="CMS 집금 후보" n={cmsResults.length} desc="통장 입금 1건 ↔ 자동이체 N건 · 수수료=합계−집금 · high만 기본선택 · 구성건은 자금원장에서 제외(이중계상 방지)" hideable={false}
           right={<Btn onClick={applyCms} disabled={applying || busy || cmsSelCount === 0}>{applying || busy ? '적용 중…' : `선택 ${cmsSelCount}건 정산`}</Btn>}>
           <ListBox>
             {cmsResults.map((c) => {
@@ -254,8 +262,8 @@ export default function PaymentsPage() {
         </Sec>
       )}
 
-      {results && results.length > 0 && (
-        <Sec title="매칭 제안" n={results.length} desc="체크 확인 후 적용 · high=이름/차번+금액 일치 · 매칭은 미수를 줄이기만" hideable={false}
+      {show('pay-match') && results && results.length > 0 && (
+        <Sec id="pay-match" title="매칭 제안" n={results.length} desc="체크 확인 후 적용 · high=이름/차번+금액 일치 · 매칭은 미수를 줄이기만" hideable={false}
           right={<Btn onClick={apply} disabled={applying || busy || selCount === 0}>{applying || busy ? '적용 중…' : `선택 ${selCount}건 적용`}</Btn>}>
           <ListBox>
             {results.map((r) => {
@@ -289,8 +297,8 @@ export default function PaymentsPage() {
         </Sec>
       )}
 
-      {matched.length > 0 && (
-        <Sec title="매칭된 입금" n={matched.length} desc="계약 회차에 붙은 입금 — 잘못 붙었으면 해제(미수 원복)" hideable={false}>
+      {show('pay-matched') && matched.length > 0 && (
+        <Sec id="pay-matched" title="매칭된 입금" n={matched.length} desc="계약 회차에 붙은 입금 — 잘못 붙었으면 해제(미수 원복)" hideable={false}>
           <ListBox>
             {matched.slice(0, 60).map((t) => {
               const crec = csByKey.get(String(t.matchedContractId));
@@ -320,31 +328,32 @@ export default function PaymentsPage() {
         </Sec>
       )}
 
-      <Sec title="미매칭 입금" n={pending.length} desc="자동매칭 안 된 입금 — 수동 검토(차량360 수납 또는 재실행)" hideable={false}>
-        {loading ? <PageLoading />
-          : pending.length === 0 ? <EmptyState>미매칭 입금 없음</EmptyState>
-            : (
-              <>
-                <ListBox>
-                  {pending.slice(0, 60).map((t) => {
-                    const suggested = results?.some((r) => r.tx.id === t.id);
-                    return (
-                      <ListRow
-                        key={t.id}
-                        main={`${t.txDate} · ${t.counterparty || '(적요 없음)'}`}
-                        sub={suggested ? '제안됨↑' : undefined}
-                        right={<span style={{ display: 'inline-flex', alignItems: 'center', gap: SPACE_M, opacity: suggested ? 0.55 : 1 }}>
-                          <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 700 }}>{won(t.amount)}</span>
-                          <Btn size="sm" variant="ghost" onClick={() => { setManualTx(t); setMq(''); }}>연결</Btn>
-                        </span>}
-                      />
-                    );
-                  })}
-                </ListBox>
-                {pending.length > 60 && <div style={{ fontSize: 11.5, color: C.faint, padding: '4px 2px' }}>외 {pending.length - 60}건 …</div>}
-              </>
-            )}
+      {show('pay-pending') && (
+      <Sec id="pay-pending" title="미매칭 입금" n={pending.length} desc="자동매칭 안 된 입금 — 수동 검토(차량360 수납 또는 재실행)" hideable={false}>
+        {pending.length === 0 ? <EmptyState>미매칭 입금 없음</EmptyState>
+          : (
+            <>
+              <ListBox>
+                {pending.slice(0, 60).map((t) => {
+                  const suggested = results?.some((r) => r.tx.id === t.id);
+                  return (
+                    <ListRow
+                      key={t.id}
+                      main={`${t.txDate} · ${t.counterparty || '(적요 없음)'}`}
+                      sub={suggested ? '제안됨↑' : undefined}
+                      right={<span style={{ display: 'inline-flex', alignItems: 'center', gap: SPACE_M, opacity: suggested ? 0.55 : 1 }}>
+                        <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 700 }}>{won(t.amount)}</span>
+                        <Btn size="sm" variant="ghost" onClick={() => { setManualTx(t); setMq(''); }}>연결</Btn>
+                      </span>}
+                    />
+                  );
+                })}
+              </ListBox>
+              {pending.length > 60 && <div style={{ fontSize: 11.5, color: C.faint, padding: '4px 2px' }}>외 {pending.length - 60}건 …</div>}
+            </>
+          )}
       </Sec>
+      )}
 
       {manualTx && (
         <div onClick={() => { setManualTx(null); setMq(''); }} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 60, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '10vh 16px 16px' }}>
@@ -376,6 +385,8 @@ export default function PaymentsPage() {
           </div>
         </div>
       )}
-    </Page>
+        </>
+      )}
+    </FacetPage>
   );
 }

@@ -118,7 +118,7 @@ export type Vehicle = {
   loanMonths?: number;             // 할부개월 (예: 60)
   loanRemainingPrincipal?: number; // 잔여원금 (원)
   loanStartDate?: string;          // 할부 개시일
-  loanCashOnly?: boolean;          // 할부 없음 (현금 일시불) — 명시적 표시. 미입력과 구분
+  loanCashOnly?: '예' | '아니오';   // 할부 없음(현금 일시불) — 저장값 문자열 SSOT
   gpsProvider?: string;            // GPS 공급사 (예: 마카롱)
   gpsDeviceId?: string;            // GPS 단말번호
 

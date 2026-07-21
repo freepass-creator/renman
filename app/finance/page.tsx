@@ -19,6 +19,8 @@ import { openCar, openCustomer, openPayments, openIngest } from '@/lib/ui-bus';
 import { customerKey } from '@/lib/customers';
 import { normPlate } from '@/lib/plate';
 import { useCashLedgerLists } from '@/lib/use-cash-ledger-lists';
+import { resolveWriteCompany, NEED_COMPANY } from '@/lib/scope';
+import { toast } from '@/lib/toast';
 import { useSecOrder } from '@/lib/use-sec-order';
 
 const FIN_SECS = ['f-uncl', 'f-class', 'f-ledger'] as const;
@@ -97,14 +99,18 @@ export default function FinancePage() {
 
   // 분류 저장 — 공용 SSOT(classifyTx). store가 자동 반영 브로드캐스트 → 홈·타화면 갱신.
   const classify = async (r: CashRow, label: string) => {
-    const co = r.companyId || (companyId === ALL_COMPANIES ? 'switchplan' : companyId);
+    const co = resolveWriteCompany(companyId, r);   // 임의 폴백('switchplan') 금지 — 모호하면 저장 안 함
+    if (!co) { toast(NEED_COMPANY, 'error'); return; }
     await classifyTx(r.entity, co, r.recKey, label);
   };
   // 추천 일괄 적용 — 확신도 high/medium 추천을 미분류 건에 한 번에 분류(low는 사람이 확인)
   const suggestable = unclassified.map((r) => ({ r, s: suggestSubject(r) })).filter((x) => x.s && x.s.confidence !== 'low');
   const classifyBatch = async () => {
     if (!suggestable.length) return;
-    await Promise.all(suggestable.map(({ r, s }) => classifyTx(r.entity, r.companyId || (companyId === ALL_COMPANIES ? 'switchplan' : companyId), r.recKey, s!.label)));
+    const jobs = suggestable.map(({ r, s }) => ({ co: resolveWriteCompany(companyId, r), r, s }));
+    const skipped = jobs.filter((j) => !j.co).length;
+    await Promise.all(jobs.filter((j) => j.co).map((j) => classifyTx(j.r.entity, j.co!, j.r.recKey, j.s!.label)));
+    if (skipped) toast(`${skipped}건은 법인 불명으로 건너뜀 — ${NEED_COMPANY}`, 'error');
   };
   const partyAggs = useMemo(() => aggregateByParty(scoped), [scoped]);
 

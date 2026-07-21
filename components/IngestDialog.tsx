@@ -10,6 +10,8 @@ import { uploadDoc, docPath, storageReady } from '@/lib/storage';
 import { pushDocVersion } from '@/lib/docs';
 import { Modal, FormGrid, Btn, Badge, StatusTag, OcrCrosscheck, ActionGrid, ActionTile, ListBox, ListRow, Input, Select, C } from '@/components/ui';
 import { type CrosscheckResult } from '@/lib/ocr-crosscheck';
+import { resolveWriteCompany, NEED_COMPANY } from '@/lib/scope';
+import { toast } from '@/lib/toast';
 import { Car, FileText, ShieldCheck, Receipt, User, Wrench, UploadCloud, Wallet } from 'lucide-react';
 
 // 문서 유형 = 엔티티. 실무자는 "무슨 서류를 담나"로 진입 → 전부 차(plate)에 붙음.
@@ -38,8 +40,7 @@ const QUICK: Record<string, string[]> = {
 export function IngestDialog({ onClose, onSaved, presetPlate, presetType, editRec, editType }: { onClose: () => void; onSaved: () => void; presetPlate?: string; presetType?: string; editRec?: EntityRecord; editType?: string }) {
   const { companyId, user } = useSession();
   const editing = !!(editRec && editType && ENTITIES[editType]);   // 기존 레코드 정정 모드
-  const [co, setCo] = useState<string>(editRec?.companyId ? String(editRec.companyId) : (companyId === ALL_COMPANIES ? COMPANIES[0] : companyId));
-  const target = co; // 이 입력이 귀속될 법인
+  const [co, setCo] = useState<string>(editRec?.companyId ? String(editRec.companyId) : (companyId === ALL_COMPANIES ? '' : companyId));
   const [type, setType] = useState<string | null>(editing ? editType! : (presetType && ENTITIES[presetType] ? presetType : null));
   const [form, setForm] = useState<EntityRecord>(editRec ? { ...editRec } : (presetPlate ? { plate: normalizePlate(presetPlate) } : {}));
   const [saving, setSaving] = useState(false);
@@ -61,11 +62,11 @@ export function IngestDialog({ onClose, onSaved, presetPlate, presetType, editRe
 
   // 앵커 유형이면 해당 회사 차량 로드(자동완성 소스). 회사·유형 바뀌면 재조회.
   useEffect(() => {
-    if (!anchored) return;
+    if (!anchored || !co) return;
     let alive = true;
-    getStore().list('vehicle', target).then((vs) => { if (alive) setVehicles(vs); }).catch(() => {});
+    getStore().list('vehicle', co).then((vs) => { if (alive) setVehicles(vs); }).catch(() => {});
     return () => { alive = false; };
-  }, [target, anchored]);
+  }, [co, anchored]);
 
   // preset/확정된 앵커의 차명 프리필(폼에 carName 필드가 있고 비어 있을 때).
   useEffect(() => {
@@ -99,7 +100,7 @@ export function IngestDialog({ onClose, onSaved, presetPlate, presetType, editRe
     if (!f || !entity?.ocrType) return;
     setDocBusy(true); setDoc(null);
     const recordKey = String(form.plate || form[entity.idFrom] || 'new');
-    const upP = uploadDoc(f, docPath(target, entity.key, recordKey, f.name)).catch(() => null);
+    const upP = uploadDoc(f, docPath(co, entity.key, recordKey, f.name)).catch(() => null);
     const ocrP = callOcrExtract(f, entity.ocrType);
     const [url, res] = await Promise.all([upP, ocrP]);
     if (res.ok && res.raw) {
@@ -120,6 +121,8 @@ export function IngestDialog({ onClose, onSaved, presetPlate, presetType, editRe
 
   async function save() {
     if (!entity || !canSave) return;
+    const target = resolveWriteCompany(companyId, { companyId: co });
+    if (!target) { toast(NEED_COMPANY, 'error'); return; }
     setSaving(true);
     try {
       const rec: EntityRecord = { ...form, companyId: target };
@@ -155,6 +158,7 @@ export function IngestDialog({ onClose, onSaved, presetPlate, presetType, editRe
           <div style={{ marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
             <label style={{ fontSize: 11.5, color: C.mute, fontWeight: 700 }}>회사(법인)</label>
             <Select value={co} onChange={(e) => setCo(e.target.value)}>
+              {companyId === ALL_COMPANIES && !editing ? <option value="">— 회사 선택 —</option> : null}
               {COMPANIES.map((c) => <option key={c} value={c}>{companyLabel(c)}</option>)}
             </Select>
             <span style={{ fontSize: 11, color: C.faint }}>이 법인에 귀속됩니다</span>

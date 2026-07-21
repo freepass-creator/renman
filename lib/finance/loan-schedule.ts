@@ -6,6 +6,7 @@
  *   손익: 이자만 비용(금융비용), 원금은 부채 상환(자본 — 손익 아님).
  */
 import { type EntityRecord } from '@/lib/intake/entities';
+import { isCashPurchase } from '@/lib/domain/vehicle-finance';
 
 export type LoanRow = { seq: number; ym: string; payment: number; interest: number; principal: number; balance: number };
 
@@ -14,7 +15,7 @@ const monthlyRate = (raw: number): number => { const r = raw > 1 ? raw / 100 : r
 
 /** 차량 1대 할부 상환 스케줄(원리금 균등). 현금구매(loanCashOnly=예)·데이터 없으면 []. */
 export function loanSchedule(v: EntityRecord): LoanRow[] {
-  if (String(v.loanCashOnly || '') === '예') return [];
+  if (isCashPurchase(v.loanCashOnly)) return [];
   const P = Number(v.loanPrincipal) || 0;
   const n = Number(v.loanMonths) || 0;
   const start = String(v.loanStartDate || '').slice(0, 7);

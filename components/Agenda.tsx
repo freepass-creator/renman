@@ -2,6 +2,7 @@
 /**
  * 일정(어젠다) 공용 컴포넌트 — 달력 + 일정별 섹션(못한거·오늘·내일·이번주·예정).
  *   홈 '일정' 탭(회사 전체)과 마이페이지 '일정' 탭이 같은 이걸 쓴다(규격통일, 중복 금지).
+ *   마이페이지에서는 이어서 MySchedule(내 일정) Sec이 붙는다 — 서브탭으로 가르지 않음.
  *   데이터 = ctx.agenda(예정 기한) + ctx.dayFeedFor(그날 한 일). 기간 축 세계관.
  */
 import { useMemo, useState, type CSSProperties } from 'react';
@@ -126,7 +127,7 @@ export function Agenda({ ctx, facets }: { ctx: SectionCtx; facets?: Set<string> 
   ];
   return (
     <>
-      <Sec title="현황" desc="기한(예정) · 오늘 한 일(실적)">
+      <Sec title="회사 일정" desc="기한(예정) · 오늘 한 일(실적) · 회사 전체">
         <Cards min={128} fit>
           <Metric label="못한 일(지남)" value={overdue.length} tone={overdue.length ? 'danger' : 'ink'} onClick={() => goSec('sc-overdue')} />
           <Metric label="오늘 예정" value={today.length} tone={today.length ? 'warn' : 'ink'} onClick={() => goSec('sc-today')} />
@@ -135,7 +136,7 @@ export function Agenda({ ctx, facets }: { ctx: SectionCtx; facets?: Set<string> 
           <Metric label="이번주" value={week.length} tone="ink" onClick={() => goSec('sc-week')} />
         </Cards>
       </Sec>
-      <Sec title="달력" desc="날짜 클릭 → 그 날 예정 + 그 날 한 일">
+      <Sec title="회사 달력" desc="날짜 클릭 → 그 날 예정 + 그 날 한 일">
         <AgendaCalendar marks={items.map((it) => ({ date: it.date, tone: it.tone, label: it.plate || it.kind }))} selected={selDate} onSelect={(d) => setSelDate((s) => s === d ? '' : d)} />
       </Sec>
       {selDate ? (

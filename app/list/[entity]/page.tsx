@@ -1,8 +1,6 @@
 'use client';
-import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useSession } from '@/lib/session';
-import { getStore, listsCached } from '@/lib/store';
 import { ENTITIES, type EntityRecord } from '@/lib/intake/entities';
 import { computeAssetLedgerEntry } from '@/lib/payments/asset-ledger';
 import type { Vehicle } from '@/lib/payments/types';
@@ -10,6 +8,7 @@ import { openIngest } from '@/lib/ui-bus';
 import { Page, Sec, Cards, Metric, DataTable, Btn, Badge, EmptyState, won, C, Panel, type Col, PageLoading } from '@/components/ui';
 import { companyLabel } from '@/lib/companies';
 import { TODAY } from '@/lib/dashboard-consts';
+import { useEntityList } from '@/lib/use-entity-lists';
 
 // v6 차량 레코드 → 감가엔진(장부가). 증명서 OCR 데이터로 v5 Vehicle 타입 매핑.
 function bookValue(rec: EntityRecord): number | null {
@@ -28,15 +27,8 @@ export default function ListPage() {
   const entityKey = String(params.entity);
   const { companyId, user, scopeAll } = useSession();
   const entity = ENTITIES[entityKey];
-  const [records, setRecords] = useState<EntityRecord[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { rows: records, loading } = useEntityList(entity ? entityKey : 'vehicle');
   const scopeLabel = scopeAll ? '전체' : companyLabel(companyId);
-
-  useEffect(() => {
-    if (!entity) return;
-    if (!listsCached([entityKey], companyId)) setLoading(true);
-    getStore().list(entityKey, companyId).then((r) => { setRecords(r); setLoading(false); }).catch(() => setLoading(false));
-  }, [entityKey, companyId, entity]);
 
   if (!entity) return <Page title={`알 수 없는 엔티티: ${entityKey}`}><EmptyState>존재하지 않는 데이터 종류입니다.</EmptyState></Page>;
 

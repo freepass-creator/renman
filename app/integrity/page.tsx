@@ -1,21 +1,19 @@
 'use client';
-import { useCallback, useEffect, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSession } from '@/lib/session';
-import { getStore, listsCached } from '@/lib/store';
 import { ENTITIES, type EntityRecord } from '@/lib/intake/entities';
 import { FacetPage, Sec, Cards, Metric, EmptyState, Badge, RISK_TONE, SevTag, DataTable, won, C, type Col, PageLoading } from '@/components/ui';
 import { FacetRail } from '@/components/FacetRail';
 import { WorkbenchBar } from '@/components/WorkbenchBar';
 import { companyLabel } from '@/lib/companies';
 import { scanRisks } from '@/lib/risk-ops';
-import { computeContractView } from '@/lib/contract-ops';
+import { selectReceivables } from '@/lib/snapshot/selectors';
 import { riskKindMatch } from '@/lib/lens-filters';
 import { textMatch } from '@/lib/search-match';
-import { useReloadOnSaved } from '@/lib/use-reload-on-saved';
-import { withTimeout } from '@/lib/async';
 import { CheckCircle2 } from 'lucide-react';
 import { TODAY, dday } from '@/lib/dashboard-consts';
+import { useEntityLists } from '@/lib/use-entity-lists';
 
 // 리스크 = 정합성이 안 맞는 모든 것. 베이스 경고 + 데이터 점검을 같은 규격 한 줄로. 필터=공용 FacetRail(lensKey='정합성').
 type Sev = 'high' | 'mid';
@@ -68,37 +66,21 @@ function dataChecks(data: Record<string, EntityRecord[]>): RiskItem[] {
 export default function RiskPage() {
   const { companyId, scopeAll } = useSession();
   const router = useRouter();
-  const [items, setItems] = useState<RiskItem[]>([]);
-  const [unpaidTotal, setUnpaidTotal] = useState(0);   // 미납 총액 = 계약 net 직접 합산(SSOT). 렌더 문자열 파싱 금지.
+  const { data: [vehicles = [], contracts = [], insurance = [], penalty = []], loading } = useEntityLists(RISK_ENTITIES);
   const [facets, setFacets] = useState<Set<string>>(new Set());
   const [q, setQ] = useState('');
-  const [loading, setLoading] = useState(true);
   const toggleFacet = (label: string) => setFacets((s) => { const n = new Set(s); n.has(label) ? n.delete(label) : n.add(label); return n; });
   const resetFacets = () => setFacets(new Set());
 
-  const load = useCallback((quiet = false) => {
-    const warm = listsCached(RISK_ENTITIES, companyId);
-    if (!quiet && !warm) setLoading(true);
-    const store = getStore();
-    withTimeout(
-      Promise.all(RISK_ENTITIES.map((k) => store.list(k, companyId).then((r) => [k, r] as const))),
-      15_000,
-      '리스크 로드',
-    )
-      .then((pairs) => {
-        const data = Object.fromEntries(pairs) as Record<string, EntityRecord[]>;
-        const base: RiskItem[] = scanRisks(data.contract || [], TODAY).flatMap((r) =>
-          r.flags.map((f) => ({ sev: f.sev === 'high' ? 'high' as Sev : 'mid' as Sev, kind: f.kind,
-            target: `${r.rec.plate || ''} · ${r.rec.contractorName || ''}`, detail: f.detail,
-            href: r.rec.plate ? `/vehicle/${encodeURIComponent(String(r.rec.plate))}?do=unpaid` : `/contract`, co: r.rec.companyId })));
-        const all = [...base, ...dataChecks(data)].sort((a, b) => (a.sev === b.sev ? 0 : a.sev === 'high' ? -1 : 1));
-        setItems(all);
-        setUnpaidTotal((data.contract || []).reduce((s, c) => s + Math.max(0, computeContractView(c, TODAY).net), 0));
-        setLoading(false);
-      }).catch(() => setLoading(false));
-  }, [companyId]);
-  useEffect(() => { load(); }, [load]);
-  useReloadOnSaved(useCallback(() => load(true), [load]));
+  const { items, unpaidTotal } = useMemo(() => {
+    const data: Record<string, EntityRecord[]> = { vehicle: vehicles, contract: contracts, insurance, penalty };
+    const base: RiskItem[] = scanRisks(contracts, TODAY).flatMap((r) =>
+      r.flags.map((f) => ({ sev: f.sev === 'high' ? 'high' as Sev : 'mid' as Sev, kind: f.kind,
+        target: `${r.rec.plate || ''} · ${r.rec.contractorName || ''}`, detail: f.detail,
+        href: r.rec.plate ? `/vehicle/${encodeURIComponent(String(r.rec.plate))}?do=unpaid` : `/contract`, co: r.rec.companyId })));
+    const all = [...base, ...dataChecks(data)].sort((a, b) => (a.sev === b.sev ? 0 : a.sev === 'high' ? -1 : 1));
+    return { items: all, unpaidTotal: selectReceivables(contracts, TODAY).total };
+  }, [vehicles, contracts, insurance, penalty]);
 
   const sevSel = (['위험', '주의'] as const).filter((x) => facets.has(x));
   const shown = items.filter((it) => {

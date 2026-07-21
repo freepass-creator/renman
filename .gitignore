@@ -1,4 +1,5 @@
 node_modules
+# Next 산출물은 형제 ../cache/jpkerp6/.next (docs/CACHE.md). 로컬에 남아도 ignore.
 .next
 out
 .env.local

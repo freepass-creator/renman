@@ -4,10 +4,8 @@
  *   구매예정 · 등록예정 · 보유중 · 처분예정 · 처분완료 + FacetRail 상시.
  *   가동률·미수율은 홈(지표).
  */
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { useReloadOnSaved } from '@/lib/use-reload-on-saved';
+import { useMemo, useState, type ReactNode } from 'react';
 import { useSession } from '@/lib/session';
-import { getStore, listsCached } from '@/lib/store';
 import { type EntityRecord } from '@/lib/intake/entities';
 import { openCar, openIngest } from '@/lib/ui-bus';
 import { FacetPage, Sec, Cards, Metric, ObjCard, Btn, EmptyState, won, C, SPACE_M, PageLoading } from '@/components/ui';
@@ -21,6 +19,7 @@ import { linkFleet, type Ownership, type VehicleNode } from '@/lib/domain/model'
 import { textMatch } from '@/lib/search-match';
 import { vehicleLoanView } from '@/lib/vehicle-asset';
 import { useSecOrder } from '@/lib/use-sec-order';
+import { useEntityLists } from '@/lib/use-entity-lists';
 
 const UTIL_LABELS = ['운행', '유휴', '정비'];
 const LIFE_SECS = ['a-buy', 'a-reg', 'a-hold', 'a-out-plan', 'a-out'] as const;
@@ -62,26 +61,13 @@ const badgeTone = (t: VehicleNode['tone']): 'green' | 'amber' | 'gray' | 'blue' 
 
 export default function AssetPage() {
   const { companyId, scopeAll } = useSession();
-  const [vs, setVs] = useState<EntityRecord[]>([]);
-  const [cs, setCs] = useState<EntityRecord[]>([]);
-  const [hs, setHs] = useState<EntityRecord[]>([]);
+  const { data: [vs = [], cs = [], hs = []], loading } = useEntityLists(['vehicle', 'contract', 'history']);
   const [facets, setFacets] = useState<Set<string>>(new Set());
   const [q, setQ] = useState('');
-  const [loading, setLoading] = useState(true);
   const [logPlate, setLogPlate] = useState<string | null>(null);
   const [order, reorder] = useSecOrder('jpk:order:asset', [...LIFE_SECS]);
   const toggleFacet = (label: string) => setFacets((s) => { const n = new Set(s); n.has(label) ? n.delete(label) : n.add(label); return n; });
   const resetFacets = () => setFacets(new Set());
-
-  const load = useCallback((silent = false) => {
-    const warm = listsCached(['vehicle', 'contract', 'history'], companyId);
-    if (!silent && !warm) setLoading(true);
-    Promise.all([getStore().list('vehicle', companyId), getStore().list('contract', companyId), getStore().list('history', companyId)])
-      .then(([v, c, h]) => { setVs(v); setCs(c); setHs(h); setLoading(false); })
-      .catch(() => setLoading(false));
-  }, [companyId]);
-  useEffect(() => { load(); }, [load]);
-  useReloadOnSaved(useCallback(() => load(true), [load]));
 
   const fleet = useMemo(() => linkFleet(vs, cs, TODAY), [vs, cs]);
   const extra = useMemo(() => {

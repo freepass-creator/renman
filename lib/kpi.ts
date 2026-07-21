@@ -3,6 +3,7 @@
 import type { EntityRecord } from './intake/entities';
 import { computeContractView } from './contract-ops';
 import { linkFleet } from './domain/model';
+import { selectReceivables } from './snapshot/selectors';
 
 export interface KPI {
   companyId: string;
@@ -23,25 +24,21 @@ export function computeKPI(contracts: EntityRecord[], vehicles: EntityRecord[], 
   const idle = held.filter((n) => n.utilization === '유휴');
   const util = held.length ? Math.round((running.length / held.length) * 100) : 0;
   const active = views.filter((v) => v.status === '운행');
-  let misuActive = 0, misuReturned = 0, unpaidCount = 0, monthlyBilled = 0;
+  const recv = selectReceivables(contracts, today);
   const aging: [number, number, number, number] = [0, 0, 0, 0];
   for (const v of views) {
-    if (v.net <= 0) continue;
-    unpaidCount++;
-    if (v.ended) misuReturned += v.net;
-    else {
-      misuActive += v.net;
-      const d = v.overdueDays;
-      if (d <= 30) aging[0] += v.net; else if (d <= 60) aging[1] += v.net; else if (d <= 90) aging[2] += v.net; else aging[3] += v.net;
-    }
+    if (v.net <= 0 || v.ended) continue;
+    const d = v.overdueDays;
+    if (d <= 30) aging[0] += v.net; else if (d <= 60) aging[1] += v.net; else if (d <= 90) aging[2] += v.net; else aging[3] += v.net;
   }
+  let monthlyBilled = 0;
   for (const v of active) monthlyBilled += v.monthlyRent;
   const loanRemaining = held.reduce((s, n) => s + (Number(n.veh.loanRemainingPrincipal) || 0), 0);
   const assetValue = held.reduce((s, n) => s + (Number(n.veh.acquisitionPrice) || 0), 0);
   const expiring30 = active.filter((v) => v.dday != null && v.dday >= 0 && v.dday <= 30).length;
   return {
     companyId, totalVehicles: held.length, running: running.length, idle: idle.length, util,
-    totalUnpaid: misuActive + misuReturned, unpaidCount, misuActive, misuReturned, aging,
+    totalUnpaid: recv.total, unpaidCount: recv.unpaidCount, misuActive: recv.misuActive, misuReturned: recv.misuReturned, aging,
     loanRemaining, assetValue, monthlyBilled,
     activeContracts: active.length, expiring30,
     debtRatio: assetValue > 0 ? Math.round((loanRemaining / assetValue) * 100) : 0,

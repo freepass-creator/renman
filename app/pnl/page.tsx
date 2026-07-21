@@ -1,10 +1,7 @@
 'use client';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSession } from '@/lib/session';
-import { getStore, listsCached } from '@/lib/store';
-import { type EntityRecord } from '@/lib/intake/entities';
-import { useReloadOnSaved } from '@/lib/use-reload-on-saved';
 import { FacetPage, Sec, Cards, Metric, DataTable, EmptyState, PeriodBar, won, C, PageLoading, type Col } from '@/components/ui';
 import { WorkbenchBar } from '@/components/WorkbenchBar';
 import { useCashHubNav } from '@/components/CashHubTabs';
@@ -13,6 +10,7 @@ import { buildCashLedger, aggregateBySubject, type SubjectAgg } from '@/lib/fina
 import { groupOfLabel } from '@/lib/payments/ledger-subjects';
 import { loanTotalsInRange } from '@/lib/finance/loan-schedule';
 import { useCashLedgerLists } from '@/lib/use-cash-ledger-lists';
+import { useEntityList } from '@/lib/use-entity-lists';
 
 // 손익분석(경영·비즈니스 티어) — 영업손익(영업수입 − 영업비용) + 금융비용(할부이자) = 세전이익. 현금 기준.
 export default function PnlPage() {
@@ -20,19 +18,8 @@ export default function PnlPage() {
   const router = useRouter();
   const cashNav = useCashHubNav();
   const { bank, card, loading: cashLoading } = useCashLedgerLists();
-  const [veh, setVeh] = useState<EntityRecord[]>([]);
-  const [vehLoading, setVehLoading] = useState(true);
+  const { rows: veh, loading: vehLoading } = useEntityList('vehicle');
   const [range, setRange] = useState<{ from: string; to: string }>({ from: '', to: '' });
-
-  const loadVeh = useCallback((silent = false) => {
-    const warm = listsCached(['vehicle'], companyId);
-    if (!silent && !warm) setVehLoading(true);
-    getStore().list('vehicle', companyId)
-      .then((v) => { setVeh(v); setVehLoading(false); })
-      .catch(() => setVehLoading(false));
-  }, [companyId]);
-  useEffect(() => { loadVeh(); }, [loadVeh]);
-  useReloadOnSaved(useCallback(() => loadVeh(true), [loadVeh]));
 
   const loading = cashLoading || vehLoading;
   const rows = useMemo(() => buildCashLedger(bank, card), [bank, card]);

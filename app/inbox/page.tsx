@@ -4,11 +4,10 @@
  *   업로드 = uploadDoc(Storage) → inbox 레코드(status='대기'). 매칭 = 대상 레코드 _docs 첨부 + status='매칭'.
  *   모바일 우선: 큰 업로드 버튼 + 대기 카드 + 대상(차량/계약/자금) 검색·첨부.
  */
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { useSession } from '@/lib/session';
-import { getStore, listsCached } from '@/lib/store';
+import { getStore } from '@/lib/store';
 import { type EntityRecord } from '@/lib/intake/entities';
-import { useReloadOnSaved } from '@/lib/use-reload-on-saved';
 import { storageReady } from '@/lib/storage';
 import { uploadToInbox } from '@/lib/inbox-upload';
 import { notifySaved, openCar, openCustomer, openPayments } from '@/lib/ui-bus';
@@ -23,6 +22,7 @@ import { WorkbenchBar } from '@/components/WorkbenchBar';
 import { WorkHubBack } from '@/components/WorkHubTabs';
 import { SignaturePad, dataUrlToFile } from '@/components/SignaturePad';
 import { Camera, Paperclip, PenLine } from 'lucide-react';
+import { useEntityLists } from '@/lib/use-entity-lists';
 
 type Target = 'vehicle' | 'contract' | 'bank_tx';
 const TARGET_LABEL: Record<Target, string> = { vehicle: '차량', contract: '계약', bank_tx: '자금' };
@@ -30,11 +30,7 @@ const norm = (s: unknown) => String(s || '').replace(/\s/g, '');
 
 export default function InboxPage() {
   const { companyId, user } = useSession();
-  const [rows, setRows] = useState<EntityRecord[]>([]);
-  const [vs, setVs] = useState<EntityRecord[]>([]);
-  const [cs, setCs] = useState<EntityRecord[]>([]);
-  const [bts, setBts] = useState<EntityRecord[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data: [rows = [], vs = [], cs = [], bts = []], loading, reload } = useEntityLists(['inbox', 'vehicle', 'contract', 'bank_tx']);
   const [busy, setBusy] = useState(false);
   const [sign, setSign] = useState(false);
   const [signData, setSignData] = useState<string | null>(null);
@@ -44,16 +40,6 @@ export default function InboxPage() {
   const camRef = useRef<HTMLInputElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  const load = useCallback((silent = false) => {
-    const warm = listsCached(['inbox', 'vehicle', 'contract', 'bank_tx'], companyId);
-    if (!silent && !warm) setLoading(true);
-    Promise.all([getStore().list('inbox', companyId), getStore().list('vehicle', companyId), getStore().list('contract', companyId), getStore().list('bank_tx', companyId)])
-      .then(([i, v, c, b]) => { setRows(i); setVs(v); setCs(c); setBts(b); setLoading(false); })
-      .catch(() => setLoading(false));
-  }, [companyId]);
-  useEffect(() => { load(); }, [load]);
-  useReloadOnSaved(useCallback(() => load(true), [load]));
-
   const pending = rows.filter((r) => String(r.status || '대기') === '대기');
   const matched = rows.filter((r) => String(r.status) === '매칭');
 
@@ -62,7 +48,7 @@ export default function InboxPage() {
     const r = await uploadToInbox(file, kind, companyId, String(user.name || ''));
     setBusy(false);
     if (!r.ok) { toast(r.reason === 'unconfigured' ? '저장소(Firebase) 미설정 — 업로드하려면 설정 필요' : '업로드 실패', 'error'); return; }
-    toast(`${kind} 업로드 완료 — 수집함 대기`, 'success'); load();
+    toast(`${kind} 업로드 완료 — 수집함 대기`, 'success'); reload();
   }
   async function saveSignature() {
     if (!signData) { setSign(false); return; }
@@ -94,7 +80,7 @@ export default function InboxPage() {
     }
     await getStore().update('inbox', companyId, String(matchRec._key || matchRec.inboxKey), { status: '매칭', matchedEntity: target, matchedKey: String(targetRec._key), plate: String(targetRec.plate || ''), matchedAt: new Date().toISOString() });
     notifySaved(); toast(`${TARGET_LABEL[target]} 에 첨부·매칭`, 'success');
-    setMatchRec(null); setMq(''); load();
+    setMatchRec(null); setMq(''); reload();
     const plate = String(targetRec.plate || '');
     if (target === 'vehicle' || target === 'contract') {
       if (plate) openCar(plate, 'doc');

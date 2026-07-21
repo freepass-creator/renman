@@ -14,9 +14,9 @@ import { pushDocVersion } from '@/lib/docs';
 import { useSession } from '@/lib/session';
 import { toast } from '@/lib/toast';
 import { haptic } from '@/lib/haptics';
-import { ALL_COMPANIES, COMPANIES } from '@/lib/companies';
+import { resolveWriteCompany, NEED_COMPANY } from '@/lib/scope';
 import { FUEL_LEVELS } from '@/lib/domain/fuel';
-import { Modal, Stepper, Btn, Message, C, R, SH, type Step } from '@/components/ui';
+import { Modal, Stepper, Btn, Message, C, R, SH, toggleStyle, type Step } from '@/components/ui';
 import { type EntityRecord } from '@/lib/intake/entities';
 
 const TODAY = () => new Date().toISOString().slice(0, 10);
@@ -29,7 +29,7 @@ export function DeliveryWizard({ contract, vehicle, onClose, onDone }: {
   contract: EntityRecord; vehicle?: EntityRecord | null; onClose: () => void; onDone: () => void;
 }) {
   const { companyId, user } = useSession();
-  const target = companyId === ALL_COMPANIES ? (String(contract.companyId || '') || COMPANIES[0]) : companyId;
+  const target = resolveWriteCompany(companyId, contract);   // 모호하면 null → 저장 차단(임의 폴백 금지 = 타 법인 오배치 방지)
   const [step, setStep] = useState(0);
   const [date, setDate] = useState(TODAY());
   const [mileage, setMileage] = useState('');
@@ -47,6 +47,7 @@ export function DeliveryWizard({ contract, vehicle, onClose, onDone }: {
 
   async function commit() {
     if (!contractNo) { toast('계약 식별 불가', 'error'); return; }
+    if (!target) { toast(NEED_COMPANY, 'error'); return; }
     setSaving(true);
     // 최신 상태 재확인 — 다른 기기/스테일 목록에서의 중복 인도 방지. 단일 writer 보호.
     const fresh = await getStore().get('contract', target, contractNo);
@@ -141,7 +142,7 @@ export function DeliveryWizard({ contract, vehicle, onClose, onDone }: {
               <label style={lbl}>출고 연료량</label>
               <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap' }}>
                 {FUEL_LEVELS.map((f) => (
-                  <button key={f} onClick={() => { setFuel(f); haptic.select(); }} style={{ height: 42, padding: '0 16px', borderRadius: R, border: `1px solid ${fuel === f ? C.brand : C.line}`, background: fuel === f ? C.brand : '#fff', color: fuel === f ? '#fff' : C.ink, fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>{f}</button>
+                  <button key={f} type="button" data-ui="toggle" onClick={() => { setFuel(f); haptic.select(); }} aria-pressed={fuel === f} style={toggleStyle(fuel === f, 'lg')}>{f}</button>
                 ))}
               </div>
             </div>
@@ -156,11 +157,11 @@ export function DeliveryWizard({ contract, vehicle, onClose, onDone }: {
               <label style={lbl}>출차 사진 (외관·계기판)</label>
               <input ref={camRef} type="file" accept="image/*" capture="environment" style={{ display: 'none' }} onChange={(e) => { const f = e.target.files?.[0]; if (f) { setPhotos((p) => [...p, f]); haptic.tap(); } e.currentTarget.value = ''; }} />
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-                <button onClick={() => camRef.current?.click()} style={{ height: 46, padding: '0 16px', borderRadius: R, border: `1px solid ${C.line}`, background: C.taupeBg, color: C.ink, fontSize: 14, fontWeight: 700, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 8 }}><Camera size={17} /> 사진 촬영</button>
+                <Btn variant="ghost" size="lg" onClick={() => camRef.current?.click()}><Camera size={17} /> 사진 촬영</Btn>
                 {photos.map((p, i) => (
-                  <span key={i} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 12, padding: '4px 4px 4px 10px', borderRadius: R, border: `1px solid ${C.line}`, background: '#fff', color: C.mute, minHeight: 36 }}>
+                  <span key={i} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 12, padding: '4px 4px 4px 10px', borderRadius: R, border: `1px solid ${C.line}`, background: '#fff', color: C.mute, minHeight: 40 }}>
                     {p.name.slice(0, 12)}
-                    <button aria-label="사진 삭제" onClick={() => setPhotos((ps) => ps.filter((_, j) => j !== i))} style={{ border: 'none', background: 'none', cursor: 'pointer', color: C.faint, width: 32, height: 32, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', WebkitTapHighlightColor: 'transparent' }}><X size={16} /></button>
+                    <button aria-label="사진 삭제" onClick={() => setPhotos((ps) => ps.filter((_, j) => j !== i))} style={{ border: 'none', background: 'none', cursor: 'pointer', color: C.faint, width: 40, height: 40, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', WebkitTapHighlightColor: 'transparent' }}><X size={16} /></button>
                   </span>
                 ))}
                 {photos.length > 0 && <span style={{ fontSize: 12, color: C.mute, fontWeight: 700 }}>{photos.length}장</span>}

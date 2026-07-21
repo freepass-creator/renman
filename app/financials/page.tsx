@@ -1,18 +1,18 @@
 'use client';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { useSession } from '@/lib/session';
-import { getStore, listsCached } from '@/lib/store';
-import { type EntityRecord } from '@/lib/intake/entities';
-import { useReloadOnSaved } from '@/lib/use-reload-on-saved';
 import { FacetPage, Sec, Cards, Metric, won, C, PageLoading } from '@/components/ui';
 import { WorkbenchBar } from '@/components/WorkbenchBar';
 import { useCashHubNav } from '@/components/CashHubTabs';
 import { companyLabel } from '@/lib/companies';
 import { computeContractView } from '@/lib/contract-ops';
+import { selectReceivables } from '@/lib/snapshot/selectors';
 import { computeAssetLedgerEntry } from '@/lib/payments/asset-ledger';
 import { loanSchedule } from '@/lib/finance/loan-schedule';
+import { isCashPurchase } from '@/lib/domain/vehicle-finance';
 import type { Vehicle } from '@/lib/payments/types';
 import { TODAY } from '@/lib/dashboard-consts';
+import { useEntityLists } from '@/lib/use-entity-lists';
 
 // 재무상태표(경영·비즈니스 티어) — 오늘 기준 스냅샷. 자산 = 부채 + 자본.
 //   자산: 차량 장부가(취득−감가) + 미수금 + 현금(자금일보 순증감). 부채: 할부잔여 + 보증금예수.
@@ -33,20 +33,7 @@ function Row({ label, value, tone, strong, hint }: { label: string; value: numbe
 export default function FinancialsPage() {
   const { companyId, scopeAll } = useSession();
   const cashNav = useCashHubNav();
-  const [vs, setVs] = useState<EntityRecord[]>([]);
-  const [cs, setCs] = useState<EntityRecord[]>([]);
-  const [bank, setBank] = useState<EntityRecord[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  const load = useCallback((silent = false) => {
-    const warm = listsCached(['vehicle', 'contract', 'bank_tx'], companyId);
-    if (!silent && !warm) setLoading(true);
-    Promise.all([getStore().list('vehicle', companyId), getStore().list('contract', companyId), getStore().list('bank_tx', companyId)])
-      .then(([v, c, b]) => { setVs(v); setCs(c); setBank(b); setLoading(false); })
-      .catch(() => setLoading(false));
-  }, [companyId]);
-  useEffect(() => { load(); }, [load]);
-  useReloadOnSaved(useCallback(() => load(true), [load]));
+  const { data: [vs = [], cs = [], bank = []], loading } = useEntityLists(['vehicle', 'contract', 'bank_tx']);
 
   const F = useMemo(() => {
     // 자산
@@ -55,8 +42,9 @@ export default function FinancialsPage() {
       const acq = Number(v.acquisitionPrice) || 0; acquisition += acq;
       if (acq) carBook += computeAssetLedgerEntry({ id: String(v.plate), plate: String(v.plate), model: String(v.carName || ''), status: '운행', purchasePrice: acq, firstRegisteredDate: String(v.firstReg || v.acquisitionDate || '') } as unknown as Vehicle, TODAY).bookValue;
     }
-    let receivable = 0, deposit = 0;
-    for (const c of cs) { const view = computeContractView(c, TODAY); if (!view.ended) { receivable += view.net; deposit += Number(c.deposit) || 0; } }
+    const recv = selectReceivables(cs, TODAY);
+    let receivable = recv.misuActive, deposit = 0;
+    for (const c of cs) { const view = computeContractView(c, TODAY); if (!view.ended) deposit += Number(c.deposit) || 0; }
     // 현금 = 계좌별 최신 '잔액' 원자(실제 잔액). 잔액 없으면 순증감 fallback(참고치).
     const byAcct = new Map<string, { date: string; idx: number; bal: number }>();
     let cashIsReal = false;
@@ -71,7 +59,7 @@ export default function FinancialsPage() {
       : bank.reduce((s, b) => s + (Number(b.amount) || 0) - (Number(b.withdraw) || 0), 0);
     // 부채
     let loanRemain = 0;
-    for (const v of vs) { const cur = loanSchedule(v).filter((r) => r.ym <= TYM).pop(); loanRemain += cur ? cur.balance : (String(v.loanCashOnly) === '예' ? 0 : Number(v.loanPrincipal) || 0); }
+    for (const v of vs) { const cur = loanSchedule(v).filter((r) => r.ym <= TYM).pop(); loanRemain += cur ? cur.balance : (isCashPurchase(v.loanCashOnly) ? 0 : Number(v.loanPrincipal) || 0); }
     const assets = carBook + receivable + cash;
     const liabilities = loanRemain + deposit;
     const equity = assets - liabilities;

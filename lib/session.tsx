@@ -146,12 +146,13 @@ type AuthMode = 'login' | 'signup' | 'reset';
 function LoginScreen() {
   const [mode, setMode] = useState<AuthMode>('login');
   return (
-    <div className="auth-page">
-      <div className="auth-brand"><div className="auth-brand__name">renman</div><div className="auth-brand__sub">렌터카매니저</div></div>
-      {mode === 'login' && <LoginForm onSignup={() => setMode('signup')} onReset={() => setMode('reset')} />}
-      {mode === 'signup' && <SignupForm onBack={() => setMode('login')} />}
-      {mode === 'reset' && <ResetForm onBack={() => setMode('login')} />}
-      <p className="auth-foot">© {new Date().getFullYear()} renman. All Rights Reserved.</p>
+    <div className="fp-login">
+      <div className="login-page">
+        <div className="login-brand">렌터카매니저</div>
+        {mode === 'login' && <LoginForm onSignup={() => setMode('signup')} onReset={() => setMode('reset')} />}
+        {mode === 'signup' && <SignupForm onBack={() => setMode('login')} />}
+        {mode === 'reset' && <ResetForm onBack={() => setMode('login')} />}
+      </div>
     </div>
   );
 }
@@ -173,30 +174,31 @@ function LoginForm({ onSignup, onReset }: { onSignup: () => void; onReset: () =>
     finally { setBusy(false); }
   }
   return (
-    <section className="auth-card" aria-label="로그인">
-      <header className="auth-card__head">
-        <h2 className="auth-card__title">로그인</h2>
-        <p className="auth-card__sub">이메일과 비밀번호를 입력해주세요.</p>
+    <form className={`login-card${busy ? ' is-loading' : ''}`} onSubmit={submit} noValidate aria-label="로그인">
+      <header className="login-head">
+        <h2 className="login-title">로그인</h2>
+        <p className="login-sub">이메일과 비밀번호를 입력해주세요.</p>
       </header>
-      <form className="auth-form" onSubmit={submit}>
-        {err && <div className="auth-alert" role="alert">{err}</div>}
-        <div className="auth-field">
+      <div className="login-form">
+        <div className="login-field">
           <label htmlFor="login-email">이메일</label>
           <input id="login-email" type="email" autoComplete="username" placeholder="name@company.com" required
             value={email} onChange={(e) => setEmail(e.target.value)} />
         </div>
-        <div className="auth-field">
+        <div className="login-field">
           <label htmlFor="login-password">비밀번호</label>
           <input id="login-password" type="password" autoComplete="current-password" placeholder="비밀번호 입력" required
             value={password} onChange={(e) => setPassword(e.target.value)} />
         </div>
-        <button type="submit" className="auth-submit" disabled={busy}>{busy ? '접속 중...' : '로그인'}</button>
-        <div className="auth-links">
-          <AuthLink onClick={onSignup}>계정 만들기</AuthLink>
-          <AuthLink onClick={onReset}>비밀번호 재설정</AuthLink>
-        </div>
-      </form>
-    </section>
+        <button type="submit" className="login-submit" disabled={busy}>로그인</button>
+      </div>
+      <div className="login-links">
+        <AuthLink onClick={onSignup}>계정 만들기</AuthLink>
+        <span className="login-links-sep">·</span>
+        <AuthLink onClick={onReset}>비밀번호 재설정</AuthLink>
+      </div>
+      {err && <p className="login-msg is-err" role="alert" aria-live="polite">{err}</p>}
+    </form>
   );
 }
 
@@ -234,42 +236,42 @@ function SignupForm({ onBack }: { onBack: () => void }) {
     } finally { setBusy(false); }
   }
   return (
-    <section className="auth-card" aria-label="계정 만들기">
-      <header className="auth-card__head">
-        <h2 className="auth-card__title">계정 만들기</h2>
-        <p className="auth-card__sub">직원 계정을 만듭니다. 가입 후 본사가 소속 법인을 배정해야 데이터가 보입니다.</p>
+    <form className={`login-card${busy ? ' is-loading' : ''}`} onSubmit={submit} noValidate aria-label="계정 만들기">
+      <header className="login-head">
+        <h2 className="login-title">계정 만들기</h2>
+        <p className="login-sub">직원 계정을 만듭니다. 가입 후 본사가 소속 법인을 배정해야 데이터가 보입니다.</p>
       </header>
-      <form className="auth-form" onSubmit={submit}>
-        {err && <div className="auth-alert" role="alert">{err}</div>}
-        {info && <div className="auth-alert auth-alert--ok" role="status">{info}</div>}
-        <div className="auth-field">
+      <div className="login-form">
+        <div className="login-field">
           <label htmlFor="su-name">이름</label>
           <input id="su-name" type="text" autoComplete="name" placeholder="홍길동" required value={name} onChange={(e) => setName(e.target.value)} />
         </div>
-        <div className="auth-field">
+        <div className="login-field">
           <label htmlFor="su-email">이메일</label>
           <input id="su-email" type="email" autoComplete="email" placeholder="name@company.com" required value={email} onChange={(e) => setEmail(e.target.value)} />
         </div>
-        <div className="auth-field">
+        <div className="login-field">
           <label htmlFor="su-phone">휴대폰 (선택)</label>
           <input id="su-phone" type="tel" autoComplete="tel" placeholder="010-0000-0000" value={phone} onChange={(e) => setPhone(e.target.value)} />
         </div>
-        <div className="auth-field">
+        <div className="login-field">
           <label htmlFor="su-dept">부서 (선택)</label>
           <input id="su-dept" type="text" placeholder="운영팀" value={department} onChange={(e) => setDepartment(e.target.value)} />
         </div>
-        <div className="auth-field">
+        <div className="login-field">
           <label htmlFor="su-pw">비밀번호</label>
           <input id="su-pw" type="password" autoComplete="new-password" placeholder="6자 이상" required value={password} onChange={(e) => setPassword(e.target.value)} />
         </div>
-        <div className="auth-field">
+        <div className="login-field">
           <label htmlFor="su-pw2">비밀번호 확인</label>
           <input id="su-pw2" type="password" autoComplete="new-password" placeholder="비밀번호 다시 입력" required value={password2} onChange={(e) => setPassword2(e.target.value)} />
         </div>
-        <button type="submit" className="auth-submit" disabled={busy || !!info}>{busy ? '처리 중...' : '가입하기'}</button>
-        <div className="auth-links"><AuthLink onClick={onBack}>로그인으로 돌아가기</AuthLink></div>
-      </form>
-    </section>
+        <button type="submit" className="login-submit" disabled={busy || !!info}>가입하기</button>
+      </div>
+      <div className="login-links"><AuthLink onClick={onBack}>로그인으로 돌아가기</AuthLink></div>
+      {err && <p className="login-msg is-err" role="alert" aria-live="polite">{err}</p>}
+      {info && <p className="login-msg is-ok" role="status" aria-live="polite">{info}</p>}
+    </form>
   );
 }
 
@@ -288,27 +290,27 @@ function ResetForm({ onBack }: { onBack: () => void }) {
     } finally { setBusy(false); }
   }
   return (
-    <section className="auth-card" aria-label="비밀번호 재설정">
-      <header className="auth-card__head">
-        <h2 className="auth-card__title">비밀번호 재설정</h2>
-        <p className="auth-card__sub">가입 이메일로 재설정 링크를 보냅니다.</p>
+    <form className={`login-card${busy ? ' is-loading' : ''}`} onSubmit={submit} noValidate aria-label="비밀번호 재설정">
+      <header className="login-head">
+        <h2 className="login-title">비밀번호 재설정</h2>
+        <p className="login-sub">가입한 이메일로 재설정 링크를 보내드립니다.</p>
       </header>
-      <form className="auth-form" onSubmit={submit}>
-        {err && <div className="auth-alert" role="alert">{err}</div>}
-        {info && <div className="auth-alert auth-alert--ok" role="status">{info}</div>}
-        <div className="auth-field">
+      <div className="login-form">
+        <div className="login-field">
           <label htmlFor="reset-email">이메일</label>
           <input id="reset-email" type="email" autoComplete="email" placeholder="name@company.com" required value={email} onChange={(e) => setEmail(e.target.value)} />
         </div>
-        <button type="submit" className="auth-submit" disabled={busy || !!info}>{busy ? '보내는 중...' : '재설정 메일 받기'}</button>
-        <div className="auth-links"><AuthLink onClick={onBack}>로그인으로 돌아가기</AuthLink></div>
-      </form>
-    </section>
+        <button type="submit" className="login-submit" disabled={busy || !!info}>재설정 메일 전송</button>
+      </div>
+      <div className="login-links"><AuthLink onClick={onBack}>로그인으로 돌아가기</AuthLink></div>
+      {err && <p className="login-msg is-err" role="alert" aria-live="polite">{err}</p>}
+      {info && <p className="login-msg is-ok" role="status" aria-live="polite">{info}</p>}
+    </form>
   );
 }
 
 function AuthLink({ onClick, children }: { onClick: () => void; children: ReactNode }) {
-  return <button type="button" className="auth-link" onClick={onClick}>{children}</button>;
+  return <button type="button" className="login-link" onClick={onClick}>{children}</button>;
 }
 
 function Gate({ title, desc, loading, onLogout }: { title: string; desc?: string; loading?: boolean; onLogout?: () => void }) {
@@ -316,21 +318,25 @@ function Gate({ title, desc, loading, onLogout }: { title: string; desc?: string
   if (loading) {
     return (
       <div role="status" aria-busy="true" aria-live="polite"
-        style={{ position: 'fixed', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12, background: 'var(--bg-page)' }}>
-        <Spinner size={28} stroke={2.5} color="var(--brand)" />
-        <div style={{ fontSize: 12.5, color: 'var(--text-sub)' }}>{title}</div>
+        style={{ position: 'fixed', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12, background: '#fff' }}>
+        <Spinner size={28} stroke={2.5} color="#1B2A4A" />
+        <div style={{ fontSize: 12.5, color: '#5f6368' }}>{title}</div>
       </div>
     );
   }
-  // 계정 미등록 등 안내 상태 = 브랜드 + 카드 유지(로그아웃 버튼 필요).
+  // 계정 미등록 등 안내 상태 = ERP4 로그인 셸 + 카드
   return (
-    <div className="auth-page">
-      <div className="auth-brand"><div className="auth-brand__name">renman</div></div>
-      <section className="auth-card" style={{ textAlign: 'center' }}>
-        <h2 className="auth-card__title">{title}</h2>
-        {desc && <p className="auth-card__sub">{desc}</p>}
-        {onLogout && <button type="button" className="auth-submit" style={{ marginTop: 16 }} onClick={onLogout}>로그아웃</button>}
-      </section>
+    <div className="fp-login">
+      <div className="login-page">
+        <div className="login-brand">렌터카매니저</div>
+        <section className="login-card" style={{ textAlign: 'center' }}>
+          <header className="login-head">
+            <h2 className="login-title">{title}</h2>
+            {desc && <p className="login-sub">{desc}</p>}
+          </header>
+          {onLogout && <button type="button" className="login-submit" onClick={onLogout}>로그아웃</button>}
+        </section>
+      </div>
     </div>
   );
 }

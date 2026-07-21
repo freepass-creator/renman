@@ -6,10 +6,9 @@
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSession } from '@/lib/session';
-import { getStore, listsCached } from '@/lib/store';
+import { getStore } from '@/lib/store';
 import { type EntityRecord } from '@/lib/intake/entities';
 import { companyLabel } from '@/lib/companies';
-import { useReloadOnSaved } from '@/lib/use-reload-on-saved';
 import {
   computeContractView, contractSchedules,
   patchDeliver, patchReturn, patchTerminate, patchExtend,
@@ -27,6 +26,7 @@ import { openIngest, openEntityEdit, openCar, openCustomer } from '@/lib/ui-bus'
 import { toast } from '@/lib/toast';
 import { TODAY } from '@/lib/dashboard-consts';
 import { useSecOrder } from '@/lib/use-sec-order';
+import { useEntityList } from '@/lib/use-entity-lists';
 
 const LIFE_SECS = ['c-wait', 'c-run', 'c-end', 'c-cust'] as const;
 type LifeSec = (typeof LIFE_SECS)[number];
@@ -47,11 +47,13 @@ type Act = { kind: ActKind; value: string };
 
 export default function ContractWorkspace() {
   const { companyId, scopeAll } = useSession();
-  const [recs, setRecs] = useState<EntityRecord[]>([]);
-  const [views, setViews] = useState<ContractView[]>([]);
+  const { rows: recs, loading, reload } = useEntityList('contract');
+  const views = useMemo(
+    () => recs.map((r) => computeContractView(r, TODAY)).sort((a, b) => b.net - a.net),
+    [recs],
+  );
   const [facets, setFacets] = useState<Set<string>>(new Set());
   const [q, setQ] = useState('');
-  const [loading, setLoading] = useState(true);
   const [openKey, setOpenKey] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [act, setAct] = useState<Act | null>(null);
@@ -59,18 +61,6 @@ export default function ContractWorkspace() {
   const toggleFacet = (label: string) => setFacets((s) => { const n = new Set(s); n.has(label) ? n.delete(label) : n.add(label); return n; });
   const resetFacets = () => setFacets(new Set());
   const setF = (labels: string[]) => setFacets(new Set(labels));
-
-  const load = useCallback((silent = false) => {
-    const warm = listsCached(['contract'], companyId);
-    if (!silent && !warm) setLoading(true);
-    getStore().list('contract', companyId).then((rs) => {
-      setRecs(rs);
-      setViews(rs.map((r) => computeContractView(r, TODAY)).sort((a, b) => b.net - a.net));
-      setLoading(false);
-    }).catch(() => setLoading(false));
-  }, [companyId]);
-  useEffect(() => { load(); }, [load]);
-  useReloadOnSaved(useCallback(() => load(true), [load]));
 
   useEffect(() => {
     if (loading) return;
@@ -86,14 +76,14 @@ export default function ContractWorkspace() {
     setBusy(true);
     try {
       await getStore().update('contract', String(v.rec.companyId || companyId), String(v.rec._key || ''), patch);
-      setAct(null); setOpenKey(null); load();
+      setAct(null); setOpenKey(null); reload();
     } catch (e) { toast('저장 실패: ' + (e as Error).message, 'error'); }
     finally { setBusy(false); }
   }
   async function delContract(v: ContractView) {
     if (!window.confirm(`이 계약을 삭제할까요? (휴지통에서 복구 가능)\n${String(v.rec.contractorName || '')} · ${String(v.rec.plate || '')}`)) return;
     setBusy(true);
-    try { await getStore().remove('contract', String(v.rec.companyId || companyId), String(v.rec._key || ''), '수기 삭제'); setOpenKey(null); load(); }
+    try { await getStore().remove('contract', String(v.rec.companyId || companyId), String(v.rec._key || ''), '수기 삭제'); setOpenKey(null); reload(); }
     catch (e) { toast('삭제 실패: ' + (e as Error).message, 'error'); }
     finally { setBusy(false); }
   }
@@ -134,7 +124,7 @@ export default function ContractWorkspace() {
     if (remain > 0) newPays.push({ seq: scheds.length ? scheds[scheds.length - 1].seq : 1, date: TODAY, amount: remain, source: '수동', manual: true });
     try {
       await getStore().update('contract', String(v.rec.companyId || companyId), String(v.rec._key || ''), { _payments: [...existing, ...newPays] });
-      setAct(null); load();
+      setAct(null); reload();
     } catch (e) { toast('수납 저장 실패: ' + (e as Error).message, 'error'); }
     finally { setBusy(false); }
   }

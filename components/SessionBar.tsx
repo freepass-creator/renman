@@ -8,7 +8,7 @@ import { useAppBarSlots } from '@/lib/appbar';
 import { useIsMobile } from '@/lib/use-mobile';
 import { MobileTabBar } from '@/components/MobileTabBar';
 import { haptic } from '@/lib/haptics';
-import { C } from '@/components/ui';
+import { C, ctrlH, IconBtn } from '@/components/ui';
 import { NAV_GROUPS } from '@/lib/nav';
 import { tierIncludes } from '@/lib/tier';
 
@@ -25,10 +25,9 @@ function NavMenu() {
   const line = 'var(--border)', ink = 'var(--text-main)', mute = 'var(--text-sub)', weak = 'var(--text-weak)';
   return (
     <div style={{ position: 'relative' }}>
-      <button onClick={() => setOpen((o) => !o)} title="메뉴" aria-label="메뉴"
-        style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 36, height: 32, boxSizing: 'border-box', border: `1px solid ${line}`, borderRadius: 'var(--radius)', background: open ? C.hover : C.taupeBg, cursor: 'pointer', color: ink }}>
+      <IconBtn title="메뉴" active={open} onClick={() => setOpen((o) => !o)}>
         <Menu size={17} />
-      </button>
+      </IconBtn>
       {open && (<>
         <div onClick={() => setOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 44 }} />
         <div style={{ position: 'absolute', left: 0, top: 'calc(100% + 4px)', width: 220, background: C.taupeBg, border: `1px solid ${line}`, borderRadius: 'var(--radius)', boxShadow: 'var(--shadow-lg)', zIndex: 45, overflow: 'hidden' }}>
@@ -97,7 +96,8 @@ export default function TopBar() {
   const [todayLabel, setTodayLabel] = useState('');
   useEffect(() => { const n = new Date(); setTodayLabel(`${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}-${String(n.getDate()).padStart(2, '0')} (${['일', '월', '화', '수', '목', '금', '토'][n.getDay()]})`); }, []);
   const goBack = () => { haptic.back(); if (slots.back) slots.back(); else router.back(); };
-  const barBtn: CSSProperties = { display: 'inline-flex', alignItems: 'center', gap: 4, height: 32, boxSizing: 'border-box', padding: '0 12px', border: `1px solid ${line}`, borderRadius: 'var(--radius)', background: C.taupeBg, cursor: 'pointer', fontSize: 12.5, fontWeight: 600, color: ink, textDecoration: 'none' };
+  const bh = ctrlH(false);
+  const barBtn: CSSProperties = { display: 'inline-flex', alignItems: 'center', gap: 4, height: bh, boxSizing: 'border-box', padding: '0 12px', border: `1px solid ${line}`, borderRadius: 'var(--radius)', background: C.taupeBg, cursor: 'pointer', fontSize: 12.5, fontWeight: 600, color: ink, textDecoration: 'none' };
 
   if (mobile) {
     const tapTarget: CSSProperties = { display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 44, height: 44, flexShrink: 0, border: 'none', background: 'none', cursor: 'pointer', color: ink, WebkitTapHighlightColor: 'transparent' };

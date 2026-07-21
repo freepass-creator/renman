@@ -4,14 +4,13 @@
  *   · 발급 = DocIssueDialog → getStore().save('issued_doc') (감사로그 자동 기록)
  *   · 목록 = 발급 이력(동결 본문 bodyHtml 보관) → 재인쇄는 격리 새창
  */
-import { useCallback, useEffect, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useSession } from '@/lib/session';
-import { getStore, listsCached } from '@/lib/store';
 import { companyLabel } from '@/lib/companies';
 import { Page, Sec, EmptyState, DataTable, Badge, Btn, C, type Col, type BadgeTone, PageLoading } from '@/components/ui';
 import { DOC_PRINT_CSS } from '@/lib/doc-templates';
 import { DocIssueDialog } from '@/components/DocIssueDialog';
-import { useReloadOnSaved } from '@/lib/use-reload-on-saved';
+import { useEntityList } from '@/lib/use-entity-lists';
 
 type Doc = {
   _key?: string; docNo?: string; templateTitle?: string; category?: string;
@@ -30,19 +29,12 @@ function reprint(d: Doc) {
 
 export default function DocsPage() {
   const { companyId, scopeAll } = useSession();
-  const [rows, setRows] = useState<Doc[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { rows: raw, loading } = useEntityList('issued_doc');
+  const rows = useMemo(
+    () => (raw as Doc[]).slice().sort((a, b) => (b.issuedAt || '').localeCompare(a.issuedAt || '')),
+    [raw],
+  );
   const [dialog, setDialog] = useState(false);
-
-  const load = useCallback((silent = false) => {
-    const warm = listsCached(['issued_doc'], companyId);
-    if (!silent && !warm) setLoading(true);
-    getStore().list('issued_doc', companyId)
-      .then((rs) => { setRows((rs as Doc[]).slice().sort((a, b) => (b.issuedAt || '').localeCompare(a.issuedAt || ''))); setLoading(false); })
-      .catch(() => setLoading(false));
-  }, [companyId]);
-  useEffect(() => { load(); }, [load]);
-  useReloadOnSaved(useCallback(() => load(true), [load]));
 
   const cols: Col<Doc>[] = [
     { key: 'docNo', label: '문서번호', render: (d) => <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: C.mute }}>{d.docNo}</span> },
@@ -63,7 +55,7 @@ export default function DocsPage() {
           : rows.length === 0 ? <EmptyState>발급된 문서가 없습니다 — 우측 상단 “신규 발급”</EmptyState>
             : <DataTable cols={scopeAll ? cols : cols.filter((c) => c.key !== 'issuer')} rows={rows} />}
       </Sec>
-      {dialog && <DocIssueDialog issued={rows} onClose={() => setDialog(false)} onIssued={() => { setDialog(false); load(); }} />}
+      {dialog && <DocIssueDialog issued={rows} onClose={() => setDialog(false)} onIssued={() => setDialog(false)} />}
     </Page>
   );
 }

@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useState, type CSSProperties } from 'react';
+import { useState, type CSSProperties } from 'react';
 import { getStore } from '@/lib/store';
 import { type EntityRecord } from '@/lib/intake/entities';
 import { matchPenalty } from '@/lib/penalty-match';
@@ -7,6 +7,7 @@ import { loadMaster } from '@/lib/company-master';
 import { companyLabel } from '@/lib/companies';
 import { PageLoading, Btn } from '@/components/ui';
 import { TODAY } from '@/lib/dashboard-consts';
+import { useEntityList } from '@/lib/use-entity-lists';
 
 // 과태료 변경부과 문서 — 관할기관 수신 [요청 공문] + 위반 건별 [임대차 계약 사실확인서]. window.print(A4).
 // 명의자(회사)로 온 과태료를 위반 당시 실운전자(임차인)에게 변경부과 요청. 발행 후 reassignStatus='변경부과신청' 전환.
@@ -21,13 +22,9 @@ const sheet: CSSProperties = { width: 794, minHeight: 1123, margin: '0 auto 30px
 type P = { p: EntityRecord; c: EntityRecord };
 
 export function PenaltyDocs({ penalties, companyId, onClose, onSubmitted }: { penalties: EntityRecord[]; companyId: string; onClose: () => void; onSubmitted: () => void }) {
-  const [contracts, setContracts] = useState<EntityRecord[]>([]);
-  const [ready, setReady] = useState(false);
+  const { rows: contracts, loading } = useEntityList('contract');
+  const ready = !loading;
   const [busy, setBusy] = useState(false);
-
-  useEffect(() => {
-    getStore().list('contract', companyId).then((cs) => { setContracts(cs); setReady(true); }).catch(() => setReady(true));
-  }, [companyId]);
 
   // 매칭된 것만 문서 대상(임차인 확인 가능)
   const items: P[] = penalties.map((p) => { const m = matchPenalty(p, contracts); return m ? { p, c: m.contract } : null; }).filter(Boolean) as P[];

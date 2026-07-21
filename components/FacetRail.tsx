@@ -1,38 +1,17 @@
 'use client';
 /**
  * 필터 레일 공용 — LENS_FILTERS[lensKey] 칩.
- *   형태 = 프리패스 ERP4 facet-filter: 차원 라벨 + 칩 묶음만. 트리·아코디언·채움버튼 기교 없음.
+ *   칩 = ToggleChips SSOT (ERP4: 웹28 · 모바일40 · brand 채움).
  *   데스크톱 = 좌측 sticky 레일.
  *   모바일 = UI 없음 · 검색 옆 「필터」버튼은 WorkbenchBar(MobileFacetFilterBtn).
  */
-import { useEffect, useMemo, useState, type CSSProperties } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { LENS_FILTERS, type FacetGroup } from '@/lib/lens-filters';
 import { useIsMobile } from '@/lib/use-mobile';
 import { useRegisterFacetFilter, useFacetFilterApi } from '@/lib/facet-filter-ctx';
 import { haptic } from '@/lib/haptics';
-import { Btn, C, Drawer, CTRL_M, R } from '@/components/ui';
+import { Btn, C, Drawer, IconBtn, ToggleChips, ctrlH } from '@/components/ui';
 import { SlidersHorizontal, ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react';
-
-/** ERP4 facet-chip — 작고 조용. 활성=연한 틴트(브랜드 채움 금지). */
-function facetChipStyle(active: boolean, touch?: boolean): CSSProperties {
-  return {
-    display: 'inline-flex',
-    alignItems: 'center',
-    height: touch ? 36 : 24,
-    padding: touch ? '0 12px' : '0 8px',
-    boxSizing: 'border-box',
-    border: `1px solid ${active ? 'rgba(27,42,74,0.25)' : C.line}`,
-    borderRadius: R,
-    background: active ? 'rgba(27,42,74,0.10)' : 'transparent',
-    color: active ? C.brand : C.mute,
-    fontSize: touch ? 14 : 12,
-    fontWeight: active ? 600 : 500,
-    cursor: 'pointer',
-    whiteSpace: 'nowrap',
-    transition: 'background .12s ease, border-color .12s ease, color .12s ease, box-shadow .12s ease',
-    WebkitTapHighlightColor: 'transparent',
-  };
-}
 
 function FacetGroups({ groups, facets, onToggle, touch }: {
   groups: FacetGroup[];
@@ -40,6 +19,8 @@ function FacetGroups({ groups, facets, onToggle, touch }: {
   onToggle: (label: string) => void;
   touch?: boolean;
 }) {
+  const mobile = useIsMobile();
+  const dimH = ctrlH(touch ?? mobile);
   // 기본 펼침. 라벨 클릭으로만 접음(트리·장식 없음).
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const toggleDim = (dim: string) => setCollapsed((s) => {
@@ -59,35 +40,28 @@ function FacetGroups({ groups, facets, onToggle, touch }: {
               type="button"
               onClick={() => toggleDim(g.dim)}
               style={{
-                width: '100%', display: 'flex', alignItems: 'center', gap: 4,
-                padding: touch ? '8px 0' : '4px 0', marginBottom: folded ? 0 : (touch ? 6 : 4),
-                border: 'none', background: 'none', cursor: 'pointer',
+                width: '100%', display: 'flex', alignItems: 'center', gap: 6,
+                padding: touch ? '10px 0' : '8px 0', marginBottom: folded ? 0 : (touch ? 6 : 4),
+                minHeight: dimH, border: 'none', background: 'none', cursor: 'pointer',
                 WebkitTapHighlightColor: 'transparent',
               }}
             >
               <ChevronDown
-                size={touch ? 16 : 13}
+                size={touch ? 18 : 15}
                 color={C.faint}
                 style={{ flexShrink: 0, transform: folded ? 'rotate(-90deg)' : 'none', transition: 'transform .12s' }}
               />
-              <span style={{ fontSize: touch ? 13 : 11, color: C.faint, fontWeight: 600 }}>{g.dim}</span>
+              <span style={{ fontSize: touch ? 15 : 13, color: C.ink, fontWeight: 700, letterSpacing: '-0.01em', lineHeight: 1.2 }}>{g.dim}</span>
               {nOn > 0 && (
                 <span style={{ fontSize: 11, color: C.brand, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{nOn}</span>
               )}
             </button>
             {!folded && (
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: touch ? 6 : 4, paddingLeft: touch ? 2 : 0 }}>
-                {g.chips.map((c) => (
-                  <button
-                    key={`${g.dim}-${c.label}`}
-                    type="button"
-                    data-ui="facet"
-                    aria-pressed={facets.has(c.label)}
-                    onClick={() => onToggle(c.label)}
-                    style={facetChipStyle(facets.has(c.label), touch)}
-                  >{c.label}</button>
-                ))}
-              </div>
+              <ToggleChips
+                selected={facets}
+                onToggle={onToggle}
+                options={g.chips.map((c) => ({ key: c.label, label: c.label }))}
+              />
             )}
           </div>
         );
@@ -106,31 +80,9 @@ export function MobileFacetFilterBtn() {
   const n = api.facets.size;
   return (
     <>
-      <button
-        type="button"
-        data-ui="action"
-        onClick={() => { haptic.tap(); setOpen(true); }}
-        aria-label="필터"
-        title="필터"
-        style={{
-          height: CTRL_M,
-          minWidth: CTRL_M,
-          boxSizing: 'border-box',
-          padding: '0 10px',
-          display: 'inline-flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          flexShrink: 0,
-          border: `1px solid ${n > 0 ? 'rgba(27,42,74,0.25)' : C.line}`,
-          borderRadius: R,
-          background: n > 0 ? 'rgba(27,42,74,0.10)' : '#fff',
-          color: n > 0 ? C.brand : C.mute,
-          cursor: 'pointer',
-          WebkitTapHighlightColor: 'transparent',
-        }}
-      >
+      <IconBtn title="필터" active={n > 0} onClick={() => setOpen(true)}>
         <SlidersHorizontal size={17} strokeWidth={2.2} />
-      </button>
+      </IconBtn>
       {open && (
         <Drawer
           title="필터"
@@ -139,7 +91,7 @@ export function MobileFacetFilterBtn() {
             <>
               <Btn variant="ghost" size="lg" onClick={() => api.onReset()} disabled={n === 0}>초기화</Btn>
               <span style={{ flex: 1 }} />
-              <Btn size="lg" onClick={() => setOpen(false)}>적용</Btn>
+              <Btn size="lg" onClick={() => { haptic.tap(); setOpen(false); }}>적용</Btn>
             </>
           }
         >

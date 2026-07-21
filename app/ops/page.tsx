@@ -1,10 +1,9 @@
 'use client';
 /**
  * 마이페이지 (내 업무) — 탭: 일정 · 업무.
- *   · 일정 = 회사 일정(Agenda, 홈과 동일 SSOT) + 내 일정(MySchedule, 개인 메모).
- *   · 업무 = 내가 고른 섹션(MyDesk). 홈 미결과 같은 section-registry.
- *   설정에서 초기 화면으로 지정 가능.
- *   모바일=업로드 최상단 재배치만. 셸은 홈과 동일(FacetPage·WorkbenchBar·FacetRail).
+ *   · 일정 = 회사 일정(Agenda) + 내 일정(MySchedule)을 Sec으로 한 화면(서브탭 금지).
+ *   · 업무 = MyDesk. FacetRail은 탭과 무관하게 상시(렌즈만 일정/마이 전환).
+ *   셸 = 홈과 동일(FacetPage·WorkbenchBar·FacetRail).
  */
 import { useMemo, useState } from 'react';
 import { useSession } from '@/lib/session';
@@ -19,25 +18,22 @@ import { Agenda } from '@/components/Agenda';
 import { UploadSection } from '@/components/UploadSection';
 
 type Tab = '일정' | '업무';
-type SchedScope = '회사' | '나';
+const EMPTY = new Set<string>();
 
 export default function MyPage() {
   const { scopeAll } = useSession();
   const { D, contracts, vehicles, insurances, history, bankTx, penalties, inbox, loading } = useDashboardData();
   const ctx = useMemo(() => buildSectionCtx({ D, contracts, history, bankTx, scopeAll, vehicles, insurances, penalties, inbox }), [D, contracts, history, bankTx, scopeAll, vehicles, insurances, penalties, inbox]);
   const [tab, setTab] = useState<Tab>('업무');
-  const [schedScope, setSchedScope] = useState<SchedScope>('회사');
-  const [facets, setFacets] = useState<Set<string>>(new Set());
-  const toggleFacet = (label: string) => setFacets((s) => { const n = new Set(s); n.has(label) ? n.delete(label) : n.add(label); return n; });
-  const resetFacets = () => setFacets(new Set());
-  const isWork = tab === '업무';
-  const isCompanySched = tab === '일정' && schedScope === '회사';
-
-  const rail = !loading
-    ? isWork ? <FacetRail lensKey="마이" facets={facets} onToggle={toggleFacet} onReset={resetFacets} />
-      : isCompanySched ? <FacetRail lensKey="일정" facets={facets} onToggle={toggleFacet} onReset={resetFacets} />
-        : null
-    : null;
+  const [facetSel, setFacetSel] = useState<Record<string, Set<string>>>({});
+  const lensKey = tab === '업무' ? '마이' : '일정';
+  const facets = facetSel[lensKey] || EMPTY;
+  const toggleFacet = (label: string) => setFacetSel((m) => {
+    const cur = new Set(m[lensKey] || []);
+    if (cur.has(label)) cur.delete(label); else cur.add(label);
+    return { ...m, [lensKey]: cur };
+  });
+  const resetFacets = () => setFacetSel((m) => ({ ...m, [lensKey]: new Set() }));
 
   return (
     <FacetPage
@@ -47,19 +43,20 @@ export default function MyPage() {
           tabs={[{ key: '일정', label: '일정' }, { key: '업무', label: '업무' }]}
           tab={tab}
           onTab={(k) => setTab(k as Tab)}
-          subTabs={tab === '일정' ? [{ key: '회사', label: '회사' }, { key: '나', label: '내 일정' }] : undefined}
-          subTab={schedScope}
-          onSubTab={(k) => setSchedScope(k as SchedScope)}
           search
         />
       }
-      rail={rail}
+      rail={!loading ? <FacetRail lensKey={lensKey} facets={facets} onToggle={toggleFacet} onReset={resetFacets} /> : null}
     >
       {!loading && <UploadSection />}
       {loading ? <PageLoading />
-        : isWork ? <MyDesk ctx={ctx} facets={facets} />
-          : isCompanySched ? <Agenda ctx={ctx} facets={facets} />
-            : <MySchedule />}
+        : tab === '업무' ? <MyDesk ctx={ctx} facets={facets} />
+          : (
+            <>
+              <Agenda ctx={ctx} facets={facets} />
+              <MySchedule />
+            </>
+          )}
     </FacetPage>
   );
 }

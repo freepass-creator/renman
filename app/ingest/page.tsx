@@ -6,7 +6,8 @@ import { downloadXlsxTemplate, parseSpreadsheet } from '@/lib/intake/xlsx';
 import { saveIntake } from '@/lib/intake';
 import { getStore } from '@/lib/store';
 import { useSession } from '@/lib/session';
-import { COMPANIES, companyLabel } from '@/lib/companies';
+import { COMPANIES, companyLabel, ALL_COMPANIES } from '@/lib/companies';
+import { resolveWriteCompany, NEED_COMPANY } from '@/lib/scope';
 import { Check, AlertTriangle } from 'lucide-react';
 import FileDrop from '@/components/FileDrop';
 import { toast } from '@/lib/toast';
@@ -20,13 +21,15 @@ type Tab = 'ocr' | 'excel' | 'manual';
 export default function IngestPage() {
   const { companyId, user, scopeAll } = useSession();
   const [entityKey, setEntityKey] = useState('vehicle');
-  const [saveTarget, setSaveTarget] = useState(COMPANIES[0]);
+  const [saveTarget, setSaveTarget] = useState('');
   // 운영자 합본(ALL)에서는 저장 대상 회사를 명시 선택, 그 외엔 현재 회사
   const company = scopeAll ? saveTarget : companyId;
   const [saveMsg, setSaveMsg] = useState('');
   const [saving, setSaving] = useState(false);
   async function saveRecords() {
     if (!records.length) return;
+    const target = resolveWriteCompany(companyId, scopeAll ? { companyId: saveTarget } : null);
+    if (!target) { toast(NEED_COMPANY, 'error'); return; }
     setSaving(true); setSaveMsg('');
     try {
       // 원본 OCR 스냅샷을 레코드에 영구 보존 (수기 교정해도 원본 추적 — feedback_ocr_preserve_original)
@@ -34,11 +37,11 @@ export default function IngestPage() {
         ? [{ ...records[0], _ocrOriginal: { raw: ocrRaw, at: new Date().toISOString(), source: entity.source } }]
         : records;
       // 단일 통로 — 앵커 정규화·부수효과·jpk:saved 반영
-      const r = await saveIntake(entityKey, company, toSave);
+      const r = await saveIntake(entityKey, target, toSave);
       const s = r.save;
       const fx = r.sideEffects.length ? ` · 부수효과 ${r.sideEffects.length}` : '';
       setSaveMsg(`저장 ${s.saved}건 · 중복건너뜀 ${s.duplicates} · 백엔드 ${s.backend}${fx}`);
-      toast(`저장 ${s.saved}건${s.duplicates ? ` · 중복 ${s.duplicates}` : ''} — ${entity.label} (${companyLabel(company)})`, 'success');
+      toast(`저장 ${s.saved}건${s.duplicates ? ` · 중복 ${s.duplicates}` : ''} — ${entity.label} (${companyLabel(target)})`, 'success');
       setRecords([]);
       loadSaved();
     } catch (e) { setSaveMsg('저장 실패: ' + (e as Error).message); toast('저장 실패: ' + (e as Error).message, 'error'); }
@@ -46,6 +49,7 @@ export default function IngestPage() {
   }
   const [saved, setSaved] = useState<EntityRecord[] | null>(null);
   async function loadSaved() {
+    if (!company) { toast(NEED_COMPANY, 'error'); return; }
     try { setSaved(await getStore().list(entityKey, company)); } catch { setSaved([]); }
   }
   const [tab, setTab] = useState<Tab>('ocr');
@@ -128,7 +132,7 @@ export default function IngestPage() {
       <Sec title="수집 요약" desc="선택 엔티티·저장 대상 · 미확정(저장 전)·저장본(현재 회사)">
         <Cards min={128} fit>
           <Metric label="선택 엔티티" value={entity.label} tone="ink" />
-          <Metric label="저장 대상" value={companyLabel(company)} tone="ok" />
+          <Metric label="저장 대상" value={company ? companyLabel(company) : '회사 선택'} tone={company ? 'ok' : 'warn'} />
           <Metric label="미확정 레코드" value={records.length} tone={records.length ? 'warn' : 'ink'} />
           <Metric label="저장본" value={saved == null ? '조회 대기' : saved.length} tone={saved ? 'ok' : 'ink'} />
         </Cards>
@@ -146,6 +150,7 @@ export default function IngestPage() {
             <div style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 12, color: C.mute }}>
               <span>저장 대상 회사:</span>
               <Select value={saveTarget} onChange={(e) => setSaveTarget(e.target.value)} size="sm" style={{ fontWeight: 700 }}>
+                <option value="">— 회사 선택 —</option>
                 {COMPANIES.map((c) => <option key={c} value={c}>{companyLabel(c)}</option>)}
               </Select>
               <span style={{ color: C.faint }}>(합본 — 저장은 회사 지정)</span>

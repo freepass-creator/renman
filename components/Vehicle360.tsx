@@ -9,7 +9,8 @@ import { Sec, Cards, Metric, ObjCard, Stepper, Btn, Badge, FormGrid, KV, HiddenS
 import { InfoDoc, type DocReplacePayload } from '@/components/InfoDoc';
 import { docHistory, pushDocVersion, latestDoc } from '@/lib/docs';
 import { deriveLocation, locationLabel } from '@/lib/vehicle-location';
-import { contractSchedules, computeContractView, effectiveEndDate, patchDeliver, patchReturn, patchTerminate, patchExtend, earlyTerminationFee, isReturnable } from '@/lib/contract-ops';
+import { contractSchedules, computeContractView, effectiveEndDate, patchDeliver, patchReturn, patchTerminate, patchExtend, patchEngineLock, earlyTerminationFee, isReturnable } from '@/lib/contract-ops';
+import { isCashPurchase } from '@/lib/domain/vehicle-finance';
 import { FUEL_LEVELS } from '@/lib/domain/fuel';
 import { normPlate } from '@/lib/plate';
 import { linkFleet, handoverHistory, recommendNextRent } from '@/lib/domain/model';
@@ -165,7 +166,7 @@ export function Vehicle360({ plate, focus }: { plate: string; focus?: string }) 
   }
   const status = String(v?.status || (active ? '운행' : '대기'));
   const statusTone: 'green' | 'amber' | 'gray' | 'blue' = status === '운행' ? 'green' : (['정비', '사고'].includes(status) ? 'amber' : (['매각', '말소', '매각대기'].includes(status) ? 'gray' : 'blue'));
-  const loan = (v && v.loanCashOnly !== '예' && (Number(v.loanPrincipal) || Number(v.loanRemainingPrincipal)) && Number(v.loanMonths))
+  const loan = (v && !isCashPurchase(v.loanCashOnly) && (Number(v.loanPrincipal) || Number(v.loanRemainingPrincipal)) && Number(v.loanMonths))
     ? loanSchedule(Number(v.loanPrincipal || v.loanRemainingPrincipal) || 0, Number(v.loanRate) || 0, Number(v.loanMonths) || 0, String(v.loanStartDate || ''))
     : [];
   const loanSum = loan.length ? loanSummary(loan, TODAY) : null;
@@ -210,11 +211,23 @@ export function Vehicle360({ plate, focus }: { plate: string; focus?: string }) 
     await saveIntake('history', target, [{ plate, category: '인도', title: `출고(인도)${dlvForm.mileage ? ' · ' + dlvForm.mileage + 'km' : ''} · 연료 ${dlvForm.fuel}`, date: dlvForm.date, author: user.name, customer: String(waiting.contractorName || ''), contractNo: String(waiting.contractNo || ''), companyId: target, _kind: 'activity' }]);
     setDlvOpen(false);
   };
-  // 시동제어 액션 로깅 — 제어/해제 이벤트를 이력에 남김(사유·미납액·담당자) + 차량 gpsControl 상태 갱신
+  // 시동제어 — contract.engineDisabled 정본(SSOT). gpsControl=장비 능력(가능/불가)만.
+  const engineLocked = !!active?.engineDisabled;
   const logIgnition = async (action: '제어' | '해제') => {
-    await saveIntake('history', target, [{ plate, category: '시동제어', title: `시동 ${action}`, date: TODAY, author: user.name, memo: totalUnpaid > 0 ? `미납 ${won(totalUnpaid)}` : '', companyId: target, _kind: 'activity' }]);
-    if (v?._key) await getStore().update('vehicle', target, String(v._key), { gpsControl: action === '제어' ? '제어중' : '해제됨' });
+    if (!active?._key) { toast('운행중 계약이 없어 시동제어할 수 없습니다', 'info'); return; }
+    const vview = computeContractView(active, TODAY);
+    const who = String(active.contractorName || plate);
+    const actor = user?.email || user?.name || '';
+    if (action === '해제') {
+      if (!window.confirm(`${who} · ${plate}\n입금이 확인되어 시동제어를 해제합니까?`)) return;
+      await getStore().update('contract', target, String(active._key), patchEngineLock(false, { today: TODAY, actor, reason: '' }));
+    } else {
+      if (!window.confirm(`${who} · ${plate}\n미납 ${won(vview.net)} · ${vview.overdueDays}일 연체\n\n원격 시동제어를 겁니까?`)) return;
+      await getStore().update('contract', target, String(active._key), patchEngineLock(true, { today: TODAY, actor, reason: `미납 ${won(vview.net)} · ${vview.overdueDays}일 연체` }));
+    }
+    await saveIntake('history', target, [{ plate, category: '시동제어', title: `시동 ${action}`, date: TODAY, author: user.name, memo: vview.net > 0 ? `미납 ${won(vview.net)}` : '', companyId: target, _kind: 'activity' }]);
     notifySaved();
+    toast(action === '제어' ? `시동제어 적용 · ${plate}` : `시동제어 해제 · ${plate}`, action === '제어' ? 'info' : 'success');
   };
   // 보증금 반환/충당 처리 — 정산완료 도장(depositSettledDate) + 이력 기록
   const settleDeposit = async () => {
@@ -290,7 +303,7 @@ export function Vehicle360({ plate, focus }: { plate: string; focus?: string }) 
     if (rd != null && rd < 0) issues.push({ label: '반납 지남', detail: `${-rd}일 · ${yy(active.returnScheduledDate || active.endDate)}`, tone: 'red' });
     else if (rd != null && rd <= 7) issues.push({ label: '반납 임박', detail: `D-${rd}`, tone: 'amber' });
   }
-  if (String(v?.gpsControl) === '제어중') issues.push({ label: '시동제어 중', detail: '원격 시동잠금', tone: 'gray' });
+  if (engineLocked) issues.push({ label: '시동제어 중', detail: String(active?.engineDisabledReason || '원격 시동잠금'), tone: 'gray' });
   if (pendDeposit) issues.push({ label: '보증금 미정산', detail: '반환/충당 필요', tone: 'amber' });
 
   return (
@@ -510,12 +523,13 @@ export function Vehicle360({ plate, focus }: { plate: string; focus?: string }) 
       </Sec> : null}
 
       {/* GPS · 관제 (시동제어 연동) */}
-      {v && (v.gpsDeviceId || v.gpsProvider) ? <Sec id="v-gps" title="GPS · 관제" desc="미납 원격 시동제어 연동" right={<span style={{ display: 'inline-flex', gap: 6 }}><Btn variant="danger" onClick={() => logIgnition('제어')}>시동 제어</Btn><Btn variant="ghost" onClick={() => logIgnition('해제')}>시동 해제</Btn></span>}>
+      {v && (v.gpsDeviceId || v.gpsProvider) ? <Sec id="v-gps" title="GPS · 관제" desc="미납 원격 시동제어 연동" right={active ? <span style={{ display: 'inline-flex', gap: 6 }}><Btn variant="danger" onClick={() => logIgnition('제어')} disabled={engineLocked}>시동 제어</Btn><Btn variant="ghost" onClick={() => logIgnition('해제')} disabled={!engineLocked}>시동 해제</Btn></span> : null}>
         <KV rows={[
           ['공급사', null, String(v.gpsProvider ?? '')],
           ['단말번호', null, String(v.gpsDeviceId ?? '')],
           ['설치일', null, String(v.gpsInstalledDate ?? '')],
-          ['시동제어', null, String(v.gpsControl ?? '')],
+          ['장비 시동제어', null, String(v.gpsControl ?? '—')],
+          ['계약 시동제어', null, engineLocked ? `적용중 (${String(active?.engineDisabledAt || '').slice(0, 10)})` : '—'],
         ] as [string, string | null, React.ReactNode][]} />
       </Sec> : null}
 

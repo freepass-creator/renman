@@ -1,9 +1,8 @@
 'use client';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useSession } from '@/lib/session';
-import { getStore, listsCached } from '@/lib/store';
 import { type EntityRecord } from '@/lib/intake/entities';
-import { computeContractView } from '@/lib/contract-ops';
+import { computeContractView, patchEngineLock } from '@/lib/contract-ops';
 import { collectionStage } from '@/lib/collection';
 import { openCar, openCustomer } from '@/lib/ui-bus';
 import { customerKey } from '@/lib/customers';
@@ -21,7 +20,9 @@ import { NotifyDialog, type NotifyRecipient } from '@/components/NotifyDialog';
 import { companyLabel } from '@/lib/companies';
 import { toast } from '@/lib/toast';
 import { TODAY } from '@/lib/dashboard-consts';
-import { useReloadOnSaved } from '@/lib/use-reload-on-saved';
+import { selectReceivables } from '@/lib/snapshot/selectors';
+import { useEntityLists } from '@/lib/use-entity-lists';
+import { getStore } from '@/lib/store';
 
 // 미수 워크벤치 = 회수 파트의 "딱 여기만" 메인. 미수율이 핵심축. 자금(수납)과 연동돼 자동 갱신.
 // 담당자가 어떻게 관리했는지(내용증명 발송·시동제어 여부·최근 연락)가 보이고, 그 자리에서 조치.
@@ -30,11 +31,9 @@ const CONTACT_KINDS = ['통화', '문자', '방문', '독촉'];
 
 export default function ReceivablesPage() {
   const { companyId, scopeAll, user } = useSession();
-  const [cs, setCs] = useState<EntityRecord[]>([]);
-  const [hs, setHs] = useState<EntityRecord[]>([]);
+  const { data: [cs = [], hs = []], loading, reload } = useEntityLists(['contract', 'history']);
   const [facets, setFacets] = useState<Set<string>>(new Set());
   const [q, setQ] = useState('');
-  const [loading, setLoading] = useState(true);
   const [logKey, setLogKey] = useState<string | null>(null); // 연락 기록 펼친 행. 그 자리에서 인라인(팝업 X)
   const [notify, setNotify] = useState(false); // 문자 발송 다이얼로그
   const [noticeSel, setNoticeSel] = useState<Set<string>>(new Set());
@@ -42,34 +41,24 @@ export default function ReceivablesPage() {
   const toggleFacet = (label: string) => setFacets((s) => { const n = new Set(s); n.has(label) ? n.delete(label) : n.add(label); return n; });
   const resetFacets = () => setFacets(new Set());
 
-  const load = useCallback((silent = false) => {
-    const warm = listsCached(['contract', 'history'], companyId);
-    if (!silent && !warm) setLoading(true);
-    Promise.all([getStore().list('contract', companyId), getStore().list('history', companyId)])
-      .then(([c, h]) => { setCs(c); setHs(h); setLoading(false); }).catch(() => setLoading(false));
-  }, [companyId]);
-  useEffect(() => { load(); }, [load]);
-  useReloadOnSaved(load);
-
   const D = useMemo(() => {
     const lastContact = new Map<string, EntityRecord>();
     for (const h of hs) { if (!CONTACT_KINDS.includes(String(h.category))) continue; const p = String(h.plate || ''); const cur = lastContact.get(p); if (!cur || String(h.date || '') > String(cur.date || '')) lastContact.set(p, h); }
     const rows = cs.map((c) => { const v = computeContractView(c, TODAY); return { rec: c, v, st: collectionStage(v.overdueDays), contact: lastContact.get(String(c.plate || '')) || null }; })
       .filter((r) => r.v.net > 0)
       .sort((a, b) => b.v.net - a.v.net);
-    const activeCount = cs.filter((c) => !c.returnedDate).length;
-    const runningRows = rows.filter((r) => !r.v.ended);   // 운행중 미수(진짜 미수)
-    const endedRows = rows.filter((r) => r.v.ended);       // 반납 미수(별도 관리)
-    return { rows, totalUnpaid: rows.reduce((s, r) => s + r.v.net, 0), count: rows.length,
-      misuActive: runningRows.reduce((s, r) => s + r.v.net, 0), misuActiveCount: runningRows.length,
-      misuReturned: endedRows.reduce((s, r) => s + r.v.net, 0), misuReturnedCount: endedRows.length,
-      rate: activeCount ? Math.round((runningRows.length / activeCount) * 100) : 0,
-      over30: rows.filter((r) => r.v.overdueDays >= 30).length,
-      over90: rows.filter((r) => r.v.overdueDays >= 90).length,
+    const recv = selectReceivables(cs, TODAY);
+    return {
+      rows, totalUnpaid: recv.total, count: recv.unpaidCount,
+      misuActive: recv.misuActive, misuActiveCount: recv.misuActiveCount,
+      misuReturned: recv.misuReturned, misuReturnedCount: recv.misuReturnedCount,
+      rate: recv.rate,
+      over30: recv.over30,
+      over90: recv.over90,
       noticeTodo: rows.filter((r) => (r.st.stage === '내용증명' || r.st.stage === '채권화') && !r.rec.noticeSentDate).length,
       immob: rows.filter((r) => r.rec.engineDisabled).length,
-      // 시동제어 필요 = 미납 심화(D+3 이상=시동제어 단계+) 인데 아직 시동제어 안 함. "입금 안됐는데 시동제어 안하고 있으면" 능동 알림.
-      lockTodo: rows.filter((r) => !r.v.ended && !r.rec.engineDisabled && (r.st.stage === '시동제어' || r.st.stage === '내용증명' || r.st.stage === '채권화')).length };
+      lockTodo: rows.filter((r) => !r.v.ended && !r.rec.engineDisabled && (r.st.stage === '시동제어' || r.st.stage === '내용증명' || r.st.stage === '채권화')).length,
+    };
   }, [cs, hs]);
 
   const stageSel = selectedInDim('미수', '연체단계', facets);
@@ -117,7 +106,7 @@ export default function ReceivablesPage() {
         actor: user?.email || user?.name || '',
       }));
       if (r) toast(`내용증명 ${r.docNo} · 청구 ${won(r.claim)}`, 'success');
-      load();
+      reload();
     });
   };
   const toggleNoticeSel = (key: string) => setNoticeSel((s) => { const n = new Set(s); n.has(key) ? n.delete(key) : n.add(key); return n; });
@@ -136,20 +125,21 @@ export default function ReceivablesPage() {
         toast(`내용증명 일괄 ${r.count}건 · 청구합 ${won(r.totalClaim)}`, 'success');
         setNoticeSel(new Set());
       }
-      load();
+      reload();
     });
   };
   // 시동제어 전환 — "물어보고"(확인) 걸고, engineDisabled 원자(risk-issues·needsEngineLockAction과 동일 SSOT)에 사유·시각·담당 기록.
   const toggleEngine = (r: { rec: EntityRecord; v: { net: number; overdueDays: number } }) => {
     const rec = r.rec;
     const who = String(rec.contractorName || '—'), plate = String(rec.plate || '');
+    const actor = user?.email || user?.name || '';
     if (rec.engineDisabled) {
       if (!window.confirm(`${who} · ${plate}\n입금이 확인되어 시동제어를 해제합니까?`)) return;
-      patch(rec, { engineDisabled: false, engineDisabledAt: '', engineDisabledReason: '', engineReleasedAt: TODAY, engineReleasedBy: user?.email || '' });
+      patch(rec, patchEngineLock(false, { today: TODAY, actor, reason: '' }));
       toast(`시동제어 해제 · ${plate}`);
     } else {
       if (!window.confirm(`${who} · ${plate}\n미납 ${won(r.v.net)} · ${r.v.overdueDays}일 연체\n\n원격 시동제어를 겁니까?`)) return;
-      patch(rec, { engineDisabled: true, engineDisabledAt: TODAY, engineDisabledReason: `미납 ${won(r.v.net)} · ${r.v.overdueDays}일 연체`, engineDisabledBy: user?.email || '' });
+      patch(rec, patchEngineLock(true, { today: TODAY, actor, reason: `미납 ${won(r.v.net)} · ${r.v.overdueDays}일 연체` }));
       toast(`시동제어 적용 · ${plate}`, 'info');
     }
   };
@@ -221,7 +211,7 @@ export default function ReceivablesPage() {
             ); })}
           </div>}
       </Sec>
-      {notify && <NotifyDialog recipients={recipients} onClose={() => setNotify(false)} onSent={load} />}
+      {notify && <NotifyDialog recipients={recipients} onClose={() => setNotify(false)} onSent={reload} />}
     </FacetPage>
   );
 }

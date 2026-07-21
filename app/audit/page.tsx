@@ -1,7 +1,6 @@
 'use client';
-import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
+import { Fragment, useMemo, useState } from 'react';
 import { useSession } from '@/lib/session';
-import { getStore } from '@/lib/store';
 import { companyLabel } from '@/lib/companies';
 import { ENTITIES } from '@/lib/intake/entities';
 import { AUDIT_ACTION_LABEL, type AuditLog } from '@/lib/audit';
@@ -10,7 +9,7 @@ import { FacetRail } from '@/components/FacetRail';
 import { WorkbenchBar } from '@/components/WorkbenchBar';
 import { useIsMobile } from '@/lib/use-mobile';
 import { textMatch } from '@/lib/search-match';
-import { useReloadOnSaved } from '@/lib/use-reload-on-saved';
+import { useEntityList } from '@/lib/use-entity-lists';
 
 const ACTION_TONE: Record<string, BadgeTone> = {
   create: 'green', import: 'green', update: 'blue', delete: 'red',
@@ -22,25 +21,16 @@ const entLabel = (k: string) => ENTITIES[k]?.label || k;
 export default function AuditPage() {
   const { companyId, scopeAll } = useSession();
   const mobile = useIsMobile();
-  const [rows, setRows] = useState<AuditLog[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { rows: raw, loading, reload } = useEntityList('audit_logs');
+  const rows = useMemo(
+    () => (raw as AuditLog[]).slice().sort((a, b) => (b.at || '').localeCompare(a.at || '')),
+    [raw],
+  );
   const [facets, setFacets] = useState<Set<string>>(new Set());
   const [q, setQ] = useState('');
   const [openId, setOpenId] = useState<string | null>(null);
   const toggleFacet = (label: string) => setFacets((s) => { const n = new Set(s); n.has(label) ? n.delete(label) : n.add(label); return n; });
   const resetFacets = () => setFacets(new Set());
-
-  const load = useCallback(() => {
-    setLoading(true);
-    getStore().list('audit_logs', companyId)
-      .then((rs) => {
-        setRows((rs as AuditLog[]).slice().sort((a, b) => (b.at || '').localeCompare(a.at || '')));
-        setLoading(false);
-      })
-      .catch(() => setLoading(false));
-  }, [companyId]);
-  useEffect(() => { load(); }, [load]);
-  useReloadOnSaved(load);
 
   // 필터 축: 행위 + 대상. 각 축은 rows에 실제 존재하는 값으로 동적 생성 → 좌측 FacetRail.
   const actionChips = useMemo(() => {
@@ -73,7 +63,7 @@ export default function AuditPage() {
     <FacetPage
       title="감사 로그"
       meta={`${scopeAll ? '전체 회사' : companyLabel(companyId)} · ${filtered.length}건`}
-      tools={<WorkbenchBar search={{ value: q, onChange: setQ, placeholder: '요약·행위자·대상' }} actions={<Btn variant="ghost" onClick={load}>새로고침</Btn>} />}
+      tools={<WorkbenchBar search={{ value: q, onChange: setQ, placeholder: '요약·행위자·대상' }} actions={<Btn variant="ghost" onClick={reload}>새로고침</Btn>} />}
       rail={!loading ? <FacetRail groups={groups} facets={facets} onToggle={toggleFacet} onReset={resetFacets} /> : null}
     >
       <Sec title="변경 이력" n={filtered.length} desc="등록·수정·삭제·복구 append-only 트레일 — 행 클릭 시 상세" hideable={false}>
