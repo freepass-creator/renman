@@ -3,11 +3,11 @@
  * 운영시트 — 프리패스 엑셀뷰 이식. 함대+계약 현황을 표로 한눈.
  * 카드/리스트 토글 금지 · ExcelSheet 원자만. 행 클릭 → Vehicle360.
  *
- * 탭 4종 = 사업현황.xlsx 시트 구성 그대로(자산·계약·채권·반납) — 쓰던 장부와 같은 단위.
- *   자산은 차량 1행, 나머지는 계약 1행. 손바뀜 때문에 자산 수 ≠ 계약 수인 게 정상.
- *   채권/반납은 계약의 필터일 뿐 — 별도 집계 손롤 금지(전부 computeContractView 파생).
+ * 탭 3종 — 자산(차량 1행) · 계약(계약 1행) · 미수(계약 중 net>0).
+ *   손바뀜 때문에 자산 수 ≠ 계약 수인 게 정상.
+ *   미수는 계약의 «필터»일 뿐 — 별도 집계 손롤 금지(전부 computeContractView 파생).
  */
-import { useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Download } from 'lucide-react';
 import { TODAY } from '@/lib/dashboard-consts';
 import { linkFleet } from '@/lib/domain/model';
@@ -19,14 +19,14 @@ import { useEntityLists } from '@/lib/use-entity-lists';
 import { Page, ExcelSheet, Badge, Btn, EmptyState, PageLoading, won, C, type SheetCol } from '@/components/ui';
 import { WorkbenchBar } from '@/components/WorkbenchBar';
 
-type Tab = '자산' | '계약' | '채권' | '반납';
-const TABS: Tab[] = ['자산', '계약', '채권', '반납'];
+type Tab = '자산' | '계약' | '미수';
+const TABS: Tab[] = ['자산', '계약', '미수'];
 
 const toneBadge = (t: SheetRow['tone']): 'green' | 'amber' | 'red' | 'gray' =>
   t === 'ok' ? 'green' : t === 'warn' ? 'amber' : t === 'danger' ? 'red' : 'gray';
 
 const ASSET_COLS: SheetCol<SheetRow>[] = [
-  { key: 'plate', label: '차량번호', pin: true, render: (r) => r.plate || '—', text: (r) => r.plate },
+  { key: 'plate', label: '차량번호', render: (r) => r.plate || '—', text: (r) => r.plate },
   { key: 'co', label: '법인', render: (r) => r.company || '—', text: (r) => r.company },
   { key: 'own', label: '소유', render: (r) => <Badge tone="gray">{r.ownership}</Badge>, text: (r) => r.ownership },
   { key: 'util', label: '가동', render: (r) => <Badge tone={toneBadge(r.tone)}>{r.util}</Badge>, text: (r) => r.util },
@@ -48,59 +48,66 @@ const ASSET_COLS: SheetCol<SheetRow>[] = [
   },
 ];
 
+/* ── 열 문법 (전 탭 공통) ─────────────────────────────────────────
+ *   ① 무엇 : 차량번호(고정) · 법인 · 차명
+ *   ② 누구 : 계약자
+ *   ③ 돈   : 대여료 · 보증금 · 미수        ← 금액은 항상 우측정렬·이 순서
+ *   ④ 시간 : 시작 · 만기 · D-day
+ *   ⑤ 상태 : 상태 뱃지 · 연체일 · 미납회차
+ *   ⑥ 연락 : 연락처                        ← 항상 맨 끝
+ * 탭마다 «빼기»만 한다. 자리를 바꾸지 않는다 — 탭을 옮겨도 눈이 같은 데를 본다.
+ * 라벨도 고정: 같은 값은 어느 탭에서든 같은 이름.
+ * ───────────────────────────────────────────────────────────── */
+
 const misu = (r: ContractRow) =>
   r.net > 0 ? <span style={{ color: C.danger, fontWeight: 700 }}>{won(r.net)}</span> : '—';
 
-/** 계약 공통 열 — 앞부분은 세 탭이 같다. */
-const CT_BASE: SheetCol<ContractRow>[] = [
-  { key: 'plate', label: '차량번호', pin: true, render: (r) => r.plate || '—', text: (r) => r.plate },
-  { key: 'co', label: '법인', render: (r) => r.company || '—', text: (r) => r.company },
-  { key: 'cust', label: '계약자', render: (r) => r.customer || '—', text: (r) => r.customer },
-  { key: 'car', label: '차명', render: (r) => r.carName || '—', text: (r) => r.carName },
-  { key: 'rent', label: '대여료', align: 'r', render: (r) => r.rent ? won(r.rent) : '—', text: (r) => r.rent },
-];
-
-const CONTRACT_COLS: SheetCol<ContractRow>[] = [
-  ...CT_BASE,
-  { key: 'dep', label: '보증금', align: 'r', render: (r) => r.deposit ? won(r.deposit) : '—', text: (r) => r.deposit },
-  { key: 'st', label: '상태', render: (r) => <Badge tone={r.ended ? 'gray' : 'green'}>{r.status}</Badge>, text: (r) => r.status },
-  { key: 'start', label: '시작', render: (r) => r.start || '—', text: (r) => r.start },
-  { key: 'end', label: '만기', render: (r) => r.end || '—', text: (r) => r.end },
-  {
+const CT = {
+  // 틀고정 안 함 — 고정 칸은 자기 배경이 필요해 행 호버가 그 칸만 끊긴다(전 행 한 줄로 읽혀야 함).
+  plate: { key: 'plate', label: '차량번호', render: (r) => r.plate || '—', text: (r) => r.plate },
+  co: { key: 'co', label: '법인', render: (r) => r.company || '—', text: (r) => r.company },
+  car: { key: 'car', label: '차명', render: (r) => r.carName || '—', text: (r) => r.carName },
+  cust: { key: 'cust', label: '계약자', render: (r) => r.customer || '—', text: (r) => r.customer },
+  rent: { key: 'rent', label: '대여료', align: 'r', render: (r) => r.rent ? won(r.rent) : '—', text: (r) => r.rent },
+  dep: { key: 'dep', label: '보증금', align: 'r', render: (r) => r.deposit ? won(r.deposit) : '—', text: (r) => r.deposit },
+  net: { key: 'net', label: '미수', align: 'r', render: misu, text: (r) => r.net },
+  start: { key: 'start', label: '시작', render: (r) => r.start || '—', text: (r) => r.start },
+  end: { key: 'end', label: '만기', render: (r) => r.end || '—', text: (r) => r.end },
+  dday: {
     key: 'dday', label: 'D-day', align: 'r',
     render: (r) => r.dday == null ? '—' : r.dday < 0 ? <span style={{ color: C.danger }}>{r.dday}</span> : `D-${r.dday}`,
     text: (r) => r.dday ?? '',
   },
-  { key: 'net', label: '미수', align: 'r', render: misu, text: (r) => r.net },
-  { key: 'phone', label: '연락처', render: (r) => r.phone || '—', text: (r) => r.phone },
-];
-
-/* 채권 = 미수 있는 계약. 회수 판단에 필요한 열(연체일·회차)을 앞으로 뺀다. */
-const DEBT_COLS: SheetCol<ContractRow>[] = [
-  ...CT_BASE,
-  { key: 'net', label: '미수', align: 'r', render: misu, text: (r) => r.net },
-  {
+  ret: { key: 'ret', label: '반납일', render: (r) => r.returned || '—', text: (r) => r.returned },
+  st: { key: 'st', label: '상태', render: (r) => <Badge tone={r.ended ? 'gray' : 'green'}>{r.status}</Badge>, text: (r) => r.status },
+  od: {
     key: 'od', label: '연체일', align: 'r',
     render: (r) => r.overdueDays > 0
       ? <span style={{ color: r.overdueDays >= 90 ? C.danger : C.warn, fontWeight: 700 }}>{r.overdueDays}일</span>
       : '—',
     text: (r) => r.overdueDays,
   },
-  { key: 'cnt', label: '미납회차', align: 'r', render: (r) => r.count || '—', text: (r) => r.count },
-  { key: 'st', label: '상태', render: (r) => <Badge tone={r.ended ? 'gray' : 'green'}>{r.status}</Badge>, text: (r) => r.status },
-  { key: 'end', label: '만기', render: (r) => r.end || '—', text: (r) => r.end },
-  { key: 'phone', label: '연락처', render: (r) => r.phone || '—', text: (r) => r.phone },
+  cnt: { key: 'cnt', label: '미납회차', align: 'r', render: (r) => r.count || '—', text: (r) => r.count },
+  phone: { key: 'phone', label: '연락처', render: (r) => r.phone || '—', text: (r) => r.phone },
+} satisfies Record<string, SheetCol<ContractRow>>;
+
+// 계약 = 기준 열. 미수 탭은 여기에 회수 열만 더한 것(자리 동일).
+const CONTRACT_COLS: SheetCol<ContractRow>[] = [
+  CT.plate, CT.co, CT.car, CT.cust,
+  CT.rent, CT.dep, CT.net,
+  CT.start, CT.end, CT.dday,
+  CT.st,
+  CT.phone,
 ];
 
-/* 반납 = 종료 계약. 반납일과 잔여 채권이 핵심. */
-const RETURN_COLS: SheetCol<ContractRow>[] = [
-  ...CT_BASE,
-  { key: 'start', label: '시작', render: (r) => r.start || '—', text: (r) => r.start },
-  { key: 'end', label: '만기', render: (r) => r.end || '—', text: (r) => r.end },
-  { key: 'ret', label: '반납일', render: (r) => r.returned || '—', text: (r) => r.returned },
-  { key: 'dep', label: '보증금', align: 'r', render: (r) => r.deposit ? won(r.deposit) : '—', text: (r) => r.deposit },
-  { key: 'net', label: '잔여미수', align: 'r', render: misu, text: (r) => r.net },
-  { key: 'phone', label: '연락처', render: (r) => r.phone || '—', text: (r) => r.phone },
+/* 미수 = 미수 있는 계약. 회수 판단 열(연체일·미납회차)을 ⑤ 자리에 «추가»한다 — 앞으로 당기지 않는다.
+   반납 건도 미수가 남아 있으면 여기 뜬다(반납했다고 채권이 사라지지 않는다). */
+const DEBT_COLS: SheetCol<ContractRow>[] = [
+  CT.plate, CT.co, CT.car, CT.cust,
+  CT.rent, CT.dep, CT.net,
+  CT.start, CT.end, CT.dday,
+  CT.st, CT.od, CT.cnt,
+  CT.phone,
 ];
 
 export default function SheetPage() {
@@ -118,21 +125,26 @@ export default function SheetPage() {
 
   const ctRows = useMemo(() => {
     const all = buildContractRows(fleet.contracts);
-    const byTab = tab === '채권' ? all.filter((r) => r.net > 0)
-      : tab === '반납' ? all.filter((r) => r.ended)
-        : all;
+    const byTab = tab === '미수' ? all.filter((r) => r.net > 0) : all;
     if (!q.trim()) return byTab;
     return byTab.filter((r) => textMatch(q, r.plate, r.carName, r.customer, r.company, r.status, r.phone));
   }, [fleet, q, tab]);
 
-  const cols = tab === '계약' ? CONTRACT_COLS : tab === '채권' ? DEBT_COLS : RETURN_COLS;
-  const count = tab === '자산' ? assetRows.length : ctRows.length;
-  const debtTotal = useMemo(() => ctRows.reduce((s, r) => s + Math.max(0, r.net), 0), [ctRows]);
+  const cols = tab === '미수' ? DEBT_COLS : CONTRACT_COLS;
+
+  // 헤더 필터는 ExcelSheet 안에서 돈다 — 그 «결과»를 받아 건수·합계·CSV에 쓴다(페이지에서 재계산 금지).
+  const [shownAsset, setShownAsset] = useState<SheetRow[]>([]);
+  const [shownCt, setShownCt] = useState<ContractRow[]>([]);
+  useEffect(() => { setShownAsset(assetRows); }, [assetRows]);
+  useEffect(() => { setShownCt(ctRows); }, [ctRows]);
+
+  const count = tab === '자산' ? shownAsset.length : shownCt.length;
+  const debtTotal = useMemo(() => shownCt.reduce((s, r) => s + Math.max(0, r.net), 0), [shownCt]);
 
   const exportCsv = () => {
     const [labels, body] = tab === '자산'
-      ? [ASSET_COLS.map((c) => c.label), assetRows.map((r) => ASSET_COLS.map((c) => (c.text ? c.text(r) : '')))]
-      : [cols.map((c) => c.label), ctRows.map((r) => cols.map((c) => (c.text ? c.text(r) : '')))];
+      ? [ASSET_COLS.map((c) => c.label), shownAsset.map((r) => ASSET_COLS.map((c) => (c.text ? c.text(r) : '')))]
+      : [cols.map((c) => c.label), shownCt.map((r) => cols.map((c) => (c.text ? c.text(r) : '')))];
     downloadCsv(`운영시트_${tab}_${TODAY}`, labels, body);
   };
 
@@ -140,7 +152,7 @@ export default function SheetPage() {
 
   const meta = tab === '자산'
     ? `원장 한눈 · ${count}대`
-    : tab === '채권'
+    : tab === '미수'
       ? `${count}건 · 미수 ${won(debtTotal)}`
       : `${count}건`;
 
@@ -157,10 +169,10 @@ export default function SheetPage() {
       />}
     >
       {!count
-        ? <EmptyState>{tab === '채권' ? '미수 건이 없습니다' : `표시할 ${tab}이 없습니다`}</EmptyState>
+        ? <EmptyState>{tab === '미수' ? '미수 건이 없습니다' : `표시할 ${tab}이 없습니다`}</EmptyState>
         : tab === '자산'
-          ? <ExcelSheet cols={ASSET_COLS} rows={assetRows} rowKey={(r) => r.plate} onRow={(r) => openCar(r.plate)} />
-          : <ExcelSheet cols={cols} rows={ctRows} rowKey={(r) => r.contractNo || r.plate} onRow={(r) => openCar(r.plate)} />}
+          ? <ExcelSheet cols={ASSET_COLS} rows={assetRows} rowKey={(r) => r.plate} onRow={(r) => openCar(r.plate)} onFiltered={setShownAsset} />
+          : <ExcelSheet cols={cols} rows={ctRows} rowKey={(r) => r.contractNo || r.plate} onRow={(r) => openCar(r.plate)} onFiltered={setShownCt} />}
     </Page>
   );
 }
