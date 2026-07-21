@@ -6,6 +6,7 @@ import { getStore } from '@/lib/store';
 import { ENTITIES, type EntityRecord } from '@/lib/intake/entities';
 import { companyLabel } from '@/lib/companies';
 import { Page, DetailShell, Panel, Sec, Cards, Metric, FormGrid, Btn, EmptyState, Message, C, PageLoading } from '@/components/ui';
+import { commitUpdate, commitRemove } from '@/lib/commit';
 
 export default function DetailPage() {
   const params = useParams();
@@ -26,14 +27,18 @@ export default function DetailPage() {
 
   async function save() {
     setMsg('');
-    try { await getStore().update(entityKey, companyId, id, form); setMsg('저장됨'); }
-    catch (e) { setMsg('저장 실패: ' + (e as Error).message); }
+    try {
+      await commitUpdate({ entity: entityKey, sessionCompanyId: companyId, rec, key: id, patch: form });
+      setMsg('저장됨');
+    } catch (e) { setMsg('저장 실패: ' + (e as Error).message); }
   }
   async function remove() {
     const reason = window.prompt(`${entity.label} 삭제 사유 (취소=중단)`);
     if (reason === null) return;
-    try { await getStore().remove(entityKey, companyId, id, reason); router.push(`/list/${entityKey}`); }
-    catch (e) { setMsg('삭제 실패: ' + (e as Error).message); }
+    try {
+      await commitRemove({ entity: entityKey, sessionCompanyId: companyId, rec, key: id, reason });
+      router.push(`/list/${entityKey}`);
+    } catch (e) { setMsg('삭제 실패: ' + (e as Error).message); }
   }
   async function restore() {
     try { await getStore().restore(entityKey, companyId, id); const r = await getStore().get(entityKey, companyId, id); setRec(r); setForm(r || {}); setMsg('복원됨'); }

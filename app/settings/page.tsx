@@ -12,6 +12,7 @@ import { getStore } from '@/lib/store';
 import { ENTITIES } from '@/lib/intake/entities';
 import { downloadCsv } from '@/lib/export-csv';
 import { Page, Panel, ListBox, ListRow, Btn, PillTabs, C, SPACE_M } from '@/components/ui';
+import { WorkbenchBar } from '@/components/WorkbenchBar';
 import { closePeriod, reopenPeriod, useClosedPeriods } from '@/lib/finance/period-lock';
 import { MobileTabsSettings, useMobileTabs } from '@/lib/mobile-tabs';
 import { MyDeskSettings, useMyDeskPicked } from '@/lib/my-desk';
@@ -140,7 +141,7 @@ export default function SettingsPage() {
   const landingLabel = landing === 'mydesk' ? '마이페이지' : '홈';
 
   return (
-    <Page title="설정" meta={`${user.name} · ${roleLabel(user.role)}`}>
+    <Page title="설정" meta={`${user.name} · ${roleLabel(user.role)}`} tools={<WorkbenchBar />}>
       <Panel title="계정">
         <ListBox>
           <ListRow main="이름" right={<span style={{ fontSize: 12.5, color: C.mute }}>{user.name}</span>} />

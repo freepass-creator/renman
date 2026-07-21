@@ -10,7 +10,7 @@ import { TODAY } from '@/lib/dashboard-consts';
 import { useEntityLists } from '@/lib/use-entity-lists';
 
 const AGING_LABELS = ['0~30일', '31~60일', '61~90일', '90일+'];
-const AGING_COLORS = ['var(--green-text)', '#d97706', '#ea580c', 'var(--red-text)'];
+const AGING_COLORS = ['var(--green-text)', C.warn, C.warn, 'var(--red-text)'];
 
 // 경영 현황 = 경영진용 분석 화면(실무 콕핏과 분리). 가동률·미수 aging·부채·법인별 비교. 허브=홈과 동일(메뉴·탭).
 export default function ManagePage() {
@@ -42,7 +42,7 @@ export default function ManagePage() {
         </Sec>
 
         <Sec title="미수 채권 aging" desc="연체 경과별 미수 분포">
-          <div style={{ border: `1px solid ${C.line}`, borderRadius: 'var(--radius)', background: '#fff', padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             {total.aging.map((amt, i) => (
               <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <span style={{ width: 66, flex: '0 0 66px', fontSize: 12, color: C.mute }}>{AGING_LABELS[i]}</span>
@@ -57,7 +57,7 @@ export default function ManagePage() {
 
         {byCo.length > 0 && (
           <Sec title="법인별 비교" desc="멀티법인 한눈에">
-            <div style={{ border: `1px solid ${C.line}`, borderRadius: 'var(--radius)', overflow: 'hidden', background: '#fff', overflowX: 'auto' }}>
+            <div style={{ border: `1px solid ${C.line}`, borderRadius: 'var(--radius)', overflow: 'hidden', background: C.card, overflowX: 'auto' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', whiteSpace: 'nowrap' }}>
                 <thead><tr><th style={th}>법인</th><th style={thR}>보유</th><th style={thR}>운행</th><th style={thR}>가동률</th><th style={thR}>진행계약</th><th style={thR}>월청구</th><th style={thR}>총미수</th><th style={thR}>부채비율</th></tr></thead>
                 <tbody>{byCo.map((k) => (

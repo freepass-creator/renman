@@ -2,7 +2,7 @@
 import React from 'react';
 import { useIsMobile } from '@/lib/use-mobile';
 import { haptic } from '@/lib/haptics';
-import { C, R } from './tokens';
+import { C, R, SCRIM } from './tokens';
 
 /* 드로어 · 모달 — 오버레이 원자. */
 
@@ -18,13 +18,13 @@ export function Drawer({ title, meta, onClose, children, footer, width = 560, on
     return () => window.removeEventListener('keydown', onKey);
   }, [onClose, onPrev, onNext]);
   const mobile = useIsMobile();
-  const navBtn: React.CSSProperties = { border: `1px solid ${C.line}`, background: '#fff', borderRadius: R, width: mobile ? 44 : 26, height: mobile ? 44 : 26, cursor: 'pointer', color: C.mute, fontSize: mobile ? 18 : 13, lineHeight: 1 };
+  const navBtn: React.CSSProperties = { border: `1px solid ${C.line}`, background: C.card, borderRadius: R, width: mobile ? 44 : 26, height: mobile ? 44 : 26, cursor: 'pointer', color: C.mute, fontSize: mobile ? 18 : 13, lineHeight: 1 };
   // 모바일 = 하단 바텀시트. z=70 > MobileTabBar(56).
   return (
-    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.4)', zIndex: 70, display: 'flex', justifyContent: mobile ? 'stretch' : 'flex-end', alignItems: mobile ? 'flex-end' : 'stretch' }}>
-      <div onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: mobile ? '100%' : width, height: mobile ? 'auto' : '100vh', maxHeight: mobile ? '92dvh' : undefined, background: '#fff', boxShadow: mobile ? '0 -8px 32px rgba(0,0,0,0.2)' : '-10px 0 32px rgba(0,0,0,0.16)', display: 'flex', flexDirection: 'column', borderLeft: mobile ? 'none' : `1px solid ${C.line}`, borderRadius: mobile ? '16px 16px 0 0' : 0, animation: mobile ? 'sheetUp .24s cubic-bezier(.2,.8,.2,1)' : undefined }}>
+    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: SCRIM, zIndex: 70, display: 'flex', justifyContent: mobile ? 'stretch' : 'flex-end', alignItems: mobile ? 'flex-end' : 'stretch' }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: mobile ? '100%' : width, height: mobile ? 'auto' : '100vh', maxHeight: mobile ? '92dvh' : undefined, background: C.card, boxShadow: mobile ? '0 -8px 32px rgba(0,0,0,0.2)' : '-10px 0 32px rgba(0,0,0,0.16)', display: 'flex', flexDirection: 'column', borderLeft: mobile ? 'none' : `1px solid ${C.line}`, borderRadius: mobile ? '16px 16px 0 0' : 0, animation: mobile ? 'sheetUp .24s cubic-bezier(.2,.8,.2,1)' : undefined }}>
         {mobile && <div style={{ display: 'flex', justifyContent: 'center', padding: '8px 0 0' }}><div style={{ width: 40, height: 4, borderRadius: 2, background: C.line2 }} /></div>}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: mobile ? '9px 14px 10px' : '11px 16px', borderBottom: `1px solid ${C.line}`, background: mobile ? '#fff' : C.head }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: mobile ? '9px 14px 10px' : '11px 16px', borderBottom: `1px solid ${C.line}`, background: mobile ? C.card : C.head }}>
           <div style={{ minWidth: 0, display: 'flex', alignItems: 'baseline', gap: 8 }}>
             <h2 style={{ fontSize: mobile ? 16 : 14, fontWeight: 800, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{title}</h2>
             {meta && <span style={{ fontSize: 12, color: C.mute }}>{meta}</span>}
@@ -67,13 +67,13 @@ export function Modal({ title, meta, onClose, children, footer, width = 720, loc
   return (
     <div
       onClick={lock ? undefined : onClose}
-      style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.45)', zIndex: 70, display: 'flex', alignItems: mobile ? 'stretch' : 'flex-start', justifyContent: 'center', padding: mobile ? 0 : '6vh 16px', overflowY: mobile ? 'hidden' : 'auto' }}
+      style={{ position: 'fixed', inset: 0, background: SCRIM, zIndex: 70, display: 'flex', alignItems: mobile ? 'stretch' : 'flex-start', justifyContent: 'center', padding: mobile ? 0 : '6vh 16px', overflowY: mobile ? 'hidden' : 'auto' }}
     >
       <div
         onClick={(e) => e.stopPropagation()}
         style={{
           width: '100%', maxWidth: mobile ? '100%' : width, height: mobile ? '100dvh' : undefined, minHeight: mobile ? '100dvh' : undefined,
-          background: '#fff', borderRadius: mobile ? 0 : R, boxShadow: mobile ? 'none' : '0 16px 48px rgba(0,0,0,0.22)',
+          background: C.card, borderRadius: mobile ? 0 : R, boxShadow: mobile ? 'none' : '0 16px 48px rgba(0,0,0,0.22)',
           overflow: 'hidden', border: mobile ? 'none' : `1px solid ${C.line}`,
           display: 'flex', flexDirection: 'column', animation: mobile ? 'sheetUp .22s cubic-bezier(.2,.8,.2,1)' : undefined,
         }}

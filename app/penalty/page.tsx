@@ -2,7 +2,6 @@
 import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSession } from '@/lib/session';
-import { getStore } from '@/lib/store';
 import { type EntityRecord } from '@/lib/intake/entities';
 import { matchPenalty } from '@/lib/penalty-match';
 import { dueMatcher, selectedInDim } from '@/lib/lens-filters';
@@ -19,6 +18,9 @@ import { openCar, openCustomer } from '@/lib/ui-bus';
 import { customerKey } from '@/lib/customers';
 import { Check, UploadCloud, FileText, Trash2 } from 'lucide-react';
 import { useEntityLists } from '@/lib/use-entity-lists';
+import { commitRemove } from '@/lib/commit';
+import { NEED_COMPANY } from '@/lib/scope';
+import { toast } from '@/lib/toast';
 
 type Row = { p: EntityRecord; renter: string | null; contractNo: string | null };
 
@@ -44,8 +46,10 @@ export default function PenaltyProcess() {
   // 소프트삭제 — store.remove(deletedAt+사유). /trash 에서 복구. (ERP 30원칙 Soft delete·Audit)
   const del = async (r: Row) => {
     if (!window.confirm(`이 과태료를 삭제할까요? (휴지통에서 복구 가능)\n${String(r.p.plate || '')} · ${won(r.p.amount)}`)) return;
-    await getStore().remove('penalty', String(r.p.companyId || companyId), String(r.p._key || ''), '수기 삭제');
-    reload();
+    try {
+      await commitRemove({ entity: 'penalty', sessionCompanyId: companyId, rec: r.p, key: String(r.p._key || ''), reason: '수기 삭제' });
+      reload();
+    } catch { toast(NEED_COMPANY, 'error'); }
   };
 
   const matched = rows.filter((r) => r.renter).length;

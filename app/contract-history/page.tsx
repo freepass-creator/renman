@@ -5,6 +5,7 @@ import { useSession } from '@/lib/session';
 import { normPlate } from '@/lib/plate';
 import { type EntityRecord } from '@/lib/intake/entities';
 import { Page, DataTable, EmptyState, Badge, won, C, type Col, PageLoading } from '@/components/ui';
+import { WorkbenchBar } from '@/components/WorkbenchBar';
 import { companyLabel } from '@/lib/companies';
 import { openCar } from '@/lib/ui-bus';
 import { useEntityList } from '@/lib/use-entity-lists';
@@ -34,7 +35,7 @@ export default function ContractHistoryPage() {
   ];
 
   return (
-    <Page title="지난 계약" meta={`${plate ? plate : companyLabel(companyId)} · 종료 ${past.length}건`}>
+    <Page title="지난 계약" meta={`${plate ? plate : companyLabel(companyId)} · 종료 ${past.length}건`} tools={<WorkbenchBar />}>
       {loading ? <PageLoading />
         : past.length === 0 ? <EmptyState>지난 계약 없음</EmptyState>
           : <DataTable cols={cols} rows={past} />}

@@ -15,9 +15,9 @@ export default function FileDrop({ onFile, accept, file, hint }: { onFile: (f: F
       style={{
         display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 6,
         padding: '22px 18px',
-        border: `1.5px dashed ${over ? C.accent : file ? 'var(--green-border, #86efac)' : C.line}`,
+        border: `1.5px dashed ${over ? C.accent : file ? 'var(--green-border, #86efac)' /* CSS var 폴백 */ : C.line}`,
         borderRadius: 'var(--radius)',
-        background: over ? 'var(--bg-hover)' : file ? 'var(--green-bg, #f0fdf4)' : C.bg,
+        background: over ? 'var(--bg-hover)' : file ? 'var(--green-bg, #f0fdf4)' /* CSS var 폴백 */ : C.bg,
         cursor: 'pointer', textAlign: 'center', transition: 'all .12s', minWidth: 300,
       }}
     >

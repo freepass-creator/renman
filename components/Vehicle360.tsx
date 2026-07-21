@@ -1,11 +1,11 @@
 'use client';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useSession } from '@/lib/session';
-import { getStore } from '@/lib/store';
+import { useEntityLists } from '@/lib/use-entity-lists';
 import { type EntityRecord } from '@/lib/intake/entities';
 import { generateSchedules, recalcContract } from '@/lib/payments/payment-schedule';
 import type { Contract } from '@/lib/payments/types';
-import { Sec, Cards, Metric, ObjCard, Stepper, Btn, Badge, FormGrid, KV, HiddenSecs, EmptyState, th, thR, td, tdR, won, C, PageLoading, type Step, type KVRow } from '@/components/ui';
+import { Sec, Cards, Metric, ObjCard, Stepper, Btn, Badge, FormGrid, KV, HiddenSecs, EmptyState, Message, th, thR, td, tdR, won, C, SH, PageLoading, type Step, type KVRow } from '@/components/ui';
 import { InfoDoc, type DocReplacePayload } from '@/components/InfoDoc';
 import { docHistory, pushDocVersion, latestDoc } from '@/lib/docs';
 import { deriveLocation, locationLabel } from '@/lib/vehicle-location';
@@ -20,12 +20,14 @@ import { depositView } from '@/lib/deposit';
 import { matchDriver, penaltyStatus, penaltyTone } from '@/lib/penalty-reassign';
 import { companyLabel } from '@/lib/companies';
 import { loadMaster } from '@/lib/company-master';
-import { openIngest, notifySaved, openPrintDoc } from '@/lib/ui-bus';
+import { openIngest, openPrintDoc } from '@/lib/ui-bus';
 import { toast } from '@/lib/toast';
 import { QuickLogForm } from '@/components/QuickLogForm';
 import { WorkForm } from '@/components/WorkForm';
 import { isWorkRecord, workSummary, workCategoryTone, workStatusTone } from '@/lib/work-ops';
 import { saveIntake } from '@/lib/intake';
+import { resolveWriteCompany, NEED_COMPANY } from '@/lib/scope';
+import { commitUpdate, commitSave, commitRemove } from '@/lib/commit';
 import { TODAY, dday } from '@/lib/dashboard-consts';
 
 // 날짜 표시 = yy-mm-dd (2자리 연도). 2023-11-21 → 23-11-21
@@ -49,7 +51,7 @@ function scheduleTone(s: string): 'red' | 'amber' | 'gray' | 'green' {
 const fLab: React.CSSProperties = { display: 'flex', flexDirection: 'column', gap: 3 };
 const fLl: React.CSSProperties = { fontSize: 11, color: C.mute };
 // 컨트롤 규격 SSOT — Btn과 같은 32px+box-sizing:border-box라 같은 폼 줄의 버튼과 상하 높이 일치.
-const fInp: React.CSSProperties = { height: 32, boxSizing: 'border-box', padding: '0 10px', border: `1px solid ${C.line}`, borderRadius: 'var(--radius)', fontSize: 12.5, background: '#fff', color: C.ink, fontFamily: 'inherit' };
+const fInp: React.CSSProperties = { height: 32, boxSizing: 'border-box', padding: '0 10px', border: `1px solid ${C.line}`, borderRadius: 'var(--radius)', fontSize: 12.5, background: C.card, color: C.ink, fontFamily: 'inherit' };
 function unpaidOf(rec: EntityRecord): number {
   const rent = Number(rec.monthlyRent) || 0, term = Number(rec.rentalMonths) || 0, start = String(rec.startDate || '');
   if (!rent || !term || !start) return 0;
@@ -80,15 +82,20 @@ const Add = ({ type, plate, label }: { type: string; plate: string; label: strin
 /** 한 자산(차)의 360 — 카드 언어. 편집=이벤트/담기(수정·추가), 파생은 읽기전용. */
 export function Vehicle360({ plate, focus }: { plate: string; focus?: string }) {
   const { companyId, user } = useSession();
-  const [v, setV] = useState<EntityRecord | null>(null);
-  const [contracts, setContracts] = useState<EntityRecord[]>([]);
-  const [allVehicles, setAllVehicles] = useState<EntityRecord[]>([]);  // 함대 전체 — 손바뀜 인하율(재렌트 추천 근거) 산출용
-  const [allContracts, setAllContracts] = useState<EntityRecord[]>([]);
-  const [insurances, setInsurances] = useState<EntityRecord[]>([]);
-  const [penalties, setPenalties] = useState<EntityRecord[]>([]);
-  const [history, setHistory] = useState<EntityRecord[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [tick, setTick] = useState(0);
+  const { data: [allContracts = [], insAll = [], penAll = [], hisAll = [], allVehicles = []], loading } =
+    useEntityLists(['contract', 'insurance', 'penalty', 'history', 'vehicle']);
+  const np = normPlate(plate);
+  const v = useMemo(
+    () => allVehicles.find((x) => normPlate(x.plate) === np || String(x._key) === plate) ?? null,
+    [allVehicles, np, plate],
+  );
+  const contracts = useMemo(() => allContracts.filter((c) => normPlate(c.plate) === np), [allContracts, np]);
+  const insurances = useMemo(() => insAll.filter((c) => normPlate(c.plate) === np), [insAll, np]);
+  const penalties = useMemo(() => penAll.filter((c) => normPlate(c.plate) === np), [penAll, np]);
+  const history = useMemo(
+    () => hisAll.filter((h) => normPlate(h.plate) === np).sort((a, b) => (String(a.date) < String(b.date) ? 1 : -1)),
+    [hisAll, np],
+  );
   const [editInfo, setEditInfo] = useState(false);
   const [form, setForm] = useState<EntityRecord>({});
   const [recMode, setRecMode] = useState<'pay' | 'disc' | null>(null);
@@ -102,36 +109,6 @@ export function Vehicle360({ plate, focus }: { plate: string; focus?: string }) 
   const [txForm, setTxForm] = useState({ date: TODAY, mileage: '', fuel: FUEL_LEVELS[0] as string, settleNote: '', months: '1', reason: '고객요청', penaltyNote: '' });
   const [dlvOpen, setDlvOpen] = useState(false); // 출고(인도) 캡처 패널
   const [dlvForm, setDlvForm] = useState({ date: TODAY, mileage: '', fuel: FUEL_LEVELS[0] as string });
-  const loadedKey = useRef<string | null>(null);
-
-  useEffect(() => {
-    function onSaved() { setTick((t) => t + 1); }
-    window.addEventListener('jpk:saved', onSaved);
-    return () => window.removeEventListener('jpk:saved', onSaved);
-  }, []);
-  useEffect(() => {
-    const store = getStore();
-    // 최초·차량전환만 스피너 게이트. 저장(tick) 갱신은 콘텐츠 유지 → 인라인 액션 후 패널이 접혔다 펴지지 않음.
-    const key = `${plate}|${companyId}`;
-    if (loadedKey.current !== key) setLoading(true);
-    Promise.all([
-      store.get('vehicle', companyId, plate), store.list('contract', companyId),
-      store.list('insurance', companyId), store.list('penalty', companyId), store.list('history', companyId),
-      store.list('vehicle', companyId),
-    ]).then(([veh, cs, ins, pen, his, vehs]) => {
-      setV(veh);
-      const np = normPlate(plate); // 접착제 원자 — 표기차·번호변경·OCR오차 흡수해 이 차의 계약·보험·과태료·이력을 모음
-      setContracts(cs.filter((c) => normPlate(c.plate) === np));
-      setAllContracts(cs); setAllVehicles(vehs);
-      setInsurances(ins.filter((c) => normPlate(c.plate) === np));
-      setPenalties(pen.filter((c) => normPlate(c.plate) === np));
-      setHistory(his.filter((h) => normPlate(h.plate) === np).sort((a, b) => (String(a.date) < String(b.date) ? 1 : -1)));
-      setLoading(false); loadedKey.current = key;
-    }).catch(() => setLoading(false));
-  }, [plate, companyId, tick]);
-
-  // 카드 클릭 → 상세는 항상 맨 위(기본정보 + 미결/리스크)부터 보여준다. 특정 섹션으로 자동 스크롤·자동 펼침 안 함.
-  //   (미결/리스크가 상단에 이미 요약돼 있어, 필요한 건 거기서 바로 처리)
 
   // 앱바 '수정' 버튼(openEdit) → 그 자리에서 차량정보 인라인 편집 진입
   useEffect(() => {
@@ -145,7 +122,7 @@ export function Vehicle360({ plate, focus }: { plate: string; focus?: string }) 
     return () => window.removeEventListener('jpk:edit-vehicle', onEdit);
   }, [plate, v]);
 
-  // 손바뀜·재렌트 — loading 게이트 전에 hooks 고정(Rules of Hooks).
+  // 손바꿈·재렌트 — loading 게이트 전에 hooks 고정(Rules of Hooks).
   const fleet = useMemo(() => linkFleet(allVehicles, allContracts, TODAY), [allVehicles, allContracts]);
   const myNode = fleet.byPlate.get(normPlate(plate)) || null;
   const hist = handoverHistory(myNode?.contracts ?? []);
@@ -161,8 +138,10 @@ export function Vehicle360({ plate, focus }: { plate: string; focus?: string }) 
   // 차량 소프트삭제 — 잘못 등록한 차. 매각·처분은 삭제 아니라 상태. store.remove(deletedAt)→/trash 복구.
   async function delVehicle() {
     if (!v || !window.confirm(`차량 ${plate}을(를) 삭제할까요? (휴지통에서 복구 가능)\n※ 매각·처분은 삭제가 아니라 상태(매각/말소)로 처리하세요.`)) return;
-    await getStore().remove('vehicle', String(v.companyId || companyId), plate, '수기 삭제');
-    notifySaved(); toast('차량 삭제 — 휴지통에서 복구 가능', 'info');
+    try {
+      await commitRemove({ entity: 'vehicle', sessionCompanyId: companyId, rec: v, key: plate, reason: '수기 삭제' });
+      toast('차량 삭제 — 휴지통에서 복구 가능', 'info');
+    } catch { toast(NEED_COMPANY, 'error'); }
   }
   const status = String(v?.status || (active ? '운행' : '대기'));
   const statusTone: 'green' | 'amber' | 'gray' | 'blue' = status === '운행' ? 'green' : (['정비', '사고'].includes(status) ? 'amber' : (['매각', '말소', '매각대기'].includes(status) ? 'gray' : 'blue'));
@@ -177,7 +156,12 @@ export function Vehicle360({ plate, focus }: { plate: string; focus?: string }) 
   // 위치(현재 소재) 통일 — 대여중=계약자, 유휴=최근 '이동' 로그/차상태. /asset 표기와 동일 규칙.
   const loc = deriveLocation(v, contracts, history, TODAY);
   const locStr = locationLabel(loc);
-  const target = String(v?.companyId || companyId);
+  const target = resolveWriteCompany(companyId, v) || resolveWriteCompany(companyId, active) || '';
+  const requireTarget = (): string | null => {
+    const t = resolveWriteCompany(companyId, v) || resolveWriteCompany(companyId, active);
+    if (!t) { toast(NEED_COMPANY, 'error'); return null; }
+    return t;
+  };
   // 수선(정비·사고수리·상품화·세차) = history(_kind:'work'). 목록은 이미 최신순 정렬된 history에서 추림.
   const workList = history.filter(isWorkRecord);
   // 현재 보험(증권) = 만기 최신 1건. 나머지는 '이전 증권'으로.
@@ -189,100 +173,119 @@ export function Vehicle360({ plate, focus }: { plate: string; focus?: string }) 
   const pendDeposit = contracts.map((c) => ({ c, d: depositView(c, TODAY) })).filter((x) => x.d.pendingRefund)
     .sort((a, b) => String(b.c.returnedDate || '').localeCompare(String(a.c.returnedDate || '')))[0] || null;
   const waiting = !active ? (contracts.find((cc) => !cc.returnedDate && String(cc.status || '') !== '운행') || null) : null;
-  const doTransition = async (patch: EntityRecord, key: string) => { if (!key) return; await getStore().update('contract', target, key, patch); notifySaved(); };
+  const doTransition = async (patch: EntityRecord, key: string, rec: EntityRecord) => {
+    if (!key) return;
+    try {
+      await commitUpdate({ entity: 'contract', sessionCompanyId: companyId, rec, key, patch });
+    } catch { toast(NEED_COMPANY, 'error'); }
+  };
   // 반납/연장/해지 확정 — 인라인 폼 입력값으로 패치 조립 후 커밋. 완료 시 패널 닫고 이력·현황에 반영.
   const commitTx = async () => {
     if (!active?._key) return; const key = String(active._key);
     if (txMode === 'return') {
-      await doTransition(patchReturn(active, txForm.date, { returnMileage: txForm.mileage ? Number(txForm.mileage) : '', fuelIn: txForm.fuel, returnSettleNote: txForm.settleNote }), key);
+      await doTransition(patchReturn(active, txForm.date, { returnMileage: txForm.mileage ? Number(txForm.mileage) : '', fuelIn: txForm.fuel, returnSettleNote: txForm.settleNote }), key, active);
     } else if (txMode === 'extend') {
       const m = Number(txForm.months); if (!m || m <= 0) return;
-      await doTransition(patchExtend(active, m), key);
+      await doTransition(patchExtend(active, m), key, active);
     } else if (txMode === 'terminate') {
       const et = earlyTerminationFee(active, txForm.date);
-      await doTransition(patchTerminate(active, txForm.date, { terminateReason: txForm.reason, terminatePenaltyNote: txForm.penaltyNote, earlyTerminationFee: et.fee, earlyTerminationRemainingMonths: et.remainingMonths }), key);
+      await doTransition(patchTerminate(active, txForm.date, { terminateReason: txForm.reason, terminatePenaltyNote: txForm.penaltyNote, earlyTerminationFee: et.fee, earlyTerminationRemainingMonths: et.remainingMonths }), key, active);
     }
     setTxMode(null);
   };
   // 인도(출고) 확정 — 반납과 대칭: 출고 시점 주행거리·연료(원점) 캡처 + 인도 활동 이벤트 기록 + 상태 운행 전이.
   const commitDeliver = async () => {
     if (!waiting?._key) return; const key = String(waiting._key);
-    await doTransition(patchDeliver(waiting, dlvForm.date, { mileageOut: dlvForm.mileage ? Number(dlvForm.mileage) : '', fuelOut: dlvForm.fuel }), key);
-    await saveIntake('history', target, [{ plate, category: '인도', title: `출고(인도)${dlvForm.mileage ? ' · ' + dlvForm.mileage + 'km' : ''} · 연료 ${dlvForm.fuel}`, date: dlvForm.date, author: user.name, customer: String(waiting.contractorName || ''), contractNo: String(waiting.contractNo || ''), companyId: target, _kind: 'activity' }]);
+    const t = requireTarget(); if (!t) return;
+    await doTransition(patchDeliver(waiting, dlvForm.date, { mileageOut: dlvForm.mileage ? Number(dlvForm.mileage) : '', fuelOut: dlvForm.fuel }), key, waiting);
+    await saveIntake('history', t, [{ plate, category: '인도', title: `출고(인도)${dlvForm.mileage ? ' · ' + dlvForm.mileage + 'km' : ''} · 연료 ${dlvForm.fuel}`, date: dlvForm.date, author: user.name, customer: String(waiting.contractorName || ''), contractNo: String(waiting.contractNo || ''), companyId: t, _kind: 'activity' }], { notify: false });
     setDlvOpen(false);
   };
   // 시동제어 — contract.engineDisabled 정본(SSOT). gpsControl=장비 능력(가능/불가)만.
   const engineLocked = !!active?.engineDisabled;
   const logIgnition = async (action: '제어' | '해제') => {
     if (!active?._key) { toast('운행중 계약이 없어 시동제어할 수 없습니다', 'info'); return; }
+    const t = requireTarget(); if (!t) return;
     const vview = computeContractView(active, TODAY);
     const who = String(active.contractorName || plate);
     const actor = user?.email || user?.name || '';
     if (action === '해제') {
       if (!window.confirm(`${who} · ${plate}\n입금이 확인되어 시동제어를 해제합니까?`)) return;
-      await getStore().update('contract', target, String(active._key), patchEngineLock(false, { today: TODAY, actor, reason: '' }));
+      await doTransition(patchEngineLock(false, { today: TODAY, actor, reason: '' }), String(active._key), active);
     } else {
       if (!window.confirm(`${who} · ${plate}\n미납 ${won(vview.net)} · ${vview.overdueDays}일 연체\n\n원격 시동제어를 겁니까?`)) return;
-      await getStore().update('contract', target, String(active._key), patchEngineLock(true, { today: TODAY, actor, reason: `미납 ${won(vview.net)} · ${vview.overdueDays}일 연체` }));
+      await doTransition(patchEngineLock(true, { today: TODAY, actor, reason: `미납 ${won(vview.net)} · ${vview.overdueDays}일 연체` }), String(active._key), active);
     }
-    await saveIntake('history', target, [{ plate, category: '시동제어', title: `시동 ${action}`, date: TODAY, author: user.name, memo: vview.net > 0 ? `미납 ${won(vview.net)}` : '', companyId: target, _kind: 'activity' }]);
-    notifySaved();
+    await saveIntake('history', t, [{ plate, category: '시동제어', title: `시동 ${action}`, date: TODAY, author: user.name, memo: vview.net > 0 ? `미납 ${won(vview.net)}` : '', companyId: t, _kind: 'activity' }], { notify: false });
     toast(action === '제어' ? `시동제어 적용 · ${plate}` : `시동제어 해제 · ${plate}`, action === '제어' ? 'info' : 'success');
   };
   // 보증금 반환/충당 처리 — 정산완료 도장(depositSettledDate) + 이력 기록
   const settleDeposit = async () => {
     if (!pendDeposit?.c._key) return;
+    const t = requireTarget(); if (!t) return;
     const { d } = pendDeposit;
-    await getStore().update('contract', target, String(pendDeposit.c._key), { depositSettledDate: TODAY });
-    await saveIntake('history', target, [{ plate, category: '보증금', title: d.addCharge > 0 ? `보증금 충당 후 추가청구 ${won(d.addCharge)}` : `보증금 반환 ${won(d.refund)}`, date: TODAY, author: user.name, companyId: target, _kind: 'activity' }]);
-    notifySaved();
+    await doTransition({ depositSettledDate: TODAY }, String(pendDeposit.c._key), pendDeposit.c);
+    await saveIntake('history', t, [{ plate, category: '보증금', title: d.addCharge > 0 ? `보증금 충당 후 추가청구 ${won(d.addCharge)}` : `보증금 반환 ${won(d.refund)}`, date: TODAY, author: user.name, companyId: t, _kind: 'activity' }], { notify: false });
   };
   // 차량정보(제조사·등록증·매입할부) 공유 인라인 편집
   const chg = (k: string, val: string) => setForm((f) => ({ ...f, [k]: val }));
   const startEdit = () => { setForm({ plate, ...(v || {}) }); setEditInfo(true); };
   const cancelEdit = () => setEditInfo(false);
   const saveInfo = async () => {
-    // 기존 차량 = update(merge). save()는 자연키 중복이면 skip → 편집이 저장 안 됨(앱 전역 편집 규약=update).
-    if (v?._key) await getStore().update('vehicle', target, String(v._key), { ...form, plate });
-    else await getStore().save('vehicle', target, [{ ...form, plate }]);
-    notifySaved(); setEditInfo(false);
+    try {
+      if (v?._key) await commitUpdate({ entity: 'vehicle', sessionCompanyId: companyId, rec: v, key: String(v._key), patch: { ...form, plate } });
+      else await commitSave({ entity: 'vehicle', sessionCompanyId: companyId, rec: v, records: [{ ...form, plate }] });
+      setEditInfo(false);
+    } catch { toast(NEED_COMPANY, 'error'); }
   };
   // 보험(증권) 인라인 편집
   const insChg = (k: string, val: string) => setInsForm((f) => ({ ...f, [k]: val }));
   const startEditIns = () => { setInsForm({ ...(curIns || {}) }); setEditIns(true); };
   const saveIns = async () => {
-    if (curIns?._key) await getStore().update('insurance', target, String(curIns._key), insForm);
-    else await getStore().save('insurance', target, [{ ...insForm, plate }]);
-    notifySaved(); setEditIns(false);
+    try {
+      if (curIns?._key) await commitUpdate({ entity: 'insurance', sessionCompanyId: companyId, rec: curIns, key: String(curIns._key), patch: insForm });
+      else await commitSave({ entity: 'insurance', sessionCompanyId: companyId, rec: v || curIns, records: [{ ...insForm, plate }] });
+      setEditIns(false);
+    } catch { toast(NEED_COMPANY, 'error'); }
   };
   // 서류 교체·재발급 — 파일 URL + OCR 병합 + 새 DocVersion 푸시 → 엔티티 저장. _ocrOriginal 보존.
   const onReplaceReg = async ({ url, ocr, ocrOriginal, fields, reason }: DocReplacePayload) => {
     const base = v || { plate };
     const nextDocs = pushDocVersion(base, { type: 'vehicle', url, ocr, reason });
     const patch: EntityRecord = { ...fields, _docs: nextDocs, ...(ocrOriginal ? { _ocrOriginal: ocrOriginal } : {}) };
-    if (v?._key) await getStore().update('vehicle', target, String(v._key), patch);
-    else await getStore().save('vehicle', target, [{ ...base, ...patch, plate }]);
-    notifySaved();
+    try {
+      if (v?._key) await commitUpdate({ entity: 'vehicle', sessionCompanyId: companyId, rec: v, key: String(v._key), patch });
+      else await commitSave({ entity: 'vehicle', sessionCompanyId: companyId, rec: v, records: [{ ...base, ...patch, plate }] });
+    } catch { toast(NEED_COMPANY, 'error'); }
   };
   const onReplaceIns = async ({ url, ocr, ocrOriginal, fields, reason }: DocReplacePayload) => {
     const base = curIns || { plate };
     const nextDocs = pushDocVersion(base, { type: 'insurance', url, ocr, reason });
     const patch: EntityRecord = { ...fields, _docs: nextDocs, ...(ocrOriginal ? { _ocrOriginal: ocrOriginal } : {}) };
-    if (curIns?._key) await getStore().update('insurance', target, String(curIns._key), patch);
-    else await getStore().save('insurance', target, [{ ...base, ...patch, plate }]);
-    notifySaved();
+    try {
+      if (curIns?._key) await commitUpdate({ entity: 'insurance', sessionCompanyId: companyId, rec: curIns, key: String(curIns._key), patch });
+      else await commitSave({ entity: 'insurance', sessionCompanyId: companyId, rec: v || curIns, records: [{ ...base, ...patch, plate }] });
+    } catch { toast(NEED_COMPANY, 'error'); }
   };
   const saveRecord = async () => {
     if (!active?._key || !recForm.amount) return;
-    const target = String(active.companyId || companyId), key = String(active._key);
-    if (recMode === 'pay') {
-      const list = Array.isArray(active._payments) ? (active._payments as unknown[]) : [];
-      await getStore().update('contract', target, key, { _payments: [...list, { seq: Number(recForm.seq), date: recForm.date, amount: Number(recForm.amount), source: recForm.method }] });
-    } else {
-      const list = Array.isArray(active._discounts) ? (active._discounts as unknown[]) : [];
-      await getStore().update('contract', target, key, { _discounts: [...list, { seq: Number(recForm.seq), date: recForm.date, amount: Number(recForm.amount), reason: recForm.reason }] });
-    }
-    notifySaved(); setRecMode(null); setRecForm((r) => ({ ...r, amount: '' }));
+    const key = String(active._key);
+    try {
+      if (recMode === 'pay') {
+        const list = Array.isArray(active._payments) ? (active._payments as unknown[]) : [];
+        await commitUpdate({
+          entity: 'contract', sessionCompanyId: companyId, rec: active, key,
+          patch: { _payments: [...list, { seq: Number(recForm.seq), date: recForm.date, amount: Number(recForm.amount), source: recForm.method }] },
+        });
+      } else {
+        const list = Array.isArray(active._discounts) ? (active._discounts as unknown[]) : [];
+        await commitUpdate({
+          entity: 'contract', sessionCompanyId: companyId, rec: active, key,
+          patch: { _discounts: [...list, { seq: Number(recForm.seq), date: recForm.date, amount: Number(recForm.amount), reason: recForm.reason }] },
+        });
+      }
+      setRecMode(null); setRecForm((r) => ({ ...r, amount: '' }));
+    } catch { toast(NEED_COMPANY, 'error'); }
   };
 
   // ── 미결·리스크 요약 (누적 데이터와 별개로, "지금 문제"만 위로) ──
@@ -319,7 +322,7 @@ export function Vehicle360({ plate, focus }: { plate: string; focus?: string }) 
 
       {/* 미결·리스크 — 누적 데이터와 별개로 "지금 문제"만 맨 위에(관리 by exception). 이슈 없으면 숨김. */}
       {issues.length > 0 && (
-        <div style={{ marginBottom: 14, border: `1px solid ${C.line}`, borderRadius: 'var(--radius)', background: '#fff', overflow: 'hidden' }}>
+        <div style={{ marginBottom: 14, border: `1px solid ${C.line}`, borderRadius: 'var(--radius)', background: C.card, overflow: 'hidden' }}>
           <div style={{ padding: '8px 13px', borderBottom: `1px solid ${C.line}`, background: 'var(--bg-header)', fontSize: 12.5, fontWeight: 700, color: C.ink, display: 'flex', alignItems: 'center', gap: 8 }}>
             <span style={{ width: 7, height: 7, borderRadius: '50%', background: issues.some((i) => i.tone === 'red') ? C.danger : C.warn }} />
             미결 · 리스크 <span style={{ color: C.faint, fontWeight: 500 }}>{issues.length}건</span>
@@ -417,7 +420,7 @@ export function Vehicle360({ plate, focus }: { plate: string; focus?: string }) 
         </Cards>
       </Sec>
 
-      {!v && <div style={{ marginTop: 12, padding: 12, background: '#fffbeb', color: '#92400e', borderRadius: 'var(--radius)', fontSize: 12.5 }}>등록증이 아직 안 들어왔습니다. 계약·보험·과태료만 표시. <b>정보 담기</b>로 등록하세요.</div>}
+      {!v && <div style={{ marginTop: 12 }}><Message variant="warning">등록증이 아직 안 들어왔습니다. 계약·보험·과태료만 표시. <b>정보 담기</b>로 등록하세요.</Message></div>}
 
       {/* 차량 정보 = 제조사 스펙(등록증에 없음 · 직접입력/차종마스터). 인라인 수정(값칸만). */}
       <Sec id="v-info" title={editInfo ? '차량 정보 · 편집 중' : '차량 정보'} tone={editInfo ? 'ok' : undefined} desc="제조사 스펙 · 직접입력" right={
@@ -510,7 +513,7 @@ export function Vehicle360({ plate, focus }: { plate: string; focus?: string }) 
 
       {/* 할부 상환 스케줄 — 차량 매입 부채측(원리금균등) */}
       {loan.length > 0 ? <Sec id="v-loan" title="할부 상환 스케줄" n={loan.length} desc={`${String(v?.loanCompany || '')} · 월 ${won(loanSum?.monthlyPayment || 0)} · 잔여원금 ${won(loanSum?.remainPrincipal || 0)} · 남은 ${loanSum?.remainSeq || 0}회`}>
-        <div style={{ border: `1px solid ${C.line}`, borderRadius: 'var(--radius)', overflow: 'hidden', background: '#fff' }}>
+        <div style={{ border: `1px solid ${C.line}`, borderRadius: 'var(--radius)', overflow: 'hidden', background: C.card }}>
           <div style={{ maxHeight: 400, overflowY: 'auto', overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', whiteSpace: 'nowrap' }}>
               <thead><tr><th style={th}>회차</th><th style={th}>상환일</th><th style={thR}>원금</th><th style={thR}>이자</th><th style={thR}>상환액</th><th style={thR}>잔액</th></tr></thead>
@@ -634,7 +637,7 @@ export function Vehicle360({ plate, focus }: { plate: string; focus?: string }) 
           <Btn variant="ghost" onClick={() => setRecMode(null)}>취소</Btn>
         </div> : null}
         {schedule.length === 0 ? <EmptyState variant="sec">스케줄 없음 (계약기간·월대여료 확인)</EmptyState> :
-          <div style={{ border: `1px solid ${C.line}`, borderRadius: 'var(--radius)', overflow: 'hidden', background: '#fff' }}>
+          <div style={{ border: `1px solid ${C.line}`, borderRadius: 'var(--radius)', overflow: 'hidden', background: C.card }}>
             <div style={{ maxHeight: 460, overflowY: 'auto', overflowX: 'auto' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', whiteSpace: 'nowrap' }}>
                 <thead><tr>
@@ -675,7 +678,7 @@ export function Vehicle360({ plate, focus }: { plate: string; focus?: string }) 
         {workList.length ? <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>{workList.map((h, i) => {
           const cat = String(h.category || '수선'); const ws = String(h.work_status || ''); const doc = latestDoc(h); const amt = Number(h.amount) || 0;
           return (
-            <div key={i} style={{ border: `1px solid ${C.line}`, borderRadius: 'var(--radius)', background: '#fff', padding: '10px 13px', boxShadow: '0 1px 2px rgba(15,23,42,0.05)' }}>
+            <div key={i} style={{ border: `1px solid ${C.line}`, borderRadius: 'var(--radius)', background: C.card, padding: '10px 13px', boxShadow: SH.rest }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                 <Badge tone={workCategoryTone(cat)}>{cat}</Badge>
                 {ws ? <Badge tone={workStatusTone(ws)}>{ws}</Badge> : null}
@@ -713,7 +716,9 @@ export function Vehicle360({ plate, focus }: { plate: string; focus?: string }) 
             if (!p._key) return;
             const patch: EntityRecord = { reassignStatus: next };
             if (next === '임차인확인' && drv) { patch.driverName = drv.contractorName; patch.driverPhone = drv.contractorPhone; patch.billedToRenter = true; patch.reassignDate = TODAY; }
-            await getStore().update('penalty', target, String(p._key), patch); notifySaved();
+            try {
+              await commitUpdate({ entity: 'penalty', sessionCompanyId: companyId, rec: p, key: String(p._key), patch });
+            } catch { toast(NEED_COMPANY, 'error'); }
           };
           return <div key={i} style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
             <div style={{ flex: 1, minWidth: 0 }}><ObjCard badge={st} badgeTone={penaltyTone(st)} title={String(p.description || p.docType || '과태료')} right={p.amount ? won(p.amount) : undefined} fields={[['위반', String(p.violationDate || '—')], ['실운전자', drv ? String(drv.contractorName || '—') : '미매칭'], ['기한', String(p.dueDate || '—')]]} /></div>

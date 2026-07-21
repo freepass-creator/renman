@@ -6,17 +6,19 @@
  */
 import { useRef, useState } from 'react';
 import { useSession } from '@/lib/session';
-import { getStore } from '@/lib/store';
 import { type EntityRecord } from '@/lib/intake/entities';
 import { storageReady } from '@/lib/storage';
 import { uploadToInbox } from '@/lib/inbox-upload';
-import { notifySaved, openCar, openCustomer, openPayments } from '@/lib/ui-bus';
+import { openCar, openCustomer, openPayments } from '@/lib/ui-bus';
 import { toast } from '@/lib/toast';
 import { normPlate } from '@/lib/plate';
 import { pushDocVersion } from '@/lib/docs';
 import { linkFleet } from '@/lib/domain/model';
 import { customerKey } from '@/lib/customers';
 import { TODAY } from '@/lib/dashboard-consts';
+import { resolveWriteCompany, NEED_COMPANY } from '@/lib/scope';
+import { commitUpdate, commitAll } from '@/lib/commit';
+import type { CommitUpdateArgs } from '@/lib/commit';
 import { Page, Sec, Btn, EmptyState, Input, PillTabs, Modal, ListBox, ListRow, ObjCard, won, C, PageLoading, SPACE_M } from '@/components/ui';
 import { WorkbenchBar } from '@/components/WorkbenchBar';
 import { WorkHubBack } from '@/components/WorkHubTabs';
@@ -67,19 +69,30 @@ export default function InboxPage() {
 
   async function attach(target: Target, targetRec: EntityRecord) {
     if (!matchRec) return;
+    if (!resolveWriteCompany(companyId, targetRec)) { toast(NEED_COMPANY, 'error'); return; }
     const next = pushDocVersion(targetRec, { type: 'inbox', url: String(matchRec.url || ''), reason: `수집함 매칭(${String(matchRec.kind || '')})`, by: String(user.name || '') });
-    await getStore().update(target, companyId, String(targetRec._key), { _docs: next });
+    const ops: CommitUpdateArgs[] = [
+      { entity: target, sessionCompanyId: companyId, rec: targetRec, key: String(targetRec._key), patch: { _docs: next } },
+    ];
     if (target === 'vehicle') {
       const fleet = linkFleet(vs, cs, TODAY);
       const active = fleet.activeByPlate.get(normPlate(targetRec.plate));
       if (active?.view.rec._key) {
         const crec = active.view.rec;
-        const cDocs = pushDocVersion(crec, { type: 'inbox', url: String(matchRec.url || ''), reason: `수집함→차량경유(${String(matchRec.kind || '')})`, by: String(user.name || '') });
-        await getStore().update('contract', String(crec.companyId || companyId), String(crec._key), { _docs: cDocs });
+        if (resolveWriteCompany(companyId, crec)) {
+          const cDocs = pushDocVersion(crec, { type: 'inbox', url: String(matchRec.url || ''), reason: `수집함→차량경유(${String(matchRec.kind || '')})`, by: String(user.name || '') });
+          ops.push({ entity: 'contract', sessionCompanyId: companyId, rec: crec, key: String(crec._key), patch: { _docs: cDocs } });
+        }
       }
     }
-    await getStore().update('inbox', companyId, String(matchRec._key || matchRec.inboxKey), { status: '매칭', matchedEntity: target, matchedKey: String(targetRec._key), plate: String(targetRec.plate || ''), matchedAt: new Date().toISOString() });
-    notifySaved(); toast(`${TARGET_LABEL[target]} 에 첨부·매칭`, 'success');
+    ops.push({
+      entity: 'inbox', sessionCompanyId: companyId, rec: matchRec, key: String(matchRec._key || matchRec.inboxKey),
+      patch: { status: '매칭', matchedEntity: target, matchedKey: String(targetRec._key), plate: String(targetRec.plate || ''), matchedAt: new Date().toISOString() },
+    });
+    try {
+      await commitAll(ops);
+      toast(`${TARGET_LABEL[target]} 에 첨부·매칭`, 'success');
+    } catch { toast(NEED_COMPANY, 'error'); return; }
     setMatchRec(null); setMq(''); reload();
     const plate = String(targetRec.plate || '');
     if (target === 'vehicle' || target === 'contract') {

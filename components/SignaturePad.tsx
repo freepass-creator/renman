@@ -38,7 +38,9 @@ export function SignaturePad({ onChange, height = 180, label = '여기에 서명
       const w = cv.clientWidth, h = cv.clientHeight;
       cv.width = w * dpr; cv.height = h * dpr;
       const ctx = cv.getContext('2d'); if (!ctx) return;
-      ctx.scale(dpr, dpr); ctx.lineWidth = 2.2; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.strokeStyle = '#111';
+      ctx.scale(dpr, dpr); ctx.lineWidth = 2.2; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+      // canvas strokeStyle은 CSS var 미지원 브라우저 있음 → #111 고정(잉크). 테마 토큰화 시 getComputedStyle 필요.
+      ctx.strokeStyle = '#111';
     };
     resize();
   }, []);

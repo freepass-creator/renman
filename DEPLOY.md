@@ -8,7 +8,7 @@
 2. **회사격리 Rules 배포** — `firebase deploy --only firestore:rules` (아래 2.3). **Firebase 콘솔 → Firestore → Rules에 test-mode(`allow read,write: if request.time < ...`) 블록이 없어야 함.** 이게 서버측 회사격리의 유일한 방어선.
 3. **Rules 검증(필수 테스트)** — 법인 A 계정으로 로그인 → 법인 B 문서 읽기 시도 → **PERMISSION_DENIED** 나와야 정상. 안 나오면 배포 안 된 것.
 4. **본사 마스터 계정 사전생성** — Firebase Auth 콘솔에서 `pyh@teamjpk.com` 미리 생성. (가입폼에서 이 이메일 선점은 코드로 차단됨 — auth.ts. 그래도 사전생성이 정석.)
-5. **API 라우트 잠금** — ALIGO/Gemini 실키를 붙이면 `/api/notify`·`/api/ocr`가 무단 호출 위험 → 배포 env에 **`API_SHARED_SECRET`** 설정(설정 시 미일치 요청 401). 아직 안 붙였으면 **ALIGO_* 키를 prod에 넣지 말 것**(SMS는 mock 유지=악용 0).
+5. **API 라우트 잠금** — ALIGO/Gemini 실키를 붙이면 `/api/notify`·`/api/ocr`가 무단 호출 위험 → 배포 env에 **`API_SHARED_SECRET`** + 같은 값 **`NEXT_PUBLIC_API_SHARED_SECRET`**(클라이언트 Bearer) 설정. 설정 시 미일치 요청 401. 아직 안 붙였으면 **ALIGO_* 키를 prod에 넣지 말 것**(SMS는 mock 유지=악용 0).
 
 ## 0. 지금 상태
 - 코드 골격 완성 (OCR 수집 · v5 로직 · 멀티테넌트 · CRUD · 운영화면)

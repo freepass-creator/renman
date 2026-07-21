@@ -6,7 +6,6 @@
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSession } from '@/lib/session';
-import { getStore } from '@/lib/store';
 import { type EntityRecord } from '@/lib/intake/entities';
 import { companyLabel } from '@/lib/companies';
 import {
@@ -23,6 +22,7 @@ import { FacetRail } from '@/components/FacetRail';
 import { WorkbenchBar } from '@/components/WorkbenchBar';
 import { WorkPipe } from '@/components/WorkPipe';
 import { openIngest, openEntityEdit, openCar, openCustomer } from '@/lib/ui-bus';
+import { commitUpdate, commitRemove } from '@/lib/commit';
 import { toast } from '@/lib/toast';
 import { TODAY } from '@/lib/dashboard-consts';
 import { useSecOrder } from '@/lib/use-sec-order';
@@ -75,7 +75,7 @@ export default function ContractWorkspace() {
     if (confirmMsg && !window.confirm(confirmMsg)) return;
     setBusy(true);
     try {
-      await getStore().update('contract', String(v.rec.companyId || companyId), String(v.rec._key || ''), patch);
+      await commitUpdate({ entity: 'contract', sessionCompanyId: companyId, rec: v.rec, key: String(v.rec._key || ''), patch });
       setAct(null); setOpenKey(null); reload();
     } catch (e) { toast('저장 실패: ' + (e as Error).message, 'error'); }
     finally { setBusy(false); }
@@ -83,8 +83,10 @@ export default function ContractWorkspace() {
   async function delContract(v: ContractView) {
     if (!window.confirm(`이 계약을 삭제할까요? (휴지통에서 복구 가능)\n${String(v.rec.contractorName || '')} · ${String(v.rec.plate || '')}`)) return;
     setBusy(true);
-    try { await getStore().remove('contract', String(v.rec.companyId || companyId), String(v.rec._key || ''), '수기 삭제'); setOpenKey(null); reload(); }
-    catch (e) { toast('삭제 실패: ' + (e as Error).message, 'error'); }
+    try {
+      await commitRemove({ entity: 'contract', sessionCompanyId: companyId, rec: v.rec, key: String(v.rec._key || ''), reason: '수기 삭제' });
+      setOpenKey(null); reload();
+    } catch (e) { toast('삭제 실패: ' + (e as Error).message, 'error'); }
     finally { setBusy(false); }
   }
   function startAct(kind: ActKind, v: ContractView) {
@@ -122,8 +124,12 @@ export default function ContractWorkspace() {
       remain -= pay;
     }
     if (remain > 0) newPays.push({ seq: scheds.length ? scheds[scheds.length - 1].seq : 1, date: TODAY, amount: remain, source: '수동', manual: true });
+    setBusy(true);
     try {
-      await getStore().update('contract', String(v.rec.companyId || companyId), String(v.rec._key || ''), { _payments: [...existing, ...newPays] });
+      await commitUpdate({
+        entity: 'contract', sessionCompanyId: companyId, rec: v.rec, key: String(v.rec._key || ''),
+        patch: { _payments: [...existing, ...newPays] },
+      });
       setAct(null); reload();
     } catch (e) { toast('수납 저장 실패: ' + (e as Error).message, 'error'); }
     finally { setBusy(false); }

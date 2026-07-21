@@ -27,13 +27,13 @@ export function Stepper({ steps }: { steps: Step[] }) {
   const mobile = useIsMobile();
   const dotColor = (s: Step['state']) => s === 'done' ? 'var(--green-text)' : s === 'current' ? C.brand : C.line;
   return (
-    <div style={{ display: 'flex', alignItems: 'flex-start', border: `1px solid ${C.line}`, borderRadius: R, background: '#fff', padding: mobile ? '10px 10px' : '14px 18px', overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+    <div style={{ display: 'flex', alignItems: 'flex-start', border: `1px solid ${C.line}`, borderRadius: R, background: C.card, padding: mobile ? '10px 10px' : '14px 18px', overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
       {steps.map((s, i) => (
         <React.Fragment key={i}>
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', minWidth: mobile ? 56 : 88, maxWidth: mobile ? 72 : undefined, flex: mobile ? '1 0 auto' : '0 0 auto' }}>
             <div style={{ width: 22, height: 22, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 800,
-              background: s.state === 'done' ? 'var(--green-text)' : s.state === 'current' ? C.brand : '#fff',
-              color: s.state === 'todo' ? '#cbd5e1' : '#fff', border: `2px solid ${dotColor(s.state)}`,
+              background: s.state === 'done' ? 'var(--green-text)' : s.state === 'current' ? C.brand : C.card,
+              color: s.state === 'todo' ? C.lineStrong : C.inverse, border: `2px solid ${dotColor(s.state)}`,
               boxShadow: s.state === 'current' ? `0 0 0 3px color-mix(in srgb, ${C.brand} 18%, transparent)` : 'none' }}>
               {s.state === 'done' ? '✓' : i + 1}
             </div>
@@ -63,7 +63,7 @@ export function Cards({ min = 240, fit, children }: { min?: number; fit?: boolea
 // 카드 공통 — 살짝 뜬 그림자 + 자연스러운 통일 호버(떠오름). 절제(눈 안 아프게). 그림자=SH SSOT.
 function useHover() { const [h, setH] = React.useState(false); return { h, on: { onMouseEnter: () => setH(true), onMouseLeave: () => setH(false) } }; }
 function cardStyle(h: boolean, click: boolean): React.CSSProperties {
-  return { border: `1px solid ${h && click ? C.line : C.line}`, borderRadius: 'var(--radius)', background: '#fff', boxShadow: h && click ? SH.hover : SH.rest, transition: 'box-shadow .15s ease, border-color .15s ease', cursor: click ? 'pointer' : 'default' };
+  return { border: `1px solid ${h && click ? C.line : C.line}`, borderRadius: 'var(--radius)', background: C.card, boxShadow: h && click ? SH.hover : SH.rest, transition: 'box-shadow .15s ease, border-color .15s ease', cursor: click ? 'pointer' : 'default' };
 }
 // 지표 카드 (가동률·미수 등) — 라벨 + 숫자 + 선택 hint(기준 한 줄). 색은 숫자에만. 숫자 크기=METRIC_FS.
 export function Metric({ label, value, hint, tone, onClick }: { label: React.ReactNode; value: React.ReactNode; hint?: React.ReactNode; tone?: 'ink' | 'danger' | 'ok' | 'warn'; onClick?: () => void }) {
@@ -180,7 +180,7 @@ export function EmptyState({ children, variant = 'page' }: { children: React.Rea
   return (
     <div style={{
       marginTop: 12, padding: '36px 24px', textAlign: 'center', color: C.mute,
-      border: `1px solid ${C.line}`, borderRadius: R, background: '#fff', fontSize: 13, lineHeight: 1.55,
+      border: `1px solid ${C.line}`, borderRadius: R, background: C.card, fontSize: 13, lineHeight: 1.55,
     }}>
       {children}
     </div>
@@ -238,10 +238,10 @@ export function ActionGrid({ children }: { children: React.ReactNode }) {
 export type MessageVariant = 'info' | 'success' | 'warning' | 'danger';
 export function Message({ variant = 'info', children }: { variant?: MessageVariant; children: React.ReactNode }) {
   const palette: Record<MessageVariant, { bg: string; border: string; color: string }> = {
-    info: { bg: 'var(--brand-bg)', border: '#bfdbfe', color: '#1d4ed8' },
-    success: { bg: '#ecfdf5', border: '#86efac', color: '#15803d' },
-    warning: { bg: '#fffbeb', border: '#facc15', color: '#b45309' },
-    danger: { bg: '#fef2f2', border: '#fecaca', color: '#b91c1c' },
+    info: { bg: 'var(--blue-bg)', border: 'var(--blue-border)', color: 'var(--blue-text)' },
+    success: { bg: 'var(--green-bg)', border: 'var(--green-border)', color: 'var(--green-text)' },
+    warning: { bg: 'var(--amber-bg)', border: 'var(--amber-border)', color: 'var(--amber-text)' },
+    danger: { bg: 'var(--red-bg)', border: 'var(--red-border)', color: 'var(--red-text)' },
   };
   const p = palette[variant];
   return (
@@ -253,11 +253,16 @@ export function Message({ variant = 'info', children }: { variant?: MessageVaria
 
 /* 상태/라벨 — 각진 플랫 태그. 이슈 종류별로 구분되게 8색(기업톤, 알록달록 아님). */
 export type BadgeTone = 'gray' | 'green' | 'red' | 'amber' | 'blue' | 'orange' | 'purple' | 'teal';
+/* [글자, 배경, 테두리] — globals.css의 --{tone}-text/-bg/-border 삼종. 테마 5종 + 다크에서 함께 스왑된다. */
 const BADGE: Record<BadgeTone, [string, string, string]> = {
-  gray: ['#475569', '#eef1f5', '#d5dbe4'], green: ['#15803d', '#d9f3e1', '#a3dab4'],
-  red: ['#c02418', '#fdd7d1', '#f3aba3'], amber: ['#9a5b00', '#fbebc4', '#eecb8f'],
-  blue: ['#1d4ed8', '#dbe7fd', '#aec6f5'], orange: ['#c2410c', '#fde0cf', '#f4b892'],
-  purple: ['#7c3aed', '#eadffd', '#cfb6f5'], teal: ['#0e7490', '#d0eef5', '#93cfdf'],
+  gray: ['var(--zinc-text)', 'var(--zinc-bg)', 'var(--zinc-border)'],
+  green: ['var(--green-text)', 'var(--green-bg)', 'var(--green-border)'],
+  red: ['var(--red-text)', 'var(--red-bg)', 'var(--red-border)'],
+  amber: ['var(--amber-text)', 'var(--amber-bg)', 'var(--amber-border)'],
+  blue: ['var(--blue-text)', 'var(--blue-bg)', 'var(--blue-border)'],
+  orange: ['var(--orange-text)', 'var(--orange-bg)', 'var(--orange-border)'],
+  purple: ['var(--purple-text)', 'var(--purple-bg)', 'var(--purple-border)'],
+  teal: ['var(--teal-text)', 'var(--teal-bg)', 'var(--teal-border)'],
 };
 export function Badge({ children, tone = 'gray' }: { children: React.ReactNode; tone?: BadgeTone }) {
   const mobile = useIsMobile();
@@ -268,7 +273,7 @@ export function Badge({ children, tone = 'gray' }: { children: React.ReactNode; 
 export function CompanyBadge({ co }: { co: string }) {
   const mobile = useIsMobile();
   const m = BADGE[companyTone(co)] || BADGE.gray;
-  return <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, height: mobile ? 22 : 18, boxSizing: 'border-box', padding: mobile ? '0 8px 0 6px' : '0 6px 0 5px', borderRadius: R, border: `1px solid ${m[2]}`, background: '#fff', color: m[0], fontSize: mobile ? 11.5 : 10.5, fontWeight: 700, whiteSpace: 'nowrap', lineHeight: 1 }}>
+  return <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, height: mobile ? 22 : 18, boxSizing: 'border-box', padding: mobile ? '0 8px 0 6px' : '0 6px 0 5px', borderRadius: R, border: `1px solid ${m[2]}`, background: C.card, color: m[0], fontSize: mobile ? 11.5 : 10.5, fontWeight: 700, whiteSpace: 'nowrap', lineHeight: 1 }}>
     <span style={{ width: 6, height: 6, borderRadius: '50%', background: m[0], flex: '0 0 auto' }} />{companyShort(co)}
   </span>;
 }

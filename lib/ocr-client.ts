@@ -1,6 +1,4 @@
-// 문서 OCR 클라이언트 — 파일 업로드 → /api/ocr/extract → 구조화 추출.
-// 모든 문서 업로드의 단일 진입점. 원본 스냅샷(_ocrOriginal) 부착(감사·원본보존).
-// 로컬(GEMINI_API_KEY 없음)에선 ok:false 반환 → 호출측이 수기입력 폴백.
+import { apiAuthHeaders } from './api-headers';
 import { ENTITIES, type EntityRecord } from './intake/entities';
 import { crosscheckOcr, type CrosscheckResult } from './ocr-crosscheck';
 
@@ -12,7 +10,7 @@ export async function callOcrExtract(file: File, ocrType: string): Promise<OcrRe
   fd.append('file', file);
   fd.append('type', ocrType);
   try {
-    const res = await fetch('/api/ocr/extract', { method: 'POST', body: fd });
+    const res = await fetch('/api/ocr/extract', { method: 'POST', body: fd, headers: apiAuthHeaders() });
     let json: Record<string, unknown> = {};
     try { json = await res.json(); } catch { /* non-json */ }
     if (!res.ok || !json.ok) return { ok: false, error: String(json.error || `OCR 실패 (${res.status})`) };

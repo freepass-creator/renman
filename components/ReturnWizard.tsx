@@ -2,12 +2,12 @@
 // 반납(입고) 현장 스텝 위저드 — 모바일 풀스크린 시트(Modal). 인도의 거울 + 정산 미리보기.
 //   저장은 전부 기존 SSOT: 상태전이=patchReturn(단일 writer→반납) · 타임라인=saveIntake('history',category:'반납',_kind:'activity')
 //   · 정산=computeReturnSettlement(정산서와 동일 계산) · 증거=uploadDoc+pushDocVersion(type:'handover',reason:'반납…') 계약 _docs.
-import { useMemo, useRef, useState, type CSSProperties } from 'react';
-import { Camera, PenLine, X } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { PenLine } from 'lucide-react';
 import { patchReturn, computeContractView, computeReturnSettlement, effectiveEndDate } from '@/lib/contract-ops';
 import { getStore } from '@/lib/store';
+import { commitUpdate } from '@/lib/commit';
 import { saveIntake } from '@/lib/intake';
-import { notifySaved } from '@/lib/ui-bus';
 import { SignaturePad, dataUrlToFile } from '@/components/SignaturePad';
 import { uploadDoc, docPath, storageReady } from '@/lib/storage';
 import { pushDocVersion } from '@/lib/docs';
@@ -16,14 +16,11 @@ import { toast } from '@/lib/toast';
 import { haptic } from '@/lib/haptics';
 import { resolveWriteCompany, NEED_COMPANY } from '@/lib/scope';
 import { FUEL_LEVELS } from '@/lib/domain/fuel';
-import { Modal, Stepper, Btn, Message, won, C, R, SH, toggleStyle, type Step } from '@/components/ui';
+import { Modal, Stepper, Btn, Message, won, C, toggleStyle, WizCard, WizField, WizPhotos, wizInput, type Step } from '@/components/ui';
 import { type EntityRecord } from '@/lib/intake/entities';
 
 const TODAY = () => new Date().toISOString().slice(0, 10);
 const STEP_LABELS = ['확인', '주행·연료', '정산', '사진·서명', '확정'];
-
-const lbl: CSSProperties = { fontSize: 12.5, fontWeight: 700, color: C.mute, marginBottom: 7, display: 'block' };
-const bigInput: CSSProperties = { width: '100%', height: 48, fontSize: 16, padding: '0 12px', border: `1px solid ${C.line}`, borderRadius: R, background: '#fff', color: C.ink, boxSizing: 'border-box' };
 
 export function ReturnWizard({ contract, vehicle, onClose, onDone }: {
   contract: EntityRecord; vehicle?: EntityRecord | null; onClose: () => void; onDone: () => void;
@@ -38,7 +35,6 @@ export function ReturnWizard({ contract, vehicle, onClose, onDone }: {
   const [photos, setPhotos] = useState<File[]>([]);
   const [sigData, setSigData] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-  const camRef = useRef<HTMLInputElement>(null);
 
   const plate = String(contract.plate || '');
   const who = String(contract.contractorName || '—');
@@ -70,7 +66,10 @@ export function ReturnWizard({ contract, vehicle, onClose, onDone }: {
       const extra: EntityRecord = { fuelIn: fuel };   // 반납 연료 정본 키(스키마·Vehicle360 표시와 정합)
       if (mileage) extra.returnMileage = Number(mileage);
       if (note.trim()) extra.returnSettleNote = note.trim();
-      await getStore().update('contract', target, contractNo, patchReturn(contract, date, extra));
+      await commitUpdate({
+        entity: 'contract', sessionCompanyId: companyId, rec: contract, key: contractNo,
+        patch: patchReturn(contract, date, extra),
+      });
       await saveIntake('history', target, [{
         plate, category: '반납',
         title: `반납(입고)${mileage ? ` · ${mileage}km` : ''} · 연료 ${fuel}`,
@@ -96,7 +95,12 @@ export function ReturnWizard({ contract, vehicle, onClose, onDone }: {
             const url = await uploadDoc(f, docPath(target, 'contract', contractNo, f.name));
             if (url) rec = { ...rec, _docs: pushDocVersion(rec, { type: 'handover', url, reason, by: user.name }) };
           }
-          if (rec._docs) await getStore().update('contract', target, contractNo, { _docs: rec._docs });
+          if (rec._docs) {
+            await commitUpdate({
+              entity: 'contract', sessionCompanyId: companyId, rec: contract, key: contractNo,
+              patch: { _docs: rec._docs },
+            });
+          }
         } else {
           toast('저장소(Storage) 미설정 — 사진·서명은 건너뜀', 'info');
         }
@@ -104,7 +108,6 @@ export function ReturnWizard({ contract, vehicle, onClose, onDone }: {
     } catch {
       toast('사진·서명 저장 실패 — 반납은 완료됨', 'info');
     }
-    notifySaved();
     haptic.success();
     toast(`반납 완료 · ${plate}`, 'success');
     setSaving(false);
@@ -130,43 +133,40 @@ export function ReturnWizard({ contract, vehicle, onClose, onDone }: {
         {step === 0 && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             <Message variant="info">이 계약을 <b>반납(입고)</b> 처리합니다. 반납 계기판·연료를 기록하고 정산을 확인한 뒤 사진·서명을 남깁니다.</Message>
-            <div style={{ border: `1px solid ${C.line}`, borderRadius: R, background: C.taupeBg, padding: '14px 16px', boxShadow: SH.rest, display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <WizCard>
               <Row k="차량" v={`${plate}${carName ? ` · ${carName}` : ''}`} />
               <Row k="계약자" v={who} />
               {contractNo && <Row k="계약번호" v={contractNo} mono />}
               <Row k="계약기간" v={`${String(contract.startDate || '')} ~ ${eff || '미정'}`} />
               {dday != null && <Row k="반납 시점" v={dday < 0 ? `반납예정 ${-dday}일 경과` : dday === 0 ? '오늘 반납예정' : `반납예정 D-${dday}`} />}
-            </div>
+            </WizCard>
           </div>
         )}
 
         {/* 1. 주행·연료 */}
         {step === 1 && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-            <div>
-              <label style={lbl}>반납일</label>
-              <input type="date" value={date} max={TODAY()} onChange={(e) => { const v = e.target.value; setDate(v && v > TODAY() ? TODAY() : v); }} style={bigInput} />
-            </div>
-            <div>
-              <label style={lbl}>반납 주행거리 (계기판 km) {baseMileage ? <span style={{ color: C.faint, fontWeight: 400 }}>· 출고 {baseMileage.toLocaleString()}km</span> : null}</label>
-              <input inputMode="numeric" value={mileage} onChange={(e) => setMileage(e.target.value.replace(/[^\d]/g, ''))} placeholder={baseMileage ? `${baseMileage} 이상` : '예: 47250'} style={{ ...bigInput, fontFamily: 'var(--font-mono)' }} />
+            <WizField label="반납일">
+              <input type="date" value={date} max={TODAY()} onChange={(e) => { const v = e.target.value; setDate(v && v > TODAY() ? TODAY() : v); }} style={wizInput} />
+            </WizField>
+            <WizField label={<>반납 주행거리 (계기판 km) {baseMileage ? <span style={{ color: C.faint, fontWeight: 400 }}>· 출고 {baseMileage.toLocaleString()}km</span> : null}</>}>
+              <input inputMode="numeric" value={mileage} onChange={(e) => setMileage(e.target.value.replace(/[^\d]/g, ''))} placeholder={baseMileage ? `${baseMileage} 이상` : '예: 47250'} style={{ ...wizInput, fontFamily: 'var(--font-mono)' }} />
               {drove != null && <div style={{ marginTop: 6, fontSize: 12.5, color: drove < 0 ? C.danger : C.mute }}>{drove < 0 ? '출고보다 작음 — 확인 필요' : `주행 ${drove.toLocaleString()}km`}</div>}
-            </div>
-            <div>
-              <label style={lbl}>반납 연료량 {baseFuel ? <span style={{ color: C.faint, fontWeight: 400 }}>· 출고 {baseFuel}</span> : null}</label>
+            </WizField>
+            <WizField label={<>반납 연료량 {baseFuel ? <span style={{ color: C.faint, fontWeight: 400 }}>· 출고 {baseFuel}</span> : null}</>}>
               <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap' }}>
                 {FUEL_LEVELS.map((f) => (
                   <button key={f} type="button" data-ui="toggle" onClick={() => { setFuel(f); haptic.select(); }} aria-pressed={fuel === f} style={toggleStyle(fuel === f, 'lg')}>{f}</button>
                 ))}
               </div>
-            </div>
+            </WizField>
           </div>
         )}
 
         {/* 2. 정산 */}
         {step === 2 && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-            <div style={{ border: `1px solid ${C.line}`, borderRadius: R, background: C.taupeBg, padding: '14px 16px', boxShadow: SH.rest, display: 'flex', flexDirection: 'column', gap: 9 }}>
+            <WizCard gap={9}>
               <Row k="미납 대여료 (일할정산 반영)" v={won(settle.unpaid)} strong={settle.unpaid > 0} />
               <Row k="예치 보증금" v={won(settle.deposit)} />
               <Row k="보증금 충당" v={settle.offset ? `−${won(settle.offset)}` : won(0)} muted />
@@ -174,11 +174,10 @@ export function ReturnWizard({ contract, vehicle, onClose, onDone }: {
               {settle.addCharge > 0
                 ? <Row k="추가 청구액 (임차인 납부)" v={won(settle.addCharge)} strong danger />
                 : <Row k="보증금 반환액 (임차인 환급)" v={won(settle.refund)} strong />}
-            </div>
-            <div>
-              <label style={lbl}>정산 특이사항 (손상·연료차액·과태료 등)</label>
-              <textarea value={note} onChange={(e) => setNote(e.target.value)} placeholder="예: 우측 도어 스크래치, 연료 1/4 부족" rows={3} style={{ ...bigInput, height: 'auto', padding: '10px 12px', fontFamily: 'inherit', resize: 'vertical' }} />
-            </div>
+            </WizCard>
+            <WizField label="정산 특이사항 (손상·연료차액·과태료 등)">
+              <textarea value={note} onChange={(e) => setNote(e.target.value)} placeholder="예: 우측 도어 스크래치, 연료 1/4 부족" rows={3} style={{ ...wizInput, height: 'auto', padding: '10px 12px', fontFamily: 'inherit', resize: 'vertical' }} />
+            </WizField>
             <div style={{ fontSize: 12, color: C.faint, lineHeight: 1.6 }}>※ 정산서(출력)와 동일 계산입니다. 손상·연료차액·미회수 과태료는 특이사항에 남기면 별도 청구 근거가 됩니다.</div>
           </div>
         )}
@@ -187,24 +186,12 @@ export function ReturnWizard({ contract, vehicle, onClose, onDone }: {
         {step === 3 && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             {!storageReady() && <Message variant="warning">저장소(Storage)가 미설정이라 사진·서명은 저장되지 않습니다. 반납 처리·정산은 정상 완료됩니다.</Message>}
-            <div>
-              <label style={lbl}>입고 사진 (외관·계기판·손상부)</label>
-              <input ref={camRef} type="file" accept="image/*" capture="environment" style={{ display: 'none' }} onChange={(e) => { const f = e.target.files?.[0]; if (f) { setPhotos((p) => [...p, f]); haptic.tap(); } e.currentTarget.value = ''; }} />
-              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-                <Btn variant="ghost" size="lg" onClick={() => camRef.current?.click()}><Camera size={17} /> 사진 촬영</Btn>
-                {photos.map((p, i) => (
-                  <span key={i} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 12, padding: '4px 4px 4px 10px', borderRadius: R, border: `1px solid ${C.line}`, background: '#fff', color: C.mute, minHeight: 40 }}>
-                    {p.name.slice(0, 12)}
-                    <button aria-label="사진 삭제" onClick={() => setPhotos((ps) => ps.filter((_, j) => j !== i))} style={{ border: 'none', background: 'none', cursor: 'pointer', color: C.faint, width: 40, height: 40, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', WebkitTapHighlightColor: 'transparent' }}><X size={16} /></button>
-                  </span>
-                ))}
-                {photos.length > 0 && <span style={{ fontSize: 12, color: C.mute, fontWeight: 700 }}>{photos.length}장</span>}
-              </div>
-            </div>
-            <div>
-              <label style={lbl}><span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><PenLine size={14} /> 반납 확인 서명 (고객)</span></label>
+            <WizField label="입고 사진 (외관·계기판·손상부)">
+              <WizPhotos files={photos} onChange={setPhotos} onTap={haptic.tap} />
+            </WizField>
+            <WizField label={<span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><PenLine size={14} /> 반납 확인 서명 (고객)</span>}>
               <SignaturePad onChange={setSigData} height={170} label="고객이 여기에 서명" />
-            </div>
+            </WizField>
           </div>
         )}
 
@@ -212,7 +199,7 @@ export function ReturnWizard({ contract, vehicle, onClose, onDone }: {
         {step === 4 && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             <Message variant="info">아래 내용으로 반납을 확정하면 계약이 <b>반납</b> 상태로 전환되고 정산이 확정됩니다.</Message>
-            <div style={{ border: `1px solid ${C.line}`, borderRadius: R, background: C.taupeBg, padding: '14px 16px', boxShadow: SH.rest, display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <WizCard>
               <Row k="차량" v={`${plate}${carName ? ` · ${carName}` : ''}`} />
               <Row k="계약자" v={who} />
               <Row k="반납일" v={date} />
@@ -223,7 +210,7 @@ export function ReturnWizard({ contract, vehicle, onClose, onDone }: {
                 ? <Row k="추가 청구액" v={won(settle.addCharge)} strong danger />
                 : <Row k="보증금 반환액" v={won(settle.refund)} strong />}
               <Row k="사진 / 서명" v={`${photos.length}장 / ${sigData ? '있음' : '없음'}`} />
-            </div>
+            </WizCard>
           </div>
         )}
       </div>

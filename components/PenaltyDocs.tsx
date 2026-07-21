@@ -5,7 +5,7 @@ import { type EntityRecord } from '@/lib/intake/entities';
 import { matchPenalty } from '@/lib/penalty-match';
 import { loadMaster } from '@/lib/company-master';
 import { companyLabel } from '@/lib/companies';
-import { PageLoading, Btn } from '@/components/ui';
+import { PageLoading, Btn, EmptyState, C } from '@/components/ui';
 import { TODAY } from '@/lib/dashboard-consts';
 import { useEntityList } from '@/lib/use-entity-lists';
 
@@ -13,11 +13,17 @@ import { useEntityList } from '@/lib/use-entity-lists';
 // 명의자(회사)로 온 과태료를 위반 당시 실운전자(임차인)에게 변경부과 요청. 발행 후 reassignStatus='변경부과신청' 전환.
 const won = (n: unknown) => '₩' + (Number(n) || 0).toLocaleString('ko-KR');
 const s = (v: unknown) => (v == null || v === '' ? '—' : String(v));
-const cellL: CSSProperties = { border: '1px solid #cbd5e1', padding: '7px 11px', background: '#f8fafc', fontWeight: 700, width: 96, whiteSpace: 'nowrap', fontSize: 12.5 };
-const cellR: CSSProperties = { border: '1px solid #cbd5e1', padding: '7px 11px', fontSize: 12.5 };
-const th: CSSProperties = { border: '1px solid #94a3b8', padding: '6px 8px', background: '#eef2f7', fontWeight: 700, fontSize: 11.5, whiteSpace: 'nowrap' };
-const tdc: CSSProperties = { border: '1px solid #cbd5e1', padding: '6px 8px', fontSize: 11.5 };
-const sheet: CSSProperties = { width: 794, minHeight: 1123, margin: '0 auto 30px', background: '#fff', boxShadow: '0 4px 20px rgba(0,0,0,0.12)', padding: '64px 60px', boxSizing: 'border-box', color: '#111' };
+/* ── A4 문서면(종이) — 토큰 금지, 하드코딩이 정답. 의도된 예외. ──
+ * 이건 화면 UI가 아니라 **관할기관에 보내는 공문서**다. 테마를 따라가면 안 된다:
+ *   · 다크테마에서 C.card/C.ink를 쓰면 종이가 검게 되고 글자가 흰색이 된다
+ *   · 그 상태로 인쇄하면 브라우저가 배경색을 빼므로 **흰 종이에 흰 글자** = 판독 불가
+ * 종이는 항상 흰색, 잉크는 항상 검정. 화면 크롬(배경·툴바)만 토큰을 쓴다. */
+const PAPER = '#fff', INK = '#111', INK_SUB = '#666', RULE = '#cbd5e1', RULE_H = '#94a3b8', FILL = '#f8fafc', FILL_H = '#eef2f7';
+const cellL: CSSProperties = { border: `1px solid ${RULE}`, padding: '7px 11px', background: FILL, fontWeight: 700, width: 96, whiteSpace: 'nowrap', fontSize: 12.5 };
+const cellR: CSSProperties = { border: `1px solid ${RULE}`, padding: '7px 11px', fontSize: 12.5 };
+const th: CSSProperties = { border: `1px solid ${RULE_H}`, padding: '6px 8px', background: FILL_H, fontWeight: 700, fontSize: 11.5, whiteSpace: 'nowrap' };
+const tdc: CSSProperties = { border: `1px solid ${RULE}`, padding: '6px 8px', fontSize: 11.5 };
+const sheet: CSSProperties = { width: 794, minHeight: 1123, margin: '0 auto 30px', background: PAPER, boxShadow: '0 4px 20px rgba(0,0,0,0.12)', padding: '64px 60px', boxSizing: 'border-box', color: INK };
 
 type P = { p: EntityRecord; c: EntityRecord };
 
@@ -48,27 +54,27 @@ export function PenaltyDocs({ penalties, companyId, onClose, onSubmitted }: { pe
   }
 
   return (
-    <div style={{ position: 'fixed', inset: 0, zIndex: 200, background: '#e2e8f0', overflowY: 'auto' }}>
+    <div style={{ position: 'fixed', inset: 0, zIndex: 200, background: C.line, overflowY: 'auto' }}>
       <style>{`@media print { body { visibility: hidden !important; } .print-doc, .print-doc * { visibility: visible !important; } .print-doc { position: static !important; box-shadow: none !important; margin: 0 auto !important; } .no-print { display: none !important; } } @page { size: A4; margin: 12mm; }`}</style>
       <div className="no-print" style={{ maxWidth: 794, margin: '18px auto 12px', display: 'flex', gap: 8, padding: '0 10px', alignItems: 'center' }}>
         <Btn variant="ghost" onClick={onClose}>← 닫기</Btn>
-        <span style={{ fontSize: 12.5, color: '#475569' }}>매칭 {items.length}건 · 공문 {groups.size}장 + 사실확인서 {items.length}부</span>
+        <span style={{ fontSize: 12.5, color: C.mute }}>매칭 {items.length}건 · 공문 {groups.size}장 + 사실확인서 {items.length}부</span>
         <span style={{ flex: 1 }} />
         <Btn variant="ghost" onClick={submit} disabled={busy || !items.length}>{busy ? '처리 중…' : '변경부과 신청 처리'}</Btn>
         <Btn onClick={() => window.print()}>인쇄 / PDF 저장</Btn>
       </div>
 
       {!ready ? <PageLoading />
-        : !items.length ? <div style={{ textAlign: 'center', padding: 40, color: '#64748b' }}>매칭된 과태료가 없습니다 — 임차인이 확인된 건만 변경부과 문서를 만들 수 있습니다.</div>
+        : !items.length ? <EmptyState>매칭된 과태료가 없습니다 — 임차인이 확인된 건만 변경부과 문서를 만들 수 있습니다.</EmptyState>
           : <>
             {Array.from(groups.entries()).map(([key, gr]) => {
               const co = key.split('||')[0]; const issuer = key.split('||')[1]; const m = loadMaster(co);
               const docNo = `PCR-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${(co + (issuer || '').replace(/[^가-힣0-9A-Za-z]/g, '').slice(0, 2)).toUpperCase()}`;
               return (
                 <div className="print-doc" style={sheet} key={key}>
-                  <div style={{ textAlign: 'right', fontSize: 11, color: '#666', marginBottom: 6, fontFamily: 'monospace' }}>문서번호 {docNo}</div>
+                  <div style={{ textAlign: 'right', fontSize: 11, color: INK_SUB, marginBottom: 6, fontFamily: 'monospace' }}>문서번호 {docNo}</div>
                   <div style={{ textAlign: 'center', fontSize: 22, fontWeight: 800, letterSpacing: 3, marginBottom: 4 }}>과태료 변경부과 요청</div>
-                  <div style={{ textAlign: 'center', fontSize: 12, color: '#64748b', marginBottom: 26 }}>자동차대여사업자 명의 과태료의 실운전자(임차인) 변경부과 요청</div>
+                  <div style={{ textAlign: 'center', fontSize: 12, color: INK_SUB, marginBottom: 26 }}>자동차대여사업자 명의 과태료의 실운전자(임차인) 변경부과 요청</div>
                   <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 18 }}><tbody>
                     <tr><td style={cellL}>수신</td><td style={cellR}>{issuer} 귀중</td></tr>
                     <tr><td style={cellL}>발신</td><td style={cellR}>{companyLabel(co)}{m.ceo ? ` (대표 ${m.ceo})` : ''}{m.address ? ` · ${m.address}` : ''}</td></tr>
@@ -93,7 +99,7 @@ export function PenaltyDocs({ penalties, companyId, onClose, onSubmitted }: { pe
                       </tr>
                     ))}
                   </tbody></table>
-                  <p style={{ fontSize: 12, color: '#475569', marginTop: 10 }}>붙임 : 자동차 임대차 계약 사실확인서 {gr.length}부. 끝.</p>
+                  <p style={{ fontSize: 12, color: INK_SUB, marginTop: 10 }}>붙임 : 자동차 임대차 계약 사실확인서 {gr.length}부. 끝.</p>
                   <div style={{ textAlign: 'center', marginTop: 40 }}>{dateStr}</div>
                   <div style={{ textAlign: 'center', marginTop: 14, fontSize: 16, fontWeight: 700 }}>{companyLabel(co)} {m.ceo ? `대표 ${m.ceo}` : ''} (인)</div>
                 </div>
@@ -105,7 +111,7 @@ export function PenaltyDocs({ penalties, companyId, onClose, onSubmitted }: { pe
               return (
                 <div className="print-doc" style={sheet} key={'c' + i}>
                   <div style={{ textAlign: 'center', fontSize: 22, fontWeight: 800, letterSpacing: 3, marginBottom: 4 }}>자동차 임대차 계약 사실 확인서</div>
-                  <div style={{ textAlign: 'center', fontSize: 12, color: '#64748b', marginBottom: 24 }}>위반 당시 실제 운행자(임차인) 확인</div>
+                  <div style={{ textAlign: 'center', fontSize: 12, color: INK_SUB, marginBottom: 24 }}>위반 당시 실제 운행자(임차인) 확인</div>
                   <div style={{ fontWeight: 700, fontSize: 13.5, margin: '14px 0 6px' }}>1. 임차인</div>
                   <table style={{ width: '100%', borderCollapse: 'collapse' }}><tbody>
                     <tr><td style={cellL}>성명</td><td style={cellR}>{s(it.c.contractorName)}</td><td style={cellL}>연락처</td><td style={cellR}>{s(it.c.contractorPhone)}</td></tr>

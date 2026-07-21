@@ -166,7 +166,7 @@ export type Contract = {
   unpaidSeqCount: number;      // 미납 회차 수
   // 회차 스케줄 — 운영현황 업로드 시 자동 생성 + 미수 분배 (lib/payment-schedule.ts)
   schedules?: PaymentScheduleInline[];
-  // 활성 리스크 이슈 (lib/risk-issues.ts 가 동적 계산 — 저장 X)
+  // 활성 리스크 이슈 (risk-ops.scanRisks 가 동적 계산 — 저장 X)
   // 운영현황 → 떨어진 계약은 receivables 페이지에서 자동 감지
 
   // 표준 timestamp (ERP #33) — Optimistic Lock 용

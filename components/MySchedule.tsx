@@ -39,7 +39,7 @@ export function MySchedule() {
     const d = ddayOf(e.date);
     const dtxt = d < 0 ? `${-d}일 지남` : d === 0 ? '오늘' : `D-${d}`;
     return (
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px', borderRadius: 'var(--radius)', background: '#fff', border: `1px solid ${C.line}`, opacity: e.done ? 0.55 : 1 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px', borderRadius: 'var(--radius)', background: C.card, border: `1px solid ${C.line}`, opacity: e.done ? 0.55 : 1 }}>
         <input type="checkbox" checked={!!e.done} onChange={() => toggleDone(e.id)} style={{ width: 16, height: 16, cursor: 'pointer', flexShrink: 0 }} />
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: 13.5, fontWeight: 600, color: C.ink, textDecoration: e.done ? 'line-through' : 'none', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{e.title}</div>

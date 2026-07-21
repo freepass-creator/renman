@@ -106,8 +106,11 @@ const { data: [cs, hs], loading } = useEntityLists(['contract', 'history']);
 
 > 크고 위험함. **하나씩** 붙을 것. 각 건마다 착수 전 설계 확인 → 구현 → 적대적 자체검증(반례 찾기) 순서 권장.
 
-### B-1. 미수 원장 엔진 통합 ★가장 중요·가장 위험
-**현재 (누더기)**
+### B-1. 미수 원장 엔진 통합 ★가장 중요·가장 위험 — **완화 적용(2026-07-21)**
+**완화**: `buildContract`가 `_carryUnpaid` 분배를 앱수납 유무와 무관하게 선행 → 실수납은 FIFO(`applyPayment`). `!pays.length` 스위칭 제거. 대사 `tools/audit-unpaid-seed.ts` OK.
+**잔여(본격 B-1)**: carry를 seq-0 버킷으로 승격·필드 스키마 정리·gross≠net 의미 복원.
+
+**현재 (누더기 — 완화 전 원문)**
 "개시 미수" 한 개념이 **3벌**로 저장되고 서로 보정돼야만 맞음:
 `_carryUnpaid`(앵커) + `_paidTotal`(=개시시점 pastDue−carry 역산) + `_payments`(회차별)
 
@@ -124,27 +127,28 @@ const { data: [cs, hs], loading } = useEntityLists(['contract', 'history']);
 - `cutoff`(`returnedDate<today?returnedDate:today`)가 `:76` `:139` `:180` **3곳 복제** → 헬퍼로 뽑아 동시 해결
 - `distributeUnpaid`(`lib/payments/payment-schedule.ts:295-307`)의 "가장 오래된 회차 amount 부풀리기"가 회차표 폭증 원인 중 하나 → 버킷 방식으로 대체
 
-### B-2. 쓰기 단일 퍼널
-**현재**: 상태전이(deliver/return/terminate/extend)가 단순 patch → `store.update` 병합이라 **side-effect 레지스트리 우회**. `rec.companyId||companyId` 재계산 **22곳**, `notifySaved()` 중복 호출 **23곳**(store가 이미 자동 브로드캐스트), 다중 엔티티 쓰기가 **비원자적**(절반 저장 위험), 동시성 가드가 위저드에만 있고 Vehicle360/contract 페이지엔 없음.
+### B-2. 쓰기 단일 퍼널 — **UI 핫스팟 완료(2026-07-21)**
+**현재**: `lib/commit.ts` — `commitUpdate` · `commitSave` · `commitRemove` · `commitAll`(순차).
+**이행**: Delivery/ReturnWizard · Vehicle360 · payments · **contract/receivables/inbox/penalty/list상세/IngestDialog/DocIssueDialog/inbox-upload**.
+**잔여(엔진)**: `lib/intake.ts` 부수효과 쓰기 · Firestore 진짜 트랜잭션 · 전이 합법성 검증.
 
-**목표**: `lib/commit.ts` 단일 퍼널 — `commit(change)` 로 모든 변경이 통과. 회사 해소·전이 합법성 검증·side-effect·감사·알림을 **한 곳에서**. 다중 엔티티는 `commitAll()`(트랜잭션).
-
-### B-3. 상태 SSOT 통합 + 죽은 코드 제거
-**현재**: 상태 SSOT가 **2세대 공존**. jpkerp5 이식분(`lib/payments/contract-lifecycle.ts` 등)은 **죽었는데 import는 살아있음** → 새 작업자가 그걸 고치면 화면이 하나도 안 변함.
-"운행중" 판정이 **6가지**, `VehicleStatus` 19종을 소유/가동/처분으로 쪼개는 규칙이 **4~5곳 제각각**(같은 '매각대기'가 화면마다 다른 범주), 연체 단계가 **두 함수로 이중 정의**(`collection.ts` 라이브 / `risk-issues.ts:177` 죽음).
-
-**목표**: `lib/domain/status.ts` 단일 파일에 어휘(태그된 상수 테이블)·파티션·파생·술어·회수단계를 전부 정의. 죽은 스택은 **삭제**(주석 처리 말고).
+### B-3. 상태 SSOT 통합 + 죽은 코드 제거 — **1차 완료(2026-07-21)**
+**삭제**: `lib/payments/contract-lifecycle.ts` · `lib/payments/risk-issues.ts` (죽은 루프).
+**신설**: `lib/domain/status.ts` — 어휘·차량 파티션·`isDeliveryPending`/`isReturnable`·`collectionStage`.
+**shim**: `collection.ts` · `dashboard-consts` IDLE/OUT · `contract-ops` 술어 → status.
+**잔여(후속)**: `status==='운행'` 산재 통일 · 매각대기 IDLE vs 처분예정 제품결정 · Vehicle360 손롤 상태.
 
 ### B-4. 필드 스키마 SSOT
 **현재**: 같은 엔티티에 필드 어휘가 **3벌**(entities.ts FieldDefs / 손으로 쓴 TS 타입 / EntityRecord 백). 어느 스키마에도 선언 안 된 **고스트 필드** 다수(`_paidTotal`·`_payments`·`_carryUnpaid`·`_key` 등) → 오타 한 번에 조용히 유실. `mileageOut`↔`returnMileage` 같은 **명명 비대칭**.
 
 **목표**: `lib/schema/` 에 엔티티별 선언 1벌 → FieldDefs·TS 타입·런타임 검증을 전부 파생. 손으로 쓴 `types/{contract,vehicle}.ts` 폐기.
 
-### B-5. 데이터 로딩층 전면 이행 — **진행 중**
-`lib/use-entity-lists.ts` 신설됨. 페이지 이행:
+### B-5. 데이터 로딩층 전면 이행 — **거의 완료(2026-07-21)**
+`lib/use-entity-lists.ts` (+ opts.companyId). 페이지 이행:
 - ✅ receivables · dispatch · asset · contract · contract-history · financials · payments · docs · audit · list/[entity]
 - ✅ integrity · inbox · penalty · manage · pnl · PenaltyDocs
-- ⬜ 잔여(특수): ingest(동적 entity/회사) · IngestDialog(`co`≠세션 가능) · company/[id] · Vehicle360/Customer360 · trash/settings
+- ✅ Vehicle360 · Customer360 · IngestDialog · ingest
+- ⬜ 잔여(특수·유지): company/[id](법인 id≠세션) · trash/settings(일회성 export)
 - 자금 3면은 이미 `useCashLedgerLists` / 홈·ops는 `useDashboardData`
 
 덤으로 해결됨: 로딩 UX 통일 · 저장반영 누락.
@@ -157,6 +161,8 @@ const { data: [cs, hs], loading } = useEntityLists(['contract', 'history']);
 | 원자 | 용도 |
 |---|---|
 | `lib/scope.ts` | 쓰기 대상 법인 해소 (`resolveWriteCompany`) |
+| `lib/commit.ts` | 쓰기 퍼널 (`commitUpdate`/`Save`/`Remove`/`All`) |
+| `lib/domain/status.ts` | 상태 어휘·파티션·술어·회수 SLA |
 | `lib/use-entity-lists.ts` | 목록 로딩 + 저장반영 + 튐방지 |
 | `lib/use-cash-ledger-lists.ts` | 자금 원장(bank_tx+card_tx) 전용 로딩 |
 | `lib/store.ts` `listsCached()` | 캐시 warm 체크 |

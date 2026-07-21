@@ -11,7 +11,7 @@ import { saveIntake } from '@/lib/intake';
 import { resolveWriteCompany, NEED_COMPANY } from '@/lib/scope';
 import { toast } from '@/lib/toast';
 import { matchPenalty } from '@/lib/penalty-match';
-import { Modal, Btn, Badge, Input, Select, C, won } from '@/components/ui';
+import { Modal, Btn, Badge, Input, Select, C, won, th } from '@/components/ui';
 import { UploadCloud, Trash2 } from 'lucide-react';
 // 과태료 업무의 시작 = 고지서 업로드. 다중 드롭 → OCR(자동) → 위반일시로 계약(임차인) 자동매칭 → 검토 → 저장.
 // GEMINI_API_KEY 없으면 자동추출 실패 → 각 행 수기입력으로 진행(플로우는 동일).
@@ -124,7 +124,7 @@ export function PenaltyUpload({ onClose, onSaved }: { onClose: () => void; onSav
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12, minWidth: 860 }}>
             <thead><tr style={{ background: C.head }}>
               {['상태', '차량번호', '위반일시', '위반내용', '금액', '실운전자(매칭)', '고지서', ''].map((h, i) => (
-                <th key={i} style={{ textAlign: i === 4 ? 'right' : 'left', padding: '7px 9px', fontSize: 11, color: '#33415a', fontWeight: 700, borderBottom: `2px solid #c4ccd8`, whiteSpace: 'nowrap' }}>{h}</th>
+                <th key={i} style={{ ...th, textAlign: i === 4 ? 'right' : 'left', padding: '7px 9px', fontSize: 11, borderRight: 'none', position: 'static' }}>{h}</th>
               ))}
             </tr></thead>
             <tbody>

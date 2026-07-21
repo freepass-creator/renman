@@ -9,7 +9,7 @@ import { useSession } from '@/lib/session';
 import { uploadToInbox } from '@/lib/inbox-upload';
 import { storageReady } from '@/lib/storage';
 import { toast } from '@/lib/toast';
-import { Sec, Btn, C } from '@/components/ui';
+import { Sec, Btn, C, SCRIM } from '@/components/ui';
 import { SignaturePad, dataUrlToFile } from '@/components/SignaturePad';
 import { Camera, Paperclip, PenLine } from 'lucide-react';
 
@@ -44,7 +44,7 @@ export function UploadSection() {
       </div>
       {!storageReady() && <div style={{ marginTop: 8, fontSize: 11.5, color: C.warn }}>※ 저장소(Firebase Storage) 미설정 시 업로드 불가</div>}
       {sign && (
-        <div onClick={() => { setSign(false); setSignData(null); }} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 60, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+        <div onClick={() => { setSign(false); setSignData(null); }} style={{ position: 'fixed', inset: 0, background: SCRIM, zIndex: 60, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
           <div onClick={(e) => e.stopPropagation()} style={{ background: C.taupeBg, border: `1px solid ${C.line}`, borderRadius: 'var(--radius)', boxShadow: 'var(--shadow-lg)', width: '100%', maxWidth: 420, padding: 16 }}>
             <div style={{ fontSize: 14, fontWeight: 800, color: C.ink, marginBottom: 10 }}>서명</div>
             <SignaturePad onChange={setSignData} />

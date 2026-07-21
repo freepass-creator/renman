@@ -114,7 +114,7 @@ export function InfoDoc({
       <KV rows={fields} editing={editing} form={form} onChange={onChange} />
 
       {/* 서류 행 — 현재 파일 열기/미첨부 + 버전 메타 */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8, padding: '0 12px', minHeight: 34, border: `1px solid ${C.line}`, borderRadius: 'var(--radius)', background: '#fff', fontSize: 12.5, flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8, padding: '0 12px', minHeight: 34, border: `1px solid ${C.line}`, borderRadius: 'var(--radius)', background: C.card, fontSize: 12.5, flexWrap: 'wrap' }}>
         <FileText size={14} color={C.sub} />
         <span style={{ color: C.mute }}>{label}</span>
         {current
@@ -142,7 +142,7 @@ export function InfoDoc({
             <label
               onDragOver={(e) => { e.preventDefault(); setDrag(true); }} onDragLeave={() => setDrag(false)}
               onDrop={(e) => { e.preventDefault(); setDrag(false); onFile(e.dataTransfer.files?.[0]); }}
-              style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, padding: '18px 16px', border: `1.5px dashed ${drag ? C.accent : C.line}`, borderRadius: 'var(--radius)', background: drag ? 'var(--bg-hover)' : '#fff', cursor: 'pointer', textAlign: 'center' }}>
+              style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, padding: '18px 16px', border: `1.5px dashed ${drag ? C.accent : C.line}`, borderRadius: 'var(--radius)', background: drag ? 'var(--bg-hover)' : C.card, cursor: 'pointer', textAlign: 'center' }}>
               <UploadCloud size={24} color={C.sub} strokeWidth={1.7} />
               <div style={{ fontSize: 12.5, fontWeight: 700, color: C.ink }}>{busy ? '분석 중…' : `${label} 파일을 끌어다 놓거나 클릭해서 선택`}</div>
               <div style={{ fontSize: 11.5, color: C.faint }}>{busy ? 'Storage 업로드 · OCR 재추출' : 'JPG · PNG · PDF · 올리면 OCR로 자동 채웁니다'}</div>
@@ -184,7 +184,7 @@ export function InfoDoc({
             <ChevronDown size={13} color={C.sub} style={{ transform: histOpen ? 'none' : 'rotate(-90deg)', transition: 'transform .15s' }} /> 서류 이력 {docs.length}
           </button>
           {histOpen && (
-            <div style={{ marginTop: 6, border: `1px solid ${C.line}`, borderRadius: 'var(--radius)', overflow: 'hidden', background: '#fff' }}>
+            <div style={{ marginTop: 6, border: `1px solid ${C.line}`, borderRadius: 'var(--radius)', overflow: 'hidden', background: C.card }}>
               {docs.map((d, i) => (
                 <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 12px', fontSize: 11.5, borderTop: i ? `1px solid var(--border-soft)` : 'none' }}>
                   <span style={{ fontWeight: 700, color: C.ink, fontVariantNumeric: 'tabular-nums' }}>v{d.v}</span>

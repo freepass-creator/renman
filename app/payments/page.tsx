@@ -8,8 +8,7 @@
  */
 import { useCallback, useMemo, useState } from 'react';
 import { useSession } from '@/lib/session';
-import { getStore } from '@/lib/store';
-import { notifySaved, openCar, openCustomer } from '@/lib/ui-bus';
+import { openCar, openCustomer } from '@/lib/ui-bus';
 import { customerKey } from '@/lib/customers';
 import { companyLabel } from '@/lib/companies';
 import { type EntityRecord } from '@/lib/intake/entities';
@@ -21,8 +20,10 @@ import type { BankTransaction } from '@/lib/payments/types';
 import { lockReason } from '@/lib/finance/period-lock';
 import { safeUpdate } from '@/lib/safe-update';
 import { useBusyAction } from '@/lib/use-busy-action';
+import { resolveWriteCompany, NEED_COMPANY } from '@/lib/scope';
+import { commitUpdate, commitAll } from '@/lib/commit';
 import { visibleSecs } from '@/lib/lens-filters';
-import { FacetPage, Sec, Cards, Metric, Badge, Btn, EmptyState, ListBox, ListRow, Input, C, won, SPACE_M, type BadgeTone, PageLoading } from '@/components/ui';
+import { FacetPage, Sec, Cards, Metric, Badge, Btn, EmptyState, SCRIM, ListBox, ListRow, Input, C, won, SPACE_M, type BadgeTone, PageLoading } from '@/components/ui';
 import { FacetRail } from '@/components/FacetRail';
 import { WorkbenchBar } from '@/components/WorkbenchBar';
 import { WorkHubBack } from '@/components/WorkHubTabs';
@@ -118,15 +119,14 @@ export default function PaymentsPage() {
         for (const { id, patch } of patches) {
           const trec = txByKey.get(id);
           if (!trec || trec.settlementId) { okAll = false; break; }
-          const txCo = String(trec.companyId || companyId);
+          if (!resolveWriteCompany(companyId, trec)) { okAll = false; break; }
           const ok = await safeUpdate(async () => {
-            await getStore().update('bank_tx', txCo, String(trec._key), patch);
+            await commitUpdate({ entity: 'bank_tx', sessionCompanyId: companyId, rec: trec, key: String(trec._key), patch });
           });
           if (ok == null) { okAll = false; break; }
         }
         if (okAll) applied++; else skipped++;
       }
-      notifySaved();
       setApplying(false);
       const lockNote = locked ? ` · 마감월 ${locked}` : '';
       setMsg(`CMS 집금정산 ${applied}건${skipped ? ` · 건너뜀 ${skipped}${lockNote}` : ''}`);
@@ -149,16 +149,21 @@ export default function PaymentsPage() {
         if (!crec || !trec || trec.matchedContractId) { skipped++; continue; }
         const existing = Array.isArray(crec._payments) ? (crec._payments as Array<Record<string, unknown>>) : [];
         if (existing.some((p) => p.txId === r.tx.id)) { skipped++; continue; }
-        const co = String(crec.companyId || companyId);
-        const txCo = String(trec.companyId || companyId);
+        const co = resolveWriteCompany(companyId, crec);
+        const txCo = resolveWriteCompany(companyId, trec);
+        if (!co || !txCo) { skipped++; continue; }
         const newPayments = [...existing, { seq: r.candidate.scheduleSeq, date: r.tx.txDate, amount: r.tx.amount, source: '계좌', txId: r.tx.id }];
         const ok = await safeUpdate(async () => {
-          await getStore().update('contract', co, String(crec._key), { _payments: newPayments });
-          await getStore().update('bank_tx', txCo, String(trec._key), { matchedContractId: String(crec._key), matchedScheduleSeq: r.candidate.scheduleSeq, matchedAt: new Date().toISOString(), subject: '대여료수입', category: '대여료수입' });
+          await commitAll([
+            { entity: 'contract', sessionCompanyId: companyId, rec: crec, key: String(crec._key), patch: { _payments: newPayments } },
+            {
+              entity: 'bank_tx', sessionCompanyId: companyId, rec: trec, key: String(trec._key),
+              patch: { matchedContractId: String(crec._key), matchedScheduleSeq: r.candidate.scheduleSeq, matchedAt: new Date().toISOString(), subject: '대여료수입', category: '대여료수입' },
+            },
+          ]);
         });
         if (ok != null) applied++; else skipped++;
       }
-      notifySaved();
       setApplying(false);
       const lockNote = locked ? ` · 마감월 ${locked}` : '';
       setMsg(`매칭 적용 ${applied}건${skipped ? ` · 건너뜀 ${skipped}${lockNote}` : ''} — 미수에 반영됨`);
@@ -174,13 +179,23 @@ export default function PaymentsPage() {
     if (!trec) return;
     const crec = cs.find((r) => String(r._key) === String(t.matchedContractId));
     await safeUpdate(async () => {
+      const ops = [];
       if (crec) {
         const existing = Array.isArray(crec._payments) ? (crec._payments as Array<Record<string, unknown>>) : [];
-        await getStore().update('contract', String(crec.companyId || companyId), String(crec._key), { _payments: existing.filter((p) => p.txId !== t.id) });
+        if (!resolveWriteCompany(companyId, crec)) { toast(NEED_COMPANY, 'error'); return; }
+        ops.push({
+          entity: 'contract', sessionCompanyId: companyId, rec: crec, key: String(crec._key),
+          patch: { _payments: existing.filter((p) => p.txId !== t.id) },
+        });
       }
-      await getStore().update('bank_tx', String(trec.companyId || companyId), String(trec._key), { matchedContractId: '', matchedScheduleSeq: '', matchedAt: '', subject: '', category: '' });
+      if (!resolveWriteCompany(companyId, trec)) { toast(NEED_COMPANY, 'error'); return; }
+      ops.push({
+        entity: 'bank_tx', sessionCompanyId: companyId, rec: trec, key: String(trec._key),
+        patch: { matchedContractId: '', matchedScheduleSeq: '', matchedAt: '', subject: '', category: '' },
+      });
+      await commitAll(ops);
     });
-    notifySaved(); toast('매칭 해제 — 미수 원복', 'info'); reload();
+    toast('매칭 해제 — 미수 원복', 'info'); reload();
   }
 
   async function manualMatch(t: BankTransaction, crec: EntityRecord) {
@@ -193,11 +208,20 @@ export default function PaymentsPage() {
     const mc = buildMatchContract(crec, TODAY);
     const unpaid = (mc.schedules ?? []).filter((s: { status: string }) => s.status !== '완료') as Array<{ seq: number }>;
     const seq = unpaid.length ? unpaid[0].seq : existing.length + 1;
-    const co = String(crec.companyId || companyId), txCo = String(trec.companyId || companyId);
+    const co = resolveWriteCompany(companyId, crec);
+    const txCo = resolveWriteCompany(companyId, trec);
+    if (!co || !txCo) { toast(NEED_COMPANY, 'error'); return; }
     try {
-      await getStore().update('contract', co, String(crec._key), { _payments: [...existing, { seq, date: t.txDate, amount: t.amount, source: '계좌', txId: t.id, manual: true }] });
-      await getStore().update('bank_tx', txCo, String(trec._key), { matchedContractId: String(crec._key), matchedScheduleSeq: seq, matchedAt: new Date().toISOString(), subject: '대여료수입', category: '대여료수입' });
-      notifySaved();
+      await commitAll([
+        {
+          entity: 'contract', sessionCompanyId: companyId, rec: crec, key: String(crec._key),
+          patch: { _payments: [...existing, { seq, date: t.txDate, amount: t.amount, source: '계좌', txId: t.id, manual: true }] },
+        },
+        {
+          entity: 'bank_tx', sessionCompanyId: companyId, rec: trec, key: String(trec._key),
+          patch: { matchedContractId: String(crec._key), matchedScheduleSeq: seq, matchedAt: new Date().toISOString(), subject: '대여료수입', category: '대여료수입' },
+        },
+      ]);
       toast(`${String(crec.contractorName || '')} · ${won(t.amount)} 연결 — 미수 반영`, 'success');
     } catch { toast('연결 실패', 'error'); }
     setManualTx(null); setMq(''); reload();
@@ -356,7 +380,7 @@ export default function PaymentsPage() {
       )}
 
       {manualTx && (
-        <div onClick={() => { setManualTx(null); setMq(''); }} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 60, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '10vh 16px 16px' }}>
+        <div onClick={() => { setManualTx(null); setMq(''); }} style={{ position: 'fixed', inset: 0, background: SCRIM, zIndex: 60, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '10vh 16px 16px' }}>
           <div onClick={(e) => e.stopPropagation()} style={{ background: C.taupeBg, border: `1px solid ${C.line}`, borderRadius: 'var(--radius)', boxShadow: 'var(--shadow-lg)', width: '100%', maxWidth: 440, padding: 16 }}>
             <div style={{ fontSize: 14, fontWeight: 800, color: C.ink }}>입금 수동 연결</div>
             <div style={{ fontSize: 12.5, color: C.mute, marginTop: 4 }}>{manualTx.txDate} · {manualTx.counterparty || '(적요없음)'} · <b style={{ color: C.ink }}>{won(manualTx.amount)}</b> → 계약 선택</div>

@@ -71,6 +71,21 @@ curl -s -o /dev/null -w "%{http_code}" http://localhost:6006/<route>   # 200
 
 | 날짜 | 작업자 | 내용 | 상태 |
 |---|---|---|---|
+| 2026-07-21 | Claude | **원자 테마화 완결**: `components/ui/**` hex 0(`SCRIM_FG` 예외 1) — 표면`#fff`→`C.card` · 브랜드위 글자→`C.inverse` · `Message`/`Badge` 팔레트 통째로 `--{tone}-bg/text/border`로 · globals.css `--teal-*` 삼종 신설(라이트+다크) | tsc 0 / 10p 200 |
+| 2026-07-21 | Claude | 스크림 SSOT: `SCRIM`/`SCRIM_FG`(tokens) — 5가지 값으로 흩어져 있던 7곳(Drawer·Modal·SessionBar·payments·CommandPalette·UploadSection·LoadingOverlay) 통일 | tsc 0 / 11p 200 |
+| 2026-07-21 | Claude | `.cursor/rules/renman.mdc` 신설(Cursor 자동로딩) · **PenaltyDocs 문서면 되돌림**: A4 종이는 토큰 금지(`PAPER/INK/INK_SUB/RULE…` 고정) — 다크테마에서 종이가 검어지고 인쇄 시 흰종이+흰글자로 판독불가가 됨. 화면 크롬만 토큰 | tsc 0 / 9p 200 |
+| 2026-07-21 | Cursor | tokenize-2: 잔여 `#fff`→`C.card`(Agenda/SearchBox/InfoDoc 등) · dev/data th/td 재사용 · 예외 주석 · CommandPalette `C` import 누락 자체수정 | tsc 0 |
+| 2026-07-21 | Claude | 3단계: WorkForm 타이틀밑줄·manage 박스래퍼 제거 · PenaltyDocs→`EmptyState` · Vehicle360 잔여 hex 5 | tsc 0 / 6p 200 |
+| 2026-07-21 | Claude | 2단계: 현장 위저드 공용원자 `components/ui/wizard.tsx`(`WizCard`/`WizField`/`WizPhotos`/`wizInput`) — Delivery·Return 중복 40줄 소멸. ※Row는 정렬·필드폭이 달라 의도적으로 미통합 | tsc 0 / 6p 200 |
+| 2026-07-21 | Cursor | 하드코딩 색 토큰화(CURSOR-TASK-tokenize): PenaltyDocs·manage·ingest·list·audit·360 fInp | tsc 0 |
+| 2026-07-21 | Claude | 1단계 근원: `tokens.tsx` 하드코딩 제거(`C.lineStrong`/`inverse`/`card` 추가) — `toggleStyle` 활성칩이 다크에서 안 보이던 버그 동반 수정 · PenaltyUpload 복붙 th→`...th` | tsc 0 |
+| 2026-07-21 | Cursor | B-2 잔여: contract/receivables/inbox/penalty/list상세/IngestDialog/DocIssueDialog/inbox-upload → `commit*` | tsc 0 |
+| 2026-07-21 | Cursor | B-2 확장: `commitSave/Remove/All` · Vehicle360 전 쓰기 · payments 매칭/CMS/해제 | tsc 0 |
+| 2026-07-21 | Cursor | B-3: 죽은 lifecycle/risk-issues 삭제 · `domain/status` SSOT · B-2: `commitUpdate`+Delivery/ReturnWizard | tsc 0 / audit OK |
+| 2026-07-21 | Cursor | 파이프 순서: 미수 audit OK(본격 B-1 보류) · B-5 360/Ingest/ingest→`useEntityLists`(+opts.companyId) · API/Rules는 login·Vercel link 필요(운영) | tsc 0 / audit OK |
+| 2026-07-21 | Cursor | 파이프라인 재검증(canvas) · `/sheet` 운영시트(프리패스 엑셀뷰 이식 · `ExcelSheet`+`buildSheetRows`) · 현황 메뉴 | tsc 0 |
+| 2026-07-21 | Cursor | 모바일 감사 수정: KV/QuickLog/WorkForm/Ingest 입력 `ctrlH`·16 · DataTable→ObjCard · company `WorkbenchBar.actions`+Sec · error btn40/16 · SessionBar pad=54 | tsc 0 |
+| 2026-07-21 | Cursor | 오픈게이트: B-1완화(carry분배→FIFO수납)·API Bearer(`api-headers`+NEXT_PUBLIC_API_SHARED_SECRET)·합본쓰기 scope(payments·360·receivables·contract·inbox) · Rules배포는 firebase login 필요 | tsc 0 / audit OK |
 | 2026-07-21 | Cursor | `main` 푸시 `89682ff` → GitHub `freepass-creator/renman` (Vercel 연동 배포용) | pushed |
 | 2026-07-21 | Cursor | B-5 2차: integrity·inbox·penalty·manage·pnl·PenaltyDocs → `useEntityLists` · 잔여=ingest/IngestDialog/360 | tsc 0 / 5p 200 |
 | 2026-07-21 | Cursor | B-5 착수: `useEntityLists` 이행 — receivables·dispatch·asset·contract·contract-history·financials·payments·docs·audit·list/[entity] · §2 A완료·B-5다음으로 정리 | tsc 0 / 11p 200 |

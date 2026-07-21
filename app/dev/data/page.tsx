@@ -13,8 +13,8 @@ import { reflectCompany } from '@/lib/reflect';
 import { type OperatingSummary } from '@/lib/operating-snapshot';
 import { OperatingSummaryView } from '@/components/OperatingSummary';
 import { COMPANIES, companyLabel, companyShort } from '@/lib/companies';
-import { Page, Panel, Btn, C } from '@/components/ui';
-import { LoadingOverlay } from '@/components/Spinner';
+import { Page, Panel, Btn, C, LoadingOverlay, th, td } from '@/components/ui';
+
 import { seedDemoData } from '@/lib/seed';
 
 const REAL = new Set(['switchplan']); // 실데이터 보유 회사
@@ -97,8 +97,6 @@ export default function DevDataPage() {
 
   if (!isOperator) return <Page title="개발도구"><div style={{ padding: 20, color: C.mute }}>본사(마스터) 전용입니다.</div></Page>;
 
-  const th: React.CSSProperties = { textAlign: 'left', padding: '9px 12px', fontSize: 11.5, fontWeight: 700, color: C.mute, borderBottom: `1px solid ${C.line}`, whiteSpace: 'nowrap' };
-  const td: React.CSSProperties = { padding: '10px 12px', fontSize: 13, color: C.ink, borderBottom: `1px solid ${C.line}`, verticalAlign: 'middle' };
   const num = (n: number | undefined) => <span style={{ fontFamily: 'var(--font-mono)', fontVariantNumeric: 'tabular-nums' }}>{n ?? '—'}</span>;
 
   return (

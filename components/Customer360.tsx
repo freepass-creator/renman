@@ -1,8 +1,6 @@
 'use client';
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { useSession } from '@/lib/session';
-import { getStore, listsCached } from '@/lib/store';
-import { type EntityRecord } from '@/lib/intake/entities';
+import { useEffect, useMemo, useState } from 'react';
+import { useEntityLists } from '@/lib/use-entity-lists';
 import { computeContractView } from '@/lib/contract-ops';
 import { findCustomer } from '@/lib/customers';
 import { collectionStage } from '@/lib/collection';
@@ -19,22 +17,8 @@ function commTone(cat: string): 'green' | 'purple' | 'gray' {
 
 /** 한 고객(손님)의 360 — 계약·미수·이력을 고객 단위로. 제목은 DetailShell(onTitle). */
 export function Customer360({ ckey, onTitle }: { ckey: string; onTitle?: (name: string) => void }) {
-  const { companyId } = useSession();
-  const [contracts, setContracts] = useState<EntityRecord[]>([]);
-  const [history, setHistory] = useState<EntityRecord[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [tick, setTick] = useState(0);
+  const { data: [contracts = [], history = []], loading } = useEntityLists(['contract', 'history']);
   const [logOpen, setLogOpen] = useState(false);
-  const loadedKey = useRef<string | null>(null);
-  useEffect(() => { function onSaved() { setTick((t) => t + 1); } window.addEventListener('jpk:saved', onSaved); return () => window.removeEventListener('jpk:saved', onSaved); }, []);
-  useEffect(() => {
-    const store = getStore();
-    const warm = listsCached(['contract', 'history'], companyId);
-    if (loadedKey.current !== companyId && !warm) setLoading(true);
-    Promise.all([store.list('contract', companyId), store.list('history', companyId)])
-      .then(([cs, his]) => { setContracts(cs); setHistory(his); setLoading(false); loadedKey.current = companyId; })
-      .catch(() => setLoading(false));
-  }, [companyId, tick]);
 
   const cust = useMemo(() => (loading ? null : findCustomer(contracts, ckey, TODAY)), [loading, contracts, ckey]);
   useEffect(() => { if (cust?.name) onTitle?.(cust.name); }, [cust?.name, onTitle]);

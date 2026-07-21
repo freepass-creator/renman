@@ -9,6 +9,7 @@ import { openCar, openIngest } from '@/lib/ui-bus';
 import { WORK_PAGES } from '@/lib/work-hub';
 import { tierIncludes } from '@/lib/tier';
 import { Car, LayoutGrid, Plus, Search, type LucideIcon } from 'lucide-react';
+import { C, SCRIM } from '@/components/ui';
 
 type Item = { Icon: LucideIcon; label: string; sub?: string; run: () => void };
 
@@ -70,8 +71,8 @@ export function CommandPalette() {
   if (!open) return null;
 
   return (
-    <div onClick={() => setOpen(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.35)', zIndex: 100, display: 'flex', justifyContent: 'center', alignItems: 'flex-start', paddingTop: '11vh' }}>
-      <div onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: 560, background: '#fff', borderRadius: 10, boxShadow: '0 24px 64px rgba(0,0,0,0.32)', overflow: 'hidden', border: '1px solid var(--border)' }}>
+    <div onClick={() => setOpen(false)} style={{ position: 'fixed', inset: 0, background: SCRIM, zIndex: 100, display: 'flex', justifyContent: 'center', alignItems: 'flex-start', paddingTop: '11vh' }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: 560, background: C.card, borderRadius: 10, boxShadow: '0 24px 64px rgba(0,0,0,0.32)', overflow: 'hidden', border: '1px solid var(--border)' }}>
         <input ref={inputRef} value={q}
           onChange={(e) => { setQ(e.target.value); setSel(0); }}
           onKeyDown={(e) => {

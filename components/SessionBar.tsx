@@ -8,14 +8,14 @@ import { useAppBarSlots } from '@/lib/appbar';
 import { useIsMobile } from '@/lib/use-mobile';
 import { MobileTabBar } from '@/components/MobileTabBar';
 import { haptic } from '@/lib/haptics';
-import { C, ctrlH, IconBtn } from '@/components/ui';
+import { C, SCRIM, ctrlH, IconBtn } from '@/components/ui';
 import { NAV_GROUPS } from '@/lib/nav';
 import { tierIncludes } from '@/lib/tier';
 
 // 상단 좌측 브랜드 = 이 ERP를 쓰는 운영사(테넌트) 이름. 임시 하드코딩 — 추후 로그인 유저의 소속회사로.
 const OPERATOR_BRAND = 'teamjpk';
 
-// 메뉴 = lib/nav NAV_GROUPS SSOT (현황=보기 · 비즈니스=손대기 · 경영=지표).
+// 메뉴 = lib/nav NAV_GROUPS SSOT (현황=보기 · 업무=손대기 · 경영=지표).
 const navGroups = () => NAV_GROUPS
   .map((g) => ({ ...g, items: g.items.filter((it) => tierIncludes(it.tier ?? '라이트')) }))
   .filter((g) => g.items.length > 0);
@@ -55,7 +55,7 @@ function MobileMenu({ open, onClose }: { open: boolean; onClose: () => void }) {
   if (!open) return null;
   return (
     <>
-      <div onClick={onClose} style={{ position: 'fixed', top: 54, left: 0, right: 0, bottom: 0, zIndex: 58, background: 'rgba(0,0,0,0.4)', animation: 'fadeIn .15s ease' }} />
+      <div onClick={onClose} style={{ position: 'fixed', top: 54, left: 0, right: 0, bottom: 0, zIndex: 58, background: SCRIM, animation: 'fadeIn .15s ease' }} />
       <div style={{ position: 'fixed', top: 54, left: 0, right: 0, zIndex: 59, maxHeight: 'calc(100dvh - 54px)', overflowY: 'auto', overscrollBehavior: 'contain', background: C.taupeBg, borderBottom: `1px solid ${line}`, boxShadow: 'var(--shadow-lg)', animation: 'menuDrop .18s cubic-bezier(.2,.8,.2,1)', WebkitOverflowScrolling: 'touch' }}>
         <div style={{ padding: '4px 0 16px' }}>
           {navGroups().map((g, gi) => (
@@ -89,8 +89,8 @@ export default function TopBar() {
   useEffect(() => { setMenuOpen(false); }, [pathname]);
   useEffect(() => {
     document.body.style.paddingBottom = mobile
-      ? (depth ? 'env(safe-area-inset-bottom)' : 'calc(56px + env(safe-area-inset-bottom))')
-      : (showBottom ? '56px' : '');
+      ? (depth ? 'env(safe-area-inset-bottom)' : 'calc(54px + env(safe-area-inset-bottom))')
+      : (showBottom ? '54px' : '');
     return () => { document.body.style.paddingBottom = ''; };
   }, [showBottom, mobile, depth]);
   const [todayLabel, setTodayLabel] = useState('');

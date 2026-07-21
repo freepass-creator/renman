@@ -9,6 +9,7 @@ import { useMemo, useState } from 'react';
 import { useSession } from '@/lib/session';
 import { saveIntake } from '@/lib/intake';
 import { notifySaved } from '@/lib/ui-bus';
+import { apiAuthHeaders } from '@/lib/api-headers';
 import { Modal, Btn, C, toggleStyle } from '@/components/ui';
 import { useIsMobile } from '@/lib/use-mobile';
 
@@ -77,7 +78,7 @@ export function NotifyDialog({ recipients, onClose, onSent }: {
     for (const r of targets) {
       try {
         const res = await fetch('/api/notify', {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          method: 'POST', headers: apiAuthHeaders({ 'Content-Type': 'application/json' }),
           body: JSON.stringify({ tel: r.phone, message: fill(body, r), subject: label }),
         });
         const json = await res.json();
@@ -147,7 +148,7 @@ export function NotifyDialog({ recipients, onClose, onSent }: {
               <span style={{ fontFamily: 'var(--font-mono)', color: isLong ? C.warn : C.mute }}>{body.length}자 · {isLong ? 'LMS' : 'SMS'}</span>
             </div>
             <textarea value={body} onChange={(e) => setBody(e.target.value)} placeholder="문자 본문을 입력하세요"
-              style={{ flex: 1, minHeight: 150, padding: 12, border: `1px solid ${C.line}`, borderRadius: 8, fontSize: 13, fontFamily: 'inherit', lineHeight: 1.6, resize: 'vertical', outline: 'none', color: C.ink, background: '#fff' }} />
+              style={{ flex: 1, minHeight: 150, padding: 12, border: `1px solid ${C.line}`, borderRadius: 8, fontSize: 13, fontFamily: 'inherit', lineHeight: 1.6, resize: 'vertical', outline: 'none', color: C.ink, background: C.card }} />
           </div>
           {targets[0] && (
             <div style={{ fontSize: 12, color: C.mute }}>

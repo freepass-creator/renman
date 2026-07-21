@@ -7,6 +7,7 @@ import { useSession } from '@/lib/session';
 import { COMPANIES, ALL_COMPANIES, companyLabel, companyShort } from '@/lib/companies';
 import { loadMaster, MODULE_CATALOG } from '@/lib/company-master';
 import { Page, C, ActionTile, SPACE_M } from '@/components/ui';
+import { WorkbenchBar } from '@/components/WorkbenchBar';
 
 export default function CompanyListPage() {
   const { companyId, isOperator } = useSession();
@@ -20,7 +21,7 @@ export default function CompanyListPage() {
   const list = isOperator ? COMPANIES : [companyId].filter((c) => c && c !== ALL_COMPANIES);
 
   return (
-    <Page title="법인관리" meta="법인별 전용 워크스페이스 — 소재지·차고지·등록대수·증차신청·공문">
+    <Page title="법인관리" meta="법인별 전용 워크스페이스 — 소재지·차고지·등록대수·증차신청·공문" tools={<WorkbenchBar />}>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(260px,1fr))', gap: SPACE_M, marginTop: 8 }} data-tick={tick}>
         {list.map((c) => {
           const m = loadMaster(c);

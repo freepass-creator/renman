@@ -1,6 +1,6 @@
 /**
- * 비즈니스(업무) SSOT — 이벤트 처리 목록. 메뉴·허브(/work)가 여기를 따른다.
- *   현황(원장 보기) ≠ 비즈니스(손대기). 생각날 때 WORK_PAGES에 추가.
+ * 업무 SSOT — 이벤트 처리 목록. 메뉴·허브(/work)가 여기를 따른다.
+ *   현황(원장 보기) ≠ 업무(손대기). 생각날 때 WORK_PAGES에 추가.
  *   메뉴 라벨 = 업무 말투(○○관리 · 일보 · 등록).
  *
  * Sec 파이프: WorkPipe to="…" — 손롤 <a href> 금지. PIPE SSOT.
@@ -17,7 +17,7 @@ export const WORK_PAGES = [
 
 export type WorkPageHref = (typeof WORK_PAGES)[number]['href'];
 
-/** Sec·카드 → 메뉴 페이지. 비즈니스 + 현황(원장 보기). */
+/** Sec·카드 → 메뉴 페이지. 업무 + 현황(원장 보기). */
 export const PIPE = {
   dispatch: { href: '/dispatch', label: '배차관리' },
   receivables: { href: '/receivables', label: '미수관리' },
@@ -30,12 +30,13 @@ export const PIPE = {
   finance: { href: '/finance', label: '재무현황' },
   asset: { href: '/asset', label: '자산현황' },
   contract: { href: '/contract', label: '계약현황' },
+  sheet: { href: '/sheet', label: '운영시트' },
 } as const;
 export type PipeId = keyof typeof PIPE;
 
 const WORK_HREFS: string[] = WORK_PAGES.map((p) => p.href);
 
-/** 비즈니스 허브·업무/입력 페이지 경로 여부 (모바일 탭 하이라이트). */
+/** 업무 허브·업무/입력 페이지 경로 여부 (모바일 탭 하이라이트). */
 export function isWorkPath(pathname: string): boolean {
   if (pathname === '/work' || pathname.startsWith('/work/')) return true;
   if (pathname.startsWith('/field') || pathname === '/m') return true;

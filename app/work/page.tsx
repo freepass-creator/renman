@@ -20,11 +20,11 @@ export default function WorkHubPage() {
   return (
     <Page
       title="업무현황"
-      meta={`${scopeAll ? '전체 회사' : companyLabel(companyId)} · 비즈니스·입력 한눈`}
+      meta={`${scopeAll ? '전체 회사' : companyLabel(companyId)} · 업무·입력 한눈`}
       tools={<WorkbenchBar search />}
     >
       {work.length > 0 && (
-        <Sec title="비즈니스" desc="현장 처리 · 하나를 고르면 그 페이지만">
+        <Sec title="업무" desc="현장 처리 · 하나를 고르면 그 페이지만">
           <div style={{ display: 'flex', flexDirection: 'column', gap: SPACE_M }}>
             {work.map((p) => (
               <ObjCard

@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import { useSession } from '@/lib/session';
 import { ALL_COMPANIES, COMPANIES, companyLabel } from '@/lib/companies';
-import { getStore } from '@/lib/store';
+import { useEntityList } from '@/lib/use-entity-lists';
 import { saveIntake, resolveAnchor, normalizePlate } from '@/lib/intake';
 import { ENTITIES, mapOcrToEntity, type EntityRecord, type Field } from '@/lib/intake/entities';
 import { callOcrExtract, type OcrOriginal } from '@/lib/ocr-client';
@@ -11,6 +11,7 @@ import { pushDocVersion } from '@/lib/docs';
 import { Modal, FormGrid, Btn, Badge, StatusTag, OcrCrosscheck, ActionGrid, ActionTile, ListBox, ListRow, Input, Select, C } from '@/components/ui';
 import { type CrosscheckResult } from '@/lib/ocr-crosscheck';
 import { resolveWriteCompany, NEED_COMPANY } from '@/lib/scope';
+import { commitUpdate } from '@/lib/commit';
 import { toast } from '@/lib/toast';
 import { Car, FileText, ShieldCheck, Receipt, User, Wrench, UploadCloud, Wallet } from 'lucide-react';
 
@@ -48,7 +49,6 @@ export function IngestDialog({ onClose, onSaved, presetPlate, presetType, editRe
   const [docBusy, setDocBusy] = useState(false);
   const [doc, setDoc] = useState<{ name: string; url: string; ocr?: Record<string, unknown>; ocrOriginal?: OcrOriginal; crosscheck?: CrosscheckResult; ok: boolean } | null>(null);
   // 앵커(차량) 우선 — 차량번호를 먼저 확정하면 입력칸이 열린다. presetPlate로 열리면 이미 확정.
-  const [vehicles, setVehicles] = useState<EntityRecord[]>([]);
   const [anchorConfirmed, setAnchorConfirmed] = useState<boolean>(!!presetPlate || editing);
   const [plateQuery, setPlateQuery] = useState<string>(presetPlate || '');
 
@@ -61,20 +61,16 @@ export function IngestDialog({ onClose, onSaved, presetPlate, presetType, editRe
     : [];
 
   // 앵커 유형이면 해당 회사 차량 로드(자동완성 소스). 회사·유형 바뀌면 재조회.
-  useEffect(() => {
-    if (!anchored || !co) return;
-    let alive = true;
-    getStore().list('vehicle', co).then((vs) => { if (alive) setVehicles(vs); }).catch(() => {});
-    return () => { alive = false; };
-  }, [co, anchored]);
+  const { rows: vehicles } = useEntityList('vehicle', { companyId: anchored && co ? co : undefined });
+  // 앵커 미선택/회사 미정일 때 훅은 세션 스코프로 돌아감 — 아래는 앵커+co 있을 때만 씀.
 
   // preset/확정된 앵커의 차명 프리필(폼에 carName 필드가 있고 비어 있을 때).
   useEffect(() => {
-    if (!anchored || !anchorConfirmed || !hasCarName) return;
+    if (!anchored || !anchorConfirmed || !hasCarName || !co) return;
     const p = String(form.plate || ''); if (!p || form.carName) return;
     const hit = resolveAnchor(vehicles, p);
     if (hit?.carName) setForm((f) => (f.carName ? f : { ...f, carName: String(hit.carName) }));
-  }, [vehicles, anchored, anchorConfirmed, hasCarName, form.plate, form.carName]);
+  }, [vehicles, anchored, anchorConfirmed, hasCarName, form.plate, form.carName, co]);
 
   const qText = plateQuery.trim();
   const q = normalizePlate(plateQuery);
@@ -132,8 +128,14 @@ export function IngestDialog({ onClose, onSaved, presetPlate, presetType, editRe
         if (doc.ocrOriginal) rec._ocrOriginal = doc.ocrOriginal;
       }
       if (editing) {
-        // 정정 = 기존 레코드 부분갱신(자연키·_key 보존, 감사는 store.update). 신규생성 아님.
-        await getStore().update(entity.key, String(editRec!.companyId || target), String(editRec!._key || ''), rec);
+        // 정정 = 기존 레코드 부분갱신(자연키·_key 보존). 신규생성 아님.
+        await commitUpdate({
+          entity: entity.key,
+          sessionCompanyId: companyId,
+          rec: editRec!,
+          key: String(editRec!._key || ''),
+          patch: rec,
+        });
       } else {
         // 단일 파이프라인 통과(정규화 균일). onSaved가 이미 반영(notifySaved) → 이중반영 방지로 notify:false.
         await saveIntake(entity.key, target, [rec], { notify: false });
@@ -172,7 +174,7 @@ export function IngestDialog({ onClose, onSaved, presetPlate, presetType, editRe
               </label>
               <Input autoFocus value={plateQuery} onChange={(e) => setPlateQuery(e.target.value)}
                 placeholder="차량번호 입력 (예: 24가1005) · 차명으로도 검색"
-                style={{ width: '100%', borderColor: C.accent, fontSize: 15 }} />
+                style={{ width: '100%', borderColor: C.accent }} />
               <div style={{ maxHeight: 260, overflowY: 'auto' }}>
                 <ListBox>
                   {suggestions.map((v) => (

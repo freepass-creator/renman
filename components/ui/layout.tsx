@@ -40,7 +40,7 @@ export function Page({ title, meta, left, mid, right, tools, children, fill, bac
             {tools != null && <div style={{ flex: 1, minWidth: 0 }}>{tools}</div>}
           </div>
         )}
-        {right != null && tools == null && <><span style={{ flex: 1, minWidth: 8 }} />{right}</>}
+        {right != null && <><span style={{ flex: tools != null ? 0 : 1, minWidth: tools != null ? 0 : 8 }} />{right}</>}
       </div>
       {children}
     </main>

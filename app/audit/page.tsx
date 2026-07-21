@@ -4,7 +4,7 @@ import { useSession } from '@/lib/session';
 import { companyLabel } from '@/lib/companies';
 import { ENTITIES } from '@/lib/intake/entities';
 import { AUDIT_ACTION_LABEL, type AuditLog } from '@/lib/audit';
-import { FacetPage, Sec, EmptyState, Badge, Btn, C, type BadgeTone, PageLoading } from '@/components/ui';
+import { FacetPage, Sec, EmptyState, Badge, Btn, C, th, td, type BadgeTone, PageLoading } from '@/components/ui';
 import { FacetRail } from '@/components/FacetRail';
 import { WorkbenchBar } from '@/components/WorkbenchBar';
 import { useIsMobile } from '@/lib/use-mobile';
@@ -55,9 +55,6 @@ export default function AuditPage() {
     (actionSel.length === 0 || actionSel.includes(r.action)) &&
     (entitySel.length === 0 || entitySel.includes(r.entityType)) &&
     textMatch(q, r.label, r.by, r.byEmail, entLabel(r.entityType), AUDIT_ACTION_LABEL[r.action], r.entityId));
-
-  const th: React.CSSProperties = { textAlign: 'left', padding: '7px 10px', fontSize: 11, fontWeight: 700, color: C.mute, borderBottom: `1px solid ${C.line}`, whiteSpace: 'nowrap' };
-  const td: React.CSSProperties = { padding: '8px 10px', fontSize: 12.5, color: C.ink, borderBottom: `1px solid ${C.line}`, verticalAlign: 'top' };
 
   return (
     <FacetPage

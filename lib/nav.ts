@@ -4,13 +4,13 @@
  * 데이터 층 = lib/domain/layers · 티어 = lib/tier.
  *
  * 라이트 = 홈·마이·현황(+설정·검색). 처리는 홈/마이 그자리(context).
- * 스탠다드+ = 메뉴「비즈니스」(배차·미수·자금일보·정비…). 경영 지표 = 비즈니스 티어.
+ * 스탠다드+ = 메뉴「업무」(배차·미수·자금일보·정비…). 경영 지표 = 비즈니스 티어(상품 등급명).
  * `BUILD_TIER`=`lib/tier`.
  *
  * 입력 두 입구: 한곳(batch)=담기/수집함(허브 안) · 그자리(context)=360·위저드·QuickLog.
  */
 import {
-  Home, LayoutDashboard, Car, FileText, Wallet, LayoutGrid,
+  Home, LayoutDashboard, Car, FileText, Wallet, LayoutGrid, Table2,
   ArrowLeftRight, ReceiptText, BookOpen, Wrench, TriangleAlert, Upload, Inbox,
   TrendingUp, Settings, type LucideIcon,
 } from 'lucide-react';
@@ -48,18 +48,19 @@ export const PAGE_IA: PageIA[] = [
   { href: '/asset', label: '자산현황', role: 'view', layer: 'ledger', tier: '라이트', assetKind: 'physical', view: '현물 생애(구매예정·등록예정·보유중·처분예정·처분완료)', grab: 'both', grabHow: '한곳=담기(차량) · 그자리=360·기록' },
   { href: '/contract', label: '계약현황', role: 'view', layer: 'ledger', tier: '라이트', assetKind: 'contract', view: '계약 생애(예정·중·완료) · 손님', grab: 'both', grabHow: '한곳=담기(계약) · 그자리=인도/반납/입금' },
   { href: '/finance', label: '재무현황', role: 'view', layer: 'ledger', tier: '라이트', assetKind: 'cash', view: '자금 생애(미분류·분류·원장)', grab: 'batch', grabHow: '한곳=담기(계좌) · 분류는 그자리' },
+  { href: '/sheet', label: '운영시트', role: 'view', layer: 'ledger', tier: '라이트', view: '함대·계약 엑셀형 한눈', grab: 'none', grabHow: '조회→360' },
 
-  // 스탠다드 — 메뉴「비즈니스」(현장 처리). 라벨은 업무 말투(관리·일보).
-  { href: '/work', label: '업무현황', role: 'work', layer: 'event', tier: '스탠다드', view: '비즈니스·입력 한눈', grab: 'none', grabHow: '배차·미수·자금일보·정비·과태료·자료등록·증빙' },
+  // 스탠다드 — 메뉴「업무」(현장 처리). 라벨은 업무 말투(관리·일보).
+  { href: '/work', label: '업무현황', role: 'work', layer: 'event', tier: '스탠다드', view: '업무·입력 한눈', grab: 'none', grabHow: '배차·미수·자금일보·정비·과태료·자료등록·증빙' },
   { href: '/dispatch', label: '배차관리', role: 'work', layer: 'event', tier: '스탠다드', view: '출고·반납·재고·이동', grab: 'context', grabHow: '위저드·메모·자료등록' },
   { href: '/receivables', label: '미수관리', role: 'work', layer: 'event', tier: '스탠다드', view: '연체 독촉·시동·내용증명', grab: 'context', grabHow: '연락기록·독촉·시동(그자리)' },
   { href: '/payments', label: '자금일보', role: 'work', layer: 'event', tier: '스탠다드', view: '입금매칭·CMS → 재무현황 공급', grab: 'none', grabHow: '원천=자료등록·계좌 · 여기는 매칭·분류 연결' },
   { href: '/repair', label: '정비관리', role: 'work', layer: 'event', tier: '스탠다드', view: '정비·사고·복귀', grab: 'both', grabHow: '자료등록(history)·QuickLog' },
   { href: '/penalty', label: '과태료관리', role: 'work', layer: 'event', tier: '스탠다드', view: '미매칭·진행·종결', grab: 'both', grabHow: '한곳=업로드/자료등록 · 그자리=매칭' },
-  { href: '/ingest', label: '자료등록', role: 'input', layer: 'ledger', tier: '스탠다드', view: '원장 자산 투입(OCR·엑셀·직접)', grab: 'batch', grabHow: '비즈니스 → 자료등록' },
-  { href: '/inbox', label: '증빙수집', role: 'input', layer: 'event', tier: '스탠다드', view: '현장 사진·서명 대기함', grab: 'batch', grabHow: '비즈니스 → 증빙수집' },
+  { href: '/ingest', label: '자료등록', role: 'input', layer: 'ledger', tier: '스탠다드', view: '원장 자산 투입(OCR·엑셀·직접)', grab: 'batch', grabHow: '업무 → 자료등록' },
+  { href: '/inbox', label: '증빙수집', role: 'input', layer: 'event', tier: '스탠다드', view: '현장 사진·서명 대기함', grab: 'batch', grabHow: '업무 → 증빙수집' },
 
-  // 비즈니스 — 경영 지표
+  // 경영 지표 (상품 티어명 = 비즈니스)
   { href: '/pnl', label: '손익현황', role: 'view', layer: 'metric', tier: '비즈니스', view: '현금 손익 집계', grab: 'none', grabHow: '조회만(원천=자금·담기)' },
   { href: '/vat', label: '부가세', role: 'view', layer: 'metric', tier: '비즈니스', view: '부가세 추정', grab: 'none', grabHow: '조회만' },
   { href: '/financials', label: '재무상태', role: 'view', layer: 'metric', tier: '비즈니스', view: '자산·부채 스냅샷', grab: 'none', grabHow: '조회만' },
@@ -84,7 +85,7 @@ export type NavGroup = { title: string; items: NavItem[] };
 
 /**
  * 햄버거 메뉴 — PAGE_IA tier 와 동기.
- * 라이트: 홈·마이·현황·설정. 스탠다드+: 「비즈니스」그룹. 경영 티어: 손익 등.
+ * 라이트: 홈·마이·현황·설정. 스탠다드+: 「업무」그룹. 경영 티어: 손익 등.
  */
 export const NAV_GROUPS: NavGroup[] = [
   { title: '', items: [
@@ -95,8 +96,9 @@ export const NAV_GROUPS: NavGroup[] = [
     { href: '/asset', label: '자산현황', icon: Car, tier: '라이트' },
     { href: '/contract', label: '계약현황', icon: FileText, tier: '라이트' },
     { href: '/finance', label: '재무현황', icon: Wallet, tier: '라이트' },
+    { href: '/sheet', label: '운영시트', icon: Table2, tier: '라이트' },
   ] },
-  { title: '비즈니스', items: [
+  { title: '업무', items: [
     { href: '/dispatch', label: '배차관리', icon: ArrowLeftRight, tier: '스탠다드' },
     { href: '/receivables', label: '미수관리', icon: ReceiptText, tier: '스탠다드' },
     { href: '/payments', label: '자금일보', icon: BookOpen, tier: '스탠다드' },

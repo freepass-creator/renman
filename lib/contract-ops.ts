@@ -6,10 +6,16 @@
  */
 import type { EntityRecord } from './intake/entities';
 import type { Contract, PaymentEntry, DiscountEntry } from './payments/types';
-import { generateSchedules, recalcContract, addPaymentEntry, addDiscountEntry, distributeUnpaid } from './payments/payment-schedule';
+import { generateSchedules, recalcContract, addPaymentEntry, addDiscountEntry, distributeUnpaid, applyPayment } from './payments/payment-schedule';
 import { applyReturnedProration } from './payments/returned-proration';
+import {
+  isDeliveryPending as statusDeliveryPending,
+  isReturnable as statusReturnable,
+  isContractEndedStatus,
+  type LifeStatus as StatusLife,
+} from './domain/status';
 
-export type LifeStatus = '대기' | '운행' | '반납' | '해지' | '채권';
+export type LifeStatus = StatusLife;
 
 export type ContractView = {
   rec: EntityRecord;
@@ -54,30 +60,39 @@ function buildContract(rec: EntityRecord, today: string): Contract {
     : [];
   const pays = Array.isArray(rec._payments) ? (rec._payments as Array<Record<string, unknown>>) : [];
   const discs = Array.isArray(rec._discounts) ? (rec._discounts as Array<Record<string, unknown>>) : [];
-  if (schedules.length && (pays.length || discs.length)) {
-    const bySeq = new Map<number, number>(schedules.map((s, i) => [s.seq, i]));
-    for (const dsc of discs) { // 할인 먼저(effective에 반영)
-      const idx = bySeq.get(Number(dsc.seq));
-      if (idx != null) schedules[idx] = addDiscountEntry(schedules[idx], { date: String(dsc.date || ''), amount: Number(dsc.amount) || 0, reason: (dsc.reason || '기타') } as DiscountEntry, today);
-    }
-    for (const p of pays) {
-      const idx = bySeq.get(Number(p.seq));
-      if (idx != null) { const r = addPaymentEntry(schedules[idx], { date: String(p.date || ''), amount: Number(p.amount) || 0, source: (p.source || '수동') } as PaymentEntry, today); schedules[idx] = r.schedule; }
-    }
-  }
-  // 미수 반영 — 명시 실미수(_carryUnpaid = 마이그레이션 씨앗 = 직원 running balance/추심잔여) 우선,
-  //   없으면 레거시 단일 납부값(_paidTotal): 도래분−납부.
+  // 미수 분배 먼저 — 명시 실미수(_carryUnpaid) 또는 레거시 _paidTotal.
+  //   ★앱수납(_payments) 유무와 무관하게 선행(B-1 완화). 예전 `!pays.length` 가드는 첫 앱수납 순간
+  //   분배를 건너뛰어 회차표·헤드라인이 어긋나는 스위칭 버그였다.
   const paidTotal = Number(rec._paidTotal) || 0;
   const hasCarry = rec._carryUnpaid !== undefined && rec._carryUnpaid !== null;
-  if (schedules.length && !pays.length && (hasCarry || paidTotal > 0)) {
-    // 미수 기준일 = 반납 계약이면 반납일(그 시점 정산 — 이후 회차는 recalc가 면제).
-    //   ★ today가 아닌 반납일 cutoff로 분배해야 미수가 반납前 회차에 놓여 면제로 사라지지 않음(돈 유실 방지).
+  if (schedules.length && (hasCarry || paidTotal > 0)) {
     const rd = ymd(rec.returnedDate);
     const cutoff = rd && rd < today ? rd : today;
     const pastDue = schedules.filter((sc) => String(sc.dueDate || '') <= cutoff).reduce((sum, sc) => sum + sc.amount, 0);
-    // carry가 있으면 그 값을 그대로 미수로(도래분 부족 시 distributeUnpaid의 期초이월 흡수가 가장 오래된 회차에 담음).
     const unpaid = hasCarry ? Math.max(0, Number(rec._carryUnpaid) || 0) : Math.max(0, pastDue - paidTotal);
     schedules = distributeUnpaid(schedules, unpaid, cutoff, '');
+  }
+  if (schedules.length && (pays.length || discs.length)) {
+    const bySeq = new Map<number, number>(schedules.map((s, i) => [s.seq, i]));
+    for (const dsc of discs) {
+      const idx = bySeq.get(Number(dsc.seq));
+      if (idx != null) schedules[idx] = addDiscountEntry(schedules[idx], { date: String(dsc.date || ''), amount: Number(dsc.amount) || 0, reason: (dsc.reason || '기타') } as DiscountEntry, today);
+    }
+    // 씨앗(carry) 계약: 분배 후 실수납은 FIFO(applyPayment). seq 지정 납부는 분배와 어긋나 회차 왜곡.
+    // 일반 계약: 회차(seq)에 직접 가산.
+    if (hasCarry) {
+      for (const p of pays) {
+        const amt = Number(p.amount) || 0;
+        if (amt <= 0) continue;
+        const src = (p.source || '수동') as PaymentEntry['source'];
+        schedules = applyPayment(schedules, amt, String(p.date || today), src, p.txId ? { txId: String(p.txId) } : undefined).schedules;
+      }
+    } else {
+      for (const p of pays) {
+        const idx = bySeq.get(Number(p.seq));
+        if (idx != null) { const r = addPaymentEntry(schedules[idx], { date: String(p.date || ''), amount: Number(p.amount) || 0, source: (p.source || '수동') } as PaymentEntry, today); schedules[idx] = r.schedule; }
+      }
+    }
   }
   return { id: String(rec._key || 'c'), monthlyRent: rent, termMonths: term, status: '운행', schedules } as unknown as Contract;
 }
@@ -117,7 +132,7 @@ export function effectiveEndDate(rec: EntityRecord): string {
 /** 계약 1건의 운영 뷰(상태·미수·일할·D-day) 산출. */
 export function computeContractView(rec: EntityRecord, today: string): ContractView {
   const status = deriveStatus(rec);
-  const ended = status === '반납' || status === '해지' || status === '채권';
+  const ended = isContractEndedStatus(status);
   const delivered = !!rec.deliveredDate || status === '운행' || ended;
   const start = ymd(rec.startDate || rec.contractDate);
   // 1930 등 startDate 이전 만기는 무효 → start+rentalMonths로 폴백(소스손상 방어, 재수입 전에도 안전)
@@ -146,18 +161,16 @@ export function computeContractView(rec: EntityRecord, today: string): ContractV
   const hasPerSeq = seedPaid > 0;
   // 입금누계: 씨앗은 개시분(_paidTotal) + 오픈후 앱수납(_payments). 그 외는 _payments 또는 _paidTotal.
   const paid = seedCarry ? seedPaidTotal + seedPaid : (hasPerSeq ? seedPaid : seedPaidTotal);
-  // 마이그레이션 씨앗 미수(전체 장부의 정확성 핵심):
-  //   · 무납부 = carry(개시 앵커, 스케줄 날짜경계·반올림 무관하게 정확).
-  //   · 앱수납 발생 후 = buildContract가 carry/_paidTotal 분배를 건너뛰어 schedGross=(전체 도래−_payments)가 됨 →
-  //     _paidTotal(개시 역산 납부분)을 빼면 net = 도래−개시납부−앱수납 = 개시미수 보존 + 오픈후 도래분 자동 가산 + 납부 차감.
-  //   ★carry−수납으로 못박으면 운행중 씨앗이 당월 대여료 납부에 개시미수가 잠식돼 과소계상(자체검증 회귀) → 반드시 schedGross 기반.
+  // 마이그레이션 씨앗 미수:
+  //   · 무납부 = carry 앵커(스케줄 날짜경계와 무관).
+  //   · 앱수납 후 = buildContract가 carry 분배→수납 적용 → schedGross가 순미수(헤드라인=회차표).
   const carrySeed = Math.max(0, Number(rec._carryUnpaid) || 0);
-  const seedNet = seedCarry ? (hasPerSeq ? Math.max(0, schedGross - seedPaidTotal) : carrySeed) : null;
+  const seedNet = seedCarry ? (hasPerSeq ? schedGross : carrySeed) : null;
   const gross = seedNet != null ? seedNet : schedGross;
   const net = seedNet != null ? seedNet : schedGross;
   const rent0 = Number(rec.monthlyRent) || 0;
-  // 미납 회차수: 씨앗은 net 기준(회차표가 carry분배 skip으로 폭증해도 헤드라인/문서 회차수는 net과 일치 → 내용증명 '11회' 오표기 방지).
-  const count = seedNet != null
+  // 미납 회차수: 씨앗 무납부는 net÷월대여(회차표 carry 분배 전에도 문서 회차 일치). 앱수납 후·일반=엔진 카운트.
+  const count = seedNet != null && !hasPerSeq
     ? (seedNet > 0 ? Math.max(1, rent0 > 0 ? Math.ceil(seedNet / rent0) : 1) : 0)
     : (rc.unpaidSeqCount || 0);
 
@@ -192,15 +205,15 @@ export function contractSchedules(rec: EntityRecord, today: string) {
   });
 }
 
-/** 인도(출고) 대기 계약 술어 — SSOT. 운영현황(deliveryPending)·입출고(/dispatch) 동일 집합 보장.
+/** 인도(출고) 대기 계약 술어 — SSOT → domain/status.
  *  대기 상태 + 번호판 있음 + 아직 인도/반납 안 함. 손롤 필터 금지, 이 헬퍼로 통일. */
 export function isDeliveryPending(c: EntityRecord): boolean {
-  return !!c.plate && !c.deliveredDate && !c.returnedDate && String(c.status || '') === '대기';
+  return statusDeliveryPending(c);
 }
 
-/** 반납 대상 계약 술어 — SSOT. 인도 완료 + 아직 반납 안 함 + 종료(반납/해지/채권) 아님(=운행중). */
+/** 반납 대상 계약 술어 — SSOT → domain/status. 인도 완료 + 아직 반납 안 함 + 종료 아님(=운행중). */
 export function isReturnable(c: EntityRecord): boolean {
-  return !!c.plate && !!c.deliveredDate && !c.returnedDate && !['반납', '해지', '채권'].includes(String(c.status || ''));
+  return statusReturnable(c);
 }
 
 /** 반납 정산 — 정산서(SettlementDoc)·현장 반납폼 공용 SSOT. 손롤 금지, 이 함수로 통일.

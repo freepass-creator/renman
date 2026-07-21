@@ -22,7 +22,7 @@
 import { type EntityRecord } from '../intake/entities';
 import { computeContractView, type ContractView } from '../contract-ops';
 import { normPlate } from '../plate';
-import { OUT } from '../dashboard-consts';
+import { OUT, VEHICLE_REPAIR, VEHICLE_BUY_PLAN, VEHICLE_REG_PLAN, VEHICLE_DISPOSE_PLAN } from './status';
 import { customerKey } from '../customers';
 
 type Tone = 'ok' | 'warn' | 'danger' | 'mute';
@@ -63,22 +63,18 @@ export type VehicleClass = {
 };
 /** 장부 잔존(아직 처분완료 아님) — 보유 대수·자산 집계. */
 export const onBooks = (o: Ownership) => o !== '처분완료';
-const REPAIR = new Set(['정비', '사고', '수리']);
-const BUY_PLAN = new Set(['구매대기', '구매예정', '매입검토', '구매검토', '검토', '매입대기']);
-const REG_PLAN = new Set(['등록대기', '등록예정', '입고대기']);
-const DISPOSE_PLAN = new Set(['매각대기', '매각검토', '처분예정']);
 
 /** 차량 → 2축 분류. 가동은 보유중만 파생(활성 계약→운행, 아니면 유휴/정비). */
 export function classifyVehicle(veh: EntityRecord, hasActiveContract: boolean): VehicleClass {
   const s = String(veh.status || '');
   let ownership: Ownership;
   if (OUT.has(s)) ownership = '처분완료';
-  else if (DISPOSE_PLAN.has(s)) ownership = '처분예정';
-  else if (BUY_PLAN.has(s)) ownership = '구매예정';
-  else if (REG_PLAN.has(s)) ownership = '등록예정';
+  else if (VEHICLE_DISPOSE_PLAN.has(s)) ownership = '처분예정';
+  else if (VEHICLE_BUY_PLAN.has(s)) ownership = '구매예정';
+  else if (VEHICLE_REG_PLAN.has(s)) ownership = '등록예정';
   else ownership = '보유중';
   let utilization: Utilization = null;
-  if (ownership === '보유중') utilization = REPAIR.has(s) ? '정비' : hasActiveContract ? '운행' : '유휴';
+  if (ownership === '보유중') utilization = VEHICLE_REPAIR.has(s) ? '정비' : hasActiveContract ? '운행' : '유휴';
   const label =
     ownership === '처분완료' ? (s || '매각')
       : ownership === '처분예정' ? (s || '처분예정')

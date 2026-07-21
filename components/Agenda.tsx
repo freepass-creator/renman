@@ -23,7 +23,7 @@ function AgendaRow({ it }: { it: AgendaItem }) {
   const col = it.tone === 'red' ? C.danger : it.tone === 'amber' ? C.warn : it.tone === 'green' ? 'var(--green-text)' : C.mute;
   const bt = (it.tone === 'red' ? 'red' : it.tone === 'amber' ? 'amber' : it.tone === 'green' ? 'green' : 'gray') as 'red' | 'amber' | 'green' | 'gray';
   return (
-    <div onClick={() => it.plate && openCar(it.plate)} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: mobile ? '12px 14px' : '9px 12px', minHeight: mobile ? 52 : undefined, borderRadius: 'var(--radius)', background: '#fff', border: `1px solid ${C.line}`, cursor: it.plate ? 'pointer' : 'default', WebkitTapHighlightColor: 'transparent' }}>
+    <div onClick={() => it.plate && openCar(it.plate)} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: mobile ? '12px 14px' : '9px 12px', minHeight: mobile ? 52 : undefined, borderRadius: 'var(--radius)', background: C.card, border: `1px solid ${C.line}`, cursor: it.plate ? 'pointer' : 'default', WebkitTapHighlightColor: 'transparent' }}>
       <Badge tone={bt}>{it.kind}</Badge>
       <span style={{ fontWeight: 700, whiteSpace: 'nowrap', fontSize: mobile ? 14.5 : undefined }}>{it.plate || '—'}</span>
       <span style={{ color: C.mute, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0, flex: 1, fontSize: mobile ? 13 : undefined }}>{it.title}</span>
@@ -42,7 +42,7 @@ function FeedRow({ it }: { it: DayFeedItem }) {
         if (it.plate) openCar(it.plate);
         else if (it.customerKey) openCustomer(it.customerKey);
       }}
-      style={{ display: 'flex', alignItems: 'center', gap: 10, padding: mobile ? '12px 14px' : '9px 12px', minHeight: mobile ? 52 : undefined, borderRadius: 'var(--radius)', background: '#fff', border: `1px solid ${C.line}`, cursor: (it.plate || it.customerKey) ? 'pointer' : 'default', WebkitTapHighlightColor: 'transparent' }}
+      style={{ display: 'flex', alignItems: 'center', gap: 10, padding: mobile ? '12px 14px' : '9px 12px', minHeight: mobile ? 52 : undefined, borderRadius: 'var(--radius)', background: C.card, border: `1px solid ${C.line}`, cursor: (it.plate || it.customerKey) ? 'pointer' : 'default', WebkitTapHighlightColor: 'transparent' }}
     >
       <Badge tone={bt}>{it.kind}</Badge>
       {it.plate ? <span style={{ fontWeight: 700, whiteSpace: 'nowrap', fontSize: mobile ? 14.5 : undefined }}>{it.plate}</span> : null}
@@ -66,10 +66,10 @@ export function AgendaCalendar({ marks, selected, onSelect }: { marks: CalMark[]
   const ds = (day: number) => `${ym}-${String(day).padStart(2, '0')}`;
   const dot = (t: string) => t === 'red' ? C.danger : t === 'amber' ? C.warn : t === 'green' ? 'var(--green-text)' : C.mute;
   const chipBg = (t: string) => t === 'red' ? 'rgba(220,38,38,0.10)' : t === 'amber' ? 'rgba(217,119,6,0.10)' : t === 'green' ? 'rgba(22,163,74,0.10)' : 'var(--bg-stripe)';
-  const nav: CSSProperties = { border: `1px solid ${C.line}`, background: '#fff', borderRadius: 'var(--radius)', width: mobile ? 40 : 32, height: mobile ? 40 : 32, boxSizing: 'border-box', cursor: 'pointer', color: C.mute, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', WebkitTapHighlightColor: 'transparent' };
+  const nav: CSSProperties = { border: `1px solid ${C.line}`, background: C.card, borderRadius: 'var(--radius)', width: mobile ? 40 : 32, height: mobile ? 40 : 32, boxSizing: 'border-box', cursor: 'pointer', color: C.mute, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', WebkitTapHighlightColor: 'transparent' };
   const cellH = mobile ? 46 : 100, maxChips = 3;
   return (
-    <div style={{ border: `1px solid ${C.line}`, borderRadius: 'var(--radius)', background: '#fff', padding: mobile ? 10 : 16, width: '100%', boxSizing: 'border-box' }}>
+    <div style={{ border: `1px solid ${C.line}`, borderRadius: 'var(--radius)', background: C.card, padding: mobile ? 10 : 16, width: '100%', boxSizing: 'border-box' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
         <button onClick={() => shift(-1)} style={nav} aria-label="이전 달"><ChevronLeft size={mobile ? 18 : 16} /></button>
         <span style={{ fontSize: mobile ? 16 : 15, fontWeight: 800, color: C.ink, minWidth: 96, textAlign: 'center' }}>{y}년 {m}월</span>
@@ -83,7 +83,7 @@ export function AgendaCalendar({ marks, selected, onSelect }: { marks: CalMark[]
           if (day == null) return <div key={i} />;
           const dstr = ds(day); const its = byDate.get(dstr) || []; const isToday = dstr === TODAY; const isSel = dstr === selected;
           return (
-            <button key={i} onClick={() => onSelect(dstr)} style={{ minHeight: cellH, boxSizing: 'border-box', borderRadius: 'var(--radius)', border: `1px solid ${isSel ? C.accent : isToday ? C.mute : C.line}`, background: isSel ? 'var(--bg-card)' : '#fff', cursor: 'pointer', padding: mobile ? '3px 2px' : '6px 7px', display: 'flex', flexDirection: 'column', gap: 3, textAlign: 'left', overflow: 'hidden' }}>
+            <button key={i} onClick={() => onSelect(dstr)} style={{ minHeight: cellH, boxSizing: 'border-box', borderRadius: 'var(--radius)', border: `1px solid ${isSel ? C.accent : isToday ? C.mute : C.line}`, background: isSel ? 'var(--bg-card)' : C.card, cursor: 'pointer', padding: mobile ? '3px 2px' : '6px 7px', display: 'flex', flexDirection: 'column', gap: 3, textAlign: 'left', overflow: 'hidden' }}>
               <span style={{ fontSize: mobile ? 11.5 : 13, fontWeight: isToday ? 800 : 600, color: isToday ? C.accent : C.ink, alignSelf: mobile ? 'center' : 'flex-start', flexShrink: 0 }}>{day}</span>
               {mobile ? (
                 <span style={{ display: 'flex', gap: 2, flexWrap: 'wrap', justifyContent: 'center' }}>

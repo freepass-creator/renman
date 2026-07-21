@@ -1,14 +1,15 @@
 'use client';
 // 법인 워크스페이스 — 법인 하나의 전용 페이지. 모듈(기본정보·차고지·등록대수·증차신청·공문…)을
 // 접기/펼치기 + 카탈로그에서 추가/제거. 자산·자금이 이 법인에 귀속되는 뿌리 설정.
-import { useEffect, useMemo, useState, type CSSProperties } from 'react';
+import { useEffect, useState, type CSSProperties } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { ChevronDown, Plus, X, Trash2, Building2 } from 'lucide-react';
+import { Plus, X, Trash2, Building2 } from 'lucide-react';
 import { useSession } from '@/lib/session';
 import { getStore } from '@/lib/store';
 import { COMPANIES, companyLabel, companyShort } from '@/lib/companies';
 import { loadMaster, saveMaster, genId, MODULE_CATALOG, type CompanyMaster, type Garage, type RegApplication, type OfficialDoc } from '@/lib/company-master';
-import { Page, Panel, Btn, Input, Select, C } from '@/components/ui';
+import { Page, Panel, Sec, Btn, Input, Select, C } from '@/components/ui';
+import { WorkbenchBar } from '@/components/WorkbenchBar';
 
 const lab: CSSProperties = { fontSize: 11.5, color: 'var(--text-sub)', display: 'block', marginBottom: 3 };
 const APP_STATUS: RegApplication['status'][] = ['준비', '접수', '승인', '반려'];
@@ -29,10 +30,8 @@ export default function CompanyWorkspace() {
   useEffect(() => { getStore().list('vehicle', id).then((v) => setOwned(v.filter((x) => String(x.status || '') !== '매각' && String(x.status || '') !== '말소').length)).catch(() => {}); }, [id]);
 
   const modules = m.modules || [];
-  const collapsed = new Set(m.collapsed || []);
   const set = (patch: Partial<CompanyMaster>) => { setM((p) => ({ ...p, ...patch })); setDirty(true); };
   const save = () => { saveMaster(id, m); setDirty(false); };
-  const toggleFold = (k: string) => set({ collapsed: collapsed.has(k) ? (m.collapsed || []).filter((x) => x !== k) : [...(m.collapsed || []), k] });
   const addModule = (k: string) => set({ modules: [...modules, k] });
   const removeModule = (k: string) => set({ modules: modules.filter((x) => x !== k) });
   const available = MODULE_CATALOG.filter((c) => !modules.includes(c.key));
@@ -42,10 +41,12 @@ export default function CompanyWorkspace() {
 
   return (
     <Page title={companyLabel(id)} meta={`법인 워크스페이스 · ${companyShort(id)}`}
-      right={<div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-        {dirty && <span style={{ fontSize: 12, color: C.warn, fontWeight: 700 }}>저장 안 됨</span>}
-        <Btn onClick={save} disabled={!dirty}>저장</Btn>
-      </div>}>
+      tools={<WorkbenchBar actions={
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          {dirty && <span style={{ fontSize: 12, color: C.warn, fontWeight: 700 }}>저장 안 됨</span>}
+          <Btn onClick={save} disabled={!dirty}>저장</Btn>
+        </div>
+      } />}>
 
       {/* 법인 스위처 — 본사만 */}
       {isOperator && (
@@ -62,18 +63,11 @@ export default function CompanyWorkspace() {
       {modules.map((key) => {
         const cat = MODULE_CATALOG.find((c) => c.key === key);
         if (!cat) return null;
-        const fold = collapsed.has(key);
         return (
-          <div key={key} style={{ marginTop: 14, border: `1px solid ${C.line}`, borderRadius: 'var(--radius)', background: '#fff', overflow: 'hidden', boxShadow: '0 1px 2px rgba(15,23,42,0.05)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '11px 14px', borderBottom: fold ? 'none' : `1px solid ${C.line}`, background: '#f8fafc' }}>
-              <Btn size="sm" variant="ghost" onClick={() => toggleFold(key)}><ChevronDown size={16} style={{ transform: fold ? 'rotate(-90deg)' : 'none', transition: 'transform .12s' }} /></Btn>
-              <span style={{ fontSize: 13, fontWeight: 700, color: C.ink }}>{cat.label}</span>
-              <span style={{ fontSize: 11.5, color: C.faint }}>{cat.desc}</span>
-              <span style={{ flex: 1 }} />
-              {!cat.core && <Btn size="sm" variant="ghost" onClick={() => removeModule(key)}><X size={15} /></Btn>}
-            </div>
-            {!fold && <div style={{ padding: '14px' }}>{renderModule(key, m, set, owned)}</div>}
-          </div>
+          <Sec key={key} id={`co-${key}`} title={cat.label} desc={cat.desc}
+            right={!cat.core ? <Btn size="sm" variant="ghost" onClick={() => removeModule(key)}><X size={15} /></Btn> : undefined}>
+            {renderModule(key, m, set, owned)}
+          </Sec>
         );
       })}
 

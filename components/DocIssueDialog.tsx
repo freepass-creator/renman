@@ -2,16 +2,16 @@
 /**
  * 표준 문서 발급 다이얼로그 — 양식 선택 → 폼 입력 → A4 미리보기 → 인쇄·발급. (v5 document-issue-dialog 이식)
  *   · 발급자 회사 = 활성 회사(회사마스터에서 사업자번호·대표·주소 자동). 합본이면 회사 선택.
- *   · 대상(직원/거래처) = 수기 입력. 발급 시 getStore().save('issued_doc') → 감사로그 자동 기록.
+ *   · 대상(직원/거래처) = 수기 입력. 발급 시 commitSave('issued_doc') → 감사로그 자동 기록.
  *   · 인쇄 = 격리 새창(window.open) — 앱 CSS 충돌 없이 A4 인쇄/PDF.
  */
 import { useEffect, useMemo, useState } from 'react';
 import { useSession } from '@/lib/session';
-import { getStore } from '@/lib/store';
 import { COMPANIES, ALL_COMPANIES, companyLabel } from '@/lib/companies';
 import { loadMaster } from '@/lib/company-master';
 import { Modal, Btn, C, Input, Select, toggleStyle, fieldStyle } from '@/components/ui';
 import { useIsMobile } from '@/lib/use-mobile';
+import { commitSave } from '@/lib/commit';
 import {
   listTemplates, getTemplate, renderBody, buildDocNo, computeNextSeq, fmtKDate, fmtKMoney,
   DOC_CATEGORIES, DOC_PRINT_CSS, type DocCategory,
@@ -83,6 +83,7 @@ export function DocIssueDialog({ issued, onClose, onIssued }: {
   function print() {
     const w = window.open('', '_blank', 'width=900,height=1200');
     if (!w) { setErr('팝업이 차단되었습니다 — 허용 후 다시 시도하세요.'); return; }
+    // 인쇄 격리 창 — #fff 고정(프린터는 테마 모름)
     w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>${docNo}</title><style>@page{size:A4;margin:0}body{margin:0;background:#fff}${DOC_PRINT_CSS}</style></head><body><div class="doc-paper" style="position:relative">${docNo ? `<div class="doc-no">${docNo}</div>` : ''}${previewBody}</div><script>window.onload=function(){setTimeout(function(){window.print()},250)}<\/script></body></html>`);
     w.document.close();
   }
@@ -94,13 +95,18 @@ export function DocIssueDialog({ issued, onClose, onIssued }: {
     if (missing.length) { setErr(`필수값 누락: ${missing.map((f) => f.label).join(', ')}`); return; }
     setErr(''); setSaving(true);
     try {
-      await getStore().save('issued_doc', issuerId, [{
-        docNo, templateId: template.id, templateTitle: template.title, category: template.category,
-        targetType: template.target, targetName: targetScope?.name || '',
-        data: fieldData, issuerCompanyName: companyLabel(issuerId),
-        bodyHtml: previewBody, // 발급시점 동결(재인쇄·감사)
-        issuedAt: new Date().toISOString(), issuedBy: user.name,
-      }]);
+      await commitSave({
+        entity: 'issued_doc',
+        sessionCompanyId: companyId,
+        rec: { companyId: issuerId },
+        records: [{
+          docNo, templateId: template.id, templateTitle: template.title, category: template.category,
+          targetType: template.target, targetName: targetScope?.name || '',
+          data: fieldData, issuerCompanyName: companyLabel(issuerId),
+          bodyHtml: previewBody, // 발급시점 동결(재인쇄·감사)
+          issuedAt: new Date().toISOString(), issuedBy: user.name,
+        }],
+      });
       onIssued();
     } catch (e) { setErr(`발급 실패: ${(e as Error).message}`); setSaving(false); }
   }
@@ -176,6 +182,7 @@ export function DocIssueDialog({ issued, onClose, onIssued }: {
           ))}
         </div>
         {/* 우측 미리보기 */}
+        {/* 우측 미리보기 — #eceef1 매핑표 외(미리보기 크로마). 토큰 후보 확인 전 유지 */}
         <div style={{ background: '#eceef1', overflow: 'auto', maxHeight: '68vh', padding: 14, borderRadius: 8 }}>
           <style dangerouslySetInnerHTML={{ __html: DOC_PRINT_CSS }} />
           {template

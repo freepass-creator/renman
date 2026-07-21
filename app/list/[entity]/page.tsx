@@ -6,6 +6,7 @@ import { computeAssetLedgerEntry } from '@/lib/payments/asset-ledger';
 import type { Vehicle } from '@/lib/payments/types';
 import { openIngest } from '@/lib/ui-bus';
 import { Page, Sec, Cards, Metric, DataTable, Btn, Badge, EmptyState, won, C, Panel, type Col, PageLoading } from '@/components/ui';
+import { WorkbenchBar } from '@/components/WorkbenchBar';
 import { companyLabel } from '@/lib/companies';
 import { TODAY } from '@/lib/dashboard-consts';
 import { useEntityList } from '@/lib/use-entity-lists';
@@ -46,7 +47,7 @@ export default function ListPage() {
       key: f.key, label: f.label,
       render: (r: EntityRecord) => {
         const v = r[f.key]; const filled = v != null && v !== '';
-        return <span style={{ color: filled ? C.ink : '#cbd5e1' }}>{filled ? String(v) : '—'}</span>;
+        return <span style={{ color: filled ? C.ink : C.lineStrong }}>{filled ? String(v) : '—'}</span>;
       },
     })),
     ...(showBook ? [{ key: '_book', label: '장부가(감가)', align: 'r' as const, render: (r: EntityRecord) => { const b = bookValue(r); return b != null ? won(b) : '—'; } }] : []),
@@ -54,6 +55,7 @@ export default function ListPage() {
 
   return (
     <Page title={entity.label} meta={`${companyLabel(companyId)} · ${records.length}건 · ${user.role}`}
+      tools={<WorkbenchBar />}
       right={<Btn variant="solid" onClick={() => openIngest(entityKey)}>+ {entity.label} 담기</Btn>}>
       <Sec title="현황" desc="엔티티 요약">
         <Cards min={128} fit>

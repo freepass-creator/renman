@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 
 type T = { id: string; message: string; kind: 'success' | 'error' | 'info' };
 
+/** 토스트는 항상 어두운 칩(테마 무관 대비). C.* 로 바꾸면 라이트/다크에서 대비가 깨짐 — 의도된 예외. */
 const STYLE: Record<T['kind'], { bg: string; fg: string; icon: string }> = {
   success: { bg: '#132a1e', fg: '#d1fae5', icon: '✓' },
   error: { bg: '#3a1418', fg: '#fecaca', icon: '!' },

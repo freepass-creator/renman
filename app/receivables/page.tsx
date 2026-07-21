@@ -22,7 +22,8 @@ import { toast } from '@/lib/toast';
 import { TODAY } from '@/lib/dashboard-consts';
 import { selectReceivables } from '@/lib/snapshot/selectors';
 import { useEntityLists } from '@/lib/use-entity-lists';
-import { getStore } from '@/lib/store';
+import { commitUpdate } from '@/lib/commit';
+import { resolveWriteCompany, NEED_COMPANY } from '@/lib/scope';
 
 // 미수 워크벤치 = 회수 파트의 "딱 여기만" 메인. 미수율이 핵심축. 자금(수납)과 연동돼 자동 갱신.
 // 담당자가 어떻게 관리했는지(내용증명 발송·시동제어 여부·최근 연락)가 보이고, 그 자리에서 조치.
@@ -96,13 +97,17 @@ export default function ReceivablesPage() {
   const smsCount = recipients.filter((r) => r.phone).length;
 
   async function patch(rec: EntityRecord, p: Record<string, unknown>) {
-    await getStore().update('contract', String(rec.companyId || companyId), String(rec._key || ''), p);
+    try {
+      await commitUpdate({ entity: 'contract', sessionCompanyId: companyId, rec, key: String(rec._key || ''), patch: p });
+    } catch { toast(NEED_COMPANY, 'error'); }
   }
   const sendNotice = (rec: EntityRecord) => {
     void runBusy(async () => {
+      const co = resolveWriteCompany(companyId, rec);
+      if (!co) { toast(NEED_COMPANY, 'error'); return; }
       const r = await safeUpdate(() => sendNoticeCert({
         rec,
-        companyId: String(rec.companyId || companyId),
+        companyId: co,
         actor: user?.email || user?.name || '',
       }));
       if (r) toast(`내용증명 ${r.docNo} · 청구 ${won(r.claim)}`, 'success');
@@ -128,7 +133,7 @@ export default function ReceivablesPage() {
       reload();
     });
   };
-  // 시동제어 전환 — "물어보고"(확인) 걸고, engineDisabled 원자(risk-issues·needsEngineLockAction과 동일 SSOT)에 사유·시각·담당 기록.
+  // 시동제어 전환 — "물어보고"(확인) 걸고, engineDisabled 원자(patchEngineLock SSOT)에 사유·시각·담당 기록.
   const toggleEngine = (r: { rec: EntityRecord; v: { net: number; overdueDays: number } }) => {
     const rec = r.rec;
     const who = String(rec.contractorName || '—'), plate = String(rec.plate || '');

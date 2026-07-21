@@ -32,7 +32,7 @@ export function CompanyFilter() {
   return (
     <div style={{ position: 'relative', flexShrink: 0 }}>
       <button type="button" data-ui="action" onClick={() => { haptic.tap(); setOpen((o) => !o); }} title="보는 회사"
-        style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: h, boxSizing: 'border-box', padding: mobile ? '0 14px' : '0 11px', border: `1px solid ${C.line}`, borderRadius: R, background: '#fff', cursor: 'pointer', fontSize: ctrlFs(mobile), fontWeight: 700, color: C.ink, whiteSpace: 'nowrap', flexShrink: 0, boxShadow: SH.rest, WebkitTapHighlightColor: 'transparent' }}>
+        style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: h, boxSizing: 'border-box', padding: mobile ? '0 14px' : '0 11px', border: `1px solid ${C.line}`, borderRadius: R, background: C.card, cursor: 'pointer', fontSize: ctrlFs(mobile), fontWeight: 700, color: C.ink, whiteSpace: 'nowrap', flexShrink: 0, boxShadow: SH.rest, WebkitTapHighlightColor: 'transparent' }}>
         <Building2 size={mobile ? 16 : 14} color={C.mute} style={{ flexShrink: 0 }} />
         {trigger}
         <ChevronDown size={mobile ? 15 : 13} color={C.mute} style={{ flexShrink: 0 }} />
@@ -56,7 +56,7 @@ export function CompanyFilter() {
       {open && !mobile && (
         <>
           <div onClick={() => setOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 40 }} />
-          <div style={{ position: 'absolute', left: 0, top: 'calc(100% + 6px)', minWidth: 200, background: '#fff', border: `1px solid ${C.line}`, borderRadius: R, boxShadow: SH.pop, zIndex: 45, overflow: 'hidden' }}>
+          <div style={{ position: 'absolute', left: 0, top: 'calc(100% + 6px)', minWidth: 200, background: C.card, border: `1px solid ${C.line}`, borderRadius: R, boxShadow: SH.pop, zIndex: 45, overflow: 'hidden' }}>
             {options.map((c) => (
               <button key={c} type="button" onClick={() => pick(c)}
                 style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '8px 12px', border: 'none', background: 'none', cursor: 'pointer', fontSize: 12.5, color: C.ink, textAlign: 'left', whiteSpace: 'nowrap' }}>
@@ -96,7 +96,7 @@ export function ToggleChips<T extends string>({ selected, onToggle, options, siz
         const on = selected.has(o.key);
         return (
           <button key={o.key} type="button" data-ui="toggle" onClick={() => { haptic.select(); onToggle(o.key); }} aria-pressed={on}
-            style={{ display: 'inline-flex', alignItems: 'center', height: h, boxSizing: 'border-box', padding: pad, fontSize: fs, fontWeight: on ? 700 : 500, cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0, borderRadius: R, border: `1px solid ${on ? C.brand : C.taupeLine}`, background: on ? C.brand : C.taupeBg, color: on ? '#fff' : C.mute, lineHeight: 1, WebkitTapHighlightColor: 'transparent' }}>
+            style={{ display: 'inline-flex', alignItems: 'center', height: h, boxSizing: 'border-box', padding: pad, fontSize: fs, fontWeight: on ? 700 : 500, cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0, borderRadius: R, border: `1px solid ${on ? C.brand : C.taupeLine}`, background: on ? C.brand : C.taupeBg, color: on ? C.inverse : C.mute, lineHeight: 1, WebkitTapHighlightColor: 'transparent' }}>
             {o.label}
           </button>
         );
@@ -133,7 +133,7 @@ export function IconBtn({ children, onClick, title, active, disabled }: { childr
         display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
         height: h, width: h, boxSizing: 'border-box', padding: 0, borderRadius: R,
         border: `1px solid ${active ? C.brand : C.line}`,
-        background: active ? C.brand : C.taupeBg, color: active ? '#fff' : C.mute,
+        background: active ? C.brand : C.taupeBg, color: active ? C.inverse : C.mute,
         cursor: disabled ? 'not-allowed' : 'pointer', opacity: disabled ? 0.5 : 1,
         WebkitTapHighlightColor: 'transparent', flexShrink: 0,
       }}>
@@ -155,7 +155,7 @@ export function Btn({ children, onClick, variant = 'solid', size = 'md', disable
     cursor: disabled ? 'not-allowed' : 'pointer', opacity: disabled ? 0.5 : 1,
     border: `1px solid ${disabled ? C.line : variant === 'solid' ? C.brand : variant === 'danger' ? 'var(--red-border)' : C.line}`,
     background: variant === 'solid' ? (disabled ? C.line : C.brand) : C.taupeBg,
-    color: variant === 'solid' ? '#fff' : variant === 'danger' ? 'var(--red-text)' : C.ink,
+    color: variant === 'solid' ? C.inverse : variant === 'danger' ? 'var(--red-text)' : C.ink,
     boxShadow: disabled ? 'none' : variant === 'solid' ? SH.card : SH.rest,
     textDecoration: 'none', display: block ? 'flex' : 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6, whiteSpace: 'nowrap',
     width: block ? '100%' : undefined,
@@ -187,7 +187,7 @@ export function PeriodBar({ latest, initial = '월간', onRange }: { latest?: st
   const onRangeRef = React.useRef(onRange); onRangeRef.current = onRange;
   React.useEffect(() => { onRangeRef.current(range); }, [range.from, range.to]);
   const nh = ctrlH(mobile);
-  const nav: React.CSSProperties = { height: nh, width: nh, boxSizing: 'border-box', border: `1px solid ${C.line}`, borderRadius: R, background: '#fff', cursor: 'pointer', color: C.mute, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 };
+  const nav: React.CSSProperties = { height: nh, width: nh, boxSizing: 'border-box', border: `1px solid ${C.line}`, borderRadius: R, background: C.card, cursor: 'pointer', color: C.mute, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 };
   return (
     <div style={{ display: 'inline-flex', alignItems: 'center', gap: mobile ? SPACE_M : 8, flexWrap: 'wrap' }}>
       <Select size="md" value={custom ? '직접' : period}
@@ -220,7 +220,7 @@ export function Search({ size = 'md', style, wrapStyle, ...rest }: Omit<React.In
   const cs: CtrlSize = size === 'sm' ? 'sm' : 'md';
   const h = ctrlH(mobile, cs);
   return (
-    <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, height: h, boxSizing: 'border-box', padding: mobile ? '0 12px' : '0 10px', border: `1px solid ${C.line}`, borderRadius: R, background: '#fff', ...wrapStyle }}>
+    <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, height: h, boxSizing: 'border-box', padding: mobile ? '0 12px' : '0 10px', border: `1px solid ${C.line}`, borderRadius: R, background: C.card, ...wrapStyle }}>
       <SearchIcon size={mobile ? 16 : 14} color={C.faint} style={{ flexShrink: 0 }} />
       <input {...rest} style={{ flex: 1, border: 'none', outline: 'none', fontSize: ctrlInputFs(mobile, cs), background: 'transparent', color: C.ink, minWidth: 0, fontFamily: 'inherit', ...style }} />
     </div>

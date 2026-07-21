@@ -6,6 +6,7 @@ import { useReloadOnSaved } from '@/lib/use-reload-on-saved';
 import { ENTITY_LIST, ENTITIES, type EntityRecord } from '@/lib/intake/entities';
 import { companyLabel } from '@/lib/companies';
 import { Page, Sec, EmptyState, ListBox, ListRow, Btn, C, PageLoading } from '@/components/ui';
+import { WorkbenchBar } from '@/components/WorkbenchBar';
 
 type Item = { entity: string; rec: EntityRecord };
 
@@ -30,7 +31,7 @@ export default function TrashPage() {
   }
 
   return (
-    <Page title="휴지통" meta={`${companyLabel(companyId)} · ${items.length}건 · 소프트삭제 (복구 가능)`}>
+    <Page title="휴지통" meta={`${companyLabel(companyId)} · ${items.length}건 · 소프트삭제 (복구 가능)`} tools={<WorkbenchBar />}>
       <Sec title="삭제된 항목" n={items.length} desc="소프트삭제 · 복구 가능">
         {loading ? <PageLoading />
           : items.length === 0 ? <EmptyState>삭제된 항목 없음</EmptyState>

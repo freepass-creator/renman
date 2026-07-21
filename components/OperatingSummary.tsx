@@ -9,7 +9,7 @@ type Tone = 'ink' | 'ok' | 'danger' | 'warn' | 'mute';
 const toneColor: Record<Tone, string> = { ink: C.ink, ok: C.ok, danger: C.danger, warn: C.warn, mute: C.mute };
 
 function Stat({ label, value, sub, tone = 'ink' }: { label: string; value: string | number; sub?: string; tone?: Tone }) {
-  const cell: CSSProperties = { border: `1px solid ${C.line}`, borderRadius: 'var(--radius)', background: '#fff', padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 3, minWidth: 0 };
+  const cell: CSSProperties = { border: `1px solid ${C.line}`, borderRadius: 'var(--radius)', background: C.card, padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 3, minWidth: 0 };
   return (
     <div style={cell}>
       <span style={{ fontSize: 11, color: C.mute, fontWeight: 600 }}>{label}</span>

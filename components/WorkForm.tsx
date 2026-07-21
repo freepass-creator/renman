@@ -76,7 +76,8 @@ const ACC_OTHER: WF[] = [
 
 const fLab: React.CSSProperties = { display: 'flex', flexDirection: 'column', gap: 3, minWidth: 0 };
 const fLl: React.CSSProperties = { fontSize: 11, color: C.mute };
-const grpH: React.CSSProperties = { fontSize: 11, fontWeight: 700, color: C.sub, marginBottom: 7, paddingBottom: 4, borderBottom: `1px solid ${C.line2}` };
+/* 그룹 제목 — 밑줄(borderBottom) 금지 데코. 여백만으로 구분한다. */
+const grpH: React.CSSProperties = { fontSize: 11, fontWeight: 700, color: C.sub, marginBottom: 7 };
 
 /**
  * 차량 수선/작업 인라인 폼 — 그 자리에서 펼침(팝업 X, QuickLogForm 자매).
@@ -187,7 +188,7 @@ export function WorkForm({ plate, companyId, vehicle, idle, onDone, onCancel, st
     if (on && tone) return { ...base, border: `1px solid ${tone}`, background: tone };
     return base;
   };
-  const catToneVar: Record<WorkCategory, string> = { '정비': 'var(--amber-text)', '사고수리': 'var(--red-text)', '상품화': 'var(--text-link)', '세차': 'var(--teal-text, #0e7490)' };
+  const catToneVar: Record<WorkCategory, string> = { '정비': 'var(--amber-text)', '사고수리': 'var(--red-text)', '상품화': 'var(--text-link)', '세차': 'var(--teal-text, #0e7490)' /* CSS var 폴백 — 매핑표 외 */ };
   const filePickH = ctrlH(mobile);
 
   return (
@@ -222,14 +223,14 @@ export function WorkForm({ plate, companyId, vehicle, idle, onDone, onCancel, st
                   {(f.options || []).map((o) => <option key={o} value={o}>{o}</option>)}
                 </Select>
               : f.wide
-                ? <textarea value={vals[f.key] ?? ''} onChange={(e) => chg(f.key, e.target.value)} rows={2} style={{ ...fieldStyle(), width: '100%', height: 'auto', padding: '8px 9px', resize: 'vertical', lineHeight: 1.5 }} />
+                ? <textarea value={vals[f.key] ?? ''} onChange={(e) => chg(f.key, e.target.value)} rows={2} style={{ ...fieldStyle(false, mobile), width: '100%', height: 'auto', padding: '8px 9px', resize: 'vertical', lineHeight: 1.5 }} />
                 : <Input type={f.type === 'number' ? 'number' : f.type === 'date' ? 'date' : 'text'} value={vals[f.key] ?? ''} onChange={(e) => chg(f.key, e.target.value)} style={{ width: '100%' }} />}
           </label>
         ))}
       </div>
 
       {category === '사고수리' ? (
-        <div style={{ border: `1px solid ${C.line}`, borderRadius: 'var(--radius)', background: '#fff', padding: '11px 12px', marginBottom: 11 }}>
+        <div style={{ border: `1px solid ${C.line}`, borderRadius: 'var(--radius)', background: C.card, padding: '11px 12px', marginBottom: 11 }}>
           <div style={{ fontSize: 11, color: C.mute, marginBottom: 6 }}>보험 처리 유형 <span style={{ color: C.faint }}>· 복수선택</span></div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: mobile ? 8 : 6, marginBottom: 12 }}>
             {ACC_INS_TOGGLES.map((t) => {

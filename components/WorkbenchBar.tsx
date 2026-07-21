@@ -6,9 +6,10 @@
  * Desktop: [tabs?][subTabs?][mid?] ──spacer── [search?][stat?][actions?]
  * Mobile:  1행 [회사][search?][필터?] / 2행 [tabs·sub·mid] / 3행 [stat·actions]
  *
- * search:
- *   true  = 점프 SearchBox(차량 360·/search)
+ * search (기본=true · 공통 점프 검색 — 페이지가 빼려면 false):
+ *   true/생략 = 점프 SearchBox(차량 360·/search)
  *   { value, onChange, placeholder? } = 목록 인페이지 FilterBox
+ *   false = 검색 슬롯 숨김(예외)
  */
 import React from 'react';
 import { useIsMobile } from '@/lib/use-mobile';
@@ -21,12 +22,9 @@ import { useFacetFilterApi } from '@/lib/facet-filter-ctx';
 export type WorkbenchTab<T extends string = string> = { key: T; label: React.ReactNode; title?: string };
 export type WorkbenchSearch = boolean | { value: string; onChange: (q: string) => void; placeholder?: string };
 
-function SearchSlot({ search }: { search: WorkbenchSearch }) {
+function SearchSlot({ search }: { search: Exclude<WorkbenchSearch, false> }) {
   if (search === true) return <SearchBox />;
-  if (search && typeof search === 'object') {
-    return <FilterBox value={search.value} onChange={search.onChange} placeholder={search.placeholder} />;
-  }
-  return null;
+  return <FilterBox value={search.value} onChange={search.onChange} placeholder={search.placeholder} />;
 }
 
 export function WorkbenchBar<T extends string = string>({
@@ -39,7 +37,7 @@ export function WorkbenchBar<T extends string = string>({
   subTab,
   onSubTab,
   mid,
-  search,
+  search = true,
   stat,
   actions,
 }: {
@@ -53,12 +51,15 @@ export function WorkbenchBar<T extends string = string>({
   subTab?: string;
   onSubTab?: (k: string) => void;
   mid?: React.ReactNode;
+  /** 기본 true(점프 검색). 목록 필터는 객체. 숨기려면 false. */
   search?: WorkbenchSearch;
   stat?: React.ReactNode;
   actions?: React.ReactNode;
 }) {
   const mobile = useIsMobile();
-  const hasSearch = !!search;
+  const resolved: Exclude<WorkbenchSearch, false> | null =
+    search === false ? null : (search === true || search == null ? true : search);
+  const hasSearch = resolved != null;
   const hasFacet = !!useFacetFilterApi()?.groups.length;
   const tabRow = (
     <>
@@ -70,7 +71,7 @@ export function WorkbenchBar<T extends string = string>({
   );
   const trail = (
     <>
-      {hasSearch && <SearchSlot search={search!} />}
+      {hasSearch && <SearchSlot search={resolved!} />}
       {stat}
       {actions}
     </>
@@ -82,7 +83,7 @@ export function WorkbenchBar<T extends string = string>({
         <div style={{ display: 'flex', alignItems: 'center', gap: SPACE_M, width: '100%', minWidth: 0 }}>
           <CompanyFilter />
           {hasSearch ? (
-            <div style={{ flex: 1, minWidth: 0 }}><SearchSlot search={search!} /></div>
+            <div style={{ flex: 1, minWidth: 0 }}><SearchSlot search={resolved!} /></div>
           ) : (
             <span style={{ flex: 1, minWidth: 0 }} />
           )}

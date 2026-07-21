@@ -5,12 +5,13 @@ import { AccountAliases } from '@/components/AccountAliases';
 import { CompanyRegistry } from '@/components/CompanyRegistry';
 import { StaffConsole } from '@/components/StaffConsole';
 import { Page, Panel, DetailGrid, DetailEmpty, Btn, C } from '@/components/ui';
+import { WorkbenchBar } from '@/components/WorkbenchBar';
 
 export default function AdminPage() {
   const { companyId, user, isOperator } = useSession();
   const targets = isOperator ? COMPANIES : [companyId];
   return (
-    <Page title="일반관리" meta="법인·직원·거래처 마스터">
+    <Page title="일반관리" meta="법인·직원·거래처 마스터" tools={<WorkbenchBar />}>
       <Panel title="현재 보기">
         <DetailGrid rows={[
           ['보기 법인', companyLabel(companyId)],

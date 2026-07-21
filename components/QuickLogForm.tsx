@@ -64,7 +64,7 @@ export function QuickLogForm({ ctx, onDone, onCancel, autoFocus = true, style }:
         ))}
       </div>
       <textarea autoFocus={autoFocus} value={text} onChange={(e) => setText(e.target.value)} placeholder={hint}
-        style={{ ...fieldStyle(), width: '100%', height: 'auto', minHeight: 80, marginTop: 8, padding: '10px 12px', lineHeight: 1.5, resize: 'vertical' }} />
+        style={{ ...fieldStyle(false, mobile), width: '100%', height: 'auto', minHeight: 80, marginTop: 8, padding: '10px 12px', lineHeight: 1.5, resize: 'vertical' }} />
       <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10, fontSize: 13, color: C.mute, cursor: 'pointer' }}>
         <input type="checkbox" checked={follow} onChange={(e) => setFollow(e.target.checked)} /> 다음 할 일 있음 — 일정에 뜨게
       </label>

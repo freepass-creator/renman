@@ -28,7 +28,7 @@ export function FilterBox({
   const h = ctrlH(mobile);
   return (
     <div style={{ width: mobile ? '100%' : 240 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, height: h, padding: mobile ? '0 14px' : '0 12px', border: `1px solid ${C.line}`, borderRadius: 'var(--radius)', background: '#fff', boxSizing: 'border-box', width: '100%' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, height: h, padding: mobile ? '0 14px' : '0 12px', border: `1px solid ${C.line}`, borderRadius: 'var(--radius)', background: C.card, boxSizing: 'border-box', width: '100%' }}>
         <Search size={mobile ? 16 : 14} color={C.faint} />
         <input
           value={value}
@@ -82,7 +82,7 @@ export function SearchBox() {
 
   return (
     <div ref={wrapRef} style={{ position: 'relative', width: mobile ? '100%' : 240 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, height: ctrlH(mobile), padding: mobile ? '0 14px' : '0 12px', border: `1px solid ${C.line}`, borderRadius: 'var(--radius)', background: '#fff', boxSizing: 'border-box', width: '100%' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, height: ctrlH(mobile), padding: mobile ? '0 14px' : '0 12px', border: `1px solid ${C.line}`, borderRadius: 'var(--radius)', background: C.card, boxSizing: 'border-box', width: '100%' }}>
         <Search size={mobile ? 16 : 14} color={C.faint} />
         <input
           value={q}

@@ -4,15 +4,16 @@ import { ENTITY_LIST, ENTITIES, mapOcrToEntity, type EntityRecord } from '@/lib/
 import { parseCsv } from '@/lib/intake/csv';
 import { downloadXlsxTemplate, parseSpreadsheet } from '@/lib/intake/xlsx';
 import { saveIntake } from '@/lib/intake';
-import { getStore } from '@/lib/store';
+import { useEntityList } from '@/lib/use-entity-lists';
+import { callOcrExtract } from '@/lib/ocr-client';
 import { useSession } from '@/lib/session';
 import { COMPANIES, companyLabel, ALL_COMPANIES } from '@/lib/companies';
 import { resolveWriteCompany, NEED_COMPANY } from '@/lib/scope';
 import { Check, AlertTriangle } from 'lucide-react';
 import FileDrop from '@/components/FileDrop';
 import { toast } from '@/lib/toast';
-import { Loading } from '@/components/Spinner';
-import { Page, Sec, Cards, Metric, Btn, FormGrid, Panel, PillTabs, Select, Input, th, td, C, Message } from '@/components/ui';
+
+import { Page, Sec, Cards, Metric, Btn, FormGrid, Panel, PillTabs, Select, Input, th, td, C, Message, Loading } from '@/components/ui';
 import { WorkbenchBar } from '@/components/WorkbenchBar';
 import { WorkHubBack } from '@/components/WorkHubTabs';
 
@@ -26,6 +27,9 @@ export default function IngestPage() {
   const company = scopeAll ? saveTarget : companyId;
   const [saveMsg, setSaveMsg] = useState('');
   const [saving, setSaving] = useState(false);
+  const [peekSaved, setPeekSaved] = useState(false);
+  const { rows: savedList, reload: reloadSaved } = useEntityList(entityKey, { companyId: company || undefined });
+  useEffect(() => { setPeekSaved(false); }, [company, entityKey]);
   async function saveRecords() {
     if (!records.length) return;
     const target = resolveWriteCompany(companyId, scopeAll ? { companyId: saveTarget } : null);
@@ -43,14 +47,16 @@ export default function IngestPage() {
       setSaveMsg(`저장 ${s.saved}건 · 중복건너뜀 ${s.duplicates} · 백엔드 ${s.backend}${fx}`);
       toast(`저장 ${s.saved}건${s.duplicates ? ` · 중복 ${s.duplicates}` : ''} — ${entity.label} (${companyLabel(target)})`, 'success');
       setRecords([]);
-      loadSaved();
+      setPeekSaved(true);
+      reloadSaved();
     } catch (e) { setSaveMsg('저장 실패: ' + (e as Error).message); toast('저장 실패: ' + (e as Error).message, 'error'); }
     finally { setSaving(false); }
   }
-  const [saved, setSaved] = useState<EntityRecord[] | null>(null);
-  async function loadSaved() {
+  const saved = peekSaved ? savedList : null;
+  function loadSaved() {
     if (!company) { toast(NEED_COMPANY, 'error'); return; }
-    try { setSaved(await getStore().list(entityKey, company)); } catch { setSaved([]); }
+    setPeekSaved(true);
+    reloadSaved();
   }
   const [tab, setTab] = useState<Tab>('ocr');
   const [records, setRecords] = useState<EntityRecord[]>([]);
@@ -69,15 +75,11 @@ export default function IngestPage() {
     if (!file) { setError('파일을 선택하세요'); return; }
     setLoading(true); reset();
     try {
-      const fd = new FormData();
-      fd.append('file', file);
-      fd.append('type', entity.ocrType || '');
-      const res = await fetch('/api/ocr/extract', { method: 'POST', body: fd });
-      const json = await res.json();
-      if (!json.ok) { setError(json.error || '추출 실패'); toast('OCR 추출 실패: ' + (json.error || ''), 'error'); return; }
-      setOcrRaw(json.extracted || {});   // 원본 보존
-      setRecords([mapOcrToEntity(entityKey, json.extracted || {})]);
-      setInfo(`OCR 추출 완료 · 모델 ${json.model || ''}`);
+      const r = await callOcrExtract(file, entity.ocrType || '');
+      if (!r.ok) { setError(r.error || '추출 실패'); toast('OCR 추출 실패: ' + (r.error || ''), 'error'); return; }
+      setOcrRaw(r.raw || {});   // 원본 보존
+      setRecords([mapOcrToEntity(entityKey, r.raw || {})]);
+      setInfo('OCR 추출 완료');
       toast('OCR 추출 완료 — 아래에서 검토 후 저장', 'success');
     } catch (e) { setError((e as Error).message); toast('OCR 실패: ' + (e as Error).message, 'error'); }
     finally { setLoading(false); }
@@ -203,7 +205,7 @@ export default function IngestPage() {
           <div style={{ overflowX: 'auto', border: `1px solid ${C.line}`, borderRadius: 'var(--radius)' }}>
             <table style={{ borderCollapse: 'collapse', fontSize: 12.5, width: '100%' }}>
               <thead>
-                <tr>{entity.fields.map((f) => <th key={f.key} style={{ ...th, color: f.manual ? '#9a3412' : C.mute }}>{f.label}{f.manual ? ' ·직접' : ''}</th>)}</tr>
+                <tr>{entity.fields.map((f) => <th key={f.key} style={{ ...th, color: f.manual ? C.warn : C.mute }}>{f.label}{f.manual ? ' ·직접' : ''}</th>)}</tr>
               </thead>
               <tbody>
                 {records.map((r, i) => (
@@ -212,7 +214,7 @@ export default function IngestPage() {
                       <td key={f.key} style={{ padding: '3px 4px' }}>
                         <Input size="sm" value={(r[f.key] as string) ?? ''}
                           onChange={(e) => setRecords(records.map((rr, ri) => ri === i ? { ...rr, [f.key]: e.target.value } : rr))}
-                          style={{ width: f.type === 'text' ? 120 : 90, background: f.manual && !(r[f.key]) ? '#fff7ed' : '#fff' }} />
+                          style={{ width: f.type === 'text' ? 120 : 90, background: f.manual && !(r[f.key]) ? 'var(--orange-bg)' : C.card }} />
                       </td>
                     ))}
                   </tr>
