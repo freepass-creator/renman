@@ -7,6 +7,7 @@ import { resolve } from 'node:path';
 import { parseSwitchplanWorkbook, buildSwitchplanPackFromBuffer } from '../lib/migrate/switchplan-parse';
 import { parseSwitchplanJbo } from '../lib/migrate/switchplan-jbo-parse';
 import { computeContractView } from '../lib/contract-ops';
+import { parseContract } from '../lib/schema/contract';
 
 const TODAY = '2026-07-22';
 const won = (n: number) => n.toLocaleString('ko-KR') + '원';
@@ -92,5 +93,18 @@ for (const r of lossRows.slice(0, 12)) {
   const hyp = Math.max(0, r.carry - sp); // 가설: net ≈ carry − Σpayments (이중차감)
   console.log(`  [${r.kind}] ${r.plate}  carry ${won(r.carry)} → net ${won(r.net)}  유실 ${won(r.loss)} · Σpay ${won(sp)} · Σdisc ${won(sd)} · 가설(carry−Σpay)=${won(hyp)} ${Math.abs(hyp - r.net) <= 2000 ? '✔일치' : '✘'}`);
 }
+
+console.log('\n════════ Contract 스키마(Zod) 적합성 — 실 seed 계약 ════════');
+let bad = 0;
+const issues: string[] = [];
+for (const c of pack.contract) {
+  const r = parseContract(c);
+  if (!r.success) {
+    bad++;
+    if (issues.length < 8) issues.push(`  ${String(c.plate || '')}: ${r.error.issues.slice(0, 3).map((i) => `${i.path.join('.')} ${i.message}`).join(' · ')}`);
+  }
+}
+console.log(`적합 ${pack.contract.length - bad}/${pack.contract.length} · 위반 ${bad}건`);
+if (issues.length) console.log(issues.join('\n'));
 
 if (parsed.warnings.length) { console.log('\n파서 경고:', parsed.warnings.slice(0, 10)); }
