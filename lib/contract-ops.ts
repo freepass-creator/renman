@@ -8,6 +8,7 @@ import type { EntityRecord } from './intake/entities';
 import type { Contract, PaymentEntry, DiscountEntry } from './payments/types';
 import { generateSchedules, recalcContract, addPaymentEntry, addDiscountEntry, distributeUnpaid, applyPayment } from './payments/payment-schedule';
 import { applyReturnedProration } from './payments/returned-proration';
+import { ymd, ddayFrom, addMonthsIso } from './contracts/dates';
 import {
   isDeliveryPending as statusDeliveryPending,
   isReturnable as statusReturnable,
@@ -34,16 +35,6 @@ export type ContractView = {
   monthlyRent: number;
   overdueDays: number;         // 가장 오래된 미납 회차 경과일(0=미납없음) — 회수 SLA 단계 판정용
 };
-
-function ymd(d: unknown): string { const s = String(d || ''); return /^\d{4}-\d{2}-\d{2}/.test(s) ? s.slice(0, 10) : ''; }
-function ddayFrom(today: string, target: string): number | null {
-  if (!target) return null;
-  return Math.round((new Date(target).getTime() - new Date(today).getTime()) / 86400000);
-}
-function addMonthsIso(date: string, months: number): string {
-  const d = new Date(date); if (Number.isNaN(d.getTime())) return '';   // 손상 날짜(월13 등)=Invalid → 빈값(RangeError 방지=전 페이지 백지 방어)
-  d.setMonth(d.getMonth() + months); return d.toISOString().slice(0, 10);
-}
 
 /** 계약 레코드 → v5 Contract(스케줄 포함) 빌드. 저장된 수기 입금(_payments)·청구할인(_discounts) 적용. */
 function buildContract(rec: EntityRecord, today: string): Contract {
@@ -218,95 +209,7 @@ export function isReturnable(c: EntityRecord): boolean {
   return statusReturnable(c);
 }
 
-/** 반납 정산 — 정산서(SettlementDoc)·현장 반납폼 공용 SSOT. 손롤 금지, 이 함수로 통일.
- *  view = computeContractView(반납일 what-if). 미납(net)을 보증금으로 충당 → 반환액/추가청구 산출. */
-export type ReturnSettlement = { deposit: number; unpaid: number; offset: number; refund: number; addCharge: number; proRefund: number };
-export function computeReturnSettlement(deposit: number, view: { net: number; refund: number }): ReturnSettlement {
-  const unpaid = Math.max(0, view.net);           // 미납 대여료(일할정산 반영)
-  return {
-    deposit,
-    unpaid,
-    offset: Math.min(deposit, unpaid),            // 보증금 충당
-    refund: Math.max(0, deposit - unpaid),        // 보증금 반환액(임차인 환급)
-    addCharge: Math.max(0, unpaid - deposit),     // 추가 청구액
-    proRefund: view.refund,                       // 반납 일할 환불(정보)
-  };
-}
-
-/* ── 상태전이 패치 (store.update 에 그대로 넘김) ── */
-// extra = 출고 실무 입력(출고 주행거리 mileageOut·연료 fuelOut). 반납정산이 비교할 원점. 기존 호출부는 {} 기본값으로 그대로 동작.
-export function patchDeliver(rec: EntityRecord, date: string, extra: EntityRecord = {}): EntityRecord {
-  return { status: '운행', deliveredDate: date || ymd(rec.startDate) || date, ...extra };
-}
-// extra = 반납 실무 입력(주행거리·연료·정산 메모 등). 기존 호출부는 {} 기본값으로 그대로 동작.
-export function patchReturn(rec: EntityRecord, date: string, extra: EntityRecord = {}): EntityRecord {
-  return { status: '반납', returnedDate: date, endReason: '정상종료', ...extra };
-}
-// extra = 해지 사유·위약금 메모 등.
-export function patchTerminate(rec: EntityRecord, date: string, extra: EntityRecord = {}): EntityRecord {
-  return { status: '해지', returnedDate: date, endReason: '중도해지', ...extra };
-}
-export function patchExtend(rec: EntityRecord, addMonths: number): EntityRecord {
-  const term = (Number(rec.rentalMonths) || 0) + addMonths;
-  const start = ymd(rec.startDate || rec.contractDate);
-  return { rentalMonths: term, endDate: start ? addMonthsIso(start, term) : rec.endDate };
-}
-
-/** 시동제어 패치 SSOT — contract.engineDisabled 정본. receivables·Vehicle360 공용. */
-export function patchEngineLock(
-  enable: boolean,
-  ctx: { today: string; actor: string; reason: string },
-): Record<string, unknown> {
-  if (enable) {
-    return {
-      engineDisabled: true,
-      engineDisabledAt: ctx.today,
-      engineDisabledReason: ctx.reason,
-      engineDisabledBy: ctx.actor,
-    };
-  }
-  return {
-    engineDisabled: false,
-    engineDisabledAt: '',
-    engineDisabledReason: '',
-    engineReleasedAt: ctx.today,
-    engineReleasedBy: ctx.actor,
-  };
-}
-
-/* ── 중도해지 위약금 상시계산 (v5 early-termination 이식) ──
-   위약금 = 잔여개월 × 월대여료 × 요율(%). 만기 도래(정상종료)면 0. 요율=계약서상 earlyTerminationRate. */
-function monthsBetweenIso(from: string, to: string): number {
-  if (!from || !to || to <= from) return 0;
-  const a = new Date(from), b = new Date(to);
-  let m = (b.getFullYear() - a.getFullYear()) * 12 + (b.getMonth() - a.getMonth());
-  if (b.getDate() < a.getDate()) m -= 1;
-  return Math.max(0, m);
-}
-export type EarlyTermCalc = { rate: number; isEarly: boolean; remainingMonths: number; monthlyRent: number; fee: number; maturity: string };
-export function earlyTerminationFee(rec: EntityRecord, asOf: string): EarlyTermCalc {
-  const rate = Number(rec.earlyTerminationRate) || 0;
-  const monthlyRent = Number(rec.monthlyRent) || 0;
-  const term = Number(rec.rentalMonths) || 0;
-  const start = ymd(rec.startDate || rec.contractDate);
-  const maturity = start && term ? addMonthsIso(start, term) : '';
-  const isEarly = !!maturity && asOf < maturity;
-  const remainingMonths = isEarly ? monthsBetweenIso(asOf, maturity) : 0;
-  const fee = Math.round(remainingMonths * monthlyRent * (rate / 100));
-  return { rate, isEarly, remainingMonths, monthlyRent, fee, maturity };
-}
-
-/* ── 운영 필터 ── */
-export type ContractFilter = '전체' | '대기' | '운행' | '만기임박' | '만기경과' | '반납예정' | '종료' | '미수';
-export function passesFilter(v: ContractView, f: ContractFilter, today: string): boolean {
-  switch (f) {
-    case '전체': return true;
-    case '대기': return v.status === '대기';
-    case '운행': return v.status === '운행';
-    case '만기임박': return v.status === '운행' && v.dday != null && v.dday >= 0 && v.dday <= 30;
-    case '만기경과': return v.status === '운행' && v.dday != null && v.dday < 0;
-    case '반납예정': return v.status === '운행' && !!ymd(v.rec.returnScheduledDate);
-    case '종료': return v.ended;
-    case '미수': return v.net > 0;
-  }
-}
+/* ── 책임 분리(barrel) — 아래 그룹은 lib/contracts/* 로 이동, 여기서 re-export (호출부 '@/lib/contract-ops' import 무변경) ── */
+export { computeReturnSettlement, type ReturnSettlement, earlyTerminationFee, type EarlyTermCalc } from './contracts/settlement';
+export { patchDeliver, patchReturn, patchTerminate, patchExtend, patchEngineLock } from './contracts/patches';
+export { passesFilter, type ContractFilter } from './contracts/filters';
