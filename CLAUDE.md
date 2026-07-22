@@ -13,6 +13,7 @@
 | **`docs/RENMAN-WORK-ORDER.md`** | **작업지시서·규격서 본문(SSOT)** — 절대 규격 · A그룹(지금 틀린 것) · B그룹(구조 개편) · 공용 원자 표 · 안티패턴 · 완료 기준 |
 | `RENMAN-CURSOR.md` | Cursor 진입점 + **협업 규칙 · 핸드오프 로그**(작업 넘길 때 한 줄 追記) |
 | `DEPLOY.md` | 배포 · **오픈 전 필수 게이트** |
+| **`SECURITY.md`** | **서버 권한 경계** — 고친 것(P0-1 권한상승) · 남은 P0(Custom Claims·ID Token·원자적 커밋) · `npm run test:rules` |
 | **`docs/CACHE.md`** | **백업 SSOT** — `.next`는 프로젝트 안 유지, 백업 시 `.next`·`node_modules` 제외 |
 | `tools/archive/architecture-cleanup-handoff.md` | Cursor Phase 0~3 이력 · Phase 4 잔여 |
 | 이 파일(아래) | 코드 규격 — UI 공용 규격 · 화면 구조 · 데이터 3층 · 기능 엔진 SSOT · 개발 제약 |

@@ -1,0 +1,55 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Unit tests (미수·상태·스키마)
+        run: npm test
+
+      - name: Build
+        run: npm run build
+        env:
+          # 빌드 시 필요한 공개 env — 실제 값은 배포에서 주입. CI는 존재만 있으면 통과.
+          NEXT_PUBLIC_MASTER_EMAIL: pyh@teamjpk.com
+
+  rules:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      # Firestore 에뮬레이터는 JRE 필요.
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Install
+        run: npm ci
+
+      - name: Firestore Rules 보안 테스트 (권한상승·테넌트격리·감사·마감)
+        run: npm run test:rules

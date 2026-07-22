@@ -6,5 +6,7 @@ export default defineConfig({
   test: {
     environment: 'node',
     include: ['tests/**/*.test.ts'],
+    // Rules 테스트는 Firestore 에뮬레이터 필요 → 기본 실행 제외. `npm run test:rules`로만.
+    exclude: ['tests/rules/**', 'node_modules/**'],
   },
 });
