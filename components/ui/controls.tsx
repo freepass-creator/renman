@@ -72,14 +72,62 @@ export function CompanyFilter() {
 }
 
 // PillTabs — 룩=toggleStyle. 모바일=CTRL.md(40)+16px (ERP4). lg는 위저드 CTA만.
-export function PillTabs<T extends string>({ tabs, value, onChange, size = 'md' }: { tabs: { key: T; label: React.ReactNode; title?: string }[]; value: T; onChange: (k: T) => void; size?: 'sm' | 'md' | 'lg' }) {
+export function PillTabs<T extends string>({ tabs, value, onChange, size = 'md' }: { tabs: { key: T; label: React.ReactNode; title?: string; badge?: number }[]; value: T; onChange: (k: T) => void; size?: 'sm' | 'md' | 'lg' }) {
   const mobile = useIsMobile();
   const s: 'sm' | 'md' | 'lg' = size === 'lg' ? 'lg' : (size === 'sm' ? 'sm' : 'md');
   return (
     <div style={{ display: 'flex', flexWrap: 'wrap', gap: mobile ? 8 : 6 }}>
-      {tabs.map((t) => (
-        <button key={t.key} type="button" data-ui="toggle" aria-pressed={value === t.key} onClick={() => onChange(t.key)} title={t.title} style={toggleStyle(value === t.key, s, mobile)}>{t.label}</button>
-      ))}
+      {tabs.map((t) => {
+        // 뱃지 = 그 탭에 «쌓여 있는 건수». 0이면 안 붙인다 — 0을 보여주면 없는 일도 있는 것처럼 읽힌다.
+        const n = t.badge && t.badge > 0 ? t.badge : 0;
+        return (
+          <button key={t.key} type="button" data-ui="toggle" aria-pressed={value === t.key} onClick={() => onChange(t.key)}
+            title={t.title} style={{ ...toggleStyle(value === t.key, s, mobile), position: 'relative', overflow: 'visible' }}>
+            {t.label}
+            {n > 0 && (
+              <span aria-label={`${n}건`} style={{
+                position: 'absolute', top: -6, right: -6, minWidth: 16, height: 16, padding: '0 4px',
+                borderRadius: 999, background: C.danger, color: C.inverse, boxSizing: 'border-box',
+                fontSize: 10, fontWeight: 800, lineHeight: '15px', textAlign: 'center',
+                fontVariantNumeric: 'tabular-nums', boxShadow: `0 0 0 2px ${C.bg}`,
+              }}>{n > 99 ? '99+' : n}</span>
+            )}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+/**
+ * 아이콘 세그먼트 (= ERP4 IconSeg) — 보기 모드 전환 SSOT.
+ *   카드 ↔ 엑셀 같은 «같은 데이터, 다른 표현» 전환에만 쓴다. 자리는 검색창 오른쪽(WorkbenchBar view).
+ *   ⚠ 이걸 페이지에서 손롤하지 말 것 — 화면마다 다른 토글이 생기는 게 원래 금지된 것이고,
+ *     원자 하나를 공유하는 건 그 금지의 취지에 맞다.
+ */
+export function IconSeg<T extends string>({ value, onChange, options, size = 'md' }: {
+  value: T; onChange: (k: T) => void;
+  options: { key: T; label: string; icon: React.ReactNode }[];
+  size?: CtrlSize;
+}) {
+  const mobile = useIsMobile();
+  const h = ctrlH(mobile, size);
+  return (
+    <div style={{ display: 'flex', border: `1px solid ${C.line}`, borderRadius: R, overflow: 'hidden', flexShrink: 0 }}>
+      {options.map((o, i) => {
+        const on = value === o.key;
+        return (
+          <button key={o.key} type="button" onClick={() => onChange(o.key)} title={o.label} aria-label={o.label} aria-pressed={on}
+            style={{
+              height: h, width: h, display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+              cursor: 'pointer', border: 'none', borderLeft: i ? `1px solid ${C.line}` : 'none',
+              background: on ? C.brand : C.taupeBg, color: on ? C.inverse : C.mute, padding: 0,
+              WebkitTapHighlightColor: 'transparent',
+            }}>
+            {o.icon}
+          </button>
+        );
+      })}
     </div>
   );
 }

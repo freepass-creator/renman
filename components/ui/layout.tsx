@@ -55,16 +55,27 @@ export function FacetPage({ title, meta, left, mid, right, tools, rail, back, ch
   const mobile = useIsMobile();
   const hasRail = rail != null;
   const deskRail = hasRail && !mobile;
+  /* 레일 «자리»는 내용보다 먼저 잡는다.
+     페이지들이 로딩 중엔 rail={null}을 넘긴다 → 자리를 안 잡으면
+     로딩=전체폭 → 완료=레일 삽입 으로 본문이 한 번 쪼그라든다(메뉴 이동마다 보이던 흔들림).
+     단 rail prop 자체를 «안 주는» 화면(손익·부가세·재무상태)은 레일이 없는 게 정상이라 자리도 잡지 않는다.
+     → undefined = 레일 안 씀 / null = 쓰는데 아직 로딩 중. 이 구분이 이 컴포넌트의 계약이다. */
+  const usesRail = rail !== undefined;
   const page = (
-    <Page title={title} meta={meta} left={left} mid={mid} right={right} tools={tools} fill={deskRail} back={back}>
+    <Page title={title} meta={meta} left={left} mid={mid} right={right} tools={tools} fill={usesRail && !mobile} back={back}>
       {/* 모바일: rail 마운트만(UI null) → 검색 옆 필터 등록. 데스크톱 레일은 바깥. */}
       {mobile && hasRail ? rail : null}
       {children}
     </Page>
   );
-  const wrapped = deskRail
-    ? <div style={{ display: 'flex', alignItems: 'stretch', minHeight: 'calc(100vh - 49px)' }}>{rail}{page}</div>
-    : page;
+  const wrapped = mobile || !usesRail
+    ? page
+    : (
+      <div style={{ display: 'flex', alignItems: 'stretch', minHeight: 'calc(100vh - 49px)' }}>
+        {deskRail ? rail : <div aria-hidden style={{ flex: '0 0 200px' }} />}
+        {page}
+      </div>
+    );
   return <FacetFilterProvider>{wrapped}</FacetFilterProvider>;
 }
 

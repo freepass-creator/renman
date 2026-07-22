@@ -126,10 +126,21 @@ export function buildAssetDerived(D: any, contracts: EntityRecord[], history: En
   const missingOf = (v: any): string[] => { const m: string[] = []; if (!v.vin) m.push('차대번호'); if (!v.carName) m.push('차명'); return m; };
   const unreg = rows.map((r) => ({ ...r, miss: missingOf(r.v) })).filter((r) => (r.miss?.length || 0) > 0 || ['구매대기', '등록대기'].includes(r.status));
   const manage = rows.filter((r) => { const ins = dday(r.v.inspectionTo); return ['정비', '사고'].includes(r.status) || IDLE.has(r.status) || (ins != null && ins <= 30); });
-  const running = rows.filter((r) => r.status === '운행');
-  const idle = rows.filter((r) => IDLE.has(r.status));
-  const others = rows.filter((r) => r.status !== '운행' && !IDLE.has(r.status) && !OUT.has(r.status));
-  const outCars = rows.filter((r) => OUT.has(r.status));
+  /* 운행·유휴·매각은 «지표와 같은 값»을 써야 한다(D.running / D.idleCars / D.soldRows).
+     예전엔 여기서 v.status 로 다시 갈랐는데, 지표는 계약 기준(runningPlates)이라
+     계약은 살아있는데 status가 '운행'이 아닌 차에서 요약(102대)과 목록 수가 어긋났다.
+     집계는 lib/operating-snapshot 한 곳 — 여기서 다시 세지 않는다. */
+  const running: AssetRow[] = D.running;
+  const idle: AssetRow[] = D.idleCars;
+  const outCars: AssetRow[] = D.soldRows;
+  const runPlates = new Set(running.map((r) => String(r.v.plate)));
+  const idlePlates = new Set(idle.map((r) => String(r.v.plate)));
+  const outPlates = new Set(outCars.map((r) => String(r.v.plate)));
+  // 그 밖 = 위 셋 어디에도 안 든 차(정비·사고 등). 분류가 겹치거나 새지 않게 «차집합»으로 잡는다.
+  const others = rows.filter((r) => {
+    const p = String(r.v.plate);
+    return !runPlates.has(p) && !idlePlates.has(p) && !outPlates.has(p);
+  });
 
   // 차량별: 최근 계약(예정 대여료 도출) · 거쳐간 손님 수(생애 성과)
   const lastContractByPlate = new Map<string, EntityRecord>();
@@ -411,8 +422,9 @@ export const SECTIONS: SectionDef[] = [
     render: ({ asset }, p) => { const { running, termOf, carTypeOf, fieldsOf, runningRight, runningRail } = asset; return (
       <Sec key="a-running" id="a-running" title="운행중" n={running.length} tone="ok" desc="장기·단기 · 클릭 → 360" right={<WorkPipe to="dispatch" />} {...p}>
         {running.length === 0 ? <EmptyState variant="ok">운행 중인 차 없음</EmptyState> :
-          <><Cards min={360}>{running.slice(0, 40).map((r: any, i: number) => { const t = termOf(r); return <ObjCard key={i} onClick={() => openCar(r.v.plate)} rail={runningRail(r)} badge={t.label} badgeTone={t.tone} co={String(r.v.companyId || '')} plate={String(r.v.plate)} carType={carTypeOf(r)} fields={fieldsOf(r)} right={runningRight(r)} />; })}</Cards>
-          {running.length > 40 && <div style={{ fontSize: 12, color: C.faint, marginTop: 8 }}>외 {running.length - 40}대 — 검색 ⌘K</div>}</>}
+          /* 자르지 않는다 — 헤더가 102대라고 하는데 목록이 40개면 «분류가 틀린 것»으로 읽힌다.
+             많으면 좌측 필터·검색으로 좁히는 게 이 화면의 사용법. */
+          <Cards min={360}>{running.map((r: any, i: number) => { const t = termOf(r); return <ObjCard key={i} onClick={() => openCar(r.v.plate)} rail={runningRail(r)} badge={t.label} badgeTone={t.tone} co={String(r.v.companyId || '')} plate={String(r.v.plate)} carType={carTypeOf(r)} fields={fieldsOf(r)} right={runningRight(r)} />; })}</Cards>}
       </Sec>
     ); },
   },

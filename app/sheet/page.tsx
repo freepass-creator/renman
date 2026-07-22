@@ -1,14 +1,15 @@
 'use client';
 /**
  * 운영시트 — 프리패스 엑셀뷰 이식. 함대+계약 현황을 표로 한눈.
- * 카드/리스트 토글 금지 · ExcelSheet 원자만. 행 클릭 → Vehicle360.
+ * 보기전환(카드↔엑셀) = `IconSeg` 원자, 자리는 검색창 오른쪽 고정. 손롤 토글 금지.
+ * 표·카드 모두 ExcelSheet 원자 하나가 같은 cols로 그린다. 행 클릭 → Vehicle360.
  *
  * 탭 3종 — 자산(차량 1행) · 계약(계약 1행) · 미수(계약 중 net>0).
  *   손바뀜 때문에 자산 수 ≠ 계약 수인 게 정상.
  *   미수는 계약의 «필터»일 뿐 — 별도 집계 손롤 금지(전부 computeContractView 파생).
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Download } from 'lucide-react';
+import { Download, LayoutGrid, Table } from 'lucide-react';
 import { TODAY } from '@/lib/dashboard-consts';
 import { linkFleet } from '@/lib/domain/model';
 import { buildSheetRows, buildContractRows, type SheetRow, type ContractRow } from '@/lib/sheet-rows';
@@ -16,7 +17,7 @@ import { textMatch } from '@/lib/search-match';
 import { openCar } from '@/lib/ui-bus';
 import { downloadCsv } from '@/lib/export-csv';
 import { useEntityLists } from '@/lib/use-entity-lists';
-import { Page, ExcelSheet, Badge, Btn, EmptyState, PageLoading, won, C, type SheetCol } from '@/components/ui';
+import { Page, ExcelSheet, Badge, Btn, EmptyState, PageLoading, IconSeg, won, C, type SheetCol } from '@/components/ui';
 import { WorkbenchBar } from '@/components/WorkbenchBar';
 
 type Tab = '자산' | '계약' | '미수';
@@ -114,6 +115,8 @@ export default function SheetPage() {
   const { data: [vs = [], cs = []], loading } = useEntityLists(['vehicle', 'contract']);
   const [q, setQ] = useState('');
   const [tab, setTab] = useState<Tab>('자산');
+  // 보기 모드 — 같은 cols로 표/카드. 자리는 검색창 오른쪽(WorkbenchBar view) 고정.
+  const [view, setView] = useState<'excel' | 'card'>('excel');
 
   const fleet = useMemo(() => linkFleet(vs, cs, TODAY), [vs, cs]);
 
@@ -157,22 +160,29 @@ export default function SheetPage() {
       : `${count}건`;
 
   return (
+    /* tools 대신 left — tools로 넘기면 Page가 「제목·회사·meta·툴바」 순으로 그려서 탭이 건수 뒤로 밀린다.
+       left면 회사 필터 바로 옆이 탭 자리. 건수·미수합계는 stat으로 우측에 붙인다. */
     <Page
       title="운영시트"
-      meta={meta}
-      tools={<WorkbenchBar
+      left={<WorkbenchBar
         tabs={TABS.map((t) => ({ key: t, label: t }))}
         tab={tab}
         onTab={setTab}
         search={{ value: q, onChange: setQ, placeholder: tab === '자산' ? '차번·차명·계약자' : '차번·계약자·연락처' }}
+        /* mid = 탭 «바로 뒤». stat으로 주면 스페이서 건너 우측 끝으로 밀린다 — 건수는 탭이 바꾼 결과라 붙어 있어야 읽힌다. */
+        mid={<span style={{ fontSize: 12.5, color: C.faint, whiteSpace: 'nowrap' }}>{meta}</span>}
+        view={<IconSeg value={view} onChange={setView} options={[
+          { key: 'card', label: '카드', icon: <LayoutGrid size={15} /> },
+          { key: 'excel', label: '엑셀', icon: <Table size={15} /> },
+        ]} />}
         actions={<Btn size="sm" variant="ghost" onClick={exportCsv} disabled={!count}><Download size={14} /> CSV</Btn>}
       />}
     >
       {!count
         ? <EmptyState>{tab === '미수' ? '미수 건이 없습니다' : `표시할 ${tab}이 없습니다`}</EmptyState>
         : tab === '자산'
-          ? <ExcelSheet cols={ASSET_COLS} rows={assetRows} rowKey={(r) => r.plate} onRow={(r) => openCar(r.plate)} onFiltered={setShownAsset} />
-          : <ExcelSheet cols={cols} rows={ctRows} rowKey={(r) => r.contractNo || r.plate} onRow={(r) => openCar(r.plate)} onFiltered={setShownCt} />}
+          ? <ExcelSheet mode={view} cols={ASSET_COLS} rows={assetRows} rowKey={(r) => r.plate} onRow={(r) => openCar(r.plate)} onFiltered={setShownAsset} />
+          : <ExcelSheet mode={view} cols={cols} rows={ctRows} rowKey={(r) => r.contractNo || r.plate} onRow={(r) => openCar(r.plate)} onFiltered={setShownCt} />}
     </Page>
   );
 }

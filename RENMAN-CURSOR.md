@@ -69,8 +69,19 @@ curl -s -o /dev/null -w "%{http_code}" http://localhost:6006/<route>   # 200
 
 ## 5. 핸드오프 로그 (최신이 위)
 
+> **⚠ 다른 PC로 옮길 때 (git으로 안 따라오는 것 2가지):**
+> 1. **스위치플랜 실데이터** = `C:\dev\jpkerp6-마이그레이션\switchplan_스위치플랜\` (리포 밖·PII라 gitignore). 없으면 `MIGRATE_MODE=auto`가 frozen/demo로 폴백. 파일 2개(`[스위치플랜] 사업현황.xlsx`·`26년_스위치플랜_자금일보.xlsx`)를 그 경로에 복사해야 실데이터 반영됨. 경로 바꾸려면 `MIGRATE_ROOT` env.
+> 2. **`.env.local`** = gitignore. 이번에 `NEXT_PUBLIC_MIGRATE_MODE=frozen`→**`auto`**로 바꿈. 새 PC에선 `.env.local.example` 참고해 다시 만들 것(Firebase 키·`auto` 모드).
+> 얼린 시드 재생성 도구: `npx tsx tools/rebuild-switchplan-frozen.ts <사업현황.xlsx>` (드라이런 기본, `--write`로 반영).
+
 | 날짜 | 작업자 | 내용 | 상태 |
 |---|---|---|---|
+| 2026-07-21 | Claude | **운영현황 = 함대 흐름**: 요약현황 섹션 삭제(지표 10개가 섹션 헤더와 중복·미수는 리스크탭) → KPI(보유·가동률)는 툴바 stat 한 줄 · 섹션 순서=인도대기→반납지남→휴차→만기임박→운행중→멈춘차(`useSecOrder ops-v2`) · 「곧비는차」를 지남/임박 2섹션으로 분리 | tsc 0 / 홈 200 |
+| 2026-07-21 | Claude | **분류 SSOT 버그**: 운영현황 운행102·유휴 목록이 요약과 안 맞던 것 — `buildAssetDerived`가 `v.status`로 다시 갈랐는데 지표는 계약기준(`D.running`). 이제 `D.running/idleCars/soldRows` 재사용, 그밖=차집합 · `a-running` 40대 조용한 절단 제거 | tsc 0 |
+| 2026-07-21 | Claude | **보기전환(카드↔엑셀)**: `IconSeg` 원자 신설 · `WorkbenchBar view` 슬롯(검색창 우측 고정) · `ExcelSheet mode` — 같은 cols로 표/카드 · CLAUDE.md 금지항목 "보기전환 손롤"로 정정(원자는 허용) · 헤더필터(ERP4 오토필터)·행호버 pin 수정·틀고정 제거 | tsc 0 / sheet 200 |
+| 2026-07-21 | Claude | **레일 레이아웃 흔들림**: FacetPage가 `rail={null}`(로딩중)일 때 자리를 안 잡아 완료 시 본문이 쪼그라들던 것 — 200px 자리 예약 · `rail` undefined(안씀)/null(로딩중) 구분 계약화 | tsc 0 / 8p 200 |
+| 2026-07-21 | Claude | **탭 뱃지**: `PillTabs badge` — 미결·리스크 탭에 쌓인 건수(0이면 숨김) · `WorkbenchTab.badge` | tsc 0 |
+| 2026-07-21 | Claude | **업로드 UI 통일**: `FileDrop` 다중(`onFiles`)·진행표시 지원 · `DocUpload` 조립 원자 신설 · PenaltyUpload·InfoDoc 손롤 드롭존→`FileDrop`(과태료 고지서 창이 데이터센터와 같은 모양). 인라인버튼·카메라(WorkForm·수집함 등)는 어포던스 달라 유지 | tsc 0 |
 | 2026-07-21 | Claude | **메뉴 재구성**: 업무=고유업무만(배차·차량수선·미수·자금일보·과태료·증빙수집) · `자료등록`→**데이터센터**(최상단, 선택기를 데이터3층 optgroup으로 — 이벤트도 투입 가능함을 노출) · `정비관리`→`차량수선` · `/work`는 메뉴 제외(페이지는 모바일탭·WorkHubBack 때문에 유지) | tsc 0 / 6p 200 |
 | 2026-07-21 | Claude | **활동↔계약 매칭 버그**: `lib/activity-match` 신설(contractNo→번호판+기간→이름 3단) · Customer360이 번호판으로만 걸러 손바뀜 차에서 앞 임차인 통화가 다음 임차인에게 노출되던 것 수정 · Vehicle360 QuickLog가 contractNo 안 넘기던 것(원인) 수정 + 이력에 「상대」 표기 | tsc 0 / 5p 200 |
 | 2026-07-21 | Claude | **섹션 IA 기준 확립**: 「오늘 끝낼 수 있는가」로 탭 배치 — 미수 `s-unpaid`→`r-unpaid` 통합(미결에 두면 큐가 안 비워짐) · 정비사고 `s-repair`→자산 그룹 · `리스크현황`→`리스크관리` · 미결 9→8섹션 · `cockpit-v3` 키 승격 · CLAUDE.md 기준표 | tsc 0 / 5p 200 |

@@ -6,7 +6,8 @@ import { uploadDoc, docPath, storageReady } from '@/lib/storage';
 import type { DocVersion } from '@/lib/docs';
 import { KV, Btn, Badge, OcrCrosscheck, Select, Input, C, type KVRow } from '@/components/ui';
 import { type CrosscheckResult } from '@/lib/ocr-crosscheck';
-import { UploadCloud, ChevronDown, FileText } from 'lucide-react';
+import { ChevronDown, FileText } from 'lucide-react';
+import FileDrop from '@/components/FileDrop';
 
 /**
  * InfoDoc — "정보 + 그 서류(+이력)" 한 블록. 엔티티 불문 재사용(등록증·증권…).
@@ -55,7 +56,6 @@ export function InfoDoc({
 }: InfoDocProps) {
   const [mode, setMode] = useState<'view' | 'replace'>('view');
   const [busy, setBusy] = useState(false);
-  const [drag, setDrag] = useState(false);
   const [pending, setPending] = useState<{ url: string; ocr?: Record<string, unknown>; ocrOriginal?: OcrOriginal; crosscheck?: CrosscheckResult; fileName: string } | null>(null);
   const [confirm, setConfirm] = useState<EntityRecord>({});
   const [reason, setReason] = useState(REASONS[0]);
@@ -68,7 +68,7 @@ export function InfoDoc({
   const label = docLabel || ENTITIES[docType]?.source || docType;
   const editKeys = fields.filter((f): f is [string, string, React.ReactNode] => !!f[1]);
 
-  function resetReplace() { setMode('view'); setPending(null); setConfirm({}); setBusy(false); setDrag(false); }
+  function resetReplace() { setMode('view'); setPending(null); setConfirm({}); setBusy(false); }
 
   async function onFile(file: File | null | undefined) {
     if (!file) return;
@@ -139,15 +139,13 @@ export function InfoDoc({
           </div>
 
           {!pending ? (
-            <label
-              onDragOver={(e) => { e.preventDefault(); setDrag(true); }} onDragLeave={() => setDrag(false)}
-              onDrop={(e) => { e.preventDefault(); setDrag(false); onFile(e.dataTransfer.files?.[0]); }}
-              style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, padding: '18px 16px', border: `1.5px dashed ${drag ? C.accent : C.line}`, borderRadius: 'var(--radius)', background: drag ? 'var(--bg-hover)' : C.card, cursor: 'pointer', textAlign: 'center' }}>
-              <UploadCloud size={24} color={C.sub} strokeWidth={1.7} />
-              <div style={{ fontSize: 12.5, fontWeight: 700, color: C.ink }}>{busy ? '분석 중…' : `${label} 파일을 끌어다 놓거나 클릭해서 선택`}</div>
-              <div style={{ fontSize: 11.5, color: C.faint }}>{busy ? 'Storage 업로드 · OCR 재추출' : 'JPG · PNG · PDF · 올리면 OCR로 자동 채웁니다'}</div>
-              <input type="file" accept="image/*,application/pdf" onChange={(e) => onFile(e.target.files?.[0])} style={{ display: 'none' }} />
-            </label>
+            /* 드롭존은 FileDrop SSOT — 손롤 금지(과태료·데이터센터와 같은 모양이어야 한다). */
+            <FileDrop
+              accept="image/*,application/pdf"
+              onFile={(f) => onFile(f)}
+              hint={`${label} · JPG · PNG · PDF · 올리면 OCR로 자동 채웁니다`}
+              note={busy ? 'Storage 업로드 · OCR 재추출 중…' : undefined}
+            />
           ) : (
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, flexWrap: 'wrap', fontSize: 11.5 }}>

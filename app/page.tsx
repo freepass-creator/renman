@@ -1,8 +1,8 @@
 'use client';
-import { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSession } from '@/lib/session';
-import { FacetPage, Sec, HiddenSecs, Cards, Metric, won, PageLoading } from '@/components/ui';
+import { FacetPage, Sec, HiddenSecs, Cards, Metric, ObjCard, EmptyState, won, C, PageLoading } from '@/components/ui';
 import { WorkPipe } from '@/components/WorkPipe';
 import { visibleSecs, dueMatcher } from '@/lib/lens-filters';
 import { useIsMobile } from '@/lib/use-mobile';
@@ -12,6 +12,7 @@ import { useSecOrder } from '@/lib/use-sec-order';
 import { Agenda } from '@/components/Agenda';
 import { FacetRail } from '@/components/FacetRail';
 import { WorkbenchBar } from '@/components/WorkbenchBar';
+import { openCar } from '@/lib/ui-bus';
 
 const EMPTY_SET = new Set<string>(); // 안정 참조(빈 필터) — 불필요 재렌더 방지
 const goSec = (id: string) => { if (typeof document !== 'undefined') document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' }); };
@@ -80,6 +81,17 @@ export default function Home() {
         : lens === '리스크' ? <RiskLens ctx={ctx} facets={curFacets} setF={setF} />
           : <CockpitLens ctx={ctx} facets={curFacets} setF={setF} />;
   const footer = <>{!loading && <HiddenSecs />}</>;
+  /* 탭 뱃지 = 그 탭에 쌓인 «건수». 어느 탭에 일이 몰려 있는지 열어보지 않고 알 수 있어야 한다.
+     미결 = 오늘 끝낼 일 합 · 리스크관리 = 관리 중인 위험 건수. 지표(운영현황)·시간표(일정)엔 안 붙인다 — 셀 «건»이 아니다. */
+  const badge = useMemo(() => {
+    if (loading) return {} as Record<Lens, number>;
+    const overdueRet = D.returnFlow.filter((v: { dday: number | null }) => (v.dday ?? 0) < 0).length;
+    return {
+      콕핏: overdueRet + D.penaltyPending.length + D.ghostPlates.length + D.doubleBooking.length + D.todo.length + (D.unmatchedTx?.length ?? 0),
+      리스크: D.overduePay.length + D.compliance.length,
+    } as Record<Lens, number>;
+  }, [loading, D]);
+
   return (
     <FacetPage
       title="홈"
@@ -87,9 +99,16 @@ export default function Home() {
         <WorkbenchBar
           company
           search
-          tabs={LENSES.map((l) => ({ key: l.key, label: mobile ? l.short : l.label, title: l.desc }))}
+          tabs={LENSES.map((l) => ({ key: l.key, label: mobile ? l.short : l.label, title: l.desc, badge: badge[l.key] }))}
           tab={lens}
           onTab={(k) => setLens(k as Lens)}
+          /* 요약현황 섹션을 없앤 자리 — 함대 KPI 두 개만 한 줄로. 나머지 숫자는 각 섹션 헤더(n)가 든다. */
+          stat={!loading && lens === '운영' ? (
+            <span style={{ fontSize: 12.5, color: C.faint, whiteSpace: 'nowrap' }}>
+              보유 <b style={{ color: C.ink }}>{D.summary.held}대</b> · 가동률{' '}
+              <b style={{ color: D.summary.util >= 70 ? 'var(--green-text)' : D.summary.util < 50 ? C.warn : C.ink }}>{D.summary.util}%</b>
+            </span>
+          ) : undefined}
         />
       }
       rail={!loading ? <FacetRail lensKey={lens} facets={curFacets} onToggle={toggleFacet} onReset={resetFacets} /> : null}
@@ -101,7 +120,10 @@ export default function Home() {
 
 // 섹션 순서/이동 = 공용 훅(lib/use-sec-order). 접힌 섹션 드래그만 — 페이지 전용 손롤 금지.
 
-/** 운영현황 — ② 지표. 좌측 필터(영역)로 Sec show/hide. */
+/** 운영현황 — 「보유자산이 어떻게 굴러가나」. 섹션이 차를 직접 보여준다.
+ *  요약현황(지표 카드 12개)은 없앴다 — 10개가 아래 섹션 헤더(n)와 겹쳤고, 미수·미분류는
+ *  리스크관리·미결 탭이 이미 든다. 남는 가동률·보유는 툴바 stat 한 줄로 올렸다.
+ *  좌측 필터(보기)로 Sec show/hide. */
 function OpsLens({ ctx, facets, setF }: { ctx: SectionCtx; facets?: Set<string>; setF: (labels: string[]) => void }) {
   const D = ctx.D;
   const S = D.summary;
@@ -112,53 +134,67 @@ function OpsLens({ ctx, facets, setF }: { ctx: SectionCtx; facets?: Set<string>;
     window.dispatchEvent(new CustomEvent('jpk:navigate', { detail: { href } }));
   };
   const pick = (labels: string[], sec: string) => { setF(labels); goSec(sec); };
-  const overdueReturn = D.returnFlow.filter((v: { dday: number }) => v.dday < 0).length;
-  const returnSoon = D.returnFlow.filter((v: { dday: number }) => v.dday >= 0).length;
-  const deliveryTodo = D.todo.filter((t: { action: string }) => t.action === '인도 대기').length;
+  const overdueList = D.returnFlow.filter((v: { dday: number | null }) => (v.dday ?? 0) < 0);
+  const soonList = D.returnFlow.filter((v: { dday: number | null }) => (v.dday ?? 0) >= 0);
+  const overdueReturn = overdueList.length;
+  const returnSoon = soonList.length;
+  // 반납 카드는 지남·임박이 «같은 모양»이어야 한다 — 뱃지만 다르다.
+  const returnCard = (v: any, i: number) => {
+    const over = (v.dday ?? 0) < 0;
+    return (
+      <ObjCard key={i} onClick={() => openCar(v.rec.plate)} rail={over ? 'danger' : 'warn'}
+        badge={over ? `${-v.dday}일 지남` : `D-${v.dday}`} badgeTone={over ? 'red' : 'amber'}
+        co={String(v.rec.companyId || '')} plate={String(v.rec.plate)} carType={String(v.rec.carName || '')}
+        fields={[['계약자', String(v.rec.contractorName || '—')], ['반납예정', String(v.rec.endDate || '—')], ['월대여료', v.rec.monthlyRent ? won(v.rec.monthlyRent) : '—']]}
+        right={v.net > 0 ? <span style={{ color: 'var(--red-text)' }}>미수 {won(v.net)}</span> : undefined} />
+    );
+  };
+  const deliverList = D.todo.filter((t: { action: string }) => t.action === '인도 대기');
+  const deliveryTodo = deliverList.length;
+
+  /* 기본 순서 = 함대 흐름에서 «급한 순». 반납 지남(남의 손에 우리 차) → 인도 대기(대여료 안 도는 중)
+     → 휴차(놀고 있음) → 만기 임박(곧 빔) → 운행중(정상) → 멈춘 차.
+     접힌 섹션 드래그로 각자 바꿀 수 있다(useSecOrder) — 여기 배열은 «처음 열었을 때»의 순서일 뿐. */
+  const [order, reorder] = useSecOrder('jpk:order:ops-v2',
+    ['ops-deliver', 'ops-overdue', 'a-idle', 'ops-return', 'a-running', 'a-other']);
+
+  const node: Record<string, React.ReactNode> = {
+    'ops-deliver': (
+        <Sec id="ops-deliver" title="인도 대기" n={deliverList.length} desc="계약 성립 · 아직 출고 안 됨" right={<WorkPipe to="dispatch" />}>
+          {deliverList.length === 0 ? <EmptyState variant="ok">인도 대기 없음</EmptyState> : (
+            <Cards min={300}>
+              {deliverList.map((t: any, i: number) => (
+                <ObjCard key={i} onClick={() => openCar(t.plate)} rail="warn" badge="인도 대기" badgeTone="amber"
+                  plate={String(t.plate)} carType={String(t.name || '')}
+                  fields={[['임차인', String(t.name || '—')], ['내용', String(t.detail || '—')]]}
+                  sub={String(t.detail || '')} />
+              ))}
+            </Cards>
+          )}
+        </Sec>
+    ),
+    'ops-overdue': (
+        <Sec id="ops-overdue" title="반납 지남" n={overdueList.length} tone="danger" desc="계약 종료 · 미회수" right={<WorkPipe to="dispatch" />}>
+          {overdueList.length === 0 ? <EmptyState variant="ok">지난 반납 없음</EmptyState> : (
+            <Cards min={300}>{overdueList.map((v: any, i: number) => returnCard(v, i))}</Cards>
+          )}
+        </Sec>
+    ),
+    'ops-return': (
+        <Sec id="ops-return" title="만기 임박" n={soonList.length} desc="7일 내 반납 예정 · 다음 배차 준비" right={<WorkPipe to="dispatch" />}>
+          {soonList.length === 0 ? <EmptyState variant="ok">임박한 반납 없음</EmptyState> : (
+            <Cards min={300}>{soonList.map((v: any, i: number) => returnCard(v, i))}</Cards>
+          )}
+        </Sec>
+    ),
+    'a-idle': SECTION_MAP['a-idle']?.render(ctx, { onReorder: reorder }),
+    'a-running': SECTION_MAP['a-running']?.render(ctx, { onReorder: reorder }),
+    'a-other': SECTION_MAP['a-other']?.render(ctx, { onReorder: reorder }),
+  };
 
   return (
     <>
-      {show('ops-fleet') && (
-        <Sec id="ops-fleet" title="함대" desc="현물자산 · 가동(지표)" right={<WorkPipe to="asset" />}>
-          <Cards min={128} fit>
-            <Metric label="보유" value={`${S.held}대`} tone="ink" onClick={() => pick(['함대'], 'ops-fleet')} />
-            <Metric label="운행" value={`${S.running}대`} tone={S.running ? 'ok' : 'ink'} onClick={() => go('/asset')} />
-            <Metric label="유휴" value={`${S.idle}대`} tone={S.idle ? 'warn' : 'ink'} onClick={() => go('/asset')} />
-            <Metric label="가동률" value={`${S.util}%`} tone={S.util >= 70 ? 'ok' : S.util < 50 ? 'warn' : 'ink'} onClick={() => go('/asset')} />
-            <Metric label="정비·사고" value={`${D.repair.length}대`} tone={D.repair.length ? 'warn' : 'ink'} onClick={() => go('/repair')} />
-          </Cards>
-        </Sec>
-      )}
-      {show('ops-contract') && (
-        <Sec id="ops-contract" title="계약" desc="계약자산 · 생애 신호" right={<WorkPipe to="contract" />}>
-          <Cards min={128} fit>
-            <Metric label="운행중 계약" value={`${S.activeContracts}건`} tone="ink" onClick={() => go('/contract')} />
-            <Metric label="인도 대기" value={`${deliveryTodo}건`} tone={deliveryTodo ? 'warn' : 'ink'} onClick={() => go('/dispatch?tab=출고')} />
-            <Metric label="반납 임박" value={`${returnSoon}건`} tone={returnSoon ? 'warn' : 'ink'} onClick={() => go('/dispatch?tab=반납')} />
-            <Metric label="반납 지남" value={`${overdueReturn}건`} tone={overdueReturn ? 'danger' : 'ink'} onClick={() => go('/dispatch?tab=반납')} />
-          </Cards>
-        </Sec>
-      )}
-      {show('ops-cash') && (
-        <Sec id="ops-cash" title="자금·채권" desc="자금자산 · 미수(지표)" right={<WorkPipe to="payments" />}>
-          <Cards min={128} fit>
-            <Metric label="운행중 미수" value={won(S.misuActive)} tone={S.misuActive > 0 ? 'danger' : 'ink'} onClick={() => go('/receivables')} />
-            <Metric label="미수 건" value={`${S.misuActiveCount}건`} tone={S.misuActiveCount ? 'warn' : 'ink'} onClick={() => go('/receivables')} />
-            <Metric label="미분류 입금" value={`${S.unclassified}건`} tone={S.unclassified ? 'warn' : 'ink'} onClick={() => go('/payments')} />
-            <Metric label="자금 순증감" value={won(S.cashNet)} tone={S.cashNet < 0 ? 'danger' : 'ink'} onClick={() => go('/finance')} />
-          </Cards>
-        </Sec>
-      )}
-      {show('ops-field') && (
-        <Sec id="ops-field" title="현장 신호" desc="이벤트 · 처리할 일 힌트" right={<WorkPipe to="dispatch" />}>
-          <Cards min={128} fit>
-            <Metric label="과태료" value={`${D.penaltyPending.length}건`} tone={D.penaltyPending.length ? 'warn' : 'ink'} onClick={() => go('/penalty')} />
-            <Metric label="서류 미첨부" value={`${D.ghostPlates.length}건`} tone={D.ghostPlates.length ? 'warn' : 'ink'} onClick={() => { window.dispatchEvent(new CustomEvent('jpk:lens', { detail: '콕핏' })); }} />
-            <Metric label="할부 차량" value={`${S.loanCount}대`} tone="ink" onClick={() => go('/asset')} />
-            <Metric label="매각·말소" value={`${S.sold}대`} tone="ink" onClick={() => go('/asset')} />
-          </Cards>
-        </Sec>
-      )}
+      {order.filter((id) => show(id)).map((id) => <React.Fragment key={id}>{node[id]}</React.Fragment>)}
     </>
   );
 }

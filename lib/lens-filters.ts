@@ -102,12 +102,15 @@ export const LENS_FILTERS: Record<string, FacetGroup[]> = {
       { label: '필수누락' }, { label: '만기' }, { label: '고아' }, { label: '날짜역전' }, { label: '미납' }, { label: '보험불일치' }, { label: '반납지남' },
     ] },
   ],
-  운영: [   // 홈 운영현황 — 영역으로 Sec show/hide
-    { dim: '영역', chips: [
-      { label: '함대', secs: ['ops-fleet'] },
-      { label: '계약', secs: ['ops-contract'] },
-      { label: '자금', secs: ['ops-cash'] },
-      { label: '현장', secs: ['ops-field'] },
+  운영: [   // 홈 운영현황 — 「보유자산이 어떻게 굴러가나」. 요약 + 실체 목록.
+    { dim: '보기', chips: [
+      { label: '요약', secs: ['ops-summary'] },
+      { label: '인도 대기', secs: ['ops-deliver'] },
+      { label: '반납 지남', secs: ['ops-overdue'] },
+      { label: '만기 임박', secs: ['ops-return'] },
+      { label: '쉬는 차', secs: ['a-idle'] },
+      { label: '운행중', secs: ['a-running'] },
+      { label: '멈춘 차', secs: ['a-other'] },
     ] },
   ],
   콕핏: [

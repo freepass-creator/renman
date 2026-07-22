@@ -19,7 +19,7 @@ import { SearchBox, FilterBox } from '@/components/SearchBox';
 import { MobileFacetFilterBtn } from '@/components/FacetRail';
 import { useFacetFilterApi } from '@/lib/facet-filter-ctx';
 
-export type WorkbenchTab<T extends string = string> = { key: T; label: React.ReactNode; title?: string };
+export type WorkbenchTab<T extends string = string> = { key: T; label: React.ReactNode; title?: string; badge?: number };
 export type WorkbenchSearch = boolean | { value: string; onChange: (q: string) => void; placeholder?: string };
 
 function SearchSlot({ search }: { search: Exclude<WorkbenchSearch, false> }) {
@@ -38,6 +38,7 @@ export function WorkbenchBar<T extends string = string>({
   onSubTab,
   mid,
   search = true,
+  view,
   stat,
   actions,
 }: {
@@ -53,6 +54,8 @@ export function WorkbenchBar<T extends string = string>({
   mid?: React.ReactNode;
   /** 기본 true(점프 검색). 목록 필터는 객체. 숨기려면 false. */
   search?: WorkbenchSearch;
+  /** 보기 모드 전환(IconSeg) — 자리는 «검색창 바로 오른쪽» 고정. 페이지마다 다른 데 두지 말 것. */
+  view?: React.ReactNode;
   stat?: React.ReactNode;
   actions?: React.ReactNode;
 }) {
@@ -72,6 +75,7 @@ export function WorkbenchBar<T extends string = string>({
   const trail = (
     <>
       {hasSearch && <SearchSlot search={resolved!} />}
+      {view}
       {stat}
       {actions}
     </>
@@ -92,8 +96,9 @@ export function WorkbenchBar<T extends string = string>({
         {(tabs || subTabs || mid) && (
           <div style={{ display: 'flex', alignItems: 'center', gap: SPACE_M, flexWrap: 'wrap', overflowX: 'auto' }}>{tabRow}</div>
         )}
-        {(stat || actions) && (
+        {(view || stat || actions) && (
           <div style={{ display: 'flex', alignItems: 'center', gap: SPACE_M, flexWrap: 'wrap' }}>
+            {view}
             {stat}
             {actions}
           </div>

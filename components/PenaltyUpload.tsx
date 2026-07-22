@@ -12,7 +12,8 @@ import { resolveWriteCompany, NEED_COMPANY } from '@/lib/scope';
 import { toast } from '@/lib/toast';
 import { matchPenalty } from '@/lib/penalty-match';
 import { Modal, Btn, Badge, Input, Select, C, won, th } from '@/components/ui';
-import { UploadCloud, Trash2 } from 'lucide-react';
+import { Trash2 } from 'lucide-react';
+import FileDrop from '@/components/FileDrop';
 // 과태료 업무의 시작 = 고지서 업로드. 다중 드롭 → OCR(자동) → 위반일시로 계약(임차인) 자동매칭 → 검토 → 저장.
 // GEMINI_API_KEY 없으면 자동추출 실패 → 각 행 수기입력으로 진행(플로우는 동일).
 type Row = { id: string; fileName: string; file: File; status: 'pending' | 'done' | 'failed'; rec: EntityRecord; ocrOriginal?: unknown; error?: string };
@@ -23,7 +24,6 @@ export function PenaltyUpload({ onClose, onSaved }: { onClose: () => void; onSav
   const [rows, setRows] = useState<Row[]>([]);
   const [busy, setBusy] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [drag, setDrag] = useState(false);
   const [contracts, setContracts] = useState<EntityRecord[]>([]);
   const [existing, setExisting] = useState<EntityRecord[]>([]);
 
@@ -109,15 +109,13 @@ export function PenaltyUpload({ onClose, onSaved }: { onClose: () => void; onSav
         {contracts.length === 0 && <span style={{ fontSize: 11.5, color: C.warn }}>이 회사 계약이 없어 매칭이 안 됩니다 — 운영현황에서 계약 먼저 등록</span>}
       </div>
 
-      <label
-        onDragOver={(e) => { e.preventDefault(); setDrag(true); }} onDragLeave={() => setDrag(false)}
-        onDrop={(e) => { e.preventDefault(); setDrag(false); handleFiles(e.dataTransfer.files); }}
-        style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, padding: '22px 16px', border: `1.5px dashed ${drag ? C.accent : C.line}`, borderRadius: 'var(--radius)', background: drag ? 'var(--bg-hover)' : 'var(--bg-card)', cursor: 'pointer', textAlign: 'center' }}>
-        <UploadCloud size={26} color={C.sub} strokeWidth={1.7} />
-        <div style={{ fontSize: 13, fontWeight: 700, color: C.ink }}>고지서 파일을 끌어다 놓거나 클릭해서 선택</div>
-        <div style={{ fontSize: 11.5, color: C.faint }}>JPG · PNG · PDF · 여러 장 동시 · {busy ? 'OCR 분석 중…' : 'Gemini가 자동으로 읽습니다'}</div>
-        <input type="file" accept="image/*,application/pdf" multiple onChange={(e) => handleFiles(e.target.files)} style={{ display: 'none' }} />
-      </label>
+      {/* 드롭존은 FileDrop SSOT — 손롤 금지(데이터센터·수집함과 같은 모양이어야 한다). */}
+      <FileDrop
+        multiple accept="image/*,application/pdf"
+        onFiles={handleFiles}
+        hint="JPG · PNG · PDF · 여러 장 동시 · 자동으로 읽습니다"
+        note={busy ? 'OCR 분석 중…' : undefined}
+      />
 
       {rows.length > 0 && (
         <div style={{ marginTop: 12, overflowX: 'auto', border: `1px solid ${C.line}`, borderRadius: 'var(--radius)' }}>

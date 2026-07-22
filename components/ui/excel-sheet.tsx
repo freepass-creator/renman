@@ -9,7 +9,7 @@ import { Search } from './controls';
 /**
  * 엑셀 시트 뷰 — 프리패스 ERP4 엑셀뷰 이식(현황 한눈).
  * 데스크톱 = sticky 헤더 표(+헤더 필터). 모바일 = ObjCard(동일 cols SSOT).
- * 페이지 카드/리스트 토글 금지 — 이 원자만 쓰는 전용 페이지(/sheet).
+ * 보기 모드(mode) = 같은 cols로 표/카드. 페이지가 토글을 «손롤»하지 말고 IconSeg를 WorkbenchBar view에 넘긴다.
  *
  * 헤더 필터(= ERP4 엑셀 오토필터) 규칙:
  *   · 열 간 AND · 열 안 OR (엑셀과 동일)
@@ -127,13 +127,15 @@ function FilterPop<T>({ col, x, y, rows, sel, onSel, sort, onSort, onClose }: {
   );
 }
 
-export function ExcelSheet<T>({ cols, rows, onRow, rowKey, onFiltered }: {
+export function ExcelSheet<T>({ cols, rows, onRow, rowKey, onFiltered, mode = 'excel' }: {
   cols: SheetCol<T>[];
   rows: T[];
   onRow?: (row: T) => void;
   rowKey?: (row: T, i: number) => string;
   /** 필터·정렬 적용 결과 — 페이지 건수·CSV가 이걸 쓴다. */
   onFiltered?: (rows: T[]) => void;
+  /** 보기 모드 — 같은 cols로 표/카드를 그린다. 모바일은 항상 카드(표는 손가락으로 못 읽는다). */
+  mode?: 'excel' | 'card';
 }) {
   const mobile = useIsMobile();
   // 훅은 조건부 return 앞에서 — 모바일 분기보다 위.
@@ -162,7 +164,7 @@ export function ExcelSheet<T>({ cols, rows, onRow, rowKey, onFiltered }: {
 
   React.useEffect(() => { onFiltered?.(view); }, [view, onFiltered]);
 
-  if (mobile) {
+  if (mobile || mode === 'card') {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         {view.map((r, i) => (

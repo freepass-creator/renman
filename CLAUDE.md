@@ -47,7 +47,7 @@
 
 | 용도 | 원자 (이것만 씀) | 금지(손롤) |
 |---|---|---|
-| 페이지 헤더 | `<Page title meta left mid right tools>` / FacetRail 워크벤치=`<FacetPage … tools rail>` · 셸 툴바=`<WorkbenchBar company tabs search stat actions>` | 손롤 `<h1>`+meta·main 패딩 · 검색 자리 페이지마다 손롤 flex · **보기방식(카드/리스트) 전환 UI** |
+| 페이지 헤더 | `<Page title meta left mid right tools>` / FacetRail 워크벤치=`<FacetPage … tools rail>` · 셸 툴바=`<WorkbenchBar company tabs search stat actions>` | 손롤 `<h1>`+meta·main 패딩 · 검색 자리 페이지마다 손롤 flex · **보기전환 손롤**(→ `IconSeg`) |
 | 섹션 | `<Sec title n desc right>` / `<Panel title action>` | 박스(테두리)로 감싸기 |
 | 지표(요약) | `<Cards min={128} fit>`+`<Metric label value tone onClick>` | `<StatBar>`(박스)·손롤 카드 |
 | 필터 | `<FacetRail>`(데스크톱 좌측) · 모바일=`검색 옆 필터 버튼→Drawer`(빠른필터 칩바 금지) | 모바일 상단 칩바 상시 · 손롤 칩 |

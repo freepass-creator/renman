@@ -12,3 +12,4 @@ export * from './excel-sheet';
 export * from './detail';
 export * from './overlays';
 export * from './wizard';
+export * from './doc-upload';
