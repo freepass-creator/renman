@@ -78,7 +78,14 @@ const lossRet = rows.filter(r => r.kind === '반납').reduce((s, r) => s + r.los
 console.log(`유실 총액 ${won(totLoss)}  (운행 ${won(lossCur)} · 반납 ${won(lossRet)})`);
 console.log(`미수 손실난 계약 ${lossRows.filter(r=>r.loss>0).length}건 / 전체 ${rows.length}건`);
 console.log(`그중 _payments(실납부이력) 보유 = ${lossRows.filter(r=>r.loss>0&&r.hasPay).length}건`);
-console.log('상위 유실 계약(carry→net):');
-for (const r of lossRows.slice(0, 15)) console.log(`  [${r.kind}] ${r.plate}  carry ${won(r.carry)} → net ${won(r.net)}  (유실 ${won(r.loss)}${r.hasPay ? ' · 납부이력有' : ''})`);
+console.log('상위 유실 계약(carry→net · Σ_payments · Σ_discounts):');
+const sumArr = (a: unknown, f: string) => Array.isArray(a) ? (a as Array<Record<string, unknown>>).reduce((s, x) => s + (Number(x[f]) || 0), 0) : 0;
+for (const r of lossRows.slice(0, 12)) {
+  const c = pack.contract.find((x) => String(x.plate || '') === r.plate) as Record<string, unknown> | undefined;
+  const sp = sumArr(c?._payments, 'amount');
+  const sd = sumArr(c?._discounts, 'amount');
+  const hyp = Math.max(0, r.carry - sp); // 가설: net ≈ carry − Σpayments (이중차감)
+  console.log(`  [${r.kind}] ${r.plate}  carry ${won(r.carry)} → net ${won(r.net)}  유실 ${won(r.loss)} · Σpay ${won(sp)} · Σdisc ${won(sd)} · 가설(carry−Σpay)=${won(hyp)} ${Math.abs(hyp - r.net) <= 2000 ? '✔일치' : '✘'}`);
+}
 
 if (parsed.warnings.length) { console.log('\n파서 경고:', parsed.warnings.slice(0, 10)); }

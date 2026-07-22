@@ -563,7 +563,6 @@ function currentToRaw(c: UnpaidContract): EntityRecord {
     returnScheduledDate: clean(end),
     _carry: c.carryUnpaid,
     _carryUnpaid: c.carryUnpaid,   // 실미수(직원 running balance) = net 앵커
-    _ledger: c.ledger,             // 실 원장(월별 청구/결제/결제수단) → buildContractRecord가 회차 실이력으로
     _kind: 'current',
     _branch: clean(c.branch),
   });
@@ -598,7 +597,6 @@ function returnedToRaw(c: UnpaidContract): EntityRecord | null {
     endReason: c.carryUnpaid > 0 ? '채권보전' : '정상종료',
     _carry: c.carryUnpaid,
     _carryUnpaid: c.carryUnpaid,   // 추심잔여(반납 후 회수 대상) = net 앵커
-    _ledger: c.ledger,             // 실 원장 → 회차 실이력
     _kind: 'returned',
     _branch: clean(c.branch),
   });
@@ -748,19 +746,6 @@ function addMonthsIso(iso: string, months: number): string {
   d.setMonth(d.getMonth() + months);
   return d.toISOString().slice(0, 10);
 }
-/** 결제수단 원장표기 → v6 source. 입금→계좌, 카드→카드, 자동/자동이체→CMS. */
-function methodMap(m: unknown): string {
-  const s = String(m || '');
-  if (/카드/.test(s)) return '카드';
-  if (/자동/.test(s)) return 'CMS';
-  return '계좌';
-}
-/** YYYY-MM 두 월 사이 개월수(b−a). 원장월 → 회차 seq 매핑용. */
-function monthDiffMonths(a: string, b: string): number {
-  const am = /(\d{4})-(\d{2})/.exec(a); const bm = /(\d{4})-(\d{2})/.exec(b);
-  if (!am || !bm) return 0;
-  return (Number(bm[1]) - Number(am[1])) * 12 + (Number(bm[2]) - Number(am[2]));
-}
 
 /**
  * 계약 raw(_carry/_kind) → v6 계약 EntityRecord.
@@ -792,54 +777,14 @@ function buildContractRecord(c: EntityRecord, today: string): EntityRecord {
   const payDay = start ? dayOfMonth(start) : PAYMENT_DAY;
 
   let paidTotal = 0;
-  // ── 실 수납이력 이관: 원장(월별 청구/결제/결제수단)을 회차별 _payments/_discounts로. 헤드라인 net은 _carryUnpaid로 계속 앵커(불변). ──
-  const ledger = Array.isArray(c._ledger) ? (c._ledger as Array<{ month?: string; charged?: number; paid?: number; paidDate?: string; method?: string }>) : [];
-  const payments: Array<Record<string, unknown>> = [];
-  const discounts: Array<Record<string, unknown>> = [];
+  // 개시 납부 표시값 = 도래분 − 실미수(carry). 헤드라인 net은 _carryUnpaid 앵커.
+  // ★ B-1: 과거 원장 납부·할인을 _payments/_discounts로 재이관하지 않는다 — carry는 이미 그것이 반영된 실미수라,
+  //   렌더 buildContract의 distributeUnpaid(carry) 위에 또 FIFO 차감하면 carry 이중차감(미수 유실). 회차표는 distributeUnpaid(carry)
+  //   재구성으로 표시하고, 실 납부는 오픈 후 앱수납(_payments append)만 net에서 차감한다.
   if (start && rent > 0) {
     const schedules = generateSchedules({ contractDate: start, termMonths: rentalMonths, monthlyRent: rent, paymentDay: payDay, paymentTiming: '선불' });
     const pastDue = schedules.filter((s) => s.dueDate && s.dueDate <= cutoff).reduce((sum, s) => sum + s.amount, 0);
-    paidTotal = Math.max(0, pastDue - carry); // 납부 표시(도래분−실미수)
-    if (ledger.length) {
-      const startMonth = start.slice(0, 7);
-      const bySeq = new Map<number, { billed: number; paid: number }>();
-      for (const e of ledger) {
-        const mon = String(e.month || '');
-        if (!/^\d{4}-\d{2}$/.test(mon)) continue;
-        const seq = monthDiffMonths(startMonth, mon) + 1;
-        if (seq < 1 || seq > rentalMonths) continue;
-        const billed = Math.max(0, Number(e.charged) || 0);
-        const paid = Math.max(0, Number(e.paid) || 0);
-        bySeq.set(seq, { billed, paid });
-        if (billed > 0 && rent - billed > 1000) discounts.push({ seq, amount: rent - billed, reason: '대여료인하' });
-        if (paid > 0) payments.push({ seq, date: String(e.paidDate || ''), amount: paid, source: methodMap(e.method) });
-      }
-      // 도래 회차 정합(회차표 미납합 = carry). 헤드라인 net은 이미 _carryUnpaid로 앵커돼 불변; 이 조정은 회차표 표시 정합용.
-      //   ① 원장 없는 도래분(추적창 이전 = 期초/정산됨)은 완납 처리(잔액0).
-      for (const s of schedules) {
-        if (!(s.dueDate && s.dueDate <= cutoff)) continue;
-        if (!bySeq.has(s.seq)) payments.push({ seq: s.seq, amount: rent, source: '정산', synthetic: true, memo: '추적창 이전 정산(期초)' });
-      }
-      //   ② 방금 emit한 _payments/_discounts로 회차별 잔액을 실측(회차표와 동일 산식) → carry로 낮추는 조정을 오래된 회차부터 분배.
-      const paidBySeq = new Map<number, number>();
-      for (const p of payments) paidBySeq.set(Number(p.seq), (paidBySeq.get(Number(p.seq)) || 0) + (Number(p.amount) || 0));
-      const discBySeq = new Map<number, number>();
-      for (const d of discounts) discBySeq.set(Number(d.seq), (discBySeq.get(Number(d.seq)) || 0) + (Number(d.amount) || 0));
-      const dueBalSeqs: { seq: number; bal: number }[] = [];
-      let actualDueUnpaid = 0;
-      for (const s of schedules) {
-        if (!(s.dueDate && s.dueDate <= cutoff)) continue;
-        const bal = Math.max(0, rent - (discBySeq.get(s.seq) || 0) - (paidBySeq.get(s.seq) || 0));
-        if (bal > 0) { dueBalSeqs.push({ seq: s.seq, bal }); actualDueUnpaid += bal; }
-      }
-      let remaining = actualDueUnpaid - carry;   // 회차표를 carry로 낮출 총 조정액(감면·과오납 넷)
-      for (const { seq, bal } of dueBalSeqs) {
-        if (remaining <= 1000) break;
-        const take = Math.min(remaining, bal);
-        payments.push({ seq, amount: take, source: '정산', synthetic: true, memo: '감면·정산 조정' });
-        remaining -= take;
-      }
-    }
+    paidTotal = Math.max(0, pastDue - carry);
   }
 
   const rec: EntityRecord = {
@@ -861,8 +806,6 @@ function buildContractRecord(c: EntityRecord, today: string): EntityRecord {
     _carryUnpaid: carry,   // net 앵커 — 반납/도래분 무관하게 실미수=carry 보장
   };
   if (c.contractorPhone) rec.contractorPhone = c.contractorPhone;
-  if (payments.length) rec._payments = payments;   // 실 회차별 납부(날짜·금액·결제수단)
-  if (discounts.length) rec._discounts = discounts; // 대여료 인하 회차
   if (returned) {
     rec.returnedDate = ymd(c.returnedDate);
     rec.endReason = c.endReason;
