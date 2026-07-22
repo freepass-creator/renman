@@ -5,10 +5,13 @@
  *   가동률·미수율은 홈(지표).
  */
 import { useMemo, useState, type ReactNode } from 'react';
+import { LayoutGrid, Table } from 'lucide-react';
 import { useSession } from '@/lib/session';
 import { type EntityRecord } from '@/lib/intake/entities';
 import { openCar, openIngest } from '@/lib/ui-bus';
-import { FacetPage, Sec, Cards, Metric, ObjCard, Btn, EmptyState, won, C, SPACE_M, PageLoading } from '@/components/ui';
+import { FacetPage, Sec, Cards, Metric, ObjCard, Btn, EmptyState, ExcelSheet, IconSeg, won, C, SPACE_M, PageLoading } from '@/components/ui';
+import { buildSheetRows } from '@/lib/sheet-rows';
+import { ASSET_COLS } from '@/lib/sheet-cols';
 import { FacetRail } from '@/components/FacetRail';
 import { WorkbenchBar } from '@/components/WorkbenchBar';
 import { WorkPipe } from '@/components/WorkPipe';
@@ -64,6 +67,7 @@ export default function AssetPage() {
   const { data: [vs = [], cs = [], hs = []], loading } = useEntityLists(['vehicle', 'contract', 'history']);
   const [facets, setFacets] = useState<Set<string>>(new Set());
   const [q, setQ] = useState('');
+  const [view, setView] = useState<'card' | 'excel'>('card'); // 카드=생애 그룹뷰 · 엑셀=평면 표(운영시트와 같은 ASSET_COLS SSOT)
   const [logPlate, setLogPlate] = useState<string | null>(null);
   const [order, reorder] = useSecOrder('jpk:order:asset', [...LIFE_SECS]);
   const toggleFacet = (label: string) => setFacets((s) => { const n = new Set(s); n.has(label) ? n.delete(label) : n.add(label); return n; });
@@ -173,6 +177,10 @@ export default function AssetPage() {
       tools={
         <WorkbenchBar
           search={{ value: q, onChange: setQ, placeholder: '차량·차명·손님' }}
+          view={<IconSeg value={view} onChange={setView} options={[
+            { key: 'card', label: '카드', icon: <LayoutGrid size={15} /> },
+            { key: 'excel', label: '엑셀', icon: <Table size={15} /> },
+          ]} />}
           actions={<Btn size="sm" onClick={() => openIngest('vehicle')}>+ 차량 담기</Btn>}
         />
       }
@@ -189,7 +197,11 @@ export default function AssetPage() {
       </Sec>
 
       {loading ? <PageLoading />
-        : order.map((id) => {
+        : view === 'excel'
+          ? (filtered.length === 0
+              ? <EmptyState>표시할 차량이 없습니다</EmptyState>
+              : <ExcelSheet cols={ASSET_COLS} rows={buildSheetRows(filtered)} rowKey={(r) => r.plate} onRow={(r) => openCar(r.plate)} />)
+          : order.map((id) => {
           const sid = id as LifeSec;
           const meta = SEC_META[sid];
           const list = byOwn(SEC_OWN[sid]);

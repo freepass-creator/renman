@@ -9,45 +9,20 @@
  *   미수는 계약의 «필터»일 뿐 — 별도 집계 손롤 금지(전부 computeContractView 파생).
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Download, LayoutGrid, Table } from 'lucide-react';
+import { Download } from 'lucide-react';
 import { TODAY } from '@/lib/dashboard-consts';
 import { linkFleet } from '@/lib/domain/model';
 import { buildSheetRows, buildContractRows, type SheetRow, type ContractRow } from '@/lib/sheet-rows';
+import { ASSET_COLS } from '@/lib/sheet-cols';
 import { textMatch } from '@/lib/search-match';
 import { openCar } from '@/lib/ui-bus';
 import { downloadCsv } from '@/lib/export-csv';
 import { useEntityLists } from '@/lib/use-entity-lists';
-import { Page, ExcelSheet, Badge, Btn, EmptyState, PageLoading, IconSeg, won, C, type SheetCol } from '@/components/ui';
+import { Page, ExcelSheet, Badge, Btn, EmptyState, PageLoading, won, C, type SheetCol } from '@/components/ui';
 import { WorkbenchBar } from '@/components/WorkbenchBar';
 
 type Tab = '자산' | '계약' | '미수';
 const TABS: Tab[] = ['자산', '계약', '미수'];
-
-const toneBadge = (t: SheetRow['tone']): 'green' | 'amber' | 'red' | 'gray' =>
-  t === 'ok' ? 'green' : t === 'warn' ? 'amber' : t === 'danger' ? 'red' : 'gray';
-
-const ASSET_COLS: SheetCol<SheetRow>[] = [
-  { key: 'plate', label: '차량번호', render: (r) => r.plate || '—', text: (r) => r.plate },
-  { key: 'co', label: '법인', render: (r) => r.company || '—', text: (r) => r.company },
-  { key: 'own', label: '소유', render: (r) => <Badge tone="gray">{r.ownership}</Badge>, text: (r) => r.ownership },
-  { key: 'util', label: '가동', render: (r) => <Badge tone={toneBadge(r.tone)}>{r.util}</Badge>, text: (r) => r.util },
-  { key: 'car', label: '차명', render: (r) => r.carName || '—', text: (r) => r.carName },
-  { key: 'year', label: '연식', render: (r) => r.year || '—', text: (r) => r.year },
-  { key: 'cust', label: '계약자', render: (r) => r.customer || '—', text: (r) => r.customer },
-  { key: 'rent', label: '대여료', align: 'r', render: (r) => r.rent ? won(r.rent) : '—', text: (r) => r.rent },
-  {
-    key: 'net', label: '미수', align: 'r',
-    render: (r) => r.net > 0 ? <span style={{ color: C.danger, fontWeight: 700 }}>{won(r.net)}</span> : '—',
-    text: (r) => r.net,
-  },
-  { key: 'start', label: '시작', render: (r) => r.start || '—', text: (r) => r.start },
-  { key: 'end', label: '만기', render: (r) => r.end || '—', text: (r) => r.end },
-  {
-    key: 'dday', label: 'D-day', align: 'r',
-    render: (r) => r.dday == null ? '—' : r.dday < 0 ? <span style={{ color: C.danger }}>{r.dday}</span> : `D-${r.dday}`,
-    text: (r) => r.dday ?? '',
-  },
-];
 
 /* ── 열 문법 (전 탭 공통) ─────────────────────────────────────────
  *   ① 무엇 : 차량번호(고정) · 법인 · 차명
@@ -115,8 +90,7 @@ export default function SheetPage() {
   const { data: [vs = [], cs = []], loading } = useEntityLists(['vehicle', 'contract']);
   const [q, setQ] = useState('');
   const [tab, setTab] = useState<Tab>('자산');
-  // 보기 모드 — 같은 cols로 표/카드. 자리는 검색창 오른쪽(WorkbenchBar view) 고정.
-  const [view, setView] = useState<'excel' | 'card'>('excel');
+  // 운영시트 = 엑셀 고정(태생이 시트). 카드↔엑셀 토글은 다른 현황(카드 기본)에서 씀. 모바일은 ExcelSheet가 카드 폴백.
 
   const fleet = useMemo(() => linkFleet(vs, cs, TODAY), [vs, cs]);
 
@@ -171,18 +145,14 @@ export default function SheetPage() {
         search={{ value: q, onChange: setQ, placeholder: tab === '자산' ? '차번·차명·계약자' : '차번·계약자·연락처' }}
         /* mid = 탭 «바로 뒤». stat으로 주면 스페이서 건너 우측 끝으로 밀린다 — 건수는 탭이 바꾼 결과라 붙어 있어야 읽힌다. */
         mid={<span style={{ fontSize: 12.5, color: C.faint, whiteSpace: 'nowrap' }}>{meta}</span>}
-        view={<IconSeg value={view} onChange={setView} options={[
-          { key: 'card', label: '카드', icon: <LayoutGrid size={15} /> },
-          { key: 'excel', label: '엑셀', icon: <Table size={15} /> },
-        ]} />}
         actions={<Btn size="sm" variant="ghost" onClick={exportCsv} disabled={!count}><Download size={14} /> CSV</Btn>}
       />}
     >
       {!count
         ? <EmptyState>{tab === '미수' ? '미수 건이 없습니다' : `표시할 ${tab}이 없습니다`}</EmptyState>
         : tab === '자산'
-          ? <ExcelSheet mode={view} cols={ASSET_COLS} rows={assetRows} rowKey={(r) => r.plate} onRow={(r) => openCar(r.plate)} onFiltered={setShownAsset} />
-          : <ExcelSheet mode={view} cols={cols} rows={ctRows} rowKey={(r) => r.contractNo || r.plate} onRow={(r) => openCar(r.plate)} onFiltered={setShownCt} />}
+          ? <ExcelSheet cols={ASSET_COLS} rows={assetRows} rowKey={(r) => r.plate} onRow={(r) => openCar(r.plate)} onFiltered={setShownAsset} />
+          : <ExcelSheet cols={cols} rows={ctRows} rowKey={(r) => r.contractNo || r.plate} onRow={(r) => openCar(r.plate)} onFiltered={setShownCt} />}
     </Page>
   );
 }
