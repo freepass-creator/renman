@@ -51,6 +51,11 @@ console.log(`시트 실미수(carry) 합    운행 ${won(parsed.totals.carryCurr
 console.log(`앱 계산 순미수(net) 합   운행 ${won(netCur)} + 반납 ${won(netRet)} = ${won(netApp)}`);
 const diff = netApp - carrySheet;
 console.log(`차이(앱 net − 시트 carry) = ${won(diff)}  → ${Math.abs(diff) <= parsed.totals.countCurrent + parsed.totals.countReturned ? '✅ 일치(반올림 오차 내)' : '⚠ 불일치 — 확인 필요'}`);
+const T = parsed.totals;
+console.log('\n── 미수 성분 (carry=실미수 · pastDue=도래미납 · gross=전체청구) ──');
+console.log(`운행 ${T.countCurrent}건: carry ${won(T.carryCurrent)} · 도래미납 ${won(T.pastDueCurrent)} · gross ${won(T.grossCurrent)}`);
+console.log(`반납 ${T.countReturned}건: carry ${won(T.carryReturned)} · 도래미납 ${won(T.pastDueReturned)} · gross ${won(T.grossReturned)}`);
+console.log(`미도래(미래 청구, 미수 아님) 참고: ${won(T.futureBilled)}`);
 
 console.log('\n════════ 입금/출금 (자금일보 계좌내역) ════════');
 console.log(`총 거래 ${jbo.totals.count}건 · 기간 ${jbo.totals.dateFrom} ~ ${jbo.totals.dateTo}`);
