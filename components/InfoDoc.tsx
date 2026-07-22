@@ -28,6 +28,7 @@ export type DocReplacePayload = {
 
 type InfoDocProps = {
   id?: string;
+  order?: number;                    // flex 순서(useSecOrder 구동) — 없으면 소스 순서
   title: React.ReactNode;
   desc?: React.ReactNode;
   fields: KVRow[];                   // [label, editKey|null, displayValue][]
@@ -43,6 +44,7 @@ type InfoDocProps = {
   recordKey?: string;                // docPath용 자연키
   onReplaceDoc: (p: DocReplacePayload) => void | Promise<void>;
   canEditDoc?: boolean;
+  hideSaveCancel?: boolean;          // 상위가 편집 저장/취소를 관리(공유 편집 세션) — 자체 저장/취소 숨김
 };
 
 const REASONS = ['재발급', '변경', '오류정정'];
@@ -51,8 +53,8 @@ const fLl: React.CSSProperties = { fontSize: 11, color: C.mute };
 const link: React.CSSProperties = { display: 'inline-flex', alignItems: 'center', gap: 5, border: 'none', background: 'none', cursor: 'pointer', padding: 0, fontSize: 11.5, color: C.mute, fontWeight: 600 };
 
 export function InfoDoc({
-  id, title, desc, fields, editing, form, onChange, onEditToggle, onSave,
-  docType, docLabel, docs, companyId, recordKey, onReplaceDoc, canEditDoc = true,
+  id, order, title, desc, fields, editing, form, onChange, onEditToggle, onSave,
+  docType, docLabel, docs, companyId, recordKey, onReplaceDoc, canEditDoc = true, hideSaveCancel = false,
 }: InfoDocProps) {
   const [mode, setMode] = useState<'view' | 'replace'>('view');
   const [busy, setBusy] = useState(false);
@@ -98,14 +100,16 @@ export function InfoDoc({
   }
 
   return (
-    <div id={id} style={{ marginTop: 22, scrollMarginTop: 62 }}>
+    <div id={id} style={{ marginTop: 22, scrollMarginTop: 62, order }}>
       {/* 헤더: 제목 + 첨부상태 배지 + 우측 액션(수정 / 서류 교체·재발급) */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 9, flexWrap: 'wrap' }}>
         <span style={{ fontSize: 13.5, fontWeight: 800, letterSpacing: '-0.01em', color: C.ink }}>{title}</span>
         <Badge tone={attached ? 'green' : hasOcr ? 'amber' : 'gray'}>{attached ? '첨부됨 ✓' : hasOcr ? 'OCR만 · 미첨부' : '미첨부'}</Badge>
         {desc ? <span style={{ fontSize: 11.5, color: C.faint, flex: 1, minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{desc}</span> : <span style={{ flex: 1 }} />}
         {editing
-          ? <span style={{ display: 'inline-flex', gap: 6 }}><Btn size="sm" onClick={onSave}>저장</Btn><Btn size="sm" variant="ghost" onClick={onEditToggle}>취소</Btn></span>
+          ? (hideSaveCancel
+              ? <span style={{ fontSize: 11.5, color: C.faint }}>함께 편집 중</span>
+              : <span style={{ display: 'inline-flex', gap: 6 }}><Btn size="sm" onClick={onSave}>저장</Btn><Btn size="sm" variant="ghost" onClick={onEditToggle}>취소</Btn></span>)
           : <Btn size="sm" variant="ghost" onClick={onEditToggle}>수정</Btn>}
         {canEditDoc && <Btn size="sm" variant="ghost" onClick={() => (mode === 'replace' ? resetReplace() : setMode('replace'))}>서류 등록·변경</Btn>}
       </div>

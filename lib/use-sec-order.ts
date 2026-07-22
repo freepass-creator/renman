@@ -3,8 +3,9 @@
  * 섹션 순서 공용 엔진 — 접힌 섹션 드래그앤드롭만. ↑↓ 버튼 없음.
  *   사용자별 localStorage(storeKey)에 순서 저장. 새 섹션은 뒤에 자동 병합.
  *   페이지는 이 훅을 따다 쓰기만 — 섹션 이동 로직을 손롤하지 않는다(규격통일).
- *   사용: const [order, reorder] = useSecOrder('jpk:order:xxx', ['s-a','s-b',...]);
+ *   사용: const [order, reorder, reset] = useSecOrder('jpk:order:xxx', ['s-a','s-b',...]);
  *         order.map(id => SECTION_MAP[id]?.render(ctx, { onReorder: reorder }))
+ *   reset() = 저장 순서 삭제 → 기본 순서로 복원.
  */
 import { useEffect, useState } from 'react';
 
@@ -18,7 +19,7 @@ export function moveBefore(arr: string[], fromId: string, toId: string): string[
   return next;
 }
 
-export function useSecOrder(storeKey: string, defaults: string[]): [string[], (fromId: string, toId: string) => void] {
+export function useSecOrder(storeKey: string, defaults: string[]): [string[], (fromId: string, toId: string) => void, () => void] {
   const [order, setOrder] = useState<string[]>(defaults);
   useEffect(() => {
     try {
@@ -36,5 +37,7 @@ export function useSecOrder(storeKey: string, defaults: string[]): [string[], (f
     if (next !== cur) save(next);
     return next;
   });
-  return [order, reorder];
+  // 저장 순서 삭제 → 기본 순서 복원(초기화)
+  const reset = () => { try { localStorage.removeItem(storeKey); } catch { /* 무시 */ } setOrder(defaults); };
+  return [order, reorder, reset];
 }

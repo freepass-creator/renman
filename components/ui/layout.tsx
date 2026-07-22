@@ -10,10 +10,12 @@ import { CompanyFilter, Btn } from './controls';
 
 /* 페이지 골격 · 패널 · 섹션 · 세부 진입 껍데기 — 레이아웃 원자. */
 
-export function Page({ title, meta, left, mid, right, tools, children, fill, back }: {
+export function Page({ title, meta, left, mid, right, tools, children, fill, back, noCompany }: {
   title?: React.ReactNode; meta?: React.ReactNode; left?: React.ReactNode; mid?: React.ReactNode; right?: React.ReactNode;
   /** 셸 툴바 SSOT — WorkbenchBar. title 옆(또는 모바일 전폭). mid/right 손롤 툴바 대신 이걸 쓴다. */
   tools?: React.ReactNode;
+  /** 전체회사 셀렉터 숨김 — 회사 스코프가 무의미한 페이지(개발도구 등)용. */
+  noCompany?: boolean;
   children: React.ReactNode; fill?: boolean; back?: () => void;
 }) {
   const mobile = useIsMobile();
@@ -30,7 +32,7 @@ export function Page({ title, meta, left, mid, right, tools, children, fill, bac
     <main style={{ maxWidth: 1680, margin: '0 auto', padding: mobile ? PAGE_PAD_M : '16px 24px 60px', ...(fill ? { flex: 1, minWidth: 0 } : {}) }}>
       <div style={{ display: 'flex', flexWrap: mobile ? 'nowrap' : 'wrap', alignItems: 'center', gap: mobile ? SPACE_M : 10, paddingBottom: mobile ? PAGE_HEAD_PB_M : 14, minHeight: mobile ? 0 : 36 }}>
         {!mobile && hasTitle && <h1 style={{ fontSize: 18, fontWeight: 800, letterSpacing: '-0.02em', margin: 0, flexShrink: 0 }}>{title}</h1>}
-        {!shellOwnsCompany && <CompanyFilter />}
+        {!shellOwnsCompany && !noCompany && <CompanyFilter />}
         {left != null ? (
           <div style={{ flex: 1, minWidth: 0 }}>{left}</div>
         ) : (
@@ -100,7 +102,7 @@ export function Panel({ title, action, children }: { title: React.ReactNode; act
 const hiddenReg = new Map<string, React.ReactNode>();
 const emitSec = () => { if (typeof window !== 'undefined') window.dispatchEvent(new Event('jpk:sec-change')); };
 const SEC_DND = 'text/jpk-sec-id';
-export function Sec({ id, title, n, desc, tone, right, hideable = true, onReorder, children }: { id?: string; title: React.ReactNode; n?: number; desc?: React.ReactNode; tone?: 'ink' | 'danger' | 'ok' | 'warn'; right?: React.ReactNode; hideable?: boolean; onReorder?: (fromId: string, toId: string) => void; children: React.ReactNode }) {
+export function Sec({ id, title, n, desc, tone, right, hideable = true, onReorder, order, children }: { id?: string; title: React.ReactNode; n?: number; desc?: React.ReactNode; tone?: 'ink' | 'danger' | 'ok' | 'warn'; right?: React.ReactNode; hideable?: boolean; onReorder?: (fromId: string, toId: string) => void; order?: number; children: React.ReactNode }) {
   const mobile = useIsMobile();
   const key = id ? `jpk:sec:${id}` : '';
   const [state, setState] = React.useState<'open' | 'collapsed' | 'hidden'>('open');
@@ -125,7 +127,7 @@ export function Sec({ id, title, n, desc, tone, right, hideable = true, onReorde
   const mt = mobile ? SPACE_GROUP_M : 22;
   const hasTrail = (state !== 'collapsed' && right != null) || canDrag || (!!hideable && !!id);
   return (
-    <section id={id} style={{ marginTop: mt, scrollMarginTop: mobile ? 68 : 62, outline: over ? `2px solid ${C.accent}` : 'none', outlineOffset: 6, borderRadius: R, transition: 'outline-color .1s' }}
+    <section id={id} style={{ marginTop: mt, scrollMarginTop: mobile ? 68 : 62, outline: over ? `2px solid ${C.accent}` : 'none', outlineOffset: 6, borderRadius: R, transition: 'outline-color .1s', order }}
       onDragOver={canReorder ? (e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; if (!over) setOver(true); } : undefined}
       onDragLeave={canReorder ? (e) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setOver(false); } : undefined}
       onDrop={canReorder ? (e) => {
@@ -144,7 +146,7 @@ export function Sec({ id, title, n, desc, tone, right, hideable = true, onReorde
         </button>
         {desc && !mobile ? <span style={{ fontSize: 11.5, color: C.faint, flex: 1, minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{desc}</span> : null}
         {hasTrail && (
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: mobile ? SPACE_M : 6, marginLeft: 'auto', flexShrink: 0 }}>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: mobile ? SPACE_M : 6, marginLeft: 'auto', flexShrink: 0, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
             {state !== 'collapsed' && right}
             {canDrag && (
               <span
