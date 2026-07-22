@@ -13,78 +13,18 @@ import { Download } from 'lucide-react';
 import { TODAY } from '@/lib/dashboard-consts';
 import { linkFleet } from '@/lib/domain/model';
 import { buildSheetRows, buildContractRows, type SheetRow, type ContractRow } from '@/lib/sheet-rows';
-import { ASSET_COLS } from '@/lib/sheet-cols';
+import { ASSET_COLS, CONTRACT_COLS, DEBT_COLS } from '@/lib/sheet-cols';
 import { textMatch } from '@/lib/search-match';
 import { openCar } from '@/lib/ui-bus';
 import { downloadCsv } from '@/lib/export-csv';
 import { useEntityLists } from '@/lib/use-entity-lists';
-import { Page, ExcelSheet, Badge, Btn, EmptyState, PageLoading, won, C, type SheetCol } from '@/components/ui';
+import { Page, ExcelSheet, Btn, EmptyState, PageLoading, won, C } from '@/components/ui';
 import { WorkbenchBar } from '@/components/WorkbenchBar';
 
 type Tab = '자산' | '계약' | '미수';
 const TABS: Tab[] = ['자산', '계약', '미수'];
 
-/* ── 열 문법 (전 탭 공통) ─────────────────────────────────────────
- *   ① 무엇 : 차량번호(고정) · 법인 · 차명
- *   ② 누구 : 계약자
- *   ③ 돈   : 대여료 · 보증금 · 미수        ← 금액은 항상 우측정렬·이 순서
- *   ④ 시간 : 시작 · 만기 · D-day
- *   ⑤ 상태 : 상태 뱃지 · 연체일 · 미납회차
- *   ⑥ 연락 : 연락처                        ← 항상 맨 끝
- * 탭마다 «빼기»만 한다. 자리를 바꾸지 않는다 — 탭을 옮겨도 눈이 같은 데를 본다.
- * 라벨도 고정: 같은 값은 어느 탭에서든 같은 이름.
- * ───────────────────────────────────────────────────────────── */
-
-const misu = (r: ContractRow) =>
-  r.net > 0 ? <span style={{ color: C.danger, fontWeight: 700 }}>{won(r.net)}</span> : '—';
-
-const CT = {
-  // 틀고정 안 함 — 고정 칸은 자기 배경이 필요해 행 호버가 그 칸만 끊긴다(전 행 한 줄로 읽혀야 함).
-  plate: { key: 'plate', label: '차량번호', render: (r) => r.plate || '—', text: (r) => r.plate },
-  co: { key: 'co', label: '법인', render: (r) => r.company || '—', text: (r) => r.company },
-  car: { key: 'car', label: '차명', render: (r) => r.carName || '—', text: (r) => r.carName },
-  cust: { key: 'cust', label: '계약자', render: (r) => r.customer || '—', text: (r) => r.customer },
-  rent: { key: 'rent', label: '대여료', align: 'r', render: (r) => r.rent ? won(r.rent) : '—', text: (r) => r.rent },
-  dep: { key: 'dep', label: '보증금', align: 'r', render: (r) => r.deposit ? won(r.deposit) : '—', text: (r) => r.deposit },
-  net: { key: 'net', label: '미수', align: 'r', render: misu, text: (r) => r.net },
-  start: { key: 'start', label: '시작', render: (r) => r.start || '—', text: (r) => r.start },
-  end: { key: 'end', label: '만기', render: (r) => r.end || '—', text: (r) => r.end },
-  dday: {
-    key: 'dday', label: 'D-day', align: 'r',
-    render: (r) => r.dday == null ? '—' : r.dday < 0 ? <span style={{ color: C.danger }}>{r.dday}</span> : `D-${r.dday}`,
-    text: (r) => r.dday ?? '',
-  },
-  ret: { key: 'ret', label: '반납일', render: (r) => r.returned || '—', text: (r) => r.returned },
-  st: { key: 'st', label: '상태', render: (r) => <Badge tone={r.ended ? 'gray' : 'green'}>{r.status}</Badge>, text: (r) => r.status },
-  od: {
-    key: 'od', label: '연체일', align: 'r',
-    render: (r) => r.overdueDays > 0
-      ? <span style={{ color: r.overdueDays >= 90 ? C.danger : C.warn, fontWeight: 700 }}>{r.overdueDays}일</span>
-      : '—',
-    text: (r) => r.overdueDays,
-  },
-  cnt: { key: 'cnt', label: '미납회차', align: 'r', render: (r) => r.count || '—', text: (r) => r.count },
-  phone: { key: 'phone', label: '연락처', render: (r) => r.phone || '—', text: (r) => r.phone },
-} satisfies Record<string, SheetCol<ContractRow>>;
-
-// 계약 = 기준 열. 미수 탭은 여기에 회수 열만 더한 것(자리 동일).
-const CONTRACT_COLS: SheetCol<ContractRow>[] = [
-  CT.plate, CT.co, CT.car, CT.cust,
-  CT.rent, CT.dep, CT.net,
-  CT.start, CT.end, CT.dday,
-  CT.st,
-  CT.phone,
-];
-
-/* 미수 = 미수 있는 계약. 회수 판단 열(연체일·미납회차)을 ⑤ 자리에 «추가»한다 — 앞으로 당기지 않는다.
-   반납 건도 미수가 남아 있으면 여기 뜬다(반납했다고 채권이 사라지지 않는다). */
-const DEBT_COLS: SheetCol<ContractRow>[] = [
-  CT.plate, CT.co, CT.car, CT.cust,
-  CT.rent, CT.dep, CT.net,
-  CT.start, CT.end, CT.dday,
-  CT.st, CT.od, CT.cnt,
-  CT.phone,
-];
+/* 열 문법(자산·계약·미수)은 lib/sheet-cols SSOT — /sheet·/asset·/contract 공용. */
 
 export default function SheetPage() {
   const { data: [vs = [], cs = []], loading } = useEntityLists(['vehicle', 'contract']);

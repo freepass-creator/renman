@@ -17,7 +17,10 @@ import { classifyContract, type ContractPhase, type ContractDebt } from '@/lib/d
 import { aggregateCustomers, customerKey, type CustomerAgg } from '@/lib/customers';
 import { dueMatcher, selectedInDim } from '@/lib/lens-filters';
 import { textMatch } from '@/lib/search-match';
-import { FacetPage, Sec, Cards, Metric, DataTable, Badge, StatusTag, Btn, Drawer, Section, DetailGrid, EmptyState, Input, won, th, thR, td, tdR, C, type Col, PageLoading } from '@/components/ui';
+import { FacetPage, Sec, Cards, Metric, DataTable, ExcelSheet, IconSeg, Badge, StatusTag, Btn, Drawer, Section, DetailGrid, EmptyState, Input, won, th, thR, td, tdR, C, type Col, PageLoading } from '@/components/ui';
+import { LayoutGrid, Table } from 'lucide-react';
+import { CONTRACT_COLS } from '@/lib/sheet-cols';
+import { contractViewToRow } from '@/lib/sheet-rows';
 import { FacetRail } from '@/components/FacetRail';
 import { WorkbenchBar } from '@/components/WorkbenchBar';
 import { WorkPipe } from '@/components/WorkPipe';
@@ -54,6 +57,7 @@ export default function ContractWorkspace() {
   );
   const [facets, setFacets] = useState<Set<string>>(new Set());
   const [q, setQ] = useState('');
+  const [view, setView] = useState<'card' | 'excel'>('card'); // 카드=생애 그룹뷰 · 엑셀=평면 표(운영시트와 같은 CONTRACT_COLS SSOT)
   const [openKey, setOpenKey] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [act, setAct] = useState<Act | null>(null);
@@ -209,6 +213,10 @@ export default function ContractWorkspace() {
       tools={
         <WorkbenchBar
           search={{ value: q, onChange: setQ, placeholder: '계약·손님·차량' }}
+          view={<IconSeg value={view} onChange={setView} options={[
+            { key: 'card', label: '카드', icon: <LayoutGrid size={15} /> },
+            { key: 'excel', label: '엑셀', icon: <Table size={15} /> },
+          ]} />}
           actions={<Btn size="sm" onClick={() => openIngest('contract')}>+ 신규 계약</Btn>}
         />
       }
@@ -225,6 +233,15 @@ export default function ContractWorkspace() {
       </Sec>
 
       {loading ? <PageLoading />
+        : view === 'excel'
+          ? (allFiltered.length === 0
+              ? <EmptyState>표시할 계약이 없습니다</EmptyState>
+              : <ExcelSheet
+                  cols={CONTRACT_COLS}
+                  rows={allFiltered.map((v) => contractViewToRow(v))}
+                  rowKey={(r) => r.contractNo || r.plate}
+                  onRow={(r) => { const v = allFiltered.find((x) => String(x.rec.contractNo || x.rec._key || '') === r.contractNo); if (v) setOpenKey(String(v.rec._key || '')); }}
+                />)
         : order.map((id) => {
           const sid = id as LifeSec;
           const meta = SEC_META[sid];

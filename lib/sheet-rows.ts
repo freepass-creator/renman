@@ -8,6 +8,7 @@
  *   금액·상태는 전부 computeContractView(ContractNode.view) 파생 — 여기서 재계산 손롤 금지.
  */
 import { type VehicleNode, type ContractNode, onBooks } from './domain/model';
+import { type ContractView } from './contract-ops';
 import { companyShort } from './companies';
 
 export type SheetRow = {
@@ -58,33 +59,35 @@ function debtTone(net: number, overdueDays: number): ContractRow['tone'] {
   return 'mute';
 }
 
+/** ContractView 1건 → ContractRow. 손바뀜 노드 정보(plate·customer) 있으면 우선. 계약현황·운영시트 공용 SSOT. */
+export function contractViewToRow(v: ContractView, node?: { plate?: string; customer?: string }): ContractRow {
+  const r = v.rec;
+  return {
+    contractNo: String(r.contractNo || r._key || ''),
+    plate: node?.plate || String(r.plate || ''),
+    companyId: String(r.companyId || ''),
+    company: companyShort(String(r.companyId || '')),
+    customer: node?.customer || String(r.contractorName || ''),
+    phone: String(r.contractorPhone || ''),
+    carName: String(r.carName || ''),
+    rent: v.monthlyRent || 0,
+    deposit: Number(r.deposit) || 0,
+    net: v.net,
+    overdueDays: v.overdueDays,
+    count: v.count,
+    start: v.startDate,
+    end: v.endDate,
+    returned: String(r.returnedDate || ''),
+    dday: v.dday,
+    status: v.status,
+    ended: v.ended,
+    tone: debtTone(v.net, v.overdueDays),
+  };
+}
+
 export function buildContractRows(contracts: ContractNode[]): ContractRow[] {
   return contracts
-    .map((n) => {
-      const v = n.view;
-      const r = v.rec;
-      return {
-        contractNo: String(r.contractNo || r._key || ''),
-        plate: n.plate || String(r.plate || ''),
-        companyId: String(r.companyId || ''),
-        company: companyShort(String(r.companyId || '')),
-        customer: n.customer || String(r.contractorName || ''),
-        phone: String(r.contractorPhone || ''),
-        carName: String(r.carName || ''),
-        rent: v.monthlyRent || 0,
-        deposit: Number(r.deposit) || 0,
-        net: v.net,
-        overdueDays: v.overdueDays,
-        count: v.count,
-        start: v.startDate,
-        end: v.endDate,
-        returned: String(r.returnedDate || ''),
-        dday: v.dday,
-        status: v.status,
-        ended: v.ended,
-        tone: debtTone(v.net, v.overdueDays),
-      };
-    })
+    .map((n) => contractViewToRow(n.view, { plate: n.plate, customer: n.customer }))
     .sort((a, b) => a.plate.localeCompare(b.plate, 'ko'));
 }
 
