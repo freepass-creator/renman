@@ -235,7 +235,8 @@ function RiskLens({ ctx, facets, setF }: { ctx: SectionCtx; facets?: Set<string>
     <>
       <Sec title="현황" desc="통제 밖 위험 · 계약자 귀책">
         <Cards min={128} fit>
-          <Metric label="운행중 미수" value={won(D.summary.misuActive)} hint="운행중만" tone={D.summary.misuActive > 0 ? 'danger' : 'ink'} onClick={() => { setF(['미수']); goSec('r-unpaid'); }} />
+          <Metric label="현재 미수" value={won(D.summary.misuActive)} hint="운행중 · 정상 회수" tone={D.summary.misuActive > 0 ? 'danger' : 'ink'} onClick={() => { setF(['미수']); goSec('r-unpaid'); }} />
+          <Metric label="계약종료 미수" value={won(D.summary.misuReturned)} hint="반납·해지 추심" tone={D.summary.misuReturned > 0 ? 'warn' : 'ink'} onClick={() => { setF(['미수']); goSec('r-unpaid'); }} />
           <Metric label="미납 계약" value={D.overduePay.length} hint="연체 1회+" tone={D.overduePay.length ? 'danger' : 'ink'} onClick={() => { setF(['미수']); goSec('r-unpaid'); }} />
           <Metric label="30일+ 연체" value={over30} hint="장기 연체" tone={over30 ? 'danger' : 'ink'} onClick={() => { setF(['미수']); goSec('r-unpaid'); }} />
           <Metric label="시동제어 필요" value={lockNeed} hint="미납 D+3·미제어" tone={lockNeed ? 'danger' : 'ink'} onClick={() => { setF(['미수']); goSec('r-unpaid'); }} />

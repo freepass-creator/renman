@@ -30,9 +30,9 @@ export default function ManagePage() {
             <Metric label="운행 / 보유" value={`${total.running} / ${total.totalVehicles}`} hint="계약 파생" />
             <Metric label="진행 계약" value={total.activeContracts} />
             <Metric label="월 청구액" value={won(total.monthlyBilled)} />
-            <Metric label="총 미수" value={won(total.totalUnpaid)} hint="운행+반납" tone={total.totalUnpaid > 0 ? 'danger' : 'ink'} />
-            <Metric label="운행중 미수" value={won(total.misuActive)} hint="운행중만" tone={total.misuActive > 0 ? 'danger' : 'ink'} />
-            <Metric label="반납 미수" value={won(total.misuReturned)} hint="종료 후" tone={total.misuReturned > 0 ? 'warn' : 'ink'} />
+            <Metric label="총 미수" value={won(total.totalUnpaid)} hint="현재+계약종료" tone={total.totalUnpaid > 0 ? 'danger' : 'ink'} />
+            <Metric label="현재 미수" value={won(total.misuActive)} hint="운행중 · 정상 회수" tone={total.misuActive > 0 ? 'danger' : 'ink'} />
+            <Metric label="계약종료 미수" value={won(total.misuReturned)} hint="반납·해지 추심" tone={total.misuReturned > 0 ? 'warn' : 'ink'} />
             <Metric label="미수 고객" value={total.unpaidCount} tone={total.unpaidCount > 0 ? 'warn' : 'ink'} />
             <Metric label="만기 임박(30일)" value={total.expiring30} hint="계약 만기" tone={total.expiring30 > 0 ? 'warn' : 'ink'} />
             <Metric label="자산(매입가)" value={won(total.assetValue)} />

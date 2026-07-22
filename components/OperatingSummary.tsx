@@ -30,8 +30,8 @@ export function OperatingSummaryView({ s }: { s: OperatingSummary }) {
       <Stat label="반납·종료 계약" value={`${s.endedContracts}건`} tone="mute" />
       <Stat label="할부(상환)" value={`${s.loanCount}대`} tone="ink" />
       <Stat label="유휴(쉬는 차)" value={`${s.idle}대`} tone="mute" />
-      <Stat label="현재 미수(운행중)" value={won(s.misuActive)} sub={`${s.misuActiveCount}건 · 도래분`} tone={s.misuActive > 0 ? 'danger' : 'ink'} />
-      <Stat label="반납 미수(별도관리)" value={won(s.misuReturned)} sub={`${s.misuReturnedCount}건 · 채권보전`} tone="mute" />
+      <Stat label="현재 미수" value={won(s.misuActive)} sub={`${s.misuActiveCount}건 · 운행중`} tone={s.misuActive > 0 ? 'danger' : 'ink'} />
+      <Stat label="계약종료 미수" value={won(s.misuReturned)} sub={`${s.misuReturnedCount}건 · 반납·해지 추심`} tone="mute" />
       <Stat label="자금 거래" value={`${s.txCount}건`} sub={`순증감 ${won(s.cashNet)}`} tone="ink" />
       <Stat label="자금 순증감" value={won(s.cashNet)} sub={`입 ${won(s.cashIn)} · 출 ${won(s.cashOut)}`} tone={s.cashNet >= 0 ? 'ok' : 'danger'} />
       <Stat label="자금 미분류" value={`${s.unclassified}건`} sub={`거래 ${s.txCount}건`} tone={s.unclassified ? 'warn' : 'ink'} />
