@@ -12,7 +12,7 @@
 import {
   Home, LayoutDashboard, Car, FileText, Wallet, Table2,
   ArrowLeftRight, ReceiptText, BookOpen, Wrench, TriangleAlert, Upload, Inbox,
-  TrendingUp, Settings, type LucideIcon,
+  TrendingUp, Settings, Database, type LucideIcon,
 } from 'lucide-react';
 import type { Tier } from './tier';
 import type { AssetKind, DataLayer } from './domain/layers';
@@ -80,7 +80,7 @@ export function pageLayer(role: PageRole): DataLayer | 'mixed' {
   return layerOfPageRole(role);
 }
 
-export type NavItem = { href: string; label: string; icon: LucideIcon; tier?: Tier };
+export type NavItem = { href: string; label: string; icon: LucideIcon; tier?: Tier; hqOnly?: boolean };
 export type NavGroup = { title: string; items: NavItem[] };
 
 /**
@@ -120,6 +120,7 @@ export const NAV_GROUPS: NavGroup[] = [
     { href: '/pnl', label: '손익현황', icon: TrendingUp, tier: '비즈니스' },
   ] },
   { title: '시스템', items: [
+    { href: '/dev/data', label: '개발도구', icon: Database, tier: '라이트', hqOnly: true },
     { href: '/settings', label: '설정', icon: Settings, tier: '라이트' },
   ] },
 ];

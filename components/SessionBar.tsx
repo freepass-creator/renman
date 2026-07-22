@@ -16,12 +16,14 @@ import { tierIncludes } from '@/lib/tier';
 const OPERATOR_BRAND = 'teamjpk';
 
 // 메뉴 = lib/nav NAV_GROUPS SSOT (현황=보기 · 업무=손대기 · 경영=지표).
-const navGroups = () => NAV_GROUPS
-  .map((g) => ({ ...g, items: g.items.filter((it) => tierIncludes(it.tier ?? '라이트')) }))
+//   hqOnly 항목(개발도구 등)은 본사(마스터)에게만 노출 — 직원 계정엔 숨김.
+const navGroups = (isOperator: boolean) => NAV_GROUPS
+  .map((g) => ({ ...g, items: g.items.filter((it) => tierIncludes(it.tier ?? '라이트') && (!it.hqOnly || isOperator)) }))
   .filter((g) => g.items.length > 0);
 
 function NavMenu() {
   const [open, setOpen] = useState(false);
+  const { isOperator } = useSession();
   const line = 'var(--border)', ink = 'var(--text-main)', mute = 'var(--text-sub)', weak = 'var(--text-weak)';
   return (
     <div style={{ position: 'relative' }}>
@@ -31,7 +33,7 @@ function NavMenu() {
       {open && (<>
         <div onClick={() => setOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 44 }} />
         <div style={{ position: 'absolute', left: 0, top: 'calc(100% + 4px)', width: 220, background: C.taupeBg, border: `1px solid ${line}`, borderRadius: 'var(--radius)', boxShadow: 'var(--shadow-lg)', zIndex: 45, overflow: 'hidden' }}>
-          {navGroups().map((g, gi) => (
+          {navGroups(isOperator).map((g, gi) => (
             <div key={gi} style={{ borderTop: gi ? `1px solid ${line}` : 'none', padding: '5px 0' }}>
               {g.title && <div style={{ fontSize: 11, color: weak, fontWeight: 700, padding: '3px 13px', letterSpacing: '0.02em' }}>{g.title}</div>}
               {g.items.map((it) => (
@@ -51,6 +53,7 @@ function NavMenu() {
 }
 
 function MobileMenu({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const { isOperator } = useSession();
   const line = 'var(--border)', ink = 'var(--text-main)', mute = 'var(--text-sub)', weak = 'var(--text-weak)';
   if (!open) return null;
   return (
@@ -58,7 +61,7 @@ function MobileMenu({ open, onClose }: { open: boolean; onClose: () => void }) {
       <div onClick={onClose} style={{ position: 'fixed', top: 54, left: 0, right: 0, bottom: 0, zIndex: 58, background: SCRIM, animation: 'fadeIn .15s ease' }} />
       <div style={{ position: 'fixed', top: 54, left: 0, right: 0, zIndex: 59, maxHeight: 'calc(100dvh - 54px)', overflowY: 'auto', overscrollBehavior: 'contain', background: C.taupeBg, borderBottom: `1px solid ${line}`, boxShadow: 'var(--shadow-lg)', animation: 'menuDrop .18s cubic-bezier(.2,.8,.2,1)', WebkitOverflowScrolling: 'touch' }}>
         <div style={{ padding: '4px 0 16px' }}>
-          {navGroups().map((g, gi) => (
+          {navGroups(isOperator).map((g, gi) => (
             <div key={gi} style={{ padding: '3px 0' }}>
               {g.title && <div style={{ fontSize: 11.5, color: weak, fontWeight: 700, padding: '9px 20px 3px', letterSpacing: '0.02em' }}>{g.title}</div>}
               {g.items.map((it) => (

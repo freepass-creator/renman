@@ -95,12 +95,12 @@ export default function DevDataPage() {
   }
   function checkBackend() { setMsg('저장 백엔드: ' + getStore().backend + ' (Firebase 설정 있으면 Firestore, 없으면 로컬)'); }
 
-  if (!isOperator) return <Page title="개발도구"><div style={{ padding: 20, color: C.mute }}>본사(마스터) 전용입니다.</div></Page>;
+  if (!isOperator) return <Page title="개발도구" noCompany><div style={{ padding: 20, color: C.mute }}>본사(마스터) 전용입니다.</div></Page>;
 
   const num = (n: number | undefined) => <span style={{ fontFamily: 'var(--font-mono)', fontVariantNumeric: 'tabular-nums' }}>{n ?? '—'}</span>;
 
   return (
-    <Page title="개발도구" meta={`${user.name} · 본사 · 그때그때 필요한 관리 기능`}>
+    <Page title="개발도구" noCompany meta={`${user.name} · 본사 · 그때그때 필요한 관리 기능`}>
       {busy && <LoadingOverlay label={busy === '__all__' ? '전체 초기화 중…' : busy === '__demo__' ? '데모 샘플 넣는 중…' : `${companyLabel(busy)} 처리 중…`} />}
       <Panel title="회사별 데이터 적재 / 초기화" action={
         <span style={{ display: 'inline-flex', gap: 8 }}>
