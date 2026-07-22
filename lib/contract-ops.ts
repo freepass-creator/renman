@@ -162,7 +162,7 @@ export function computeContractView(rec: EntityRecord, today: string): ContractV
   // 입금누계: 씨앗은 개시분(_paidTotal) + 오픈후 앱수납(_payments). 그 외는 _payments 또는 _paidTotal.
   const paid = seedCarry ? seedPaidTotal + seedPaid : (hasPerSeq ? seedPaid : seedPaidTotal);
   // 마이그레이션 씨앗 미수:
-  //   · 무납부 = carry 앵커(스케줄 날짜경계와 무관).
+  //   · 무납부 = carry 앵커(스케줄 날짜경계와 무관 — start결손·용량·면제 엣지에서도 실미수 보존).
   //   · 앱수납 후 = buildContract가 carry 분배→수납 적용 → schedGross가 순미수(헤드라인=회차표).
   const carrySeed = Math.max(0, Number(rec._carryUnpaid) || 0);
   const seedNet = seedCarry ? (hasPerSeq ? schedGross : carrySeed) : null;
