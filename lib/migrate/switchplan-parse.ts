@@ -255,6 +255,7 @@ export type SwitchplanVehicle = {
   vehiclePrice: number;
   purchasePrice: number;
   gps: string;
+  disposed: boolean;   // 자산 시트 "20XX 매각" 섹션 아래 차 = 처분(매각). 미수 잔존으로 채권시트에 남아도 보유 아님.
 };
 
 function buildVehicles(wb: XLSX.WorkBook): SwitchplanVehicle[] {
@@ -276,10 +277,16 @@ function buildVehicles(wb: XLSX.WorkBook): SwitchplanVehicle[] {
   };
   const get = (row: unknown[], c: number) => (c >= 0 ? cellStr(row[c]) : '');
   const getN = (row: unknown[], c: number) => (c >= 0 ? cellNum(row[c]) : 0);
+  // 자산 시트는 [보유] 다음에 "20XX 매각" 구분행으로 처분 섹션이 이어진다.
+  // 그 구분행(plate 없음, 첫칸에 "…매각/처분/폐차/말소")을 만나면 이후 행은 전부 처분차.
+  let inDisposed = false;
   for (let r = 1; r < G.length; r++) {
     const row = G[r] as unknown[];
     const plate = get(row, col.plate);
-    if (!plate) continue;
+    if (!plate) {
+      if (/매각|처분|폐차|말소/.test(get(row, 0))) inDisposed = true;
+      continue;
+    }
     const maker = get(row, col.maker);
     const modelLine = get(row, col.model);
     const subModel = get(row, col.sub);
@@ -304,6 +311,7 @@ function buildVehicles(wb: XLSX.WorkBook): SwitchplanVehicle[] {
       vehiclePrice: getN(row, col.vprice),
       purchasePrice: getN(row, col.purchase),
       gps: get(row, col.gps),
+      disposed: inDisposed,
     });
   }
   return out;
@@ -619,7 +627,8 @@ export type SwitchplanParse = {
   vehicles: EntityRecord[];   // 자산 (163)
   contracts: EntityRecord[];  // 채권(운행중) + 반납(종료), _carry/_kind 포함
   loans: EntityRecord[];      // 상환합계 (할부, plate + 할부필드)
-  activePlates: string[];     // 채권 시트 전체 plate (현보유 118)
+  activePlates: string[];     // 채권 시트 전체 plate (미수 원장 대상)
+  disposedPlates: string[];   // 자산 "매각" 섹션 차 — 채권에 남아도 처분(매각)이라 현보유 제외
   totals: SwitchplanTotals;
   asOf: string;               // 미수 기준일 (YYYY-MM-DD)
   warnings: string[];
@@ -684,6 +693,7 @@ export function parseSwitchplanWorkbook(buf: ArrayBuffer, asOf?: string): Switch
     contracts,
     loans: loanList.map(loanRecord),
     activePlates,
+    disposedPlates: vehicleList.filter((v) => v.disposed).map((v) => v.vehiclePlate),
     totals: {
       countCurrent: currentRaw.length,
       countReturned: returnedRaw.length,
@@ -888,10 +898,12 @@ export function buildSwitchplanPackFromBuffer(buf: ArrayBuffer, today: string = 
     }
   }
   const activeSet = new Set(parsed.activePlates.map((p) => normPlate(p)));
+  const disposedSet = new Set(parsed.disposedPlates.map((p) => normPlate(p)));
 
   const vehicle = parsed.vehicles.map((v) => {
     const key = normPlate(String(v.plate || ''));
-    const status = activeSet.has(key) ? '운행' : '매각';
+    // 자산 "매각" 섹션 차는 미수 잔존으로 채권시트에 남아도 처분(매각) — 현보유 제외.
+    const status = disposedSet.has(key) ? '매각' : (activeSet.has(key) ? '운행' : '매각');
     const loan = loanByPlate.get(key) ?? {};
     return { ...v, ...loan, status };
   });
