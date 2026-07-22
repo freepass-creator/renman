@@ -9,10 +9,11 @@ import { useSession } from '@/lib/session';
 import { type EntityRecord } from '@/lib/intake/entities';
 import { companyLabel } from '@/lib/companies';
 import {
-  computeContractView, contractSchedules,
+  computeContractView, contractSchedules, deriveStatus,
   patchDeliver, patchReturn, patchTerminate, patchExtend,
   type ContractView,
 } from '@/lib/contract-ops';
+import { canTransition } from '@/lib/domain/status';
 import { classifyContract, type ContractPhase, type ContractDebt } from '@/lib/domain/model';
 import { aggregateCustomers, customerKey, type CustomerAgg } from '@/lib/customers';
 import { dueMatcher, selectedInDim } from '@/lib/lens-filters';
@@ -107,6 +108,7 @@ export default function ContractWorkspace() {
     if (!act) return;
     const val = act.value.trim();
     if (!val) return;
+    if (act.kind !== 'pay' && !canTransition(deriveStatus(v.rec), act.kind)) { toast(`${deriveStatus(v.rec)} 상태에선 처리할 수 없습니다`, 'error'); return; }
     if (act.kind === 'deliver') return applyPatch(v, patchDeliver(v.rec, val));
     if (act.kind === 'return') return applyPatch(v, patchReturn(v.rec, val));
     if (act.kind === 'terminate') return applyPatch(v, patchTerminate(v.rec, val), '중도해지로 종료 처리할까요?');

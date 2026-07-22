@@ -12,7 +12,8 @@ import { Sec, Cards, Metric, ObjCard, Stepper, Btn, Badge, FormGrid, KV, HiddenS
 import { InfoDoc, type DocReplacePayload } from '@/components/InfoDoc';
 import { docHistory, pushDocVersion, latestDoc } from '@/lib/docs';
 import { deriveLocation, locationLabel } from '@/lib/vehicle-location';
-import { contractSchedules, computeContractView, effectiveEndDate, patchDeliver, patchReturn, patchTerminate, patchExtend, patchEngineLock, earlyTerminationFee, isReturnable } from '@/lib/contract-ops';
+import { contractSchedules, computeContractView, effectiveEndDate, patchDeliver, patchReturn, patchTerminate, patchExtend, patchEngineLock, earlyTerminationFee, isReturnable, deriveStatus } from '@/lib/contract-ops';
+import { canTransition } from '@/lib/domain/status';
 import { isCashPurchase } from '@/lib/domain/vehicle-finance';
 import { FUEL_LEVELS } from '@/lib/domain/fuel';
 import { normPlate } from '@/lib/plate';
@@ -195,6 +196,7 @@ export function Vehicle360({ plate, focus }: { plate: string; focus?: string }) 
   // 반납/연장/해지 확정 — 인라인 폼 입력값으로 패치 조립 후 커밋. 완료 시 패널 닫고 이력·현황에 반영.
   const commitTx = async () => {
     if (!active?._key) return; const key = String(active._key);
+    if (txMode && !canTransition(deriveStatus(active), txMode)) { toast(`${deriveStatus(active)} 상태에선 ${txMode === 'return' ? '반납' : txMode === 'extend' ? '연장' : '해지'}할 수 없습니다`, 'error'); return; }
     if (txMode === 'return') {
       await doTransition(patchReturn(active, txForm.date, { returnMileage: txForm.mileage ? Number(txForm.mileage) : '', fuelIn: txForm.fuel, returnSettleNote: txForm.settleNote }), key, active);
     } else if (txMode === 'extend') {
@@ -209,6 +211,7 @@ export function Vehicle360({ plate, focus }: { plate: string; focus?: string }) 
   // 인도(출고) 확정 — 반납과 대칭: 출고 시점 주행거리·연료(원점) 캡처 + 인도 활동 이벤트 기록 + 상태 운행 전이.
   const commitDeliver = async () => {
     if (!waiting?._key) return; const key = String(waiting._key);
+    if (!canTransition(deriveStatus(waiting), 'deliver')) { toast('인도할 수 있는 상태가 아닙니다', 'error'); return; }
     const t = requireTarget(); if (!t) return;
     await doTransition(patchDeliver(waiting, dlvForm.date, { mileageOut: dlvForm.mileage ? Number(dlvForm.mileage) : '', fuelOut: dlvForm.fuel }), key, waiting);
     await saveIntake('history', t, [{ plate, category: '인도', title: `출고(인도)${dlvForm.mileage ? ' · ' + dlvForm.mileage + 'km' : ''} · 연료 ${dlvForm.fuel}`, date: dlvForm.date, author: user.name, customer: String(waiting.contractorName || ''), contractNo: String(waiting.contractNo || ''), companyId: t, _kind: 'activity' }], { notify: false });
