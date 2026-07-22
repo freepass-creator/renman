@@ -161,9 +161,11 @@ export function computeContractView(rec: EntityRecord, today: string): ContractV
   const hasPerSeq = seedPaid > 0;
   // 입금누계: 씨앗은 개시분(_paidTotal) + 오픈후 앱수납(_payments). 그 외는 _payments 또는 _paidTotal.
   const paid = seedCarry ? seedPaidTotal + seedPaid : (hasPerSeq ? seedPaid : seedPaidTotal);
-  // 마이그레이션 씨앗 미수:
-  //   · 무납부 = carry 앵커(스케줄 날짜경계와 무관 — start결손·용량·면제 엣지에서도 실미수 보존).
-  //   · 앱수납 후 = buildContract가 carry 분배→수납 적용 → schedGross가 순미수(헤드라인=회차표).
+  // _carryUnpaid = 마이그레이션 개시이월(opening balance) 앵커 = 순미수 SSOT.
+  //   · 무납부 = carry 그대로(스케줄 날짜경계 무관). ★ start결손·용량·면제·「반납일≤시작일」(승계·스위치)
+  //     처럼 회차 도래창이 비는 케이스에서 스케줄은 carry를 담을 자리가 없다 → 이 앵커가 load-bearing(제거 금지).
+  //   · 앱수납 후 = buildContract가 carry 분배→수납 FIFO → schedGross가 순미수(헤드라인=회차표).
+  // (완전 ledger화[charge/payment/allocation로 도출]는 P2 아키텍처 — 현재 net==carry는 정확·tests/receivables 보호.)
   const carrySeed = Math.max(0, Number(rec._carryUnpaid) || 0);
   const seedNet = seedCarry ? (hasPerSeq ? schedGross : carrySeed) : null;
   const gross = seedNet != null ? seedNet : schedGross;

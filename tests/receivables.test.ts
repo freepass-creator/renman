@@ -91,6 +91,13 @@ describe('앵커 load-bearing 가드 — 스케줄로 표현 못 하는 carry도
   it('월대여료 0 + carry → net == carry (스케줄 없음)', () => {
     expect(net({ monthlyRent: 0, _carryUnpaid: 700_000 })).toBe(700_000);
   });
+
+  it('반납일 ≤ 시작일 씨앗(승계·스위치) → net == carry (도래창 비어도 앵커 보존)', () => {
+    // 실데이터 13계약 유형: 반납일이 계약시작과 같거나 이전 → 회차 도래창 없음 → schedGross 0.
+    // _carryUnpaid 앵커가 없으면 여기서 미수가 통째로 유실됨(seq-0 단일화 시도 때 확인).
+    expect(net({ startDate: '2025-11-20', endDate: '2026-11-20', status: '반납', returnedDate: '2025-11-19', _carryUnpaid: 1_980_000 })).toBe(1_980_000);
+    expect(net({ startDate: '2026-04-23', endDate: '2026-07-23', rentalMonths: 3, status: '반납', returnedDate: '2025-12-04', _carryUnpaid: 2_400_000 })).toBe(2_400_000);
+  });
 });
 
 describe('엣지 — 크래시 없이 방어', () => {
