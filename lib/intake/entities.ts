@@ -58,6 +58,11 @@ export const ENTITIES: Record<string, Entity> = {
       { key: 'assetCode', label: '자산코드', type: 'text', manual: true, note: '회사별 자동발급(CP02VH0001)' },
       // ── 취득/매입 (매입계약서·세금계산서 → 감가 기준) ──
       { key: 'acquisitionPrice', label: '매입가(원)', type: 'number', ocrFrom: 'acquisition_price' },
+      // ── 소비자가·개소세 입력(welrix 개소세 계산 기준). 매입가와 별개 = 제조사 소비자가 ──
+      { key: 'consumerPrice', label: '소비자가격(원)', type: 'number', manual: true, note: '제조사 소비자가 — 개소세 계산 기준(C5). 매입가와 별개' },
+      { key: 'optionPrice', label: '옵션가(원)', type: 'number', manual: true },
+      { key: 'optionDiscount', label: '옵션할인(원)', type: 'number', manual: true },
+      { key: 'taxExempt', label: '과세/면세', type: 'select', options: ['과세', '면세'], manual: true, note: '면세면 개소세·교육세 0' },
       { key: 'purchasedDate', label: '매입완료일', type: 'date', manual: true },
       { key: 'acquisitionDate', label: '취득일(감가기준)', type: 'date', manual: true, note: '미입력시 최초등록일' },
       { key: 'supplier', label: '매입처', type: 'text', manual: true },
@@ -89,6 +94,10 @@ export const ENTITIES: Record<string, Entity> = {
       { key: 'trim', label: '트림', type: 'text', manual: true },
       { key: 'exteriorColor', label: '외부색상', type: 'text', manual: true },
       { key: 'interiorColor', label: '내부색상', type: 'text', manual: true },
+      { key: 'modelYear', label: '연식', type: 'text', manual: true, note: '예 2024/2024년형 — 제작연월과 별개' },
+      { key: 'driveType', label: '구동방식', type: 'text', manual: true, note: '전륜/후륜/4WD/AWD' },
+      { key: 'transmission', label: '변속기', type: 'text', manual: true, note: '자동/DCT/CVT 등' },
+      { key: 'optionList', label: '옵션', type: 'text', manual: true, note: '콤마구분 자유텍스트' },
     ],
   },
   // 차량 이력 — v5 HistoryEntry(scope=vehicle). 정비·사고·검사·세차·위반·부품교체·보험을 한 엔티티로.

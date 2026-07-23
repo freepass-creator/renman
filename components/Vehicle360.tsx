@@ -14,6 +14,7 @@ import { deriveLocation, locationLabel } from '@/lib/vehicle-location';
 import { contractSchedules, computeContractView, effectiveEndDate, patchDeliver, patchReturn, patchTerminate, patchExtend, patchEngineLock, earlyTerminationFee, isReturnable, deriveStatus } from '@/lib/contract-ops';
 import { canTransition } from '@/lib/domain/status';
 import { isCashPurchase } from '@/lib/domain/vehicle-finance';
+import { computeVehicleTax } from '@/lib/domain/vehicle-tax';
 import { FUEL_LEVELS } from '@/lib/domain/fuel';
 import { normPlate } from '@/lib/plate';
 import { isComm, matchesContract } from '@/lib/activity-match';
@@ -183,6 +184,8 @@ export function Vehicle360({ plate, focus }: { plate: string; focus?: string }) 
   const olderIns = curIns ? insurances.filter((i) => i !== curIns) : [];
   // 자산 손익 — 이 차가 벌어온 돈 vs 비용(감가·보험·정비). 운영 지표(재무제표 아님).
   const econ = v ? assetEconomics(v, contracts, insurances, history, TODAY) : null;
+  // 개소세 체인(welrix 이식) — 소비자가격 입력 시 공급가액·개소세·취득원가 파생(표시·견적용). 소비자가 없으면 계산 안 함.
+  const tax = v && Number(v.consumerPrice) ? computeVehicleTax({ consumerPrice: Number(v.consumerPrice) || 0, optionPrice: Number(v.optionPrice) || 0, optionDiscount: Number(v.optionDiscount) || 0, exempt: String(v.taxExempt) === '면세' }) : null;
   // 보증금 미반환 — 종료됐는데 정산 안 된 계약(가장 최근 것). 반환/충당 처리 대상.
   const pendDeposit = contracts.map((c) => ({ c, d: depositView(c, TODAY) })).filter((x) => x.d.pendingRefund)
     .sort((a, b) => String(b.c.returnedDate || '').localeCompare(String(a.c.returnedDate || '')))[0] || null;
@@ -450,18 +453,32 @@ export function Vehicle360({ plate, focus }: { plate: string; focus?: string }) 
       {!v && <div style={{ marginTop: 12, order: -1 }}><Message variant="warning">등록증이 아직 안 들어왔습니다. 계약·보험·과태료만 표시. <b>정보 담기</b>로 등록하세요.</Message></div>}
 
       {/* 차량 정보 = 제조사 스펙(등록증에 없음 · 직접입력/차종마스터). 인라인 수정(값칸만). */}
-      <Sec id="v-info" order={secOrd('v-info')} onReorder={reorderSec} title={editInfo ? '차량 정보 · 편집 중' : '차량 정보'} tone={editInfo ? 'ok' : undefined} desc="제조사 스펙 · 직접입력" right={
+      <Sec id="v-info" order={secOrd('v-info')} onReorder={reorderSec} title={editInfo ? '차량 정보 · 편집 중' : '차량 정보'} tone={editInfo ? 'ok' : undefined} desc="차종마스터 5단계 · 스펙 · 색상" right={
         editInfo
           ? <span style={{ fontSize: 11.5, color: C.faint }}>함께 편집 중</span>
           : <Btn variant="ghost" onClick={startEdit}>{v ? '수정' : '+ 등록'}</Btn>
       }>
         {(v || editInfo)
           ? <KV editing={editInfo} form={form} onChange={chg} rows={[
+              // 차종마스터 5단계(제조사→모델→세부모델→모델구분→트림) + 등록증차명 + 차종
               ['제조사', 'maker', String(v?.maker ?? '')],
-              ['차명', 'carName', String(v?.carName ?? '')],
+              ['모델', 'modelLine', String(v?.modelLine ?? '')],
+              ['세부모델', 'subModel', String(v?.subModel ?? '')],
+              ['모델구분', 'variant', String(v?.variant ?? '')],
+              ['트림', 'trim', String(v?.trim ?? '')],
+              ['차명(등록증)', 'carName', String(v?.carName ?? '')],
               ['차종', 'vehicleType', String(v?.vehicleType ?? '')],
+              // 스펙
+              ['연식', 'modelYear', String(v?.modelYear ?? '')],
               ['배기량', 'displacement', String(v?.displacement ?? '')],
               ['연료', 'fuel', String(v?.fuel ?? '')],
+              ['구동방식', 'driveType', String(v?.driveType ?? '')],
+              ['변속기', 'transmission', String(v?.transmission ?? '')],
+              ['승차정원', 'seats', String(v?.seats ?? '')],
+              // 색상 · 옵션
+              ['외부색상', 'exteriorColor', String(v?.exteriorColor ?? '')],
+              ['내부색상', 'interiorColor', String(v?.interiorColor ?? '')],
+              ['옵션', 'optionList', String(v?.optionList ?? '')],
             ] as KVRow[]} />
           : <EmptyState variant="sec">차량 미등록</EmptyState>}
       </Sec>
@@ -519,12 +536,27 @@ export function Vehicle360({ plate, focus }: { plate: string; focus?: string }) 
       </div> : null}
 
       {/* 취득 · 구입 = 자산 취득/부채측(직접입력). 인라인 수정은 차량정보와 공유. 상환 회차표는 아래 '할부 상환 스케줄'. */}
-      {(v || editInfo) ? <Sec id="v-purchase" order={secOrd('v-purchase')} onReorder={reorderSec} title="취득 · 구입" desc="취득일·취득가·매입처 · 할부(사·원금·이율·개월)" tone={editInfo ? 'ok' : undefined} right={
+      {(v || editInfo) ? <Sec id="v-purchase" order={secOrd('v-purchase')} onReorder={reorderSec} title="취득 · 구입" desc="소비자가·개소세 · 취득·매입 · 할부(사·원금·이율·개월)" tone={editInfo ? 'ok' : undefined} right={
         editInfo
           ? <span style={{ fontSize: 11.5, color: C.faint }}>함께 편집 중</span>
           : <Btn variant="ghost" onClick={startEdit}>수정</Btn>
       }>
         <KV editing={editInfo} form={form} onChange={chg} rows={[
+          // 소비자가·옵션·면세 = 개소세 계산 입력(제조사 소비자가, 매입가와 별개)
+          ['소비자가격', 'consumerPrice', v?.consumerPrice ? won(v.consumerPrice) : ''],
+          ['옵션가', 'optionPrice', v?.optionPrice ? won(v.optionPrice) : ''],
+          ['옵션할인', 'optionDiscount', v?.optionDiscount ? won(v.optionDiscount) : ''],
+          ['과세/면세', 'taxExempt', String(v?.taxExempt ?? '')],
+          // 개소세 파생(읽기전용) — 소비자가격 입력 시에만. 표시·견적용(세무 정밀값 아님)
+          ...(tax ? ([
+            ['· 공급가액', null, won(tax.supplyPrice)],
+            ['· 개소세', null, won(tax.exciseTax)],
+            ['· 교육세', null, won(tax.eduTax)],
+            ['· 부가세', null, won(tax.vat)],
+            ['· 취득가액', null, won(tax.acquisitionBase)],
+            ['· 취득세', null, won(tax.acquisitionTax)],
+            ['· 취득원가', null, won(tax.totalAcquisitionCost)],
+          ] as KVRow[]) : []),
           ['취득일', 'acquisitionDate', String(v?.acquisitionDate ?? '')],
           ['취득가·매입가', 'acquisitionPrice', v?.acquisitionPrice ? won(v.acquisitionPrice) : ''],
           ['매입완료일', 'purchasedDate', String(v?.purchasedDate ?? '')],
