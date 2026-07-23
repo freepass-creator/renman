@@ -4,7 +4,7 @@
  */
 import React from 'react';
 import { Badge, won, C, type SheetCol } from '@/components/ui';
-import { type SheetRow, type ContractRow } from './sheet-rows';
+import { type SheetRow, type ContractRow, type FleetRow } from './sheet-rows';
 
 const toneBadge = (t: SheetRow['tone']): 'green' | 'amber' | 'red' | 'gray' =>
   t === 'ok' ? 'green' : t === 'warn' ? 'amber' : t === 'danger' ? 'red' : 'gray';
@@ -83,4 +83,68 @@ export const DEBT_COLS: SheetCol<ContractRow>[] = [
   CT.start, CT.end, CT.dday,
   CT.st, CT.od, CT.cnt,
   CT.phone,
+];
+
+/* ── 통합 마스터 열 (운영시트: 차량 1대 = 1행) ──
+ *   기본 = 자산(번호판·법인·상태·차명) + 계약/손님(계약자·기간·월렌트) + 미수.
+ *   전체 = 기본 + 자산상세(연식·VIN·취득·검사·GPS) + 할부(할부사·원금·이율·개월) + 보험(보험사·만기·보험료) + 연체.
+ *   자리 고정 — 전체는 기본 열 사이에 «끼워넣지» 말고 뒤로 확장(눈이 같은 데를 본다). */
+const won0 = (n: number) => (n ? won(n) : '—');
+const ymd = (s: string) => s ? s.slice(0, 10) : '—';
+const FL = {
+  plate: { key: 'plate', label: '차량번호', render: (r) => r.plate || '—', text: (r) => r.plate },
+  co: { key: 'co', label: '법인', render: (r) => r.company || '—', text: (r) => r.company },
+  status: { key: 'status', label: '상태', render: (r) => <Badge tone={toneBadge(r.tone)}>{r.status}</Badge>, text: (r) => r.status },
+  loc: { key: 'loc', label: '현위치', render: (r) => r.location || '—', text: (r) => r.location },
+  car: { key: 'car', label: '차명', render: (r) => r.carName || '—', text: (r) => r.carName },
+  year: { key: 'year', label: '연식', render: (r) => r.year || '—', text: (r) => r.year },
+  vin: { key: 'vin', label: '차대번호', render: (r) => r.vin || '—', text: (r) => r.vin },
+  acqDate: { key: 'acqDate', label: '취득일', render: (r) => ymd(r.acqDate), text: (r) => r.acqDate },
+  acqPrice: { key: 'acqPrice', label: '취득가', align: 'r', render: (r) => won0(r.acqPrice), text: (r) => r.acqPrice },
+  inspect: { key: 'inspect', label: '검사만기', render: (r) => ymd(r.inspectionTo), text: (r) => r.inspectionTo },
+  gps: { key: 'gps', label: 'GPS', render: (r) => r.gps || '—', text: (r) => r.gps },
+  loanCo: { key: 'loanCo', label: '할부사', render: (r) => r.loanCompany || '—', text: (r) => r.loanCompany },
+  loanAmt: { key: 'loanAmt', label: '할부원금', align: 'r', render: (r) => won0(r.loanPrincipal), text: (r) => r.loanPrincipal },
+  loanRate: { key: 'loanRate', label: '이율', align: 'r', render: (r) => r.loanRate ? `${(r.loanRate * 100).toFixed(1)}%` : '—', text: (r) => r.loanRate },
+  loanMon: { key: 'loanMon', label: '할부개월', align: 'r', render: (r) => r.loanMonths || '—', text: (r) => r.loanMonths },
+  cust: { key: 'cust', label: '계약자', render: (r) => r.customer || '—', text: (r) => r.customer },
+  phone: { key: 'phone', label: '연락처', render: (r) => r.phone || '—', text: (r) => r.phone },
+  rent: { key: 'rent', label: '월렌트', align: 'r', render: (r) => r.rent ? won(r.rent) : '—', text: (r) => r.rent },
+  start: { key: 'start', label: '시작', render: (r) => ymd(r.start), text: (r) => r.start },
+  end: { key: 'end', label: '만기', render: (r) => ymd(r.end), text: (r) => r.end },
+  dday: {
+    key: 'dday', label: 'D-day', align: 'r',
+    render: (r) => r.dday == null ? '—' : r.dday < 0 ? <span style={{ color: C.danger }}>{r.dday}</span> : `D-${r.dday}`,
+    text: (r) => r.dday ?? '',
+  },
+  insurer: { key: 'insurer', label: '보험사', render: (r) => r.insurer || '—', text: (r) => r.insurer },
+  insEnd: { key: 'insEnd', label: '보험만기', render: (r) => ymd(r.insEnd), text: (r) => r.insEnd },
+  insPrem: { key: 'insPrem', label: '보험료', align: 'r', render: (r) => won0(r.insPremium), text: (r) => r.insPremium },
+  net: {
+    key: 'net', label: '미수', align: 'r',
+    render: (r) => r.net > 0 ? <span style={{ color: C.danger, fontWeight: 700 }}>{won(r.net)}</span> : '—',
+    text: (r) => r.net,
+  },
+  od: {
+    key: 'od', label: '연체일', align: 'r',
+    render: (r) => r.overdueDays > 0 ? <span style={{ color: r.overdueDays >= 90 ? C.danger : C.warn, fontWeight: 700 }}>{r.overdueDays}일</span> : '—',
+    text: (r) => r.overdueDays,
+  },
+} satisfies Record<string, SheetCol<FleetRow>>;
+
+/** 기본 = 자산식별 + 계약자·연락처 + 기간·D-day + 월렌트 + 미수 (운영현황 스캔 필수, erp5 운영현황 준거). */
+export const FLEET_BASIC_COLS: SheetCol<FleetRow>[] = [
+  FL.plate, FL.co, FL.status, FL.loc, FL.car,
+  FL.cust, FL.phone, FL.start, FL.end, FL.dday, FL.rent,
+  FL.net,
+];
+
+/** 전체 = 기본 열 «그대로» + 부가 열이 우측에 쭉 붙음(연식·VIN·취득·검사·GPS·할부·보험·연체).
+ *  기본 열 순서·자리는 고정(눈이 같은 데를 본다) — 확장은 앞에 끼워넣지 않고 뒤로만. */
+export const FLEET_EXPANDED_COLS: SheetCol<FleetRow>[] = [
+  ...FLEET_BASIC_COLS,
+  FL.year, FL.vin, FL.acqDate, FL.acqPrice, FL.inspect, FL.gps,
+  FL.loanCo, FL.loanAmt, FL.loanRate, FL.loanMon,
+  FL.insurer, FL.insEnd, FL.insPrem,
+  FL.od,
 ];

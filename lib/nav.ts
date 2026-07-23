@@ -48,7 +48,7 @@ export const PAGE_IA: PageIA[] = [
   { href: '/asset', label: '자산현황', role: 'view', layer: 'ledger', tier: '라이트', assetKind: 'physical', view: '현물 생애(구매예정·등록예정·보유중·처분예정·처분완료)', grab: 'both', grabHow: '한곳=담기(차량) · 그자리=360·기록' },
   { href: '/contract', label: '계약현황', role: 'view', layer: 'ledger', tier: '라이트', assetKind: 'contract', view: '계약 생애(예정·중·완료) · 손님', grab: 'both', grabHow: '한곳=담기(계약) · 그자리=인도/반납/입금' },
   { href: '/finance', label: '재무현황', role: 'view', layer: 'ledger', tier: '라이트', assetKind: 'cash', view: '자금 생애(미분류·분류·원장)', grab: 'batch', grabHow: '한곳=담기(계좌) · 분류는 그자리' },
-  { href: '/sheet', label: '운영시트', role: 'view', layer: 'ledger', tier: '라이트', view: '함대·계약 엑셀형 한눈', grab: 'none', grabHow: '조회→360' },
+  { href: '/sheet', label: '운영시트', role: 'view', layer: 'ledger', tier: '라이트', view: '차량 1대=1행 통합 마스터(자산·계약·미수 → 확장: 할부·보험·GPS) 엑셀', grab: 'none', grabHow: '조회→360' },
 
   // 스탠다드 — 메뉴「업무」(현장 처리). 라벨은 업무 말투(관리·일보).
   { href: '/work', label: '업무현황', role: 'work', layer: 'event', tier: '스탠다드', view: '업무·입력 한눈', grab: 'none', grabHow: '배차·미수·자금일보·정비·과태료·데이터센터·증빙' },
@@ -99,6 +99,7 @@ export type NavGroup = { title: string; items: NavItem[] };
 export const NAV_GROUPS: NavGroup[] = [
   { title: '', items: [
     { href: '/', label: '홈', icon: Home, tier: '라이트' },
+    { href: '/sheet', label: '운영시트', icon: Table2, tier: '라이트' },  // 차량1대=1행 통합 엑셀 마스터(전체 한눈)
     { href: '/ops', label: '마이페이지', icon: LayoutDashboard, tier: '라이트' },
     { href: '/ingest', label: '데이터센터', icon: Upload, tier: '스탠다드' },
   ] },
@@ -106,7 +107,6 @@ export const NAV_GROUPS: NavGroup[] = [
     { href: '/asset', label: '자산현황', icon: Car, tier: '라이트' },
     { href: '/contract', label: '계약현황', icon: FileText, tier: '라이트' },
     { href: '/finance', label: '재무현황', icon: Wallet, tier: '라이트' },
-    { href: '/sheet', label: '운영시트', icon: Table2, tier: '라이트' },
   ] },
   { title: '업무', items: [
     { href: '/dispatch', label: '배차관리', icon: ArrowLeftRight, tier: '스탠다드' },

@@ -9,6 +9,9 @@
  */
 import { type VehicleNode, type ContractNode, onBooks } from './domain/model';
 import { type ContractView } from './contract-ops';
+import { type EntityRecord } from './intake/entities';
+import { normPlate } from './plate';
+import { deriveLocation } from './vehicle-location';
 import { companyShort } from './companies';
 
 export type SheetRow = {
@@ -89,6 +92,107 @@ export function buildContractRows(contracts: ContractNode[]): ContractRow[] {
   return contracts
     .map((n) => contractViewToRow(n.view, { plate: n.plate, customer: n.customer }))
     .sort((a, b) => a.plate.localeCompare(b.plate, 'ko'));
+}
+
+/**
+ * 통합 마스터 행 — 차량 1대 = 1행. 자산 + (활성)계약/손님 + 미수 + 할부·보험·GPS 를 한 줄에.
+ * 운영시트(전체보기) SSOT. 자산 필드는 veh 원본, 계약/미수는 computeContractView 파생(재계산 손롤 금지),
+ * 보험은 번호판으로 조인(최신 만기 1건). 미수 = 차량의 모든 계약 net 합(반납·잔존채권 포함).
+ */
+export type FleetRow = {
+  plate: string; companyId: string; company: string;
+  // 자산
+  ownership: string; util: string; status: string; location: string; carName: string; year: string; vin: string;
+  acqDate: string; acqPrice: number; inspectionTo: string; gps: string;
+  // 할부
+  loanCompany: string; loanPrincipal: number; loanRate: number; loanMonths: number; loanStart: string;
+  // 계약(활성)
+  customer: string; phone: string; rent: number; start: string; end: string; dday: number | null;
+  // 보험
+  insurer: string; insEnd: string; insPremium: number;
+  // 미수
+  net: number; overdueDays: number;
+  tone: 'ok' | 'warn' | 'danger' | 'mute';
+};
+
+/** contracts(전체)를 넘기면 «차량 없는 계약»(고아: plate가 차량목록에 없음)도 별도 행으로 노출 →
+ *  마스터 미수 총액이 실제와 일치(계약 미수를 조용히 누락시키지 않음). */
+export function buildFleetRows(vehicles: VehicleNode[], insurance: EntityRecord[] = [], contracts: ContractNode[] = [], history: EntityRecord[] = [], today = ''): FleetRow[] {
+  // 보험: 번호판별 최신(만기 늦은) 1건
+  const insByPlate = new Map<string, EntityRecord>();
+  for (const ins of insurance) {
+    const p = normPlate(ins.plate);
+    if (!p) continue;
+    const cur = insByPlate.get(p);
+    if (!cur || String(ins.endDate || '') > String(cur.endDate || '')) insByPlate.set(p, ins);
+  }
+  const histByPlate = new Map<string, EntityRecord[]>();
+  for (const h of history) { const p = normPlate(h.plate); if (!p) continue; const a = histByPlate.get(p); if (a) a.push(h); else histByPlate.set(p, [h]); }
+  const isCash = (v: EntityRecord) => /(예|현금|Y)/i.test(String(v.loanCashOnly || ''));
+
+  // 한 plate(차량 1대 또는 고아 계약군)의 계약 파생 필드 + 보험/미수.
+  const rowFrom = (
+    plate: string, veh: EntityRecord | null, active: ContractNode | null, plateContracts: ContractNode[],
+    asset: Pick<FleetRow, 'companyId' | 'ownership' | 'util' | 'status' | 'location' | 'tone'>,
+  ): FleetRow => {
+    const v = active?.view;
+    const net = plateContracts.reduce((s, c) => s + Math.max(0, c.net), 0);
+    const overdueDays = plateContracts.reduce((m, c) => Math.max(m, c.view.overdueDays), 0);
+    const ins = insByPlate.get(plate);
+    return {
+      plate,
+      companyId: asset.companyId,
+      company: companyShort(asset.companyId),
+      ownership: asset.ownership, util: asset.util, status: asset.status, location: asset.location,
+      carName: String(veh?.carName || veh?.model || active?.view.rec.carName || ''),
+      year: String(veh?.firstReg || veh?.yearMonth || '').slice(0, 4),
+      vin: String(veh?.vin || ''),
+      acqDate: String(veh?.acquisitionDate || ''),
+      acqPrice: Number(veh?.acquisitionPrice) || 0,
+      inspectionTo: String(veh?.inspectionTo || ''),
+      gps: String(veh?.gpsProvider || ''),
+      loanCompany: String(veh?.loanCompany || '') || (veh && isCash(veh) ? '현금' : ''),
+      loanPrincipal: Number(veh?.loanPrincipal) || 0,
+      loanRate: Number(veh?.loanRate) || 0,
+      loanMonths: Number(veh?.loanMonths) || 0,
+      loanStart: String(veh?.loanStartDate || ''),
+      customer: active?.customer || '',
+      phone: String(v?.rec.contractorPhone || ''),
+      rent: Number(v?.rec.monthlyRent) || 0,
+      start: String(v?.rec.startDate || v?.rec.deliveredDate || ''),
+      end: String(v?.rec.endDate || ''),
+      dday: v?.dday ?? null,
+      insurer: String(ins?.insurer || ''),
+      insEnd: String(ins?.endDate || ''),
+      insPremium: Number(ins?.totalPremium) || 0,
+      net, overdueDays,
+      // 상태 뱃지는 «상태» 톤(운행=초록·유휴=회색·정비=주의). 미수는 미수/연체 열 색으로 별도 표시.
+      tone: asset.tone,
+    };
+  };
+
+  const rows: FleetRow[] = vehicles.map((n) =>
+    rowFrom(n.plate || String(n.veh.plate || ''), n.veh, n.activeContract, n.contracts, {
+      companyId: String(n.veh.companyId || ''), ownership: n.ownership, util: n.utilization ?? n.label, status: n.label,
+      // 현위치 = 한 칸에 하나. 대여중=계약자(차가 그 손님에게), 아니면 최근 이동처/차고지. 활성계약은 linkFleet SSOT와 일치.
+      location: n.activeContract ? (n.activeContract.customer || '차고지') : deriveLocation(n.veh, [], histByPlate.get(n.plate) || [], today).location,
+      tone: n.tone,
+    }));
+
+  // 고아 계약(차량 목록에 없는 plate) → plate별 1행(자산=차량없음). 미수 누락 방지.
+  const vplates = new Set(vehicles.map((n) => n.plate));
+  const orphanByPlate = new Map<string, ContractNode[]>();
+  for (const c of contracts) if (c.plate && !vplates.has(c.plate)) {
+    const arr = orphanByPlate.get(c.plate); if (arr) arr.push(c); else orphanByPlate.set(c.plate, [c]);
+  }
+  for (const [plate, cs] of orphanByPlate) {
+    const active = cs.find((c) => c.phase === '운행') ?? cs[cs.length - 1] ?? null;
+    rows.push(rowFrom(plate, null, active, cs, {
+      companyId: String(active?.view.rec.companyId || ''), ownership: '처분완료', util: '차량없음', status: '차량없음', location: '차량없음', tone: 'mute',
+    }));
+  }
+
+  return rows.sort((a, b) => a.plate.localeCompare(b.plate, 'ko'));
 }
 
 export function buildSheetRows(vehicles: VehicleNode[]): SheetRow[] {
