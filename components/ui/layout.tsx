@@ -4,7 +4,7 @@ import { useIsMobile } from '@/lib/use-mobile';
 import { useAppBar } from '@/lib/appbar';
 import { FacetFilterProvider } from '@/lib/facet-filter-ctx';
 import { ChevronDown, ChevronLeft, EyeOff, GripVertical } from 'lucide-react';
-import { C, R, NUM, SH } from './tokens';
+import { C, R, NUM, SH, ctrlH } from './tokens';
 import { PAGE_PAD_M, PAGE_HEAD_PB_M, SPACE_M, SPACE_GROUP_M } from './tokens';
 import { CompanyFilter, Btn } from './controls';
 
@@ -136,8 +136,9 @@ export function Sec({ id, title, n, desc, tone, right, hideable = true, onReorde
         if (from && from !== id) onReorder!(from, id!);
       } : undefined}
     >
-      {/* 액션은 marginLeft:auto 묶음 — flex:1 스페이서가 버튼을 미리 다음 줄로 안 밈. 줄바꿈 시에만 아래. */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: mobile ? SPACE_M : 8, marginBottom: mobile ? SPACE_M : 9, flexWrap: 'wrap' }}>
+      {/* 웹=한 줄 고정(nowrap) — 접기/펼치기 때 오른쪽 버튼이 2번째 줄로 «튀어» 헤더 높이가 확 바뀌던 것 제거.
+          desc가 flex:1 말줄임으로 폭을 흡수, 버튼은 flexShrink:0으로 제자리. 모바일은 wrap 유지(터치·스택). */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: mobile ? SPACE_M : 8, marginBottom: mobile ? SPACE_M : 9, flexWrap: mobile ? 'wrap' : 'nowrap', minHeight: ctrlH(mobile) }}>
         <button onClick={() => set(state === 'open' ? 'collapsed' : 'open')} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, border: 'none', background: 'none', cursor: 'pointer', padding: 0, minHeight: mobile ? 32 : undefined, maxWidth: '100%', WebkitTapHighlightColor: 'transparent' }}>
           <ChevronDown size={mobile ? 18 : 15} color={C.sub} style={{ flexShrink: 0, transform: state === 'open' ? 'none' : 'rotate(-90deg)', transition: 'transform .15s' }} />
           <span style={{ fontSize: mobile ? 15 : 13.5, fontWeight: 800, letterSpacing: '-0.01em', color: C.ink }}>{title}</span>
