@@ -36,26 +36,36 @@ function FacetGroups({ groups, facets, onToggle, touch }: {
         const nOn = g.chips.filter((c) => facets.has(c.label)).length;
         return (
           <div key={g.dim}>
-            <button
-              type="button"
-              onClick={() => toggleDim(g.dim)}
-              style={{
-                width: '100%', display: 'flex', alignItems: 'center', gap: 6,
-                padding: touch ? '10px 0' : '8px 0', marginBottom: folded ? 0 : (touch ? 6 : 4),
-                minHeight: dimH, border: 'none', background: 'none', cursor: 'pointer',
-                WebkitTapHighlightColor: 'transparent',
-              }}
-            >
-              <ChevronDown
-                size={touch ? 18 : 15}
-                color={C.faint}
-                style={{ flexShrink: 0, transform: folded ? 'rotate(-90deg)' : 'none', transition: 'transform .12s' }}
-              />
-              <span style={{ fontSize: touch ? 15 : 13, color: C.ink, fontWeight: 700, letterSpacing: '-0.01em', lineHeight: 1.2 }}>{g.dim}</span>
+            {/* dim 헤더 = 접기 토글(왼쪽 대부분) + 선택시 그룹 「해제」(오른쪽) — erp4 정렬. */}
+            <div style={{ display: 'flex', alignItems: 'center', marginBottom: folded ? 0 : (touch ? 6 : 4) }}>
+              <button
+                type="button"
+                onClick={() => toggleDim(g.dim)}
+                style={{
+                  flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 6,
+                  padding: touch ? '10px 0' : '8px 0',
+                  minHeight: dimH, border: 'none', background: 'none', cursor: 'pointer',
+                  WebkitTapHighlightColor: 'transparent',
+                }}
+              >
+                <ChevronDown
+                  size={touch ? 18 : 15}
+                  color={C.faint}
+                  style={{ flexShrink: 0, transform: folded ? 'rotate(-90deg)' : 'none', transition: 'transform .12s' }}
+                />
+                <span style={{ fontSize: touch ? 15 : 13, color: C.ink, fontWeight: 700, letterSpacing: '-0.01em', lineHeight: 1.2 }}>{g.dim}</span>
+                {nOn > 0 && (
+                  <span style={{ fontSize: 11, color: C.brand, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{nOn}</span>
+                )}
+              </button>
               {nOn > 0 && (
-                <span style={{ fontSize: 11, color: C.brand, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{nOn}</span>
+                <button
+                  type="button"
+                  onClick={() => g.chips.forEach((c) => { if (facets.has(c.label)) onToggle(c.label); })}
+                  style={{ flexShrink: 0, border: 'none', background: 'none', color: C.accent, fontSize: touch ? 12.5 : 11, fontWeight: 700, cursor: 'pointer', padding: '0 0 0 8px', WebkitTapHighlightColor: 'transparent' }}
+                >해제</button>
               )}
-            </button>
+            </div>
             {!folded && (
               <ToggleChips
                 selected={facets}
@@ -130,6 +140,7 @@ export function FacetRail({ lensKey, groups: groupsProp, facets, onToggle, onRes
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '12px 14px 10px', flexShrink: 0 }}>
         <SlidersHorizontal size={13} color={C.mute} />
         <span style={{ fontSize: 12.5, fontWeight: 800, color: C.ink }}>필터</span>
+        {facets.size > 0 && <span style={{ fontSize: 11, fontWeight: 800, color: C.inverse, background: C.brand, borderRadius: 999, minWidth: 16, height: 16, padding: '0 5px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontVariantNumeric: 'tabular-nums' }}>{facets.size}</span>}
         <span style={{ flex: 1 }} />
         {facets.size > 0 && <button onClick={onReset} style={{ border: 'none', background: 'none', color: C.accent, fontSize: 11, fontWeight: 700, cursor: 'pointer', padding: 0 }}>초기화</button>}
       </div>
