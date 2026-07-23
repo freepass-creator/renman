@@ -18,7 +18,7 @@ import { classifyContract, type ContractPhase, type ContractDebt } from '@/lib/d
 import { aggregateCustomers, customerKey, type CustomerAgg } from '@/lib/customers';
 import { dueMatcher, selectedInDim } from '@/lib/lens-filters';
 import { textMatch } from '@/lib/search-match';
-import { FacetPage, Sec, Cards, Metric, DataTable, ExcelSheet, IconSeg, Badge, StatusTag, Btn, Drawer, Section, DetailGrid, EmptyState, Input, TextLink, won, th, thR, td, tdR, C, type Col, PageLoading, useConfirm } from '@/components/ui';
+import { FacetPage, Sec, Cards, Metric, DataTable, ExcelSheet, IconSeg, Badge, StatusTag, Btn, DetailShell, Section, DetailGrid, EmptyState, Input, TextLink, won, th, thR, td, tdR, C, type Col, PageLoading, useConfirm } from '@/components/ui';
 import { LayoutGrid, Table } from 'lucide-react';
 import { CONTRACT_COLS } from '@/lib/sheet-cols';
 import { contractViewToRow } from '@/lib/sheet-rows';
@@ -283,10 +283,12 @@ export default function ContractWorkspace() {
         })}
 
       {open && (
-        <Drawer title={`${open.rec.contractNo || '계약'} · ${open.rec.contractorName || ''}`} meta={<StatusTag value={open.status} />} onClose={() => { setOpenKey(null); setAct(null); }}
-          onPrev={openIdx > 0 ? () => { setOpenKey(String(allFiltered[openIdx - 1].rec._key)); setAct(null); } : undefined}
-          onNext={openIdx >= 0 && openIdx < allFiltered.length - 1 ? () => { setOpenKey(String(allFiltered[openIdx + 1].rec._key)); setAct(null); } : undefined}
-          footer={<>
+        <DetailShell
+          fixed
+          title={`${open.rec.contractNo || '계약'} · ${open.rec.contractorName || ''}`}
+          meta={<StatusTag value={open.status} />}
+          onBack={() => { setOpenKey(null); setAct(null); }}
+          actions={<>
             {!open.delivered && <Btn variant="solid" onClick={() => startAct('deliver', open)} disabled={busy}>인도 처리</Btn>}
             {open.status === '운행' && <>
               <Btn variant="ghost" onClick={() => startAct('extend', open)} disabled={busy}>연장</Btn>
@@ -295,11 +297,17 @@ export default function ContractWorkspace() {
             </>}
             <Btn variant="ghost" onClick={() => openEntityEdit('contract', open.rec)}>정보 수정</Btn>
             <Btn variant="danger" onClick={() => delContract(open)} disabled={busy}>삭제</Btn>
-            <span style={{ flex: 1 }} />
-            <Btn variant="ghost" onClick={() => openCar(String(open.rec.plate || ''))}>차량 360 →</Btn>
-            <Btn variant="ghost" onClick={() => openCustomer(customerKey(open.rec.contractorName, open.rec.contractorPhone))}>손님 360 →</Btn>
+            <Btn variant="ghost" onClick={() => openCar(String(open.rec.plate || ''))}>차량 360</Btn>
+            <Btn variant="ghost" onClick={() => openCustomer(customerKey(open.rec.contractorName, open.rec.contractorPhone))}>손님 360</Btn>
             {open.net > 0 && <Btn variant="solid" onClick={() => startAct('pay', open)}>입금 기록</Btn>}
-          </>}>
+          </>}
+        >
+          {openIdx > 0 || (openIdx >= 0 && openIdx < allFiltered.length - 1) ? (
+            <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+              <Btn variant="ghost" size="sm" disabled={openIdx <= 0} onClick={() => { setOpenKey(String(allFiltered[openIdx - 1].rec._key)); setAct(null); }}>‹ 이전</Btn>
+              <Btn variant="ghost" size="sm" disabled={!(openIdx >= 0 && openIdx < allFiltered.length - 1)} onClick={() => { setOpenKey(String(allFiltered[openIdx + 1].rec._key)); setAct(null); }}>다음 ›</Btn>
+            </div>
+          ) : null}
           {act && (() => {
             const m = actMeta[act.kind];
             return (
@@ -347,7 +355,7 @@ export default function ContractWorkspace() {
               </div>
             ) : <div style={{ padding: 12, fontSize: 13, color: C.faint }}>월대여료·기간 입력 시 회차 생성</div>}
           </Section>
-        </Drawer>
+        </DetailShell>
       )}
     </FacetPage>
   );

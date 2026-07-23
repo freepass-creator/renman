@@ -1,7 +1,7 @@
 'use client';
 import { useMemo } from 'react';
 import { useSession } from '@/lib/session';
-import { FacetPage, Sec, Cards, Metric, won, C, PageLoading } from '@/components/ui';
+import { Page, Sec, Cards, Metric, won, C, PageLoading } from '@/components/ui';
 import { WorkbenchBar } from '@/components/WorkbenchBar';
 import { useCashHubNav } from '@/components/CashHubTabs';
 import { companyLabel } from '@/lib/companies';
@@ -67,7 +67,7 @@ export default function FinancialsPage() {
   }, [vs, cs, bank]);
 
   return (
-    <FacetPage title="재무상태표" meta={`${scopeAll ? '전체 회사' : companyLabel(companyId)} · ${TODAY} 기준 · 계산값`} tools={<WorkbenchBar {...cashNav} />}>
+    <Page title="재무상태표" meta={`${scopeAll ? '전체 회사' : companyLabel(companyId)} · ${TODAY} 기준 · 계산값`} tools={<WorkbenchBar {...cashNav} />}>
       {loading ? <PageLoading /> : <>
         <Sec id="f-summary" title="요약" desc="자산 = 부채 + 자본 (오늘 기준 · 계산값)">
           <Cards min={140} fit>
@@ -92,6 +92,6 @@ export default function FinancialsPage() {
           <div style={{ marginTop: 10, fontSize: 12, color: C.faint, lineHeight: 1.7 }}>※ {F.cashIsReal ? '현금은 계좌 최신 잔액(실제).' : '현금은 기초잔액 없이 자금원장 순증감이라 참고치.'} 감가(5년 정액·잔존10%)·할부잔여는 계산값 — 실사·상환스케줄표 OCR 시 실데이터로 교체됩니다.</div>
         </Sec>
       </>}
-    </FacetPage>
+    </Page>
   );
 }

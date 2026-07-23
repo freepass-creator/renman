@@ -22,8 +22,7 @@ import { safeUpdate } from '@/lib/safe-update';
 import { useBusyAction } from '@/lib/use-busy-action';
 import { resolveWriteCompany, NEED_COMPANY } from '@/lib/scope';
 import { commitUpdate, commitAll } from '@/lib/commit';
-import { visibleSecs } from '@/lib/lens-filters';
-import { FacetPage, Sec, Cards, Metric, Badge, Btn, EmptyState, Modal, ListBox, ListRow, Input, TextLink, C, won, SPACE_M, TOUCH, type BadgeTone, PageLoading } from '@/components/ui';
+import { FacetPage, Sec, Cards, Metric, Badge, Btn, EmptyState, ListBox, ListRow, Input, TextLink, C, won, SPACE_M, TOUCH, type BadgeTone, PageLoading } from '@/components/ui';
 import { FacetRail } from '@/components/FacetRail';
 import { WorkbenchBar } from '@/components/WorkbenchBar';
 import { WorkHubBack } from '@/components/WorkHubTabs';
@@ -33,6 +32,7 @@ import { useEntityLists } from '@/lib/use-entity-lists';
 
 const CONF_TONE: Record<string, BadgeTone> = { high: 'green', medium: 'amber', low: 'gray' };
 const EMPTY = new Set<string>();
+const FACET_SEC: Record<string, string> = { CMS: 'pay-cms', 매칭제안: 'pay-match', 매칭됨: 'pay-matched', 미매칭: 'pay-pending' };
 
 function toBankTx(rec: EntityRecord): BankTransaction {
   const method = String(rec.method || '계좌');
@@ -75,8 +75,12 @@ export default function PaymentsPage() {
     return n;
   });
   const resetFacets = () => setFacets(new Set());
-  const vis = visibleSecs('자금일보', facets);
-  const show = (id: string) => !vis || vis.has(id);
+  // 데이터 좁히기: 칩=구간 라벨. 미선택=전체. 현황은 항상.
+  const show = (id: string) => {
+    if (id === 'pay-status') return true;
+    if (!facets.size) return true;
+    return [...facets].some((f) => FACET_SEC[f] === id);
+  };
 
   const allBank = useMemo(() => txs.map(toBankTx), [txs]);
   const deposits = useMemo(() => allBank.filter((t) => t.amount > 0 && !(t.withdraw && t.withdraw > 0) && t.settlementRole !== 'deposit'), [allBank]);
@@ -352,23 +356,49 @@ export default function PaymentsPage() {
       )}
 
       {show('pay-pending') && (
-      <Sec id="pay-pending" title="미매칭 입금" n={pending.length} desc="자동매칭 안 된 입금 — 수동 검토(차량360 수납 또는 재실행)" hideable={false}>
+      <Sec id="pay-pending" title="미매칭 입금" n={pending.length} desc="자동매칭 안 된 입금 — 인라인 수동 연결" hideable={false}>
         {pending.length === 0 ? <EmptyState>미매칭 입금 없음</EmptyState>
           : (
             <>
               <ListBox>
                 {pending.slice(0, 60).map((t) => {
                   const suggested = results?.some((r) => r.tx.id === t.id);
+                  const open = manualTx?.id === t.id;
                   return (
-                    <ListRow
-                      key={t.id}
-                      main={`${t.txDate} · ${t.counterparty || '(적요 없음)'}`}
-                      sub={suggested ? '제안됨↑' : undefined}
-                      right={<span style={{ display: 'inline-flex', alignItems: 'center', gap: SPACE_M, opacity: suggested ? 0.55 : 1 }}>
-                        <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 700 }}>{won(t.amount)}</span>
-                        <Btn size="sm" variant="ghost" onClick={() => { setManualTx(t); setMq(''); }}>연결</Btn>
-                      </span>}
-                    />
+                    <div key={t.id}>
+                      <ListRow
+                        main={`${t.txDate} · ${t.counterparty || '(적요 없음)'}`}
+                        sub={suggested ? '제안됨↑' : open ? '연결 중…' : undefined}
+                        right={<span style={{ display: 'inline-flex', alignItems: 'center', gap: SPACE_M, opacity: suggested ? 0.55 : 1 }}>
+                          <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 700 }}>{won(t.amount)}</span>
+                          <Btn size="sm" variant={open ? 'solid' : 'ghost'} onClick={() => { if (open) { setManualTx(null); setMq(''); } else { setManualTx(t); setMq(''); } }}>{open ? '닫기' : '연결'}</Btn>
+                        </span>}
+                      />
+                      {open && (
+                        <div style={{ padding: '8px 12px 12px 28px', borderBottom: `1px solid ${C.line}` }}>
+                          <Input autoFocus value={mq} onChange={(e) => setMq(e.target.value)} placeholder="계약자·차번·연락처 검색" style={{ width: '100%', maxWidth: 360 }} />
+                          <div style={{ marginTop: SPACE_M, maxHeight: 220, overflowY: 'auto' }}>
+                            {mCands.length === 0 ? <div style={{ fontSize: 12, color: C.faint, padding: '8px 4px' }}>{mq.trim() ? '일치 계약 없음' : '검색어를 입력하세요'}</div>
+                              : (
+                                <ListBox>
+                                  {mCands.map((c) => {
+                                    const v = computeContractView(c, TODAY);
+                                    return (
+                                      <ListRow
+                                        key={String(c._key)}
+                                        main={String(c.contractorName || '—')}
+                                        sub={String(c.plate || '')}
+                                        right={v.net > 0 ? <span style={{ fontSize: 11.5, color: C.danger, fontWeight: 700 }}>미수 {won(v.net)}</span> : <span style={{ fontSize: 11, color: C.faint }}>미수없음</span>}
+                                        onClick={() => manualMatch(manualTx, c)}
+                                      />
+                                    );
+                                  })}
+                                </ListBox>
+                              )}
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   );
                 })}
               </ListBox>
@@ -376,38 +406,6 @@ export default function PaymentsPage() {
             </>
           )}
       </Sec>
-      )}
-
-      {manualTx && (
-        <Modal
-          title="입금 수동 연결"
-          meta={`${manualTx.txDate} · ${manualTx.counterparty || '(적요없음)'} · ${won(manualTx.amount)} → 계약 선택`}
-          onClose={() => { setManualTx(null); setMq(''); }}
-          width={440}
-          footer={<Btn size="sm" variant="ghost" onClick={() => { setManualTx(null); setMq(''); }}>닫기</Btn>}
-        >
-          <Input autoFocus value={mq} onChange={(e) => setMq(e.target.value)} placeholder="계약자·차번·연락처 검색"
-            style={{ width: '100%' }} />
-          <div style={{ marginTop: SPACE_M, maxHeight: 300, overflowY: 'auto' }}>
-            {mCands.length === 0 ? <div style={{ fontSize: 12, color: C.faint, padding: '12px 4px' }}>{mq.trim() ? '일치 계약 없음' : '검색어를 입력하세요'}</div>
-              : (
-                <ListBox>
-                  {mCands.map((c) => {
-                    const v = computeContractView(c, TODAY);
-                    return (
-                      <ListRow
-                        key={String(c._key)}
-                        main={String(c.contractorName || '—')}
-                        sub={String(c.plate || '')}
-                        right={v.net > 0 ? <span style={{ fontSize: 11.5, color: C.danger, fontWeight: 700 }}>미수 {won(v.net)}</span> : <span style={{ fontSize: 11, color: C.faint }}>미수없음</span>}
-                        onClick={() => manualMatch(manualTx, c)}
-                      />
-                    );
-                  })}
-                </ListBox>
-              )}
-          </div>
-        </Modal>
       )}
         </>
       )}

@@ -7,7 +7,7 @@ import { matchPenalty } from '@/lib/penalty-match';
 import { dueMatcher, selectedInDim } from '@/lib/lens-filters';
 import { textMatch } from '@/lib/search-match';
 import { dday } from '@/lib/dashboard-consts';
-import { Sec, Cards, Metric, DataTable, EmptyState, Btn, FacetPage, TextLink, won, C, type Col, PageLoading, useConfirm } from '@/components/ui';
+import { Sec, Cards, Metric, EmptyState, Btn, FacetPage, ObjCard, won, C, SPACE_M, PageLoading, useConfirm } from '@/components/ui';
 import { FacetRail } from '@/components/FacetRail';
 import { WorkbenchBar } from '@/components/WorkbenchBar';
 import { WorkHubBack } from '@/components/WorkHubTabs';
@@ -21,8 +21,10 @@ import { useEntityLists } from '@/lib/use-entity-lists';
 import { commitRemove } from '@/lib/commit';
 import { NEED_COMPANY } from '@/lib/scope';
 import { toast } from '@/lib/toast';
+import { useSecOrder } from '@/lib/use-sec-order';
 
 type Row = { p: EntityRecord; renter: string | null; contractNo: string | null };
+const PEN_SECS = ['penalty-status', 'penalty-unmatched', 'penalty-progress', 'penalty-done'] as const;
 
 export default function PenaltyProcess() {
   const { companyId, scopeAll } = useSession();
@@ -40,6 +42,7 @@ export default function PenaltyProcess() {
   const [q, setQ] = useState('');
   const [upload, setUpload] = useState(false);
   const [docs, setDocs] = useState(false);
+  const [order, reorder] = useSecOrder('jpk:order:penalty', [...PEN_SECS]);
   const toggleFacet = (label: string) => setFacets((s) => { const n = new Set(s); n.has(label) ? n.delete(label) : n.add(label); return n; });
   const resetFacets = () => setFacets(new Set());
   const setF = (labels: string[]) => setFacets(new Set(labels));
@@ -82,24 +85,6 @@ export default function PenaltyProcess() {
     return c;
   })();
 
-  const cols: Col<Row>[] = [
-    ...(scopeAll ? [{ key: '_co', label: '회사', render: (r: Row) => <span style={{ color: C.mute }}>{companyLabel(r.p.companyId)}</span> }] : []),
-    { key: 'plate', label: '차량', render: (r) => (
-      <TextLink stop tone="ink" disabled={!r.p.plate} onClick={() => { if (r.p.plate) openCar(r.p.plate, 'inspect'); }}>
-        {String(r.p.plate || '—')}
-      </TextLink>
-    ) },
-    { key: 'desc', label: '위반내용', render: (r) => String(r.p.description || r.p.docType || '—') },
-    { key: 'date', label: '위반일시', render: (r) => String(r.p.violationDate || '—') },
-    { key: 'amount', label: '금액', align: 'r', render: (r) => won(r.p.amount) },
-    { key: 'renter', label: '책임자(매칭)', render: (r) => r.renter
-        ? <TextLink stop tone="ok" onClick={() => openCustomer(customerKey(r.renter, ''))} style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-            <Check size={14} /> {r.renter} <span style={{ fontSize: 11, color: C.faint }}>({r.contractNo})</span>
-          </TextLink>
-        : <span style={{ color: C.warn }}>미매칭 · 회사 부담</span> },
-    { key: '_del', label: '', align: 'r', render: (r) => <Btn size="sm" variant="ghost" onClick={() => del(r)}><Trash2 size={14} /></Btn> },
-  ];
-
   const unmatched = shown.filter((r) => !r.renter);
   const done = shown.filter((r) => ['변경부과완료', '종결'].includes(String(r.p.reassignStatus || '')));
   const progress = shown.filter((r) => r.renter && !['변경부과완료', '종결'].includes(String(r.p.reassignStatus || '')));
@@ -107,6 +92,33 @@ export default function PenaltyProcess() {
     if (r.p.plate) openCar(r.p.plate, 'inspect');
     else router.push(`/list/penalty/${encodeURIComponent(String(r.p._key || ''))}`);
   };
+  const renderQueue = (list: Row[]) => (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: SPACE_M }}>
+      {list.map((r) => (
+        <div key={String(r.p._key)} style={{ display: 'flex', flexDirection: 'column', gap: SPACE_M }}>
+          <ObjCard
+            badge={String(r.p.reassignStatus || '접수')}
+            badgeTone={r.renter ? 'green' : 'amber'}
+            co={scopeAll ? String(r.p.companyId || '') : undefined}
+            plate={String(r.p.plate || '')}
+            name={r.renter || '미매칭 · 회사 부담'}
+            carType={String(r.p.description || r.p.docType || '')}
+            fields={[
+              ['위반일', String(r.p.violationDate || '—')],
+              ['납기', String(r.p.dueDate || '—')],
+              ...(r.contractNo ? [['계약', r.contractNo] as [string, string]] : []),
+            ]}
+            right={<span style={{ color: C.warn }}>{won(r.p.amount)}</span>}
+            onClick={() => openRow(r)}
+          />
+          <div style={{ display: 'flex', gap: SPACE_M, flexWrap: 'wrap' }}>
+            {r.renter ? <Btn size="sm" variant="ghost" onClick={() => openCustomer(customerKey(r.renter, ''))}><Check size={14} /> 손님</Btn> : null}
+            <Btn size="sm" variant="ghost" onClick={() => del(r)}><Trash2 size={14} /> 삭제</Btn>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
 
   return (
     <FacetPage
@@ -125,35 +137,47 @@ export default function PenaltyProcess() {
       }
       rail={!loading ? <FacetRail lensKey="과태료" facets={facets} onToggle={toggleFacet} onReset={resetFacets} counts={counts} /> : null}
     >
-      <Sec title="현황" desc="고지서 → 임차인 매칭 → 변경부과">
-        <Cards min={128} fit>
-          <Metric label="과태료 건수" value={loading ? '…' : rows.length} onClick={resetFacets} />
-          <Metric label="매칭" value={loading ? '…' : matched} tone="ok" onClick={() => setF(['매칭'])} />
-          <Metric label="미매칭" value={loading ? '…' : rows.length - matched} tone={rows.length - matched > 0 ? 'danger' : 'ink'} onClick={() => setF(['미매칭'])} />
-          <Metric label="총 금액" value={loading ? '…' : won(total)} tone="warn" />
-        </Cards>
-      </Sec>
-      {loading ? <PageLoading />
-        : rows.length === 0 ? (
-          <Sec title="과태료" desc="고지서 등록으로 시작">
-            <EmptyState>아직 과태료가 없습니다 — 위 <b>고지서 등록 (OCR)</b>로 고지서를 올리면 시작됩니다</EmptyState>
+      {loading ? <PageLoading /> : order.map((id) => {
+        if (id === 'penalty-status') {
+          return (
+            <Sec key={id} id={id} title="현황" desc="고지서 → 임차인 매칭 → 변경부과" onReorder={reorder}>
+              <Cards min={128} fit>
+                <Metric label="과태료 건수" value={rows.length} onClick={resetFacets} />
+                <Metric label="매칭" value={matched} tone="ok" onClick={() => setF(['매칭'])} />
+                <Metric label="미매칭" value={rows.length - matched} tone={rows.length - matched > 0 ? 'danger' : 'ink'} onClick={() => setF(['미매칭'])} />
+                <Metric label="총 금액" value={won(total)} tone="warn" />
+              </Cards>
+            </Sec>
+          );
+        }
+        if (rows.length === 0) {
+          if (id !== 'penalty-unmatched') return null;
+          return (
+            <Sec key={id} id={id} title="과태료" desc="고지서 등록으로 시작" onReorder={reorder}>
+              <EmptyState>아직 과태료가 없습니다 — 위 <b>고지서 등록 (OCR)</b>로 고지서를 올리면 시작됩니다</EmptyState>
+            </Sec>
+          );
+        }
+        if (id === 'penalty-unmatched') {
+          return (
+            <Sec key={id} id={id} title="미매칭" n={unmatched.length} desc="실운전자 미확인 · 회사 부담 위험" onReorder={reorder}>
+              {unmatched.length === 0 ? <EmptyState variant="ok">미매칭 없음</EmptyState> : renderQueue(unmatched)}
+            </Sec>
+          );
+        }
+        if (id === 'penalty-progress') {
+          return (
+            <Sec key={id} id={id} title="변경부과 진행" n={progress.length} desc="매칭됨 · 미종결" onReorder={reorder}>
+              {progress.length === 0 ? <EmptyState variant="sec">진행 건 없음</EmptyState> : renderQueue(progress)}
+            </Sec>
+          );
+        }
+        return (
+          <Sec key={id} id={id} title="종결" n={done.length} desc="변경부과완료·종결" onReorder={reorder}>
+            {done.length === 0 ? <EmptyState variant="sec">종결 건 없음</EmptyState> : renderQueue(done)}
           </Sec>
-        ) : (
-          <>
-            <Sec id="penalty-unmatched" title="미매칭" n={unmatched.length} desc="실운전자 미확인 · 회사 부담 위험">
-              {unmatched.length === 0 ? <EmptyState variant="ok">미매칭 없음</EmptyState>
-                : <DataTable cols={cols} rows={unmatched} onRow={openRow} />}
-            </Sec>
-            <Sec id="penalty-progress" title="변경부과 진행" n={progress.length} desc="매칭됨 · 미종결">
-              {progress.length === 0 ? <EmptyState variant="sec">진행 건 없음</EmptyState>
-                : <DataTable cols={cols} rows={progress} onRow={openRow} />}
-            </Sec>
-            <Sec id="penalty-done" title="종결" n={done.length} desc="변경부과완료·종결">
-              {done.length === 0 ? <EmptyState variant="sec">종결 건 없음</EmptyState>
-                : <DataTable cols={cols} rows={done} onRow={openRow} />}
-            </Sec>
-          </>
-        )}
+        );
+      })}
       {upload && <PenaltyUpload onClose={() => setUpload(false)} onSaved={() => reload()} />}
       {docs && <PenaltyDocs penalties={rows.filter((r) => r.renter).map((r) => r.p)} companyId={companyId} onClose={() => setDocs(false)} onSubmitted={() => reload()} />}
     </FacetPage>

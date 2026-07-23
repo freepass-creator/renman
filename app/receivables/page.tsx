@@ -24,6 +24,9 @@ import { selectReceivables } from '@/lib/snapshot/selectors';
 import { useEntityLists } from '@/lib/use-entity-lists';
 import { commitUpdate } from '@/lib/commit';
 import { resolveWriteCompany, NEED_COMPANY } from '@/lib/scope';
+import { useSecOrder } from '@/lib/use-sec-order';
+
+const RECV_SECS = ['recv-status', 'recv-list'] as const;
 
 // 미수 워크벤치 = 회수 파트의 "딱 여기만" 메인. 미수율이 핵심축. 자금(수납)과 연동돼 자동 갱신.
 // 담당자가 어떻게 관리했는지(내용증명 발송·시동제어 여부·최근 연락)가 보이고, 그 자리에서 조치.
@@ -40,6 +43,7 @@ export default function ReceivablesPage() {
   const [noticeSel, setNoticeSel] = useState<Set<string>>(new Set());
   const [, runBusy] = useBusyAction();
   const confirm = useConfirm();
+  const [order, reorder] = useSecOrder('jpk:order:receivables', [...RECV_SECS]);
   const toggleFacet = (label: string) => setFacets((s) => { const n = new Set(s); n.has(label) ? n.delete(label) : n.add(label); return n; });
   const resetFacets = () => setFacets(new Set());
 
@@ -171,66 +175,73 @@ export default function ReceivablesPage() {
       tools={<WorkbenchBar mid={<WorkHubBack />} search={{ value: q, onChange: setQ, placeholder: '손님·차량·계약' }} stat={<span style={{ fontSize: 13, fontWeight: 800, color: D.totalUnpaid > 0 ? C.danger : C.ok, whiteSpace: 'nowrap' }}>미수 {won(D.totalUnpaid)}</span>} />}
       rail={!loading ? <FacetRail lensKey="미수" facets={facets} onToggle={toggleFacet} onReset={resetFacets} counts={counts} /> : null}
     >
-      <Sec title="현황" desc="미수율 · 연체 분포 · 회수 조치 대상">
-        <Cards min={128} fit>
-          <Metric label="현재 미수" value={won(D.misuActive)} hint="운행중 · 정상 회수" tone={D.misuActive ? 'danger' : 'ink'} />
-          <Metric label="계약종료 미수" value={won(D.misuReturned)} hint="반납·해지 추심" tone={D.misuReturned ? 'warn' : 'ink'} />
-          <Metric label="미수 계약" value={`${D.misuActiveCount}건`} tone={D.misuActiveCount ? 'warn' : 'ink'} />
-          <Metric label="미수율(계약)" value={`${D.rate}%`} tone={D.rate >= 20 ? 'danger' : D.rate >= 10 ? 'warn' : 'ok'} />
-          <Metric label="30일+ 연체" value={`${D.over30}건`} tone={D.over30 ? 'warn' : 'ink'} />
-          <Metric label="90일+ 연체" value={`${D.over90}건`} tone={D.over90 ? 'danger' : 'ink'} />
-          <Metric label="내용증명 대상" value={`${D.noticeTodo}건`} tone={D.noticeTodo ? 'danger' : 'ink'} />
-          <Metric label="시동제어 필요" value={`${D.lockTodo}대`} tone={D.lockTodo ? 'danger' : 'ink'} hint="미납 심화·미제어" />
-          <Metric label="시동제어 중" value={`${D.immob}대`} tone={D.immob ? 'warn' : 'ink'} />
-        </Cards>
-      </Sec>
-
-      <Sec title="미수 목록" n={filtered.length} desc="금액 큰 순 · 체크 후 내용증명 일괄 · 자리에서 단건·시동제어·연락"
-        right={<span style={{ display: 'inline-flex', gap: SPACE_M, flexWrap: 'wrap' }}>
-          <Btn variant="ghost" onClick={() => setNoticeSel(new Set(noticeTodoFiltered.map((r) => String(r.rec._key || ''))))} disabled={noticeTodoFiltered.length === 0}>대상 선택 ({noticeTodoFiltered.length})</Btn>
-          <Btn variant="danger" onClick={() => sendNoticeBulk(noticeTargets.map((r) => r.rec))} disabled={noticeTargets.length === 0}>내용증명 일괄{noticeTargets.length ? ` (${noticeTargets.length})` : ''}</Btn>
-          <Btn onClick={() => setNotify(true)} disabled={smsCount === 0}>문자 발송{smsCount ? ` (${smsCount})` : ''}</Btn>
-        </span>}>
-        {loading ? <PageLoading /> : filtered.length === 0 ? <EmptyState variant="sec">해당 미수 없음</EmptyState> :
-          <div style={{ display: 'flex', flexDirection: 'column', gap: SPACE_M }}>
-            {filtered.map((r, i) => { const rec = r.rec; const immob = !!rec.engineDisabled; const needLock = !r.v.ended && !immob && (r.st.stage === '시동제어' || r.st.stage === '내용증명' || r.st.stage === '채권화'); const rowId = String(rec._key ?? `row-${i}`); const logOn = logKey === rowId; const checked = noticeSel.has(rowId); return (
-              <div key={i} style={{ display: 'flex', flexDirection: 'column', gap: SPACE_M }}>
-                <div style={{ display: 'flex', gap: SPACE_M, alignItems: 'flex-start' }}>
-                  <label style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: TOUCH, height: TOUCH, flexShrink: 0, marginTop: 4, cursor: 'pointer' }}>
-                    <input type="checkbox" checked={checked} onChange={() => toggleNoticeSel(rowId)}
-                      style={{ width: 16, height: 16, cursor: 'pointer' }}
-                      aria-label="내용증명 일괄 선택" />
-                  </label>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                <ObjCard
-                  badge={r.st.stage}
-                  badgeTone={STONE[r.st.stage] || 'gray'}
-                  co={scopeAll ? String(rec.companyId || '') : undefined}
-                  name={String(rec.contractorName || '—')}
-                  carType={String(rec.plate || '')}
-                  fields={[
-                    ['내용증명', rec.noticeSentDate ? `✓ ${String(rec.noticeSentDate)}` : '미발송'],
-                    ['시동제어', immob ? `적용중 (${String(rec.engineDisabledAt || '').slice(0, 10)})` : needLock ? '전환 필요' : '—'],
-                    ['최근 연락', r.contact ? `${String(r.contact.category)} · ${String(r.contact.date)}` : '없음'],
-                    ...(r.st.nextAction ? [['다음', r.st.nextAction] as [string, string]] : []),
-                  ]}
-                  right={<span style={{ color: C.danger }}>{won(r.v.net)} · {r.v.overdueDays}일</span>}
-                  onClick={() => openCar(String(rec.plate || ''), 'unpaid')}
-                />
+      {order.map((id) => {
+        if (id === 'recv-status') {
+          return (
+            <Sec key={id} id={id} title="현황" desc="미수율 · 연체 분포 · 회수 조치 대상" onReorder={reorder}>
+              <Cards min={128} fit>
+                <Metric label="현재 미수" value={won(D.misuActive)} hint="운행중 · 정상 회수" tone={D.misuActive ? 'danger' : 'ink'} />
+                <Metric label="계약종료 미수" value={won(D.misuReturned)} hint="반납·해지 추심" tone={D.misuReturned ? 'warn' : 'ink'} />
+                <Metric label="미수 계약" value={`${D.misuActiveCount}건`} tone={D.misuActiveCount ? 'warn' : 'ink'} />
+                <Metric label="미수율(계약)" value={`${D.rate}%`} tone={D.rate >= 20 ? 'danger' : D.rate >= 10 ? 'warn' : 'ok'} />
+                <Metric label="30일+ 연체" value={`${D.over30}건`} tone={D.over30 ? 'warn' : 'ink'} />
+                <Metric label="90일+ 연체" value={`${D.over90}건`} tone={D.over90 ? 'danger' : 'ink'} />
+                <Metric label="내용증명 대상" value={`${D.noticeTodo}건`} tone={D.noticeTodo ? 'danger' : 'ink'} />
+                <Metric label="시동제어 필요" value={`${D.lockTodo}대`} tone={D.lockTodo ? 'danger' : 'ink'} hint="미납 심화·미제어" />
+                <Metric label="시동제어 중" value={`${D.immob}대`} tone={D.immob ? 'warn' : 'ink'} />
+              </Cards>
+            </Sec>
+          );
+        }
+        return (
+          <Sec key={id} id={id} title="미수 목록" n={filtered.length} desc="금액 큰 순 · 체크 후 내용증명 일괄 · 자리에서 단건·시동제어·연락" onReorder={reorder}
+            right={<span style={{ display: 'inline-flex', gap: SPACE_M, flexWrap: 'wrap' }}>
+              <Btn variant="ghost" onClick={() => setNoticeSel(new Set(noticeTodoFiltered.map((r) => String(r.rec._key || ''))))} disabled={noticeTodoFiltered.length === 0}>대상 선택 ({noticeTodoFiltered.length})</Btn>
+              <Btn variant="danger" onClick={() => sendNoticeBulk(noticeTargets.map((r) => r.rec))} disabled={noticeTargets.length === 0}>내용증명 일괄{noticeTargets.length ? ` (${noticeTargets.length})` : ''}</Btn>
+              <Btn onClick={() => setNotify(true)} disabled={smsCount === 0}>문자 발송{smsCount ? ` (${smsCount})` : ''}</Btn>
+            </span>}>
+            {loading ? <PageLoading /> : filtered.length === 0 ? <EmptyState variant="sec">해당 미수 없음</EmptyState> :
+              <div style={{ display: 'flex', flexDirection: 'column', gap: SPACE_M }}>
+                {filtered.map((r, i) => { const rec = r.rec; const immob = !!rec.engineDisabled; const needLock = !r.v.ended && !immob && (r.st.stage === '시동제어' || r.st.stage === '내용증명' || r.st.stage === '채권화'); const rowId = String(rec._key ?? `row-${i}`); const logOn = logKey === rowId; const checked = noticeSel.has(rowId); return (
+                  <div key={i} style={{ display: 'flex', flexDirection: 'column', gap: SPACE_M }}>
+                    <div style={{ display: 'flex', gap: SPACE_M, alignItems: 'flex-start' }}>
+                      <label style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: TOUCH, height: TOUCH, flexShrink: 0, marginTop: 4, cursor: 'pointer' }}>
+                        <input type="checkbox" checked={checked} onChange={() => toggleNoticeSel(rowId)}
+                          style={{ width: 16, height: 16, cursor: 'pointer' }}
+                          aria-label="내용증명 일괄 선택" />
+                      </label>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                    <ObjCard
+                      badge={r.st.stage}
+                      badgeTone={STONE[r.st.stage] || 'gray'}
+                      co={scopeAll ? String(rec.companyId || '') : undefined}
+                      name={String(rec.contractorName || '—')}
+                      carType={String(rec.plate || '')}
+                      fields={[
+                        ['내용증명', rec.noticeSentDate ? `✓ ${String(rec.noticeSentDate)}` : '미발송'],
+                        ['시동제어', immob ? `적용중 (${String(rec.engineDisabledAt || '').slice(0, 10)})` : needLock ? '전환 필요' : '—'],
+                        ['최근 연락', r.contact ? `${String(r.contact.category)} · ${String(r.contact.date)}` : '없음'],
+                        ...(r.st.nextAction ? [['다음', r.st.nextAction] as [string, string]] : []),
+                      ]}
+                      right={<span style={{ color: C.danger }}>{won(r.v.net)} · {r.v.overdueDays}일</span>}
+                      onClick={() => openCar(String(rec.plate || ''), 'unpaid')}
+                    />
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', gap: SPACE_M, flexWrap: 'wrap', paddingLeft: 28 }}>
+                      <Btn variant="danger" onClick={() => sendNotice(rec)}>내용증명 발송</Btn>
+                      <Btn variant={logOn ? 'solid' : 'ghost'} onClick={() => setLogKey((k) => k === rowId ? null : rowId)}>{logOn ? '닫기' : '문자·연락 기록'}</Btn>
+                      <Btn variant={needLock ? 'danger' : 'ghost'} onClick={() => toggleEngine(r)}>{immob ? '시동제어 해제' : needLock ? '시동제어 전환' : '시동제어'}</Btn>
+                      <Btn variant="ghost" onClick={() => openCustomer(customerKey(rec.contractorName, rec.contractorPhone))}>손님</Btn>
+                      <Btn variant="ghost" onClick={() => openCar(String(rec.plate || ''), 'unpaid')}>360 · 수납</Btn>
+                    </div>
+                    {logOn ? <div style={{ paddingLeft: 28 }}><QuickLogForm ctx={{ plate: String(rec.plate || ''), customer: String(rec.contractorName || ''), contractNo: String(rec.contractNo || ''), companyId: String(rec.companyId || '') }} onDone={() => setLogKey(null)} onCancel={() => setLogKey(null)} /></div> : null}
                   </div>
-                </div>
-                <div style={{ display: 'flex', gap: SPACE_M, flexWrap: 'wrap', paddingLeft: 28 }}>
-                  <Btn variant="danger" onClick={() => sendNotice(rec)}>내용증명 발송</Btn>
-                  <Btn variant={logOn ? 'solid' : 'ghost'} onClick={() => setLogKey((k) => k === rowId ? null : rowId)}>{logOn ? '닫기' : '문자·연락 기록'}</Btn>
-                  <Btn variant={needLock ? 'danger' : 'ghost'} onClick={() => toggleEngine(r)}>{immob ? '시동제어 해제' : needLock ? '시동제어 전환' : '시동제어'}</Btn>
-                  <Btn variant="ghost" onClick={() => openCustomer(customerKey(rec.contractorName, rec.contractorPhone))}>손님</Btn>
-                  <Btn variant="ghost" onClick={() => openCar(String(rec.plate || ''), 'unpaid')}>360 · 수납</Btn>
-                </div>
-                {logOn ? <div style={{ paddingLeft: 28 }}><QuickLogForm ctx={{ plate: String(rec.plate || ''), customer: String(rec.contractorName || ''), contractNo: String(rec.contractNo || ''), companyId: String(rec.companyId || '') }} onDone={() => setLogKey(null)} onCancel={() => setLogKey(null)} /></div> : null}
-              </div>
-            ); })}
-          </div>}
-      </Sec>
+                ); })}
+              </div>}
+          </Sec>
+        );
+      })}
       {notify && <NotifyDialog recipients={recipients} onClose={() => setNotify(false)} onSent={reload} />}
     </FacetPage>
   );

@@ -42,8 +42,10 @@ export default function InboxPage() {
   const camRef = useRef<HTMLInputElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  const pending = rows.filter((r) => String(r.status || '대기') === '대기');
-  const matched = rows.filter((r) => String(r.status) === '매칭');
+  const pending = rows.filter((r) => String(r.status || '대기') === '대기')
+    .sort((a, b) => String(b.createdAt || b.date || '').localeCompare(String(a.createdAt || a.date || '')));
+  const matched = rows.filter((r) => String(r.status) === '매칭')
+    .sort((a, b) => String(b.matchedAt || b.createdAt || '').localeCompare(String(a.matchedAt || a.createdAt || '')));
 
   async function upload(file: File, kind: string) {
     setBusy(true);

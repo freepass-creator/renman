@@ -87,20 +87,26 @@ export const LENS_FILTERS: Record<string, FacetGroup[]> = {
     ] },
     { dim: '기한', chips: DUE_CHIPS },
   ],
-  // 비즈니스 업무 — FacetRail 상시(Sec show/hide).
+  // 업무 — FacetRail = 데이터 좁히기(secs show/hide 금지 · UIUX-SPEC).
   차량수선: [
     { dim: '구분', chips: [
-      { label: '정비·사고', secs: ['s-repair'] },
-      { label: '기타상태', secs: ['a-other'] },
+      { label: '정비·사고' },
+      { label: '기타상태' },
     ] },
   ],
   자금일보: [
     { dim: '구간', chips: [
-      { label: '현황', secs: ['pay-status'] },
-      { label: 'CMS', secs: ['pay-cms'] },
-      { label: '매칭제안', secs: ['pay-match'] },
-      { label: '매칭됨', secs: ['pay-matched'] },
-      { label: '미매칭', secs: ['pay-pending'] },
+      { label: 'CMS' },
+      { label: '매칭제안' },
+      { label: '매칭됨' },
+      { label: '미매칭' },
+    ] },
+  ],
+  지난계약: [
+    { dim: '종료사유', chips: [
+      { label: '만료' },
+      { label: '중도해지' },
+      { label: '기타' },
     ] },
   ],
   정합성: [

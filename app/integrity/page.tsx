@@ -3,7 +3,7 @@ import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSession } from '@/lib/session';
 import { ENTITIES, type EntityRecord } from '@/lib/intake/entities';
-import { FacetPage, Sec, Cards, Metric, EmptyState, Badge, RISK_TONE, SevTag, DataTable, won, C, type Col, PageLoading } from '@/components/ui';
+import { FacetPage, Sec, Cards, Metric, EmptyState, Badge, RISK_TONE, SevTag, ExcelSheet, won, C, type SheetCol, PageLoading } from '@/components/ui';
 import { FacetRail } from '@/components/FacetRail';
 import { WorkbenchBar } from '@/components/WorkbenchBar';
 import { companyLabel } from '@/lib/companies';
@@ -105,11 +105,11 @@ export default function RiskPage() {
     return c;
   }, [items]);
 
-  const cols: Col<RiskItem>[] = [
-    ...(scopeAll ? [{ key: '_co', label: '회사', render: (it: RiskItem) => <span style={{ color: C.mute }}>{companyLabel(it.co)}</span> }] : []),
-    { key: 'sev', label: '위험도', render: (it) => <SevTag high={it.sev === 'high'} /> },
-    { key: 'target', label: '대상', render: (it) => it.target },
-    { key: 'risk', label: '리스크 내용', render: (it) => {
+  const cols: SheetCol<RiskItem>[] = [
+    ...(scopeAll ? [{ key: '_co', label: '회사', render: (it: RiskItem) => <span style={{ color: C.mute }}>{companyLabel(it.co)}</span>, text: (it: RiskItem) => companyLabel(it.co) }] : []),
+    { key: 'sev', label: '위험도', render: (it) => <SevTag high={it.sev === 'high'} />, text: (it) => (it.sev === 'high' ? '위험' : '주의') },
+    { key: 'target', label: '대상', render: (it) => it.target, text: (it) => it.target },
+    { key: 'risk', label: '리스크 내용', text: (it) => `${it.kind === '미수' ? '미납' : it.kind} ${it.detail}`, render: (it) => {
         const label = it.kind === '미수' ? '미납' : it.kind;
         const col = it.sev === 'high' ? C.danger : C.warn;
         const body = it.detail.replace(new RegExp('^' + it.kind + '\\s*'), '').replace(/^미수\s*/, '');
@@ -137,7 +137,7 @@ export default function RiskPage() {
         {loading ? <PageLoading />
           : items.length === 0 ? <EmptyState><span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: C.ok, fontWeight: 700 }}><CheckCircle2 size={15} /> 이상 없음 — 정합성 모두 일치</span></EmptyState>
           : shown.length === 0 ? <EmptyState>해당 리스크 없음</EmptyState>
-          : <DataTable cols={cols} rows={shown} onRow={(it) => router.push(it.href)} />}
+          : <ExcelSheet cols={cols} rows={shown} rowKey={(it, i) => `${it.href}-${i}`} onRow={(it) => router.push(it.href)} />}
       </Sec>
     </FacetPage>
   );

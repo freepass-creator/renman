@@ -31,21 +31,26 @@
 6. **팝업 최소화** — 담기·매칭·정산은 인라인 패널/전용 페이지 우선(풀스크린 모달 지양).
 
 ## 위반 체크리스트 (수정 대상)
-- [ ] **/contract-history** (a): 카드↔엑셀 토글 없음 · FacetRail 없음 · 평면표 → 토글+FacetRail(지난계약 렌즈)+Sec
-- [ ] **/finance** (a): DataTable 고정·정렬불가 → 카드↔엑셀 토글 + ExcelSheet(헤더정렬)
-- [ ] **/integrity** (a): DataTable만 · Sec id 없음 → ExcelSheet + Sec id
-- [ ] **/penalty** (c): DataTable 고정(업무인데 표) · 정렬없음 · Upload/Docs 모달+confirm 남발 → 상태 카드큐 + 인라인/표준 다이얼로그
-- [ ] **/dispatch** (c): useSecOrder 없음 · Wizard 풀스크린 모달 → Sec 재정렬 + 인라인 스텝 패널
-- [ ] **/receivables** (c): useSecOrder 없음 → Sec 재정렬
-- [ ] **/payments** (c): FacetRail이 섹션 show/hide 전용 · 정렬없음 · 수동연결 모달 · 모바일 미대응 → 데이터필터 + 기본정렬 + 인라인 매칭 + 반응형
-- [ ] **/repair** (c): FacetRail 섹션 show/hide 전용 · onReorder 미배선 → 데이터필터 + Sec 재정렬
-- [ ] **/ingest** (e): 모바일 미대응 · 정렬없음 → 셸 위임 반응형 + 기본정렬
-- [ ] **/inbox** (e): 모바일 미대응 · 정렬없음 → 반응형 + 상태/시간 정렬
-- [ ] **/trash** (e): 복구 무확인 즉시실행 → 표준 확인 다이얼로그
-- [ ] **/contract** (a): 상세 Drawer · window.confirm → 360 오버레이 + 표준 다이얼로그
-- [ ] **/list/[id]** (d): 삭제사유 window.prompt → 표준 다이얼로그
-- [ ] **/settings**: 마감해제사유 window.prompt → 표준 다이얼로그
-- [ ] **/manage · /pnl · /financials** (f): Sec id 없음(접기·숨김 죽음) · FacetPage인데 rail 미전달 → Sec id + `Page` 셸로 통일
+- [x] **/contract-history** (a): 카드↔엑셀 · FacetRail(지난계약) · Sec
+- [x] **/finance** (a): IconSeg + ExcelSheet(헤더정렬)
+- [x] **/integrity** (a): ExcelSheet + Sec id
+- [x] **/penalty** (c): ObjCard 큐 + useSecOrder · Upload/Docs 오버레이는 잔여(OCR·공문)
+- [x] **/dispatch** (c): useSecOrder · ※ Wizard 풀스크린은 잔여(인라인 스텝은 후속)
+- [x] **/receivables** (c): useSecOrder
+- [x] **/payments** (c): FacetRail 데이터필터 · 수동연결 인라인 · ※ Sec 재정렬은 후속
+- [x] **/repair** (c): 데이터필터 + useSecOrder
+- [x] **/ingest** (e): 셸 위임(WorkbenchBar) — 페이지레벨 useIsMobile 불필요
+- [x] **/inbox** (e): 상태/시간 기본 정렬
+- [x] **/trash** (e): useConfirm + Sec id
+- [x] **/contract** (a): DetailShell fixed 오버레이 · useConfirm
+- [x] **/list/[id]** (d): usePrompt (기반영)
+- [x] **/settings**: usePrompt (기반영)
+- [x] **/manage · /pnl · /financials** (f): Sec id · Page 셸 · pnl ExcelSheet
 
 ## 이미 규격 부합
 `/`(홈)·`/ops`·`/asset`·`/contract`(뷰/필터/섹션 축)·`/sheet`(운영시트=b형 신규) 은 대체로 부합. 홈·/ops 는 모바일 페이지레벨 분기까지 완비(모범).
+
+## 잔여(후속)
+- 배차 Delivery/Return Wizard → 인라인 스텝 패널
+- 과태료 Upload/Docs 풀스크린 → 인라인/전용 라우트
+- 자금일보 Sec `useSecOrder` 배선

@@ -2,7 +2,7 @@
 import { type CSSProperties, useEffect, useMemo, useState } from 'react';
 import { useSession } from '@/lib/session';
 import { classifyTx } from '@/lib/classify-tx';
-import { FacetPage, Sec, Cards, Metric, DataTable, EmptyState, Badge, Btn, Select, TextLink, won, C, type Col, PageLoading, PeriodBar } from '@/components/ui';
+import { FacetPage, Sec, Cards, Metric, ExcelSheet, EmptyState, Badge, Btn, Select, TextLink, IconSeg, won, C, type SheetCol, PageLoading, PeriodBar } from '@/components/ui';
 import { FacetRail } from '@/components/FacetRail';
 import { WorkbenchBar } from '@/components/WorkbenchBar';
 import { WorkPipe } from '@/components/WorkPipe';
@@ -22,6 +22,7 @@ import { useCashLedgerLists } from '@/lib/use-cash-ledger-lists';
 import { resolveWriteCompany, NEED_COMPANY } from '@/lib/scope';
 import { toast } from '@/lib/toast';
 import { useSecOrder } from '@/lib/use-sec-order';
+import { LayoutGrid, Table } from 'lucide-react';
 
 const FIN_SECS = ['f-uncl', 'f-class', 'f-ledger'] as const;
 const goSec = (id: string) => {
@@ -51,6 +52,7 @@ export default function FinancePage() {
   const [facets, setFacets] = useState<Set<string>>(new Set());
   const [q, setQ] = useState('');
   const [cat, setCat] = useState('전체');
+  const [view, setView] = useState<'card' | 'excel'>('card');
   const [order, reorder] = useSecOrder('jpk:order:finance', [...FIN_SECS]);
   const toggleFacet = (label: string) => setFacets((s) => { const n = new Set(s); n.has(label) ? n.delete(label) : n.add(label); return n; });
   const resetFacets = () => setFacets(new Set());
@@ -133,42 +135,42 @@ export default function FinancePage() {
     </Select>
   );
 
-  const cols: Col<CashRow>[] = [
-    ...(scopeAll ? [{ key: '_co', label: '회사', render: (r: CashRow) => <span style={{ color: C.mute }}>{companyLabel(r.companyId)}</span> }] : []),
-    { key: 'date', label: '일자', render: (r) => r.date || '—' },
-    { key: 'source', label: '소스', render: (r) => <span style={{ fontSize: 11.5, color: C.mute }}>{r.source}</span> },
-    { key: 'account', label: '계좌', render: (r) => <span style={{ fontSize: 11.5, color: C.faint }}>{alias(r.account) || '—'}</span> },
-    { key: 'party', label: '내용', render: (r) => (
+  const cols: SheetCol<CashRow>[] = [
+    ...(scopeAll ? [{ key: '_co', label: '회사', render: (r: CashRow) => <span style={{ color: C.mute }}>{companyLabel(r.companyId)}</span>, text: (r: CashRow) => companyLabel(r.companyId) }] : []),
+    { key: 'date', label: '일자', render: (r) => r.date || '—', text: (r) => r.date || '' },
+    { key: 'source', label: '소스', render: (r) => <span style={{ fontSize: 11.5, color: C.mute }}>{r.source}</span>, text: (r) => r.source },
+    { key: 'account', label: '계좌', render: (r) => <span style={{ fontSize: 11.5, color: C.faint }}>{alias(r.account) || '—'}</span>, text: (r) => alias(r.account) || '' },
+    { key: 'party', label: '내용', text: (r) => r.party || '', render: (r) => (
       <TextLink stop tone="ink" onClick={() => jumpCashRow(r)}>
         {r.party || <span style={{ color: C.faint }}>—</span>}
       </TextLink>
     ) },
-    { key: 'cat', label: '계정과목', render: (r) => catPicker(r) },
-    { key: 'in', label: '입금', align: 'r', render: (r) => (r.inAmt ? <span className="mono" style={{ color: C.ok }}>{won(r.inAmt)}</span> : <span style={{ color: C.faint }}>—</span>) },
-    { key: 'out', label: '출금', align: 'r', render: (r) => (r.outAmt ? <span className="mono" style={{ color: C.danger }}>{won(r.outAmt)}</span> : <span style={{ color: C.faint }}>—</span>) },
+    { key: 'cat', label: '계정과목', render: (r) => catPicker(r), text: (r) => isUnclassified(r.category) ? UNCLASSIFIED : String(r.category || '') },
+    { key: 'in', label: '입금', align: 'r', sortNum: true, render: (r) => (r.inAmt ? <span className="mono" style={{ color: C.ok }}>{won(r.inAmt)}</span> : <span style={{ color: C.faint }}>—</span>), text: (r) => r.inAmt },
+    { key: 'out', label: '출금', align: 'r', sortNum: true, render: (r) => (r.outAmt ? <span className="mono" style={{ color: C.danger }}>{won(r.outAmt)}</span> : <span style={{ color: C.faint }}>—</span>), text: (r) => r.outAmt },
   ];
 
   type AggRow = (typeof aggs)[number];
-  const aggCols: Col<AggRow>[] = [
-    { key: 'kind', label: '성격', render: (a) => {
+  const aggCols: SheetCol<AggRow>[] = [
+    { key: 'kind', label: '성격', text: (a) => a.kind, render: (a) => {
       const tone = a.kind === '수입' ? C.ok : a.kind === '지출' ? C.danger : a.kind === '미분류' ? C.warn : C.mute;
       return <span style={{ fontSize: 11, fontWeight: 700, color: tone }}>{a.kind}</span>;
     } },
-    { key: 'label', label: '계정과목', render: (a) => <span style={{ fontWeight: cat === a.label ? 700 : 600 }}>{a.label}</span> },
-    { key: 'count', label: '건수', align: 'r', render: (a) => <span style={{ color: C.faint }}>{a.count}</span> },
-    { key: 'net', label: '순증감', align: 'r', render: (a) => {
+    { key: 'label', label: '계정과목', render: (a) => <span style={{ fontWeight: cat === a.label ? 700 : 600 }}>{a.label}</span>, text: (a) => a.label },
+    { key: 'count', label: '건수', align: 'r', sortNum: true, render: (a) => <span style={{ color: C.faint }}>{a.count}</span>, text: (a) => a.count },
+    { key: 'net', label: '순증감', align: 'r', sortNum: true, text: (a) => a.inAmt - a.outAmt, render: (a) => {
       const net = a.inAmt - a.outAmt;
       return <span className="mono" style={{ fontWeight: 700, color: net >= 0 ? C.ok : C.danger }}>{won(net)}</span>;
     } },
   ];
 
   type PartyRow = (typeof partyAggs)[number];
-  const partyCols: Col<PartyRow>[] = [
-    { key: 'party', label: '거래처', render: (a) => a.party },
-    { key: 'meta', label: '건·최근', render: (a) => <span style={{ color: C.faint }}>{a.count}건 · {a.lastDate}</span> },
-    { key: 'in', label: '입금', align: 'r', render: (a) => a.inAmt > 0 ? <span className="mono" style={{ color: C.ok }}>+{won(a.inAmt)}</span> : '—' },
-    { key: 'out', label: '출금', align: 'r', render: (a) => a.outAmt > 0 ? <span className="mono" style={{ color: C.danger }}>-{won(a.outAmt)}</span> : '—' },
-    { key: 'net', label: '순증감', align: 'r', render: (a) => {
+  const partyCols: SheetCol<PartyRow>[] = [
+    { key: 'party', label: '거래처', render: (a) => a.party, text: (a) => a.party },
+    { key: 'meta', label: '건·최근', render: (a) => <span style={{ color: C.faint }}>{a.count}건 · {a.lastDate}</span>, text: (a) => `${a.count} ${a.lastDate}` },
+    { key: 'in', label: '입금', align: 'r', sortNum: true, render: (a) => a.inAmt > 0 ? <span className="mono" style={{ color: C.ok }}>+{won(a.inAmt)}</span> : '—', text: (a) => a.inAmt },
+    { key: 'out', label: '출금', align: 'r', sortNum: true, render: (a) => a.outAmt > 0 ? <span className="mono" style={{ color: C.danger }}>-{won(a.outAmt)}</span> : '—', text: (a) => a.outAmt },
+    { key: 'net', label: '순증감', align: 'r', sortNum: true, text: (a) => a.inAmt - a.outAmt, render: (a) => {
       const net = a.inAmt - a.outAmt;
       return <span className="mono" style={{ fontWeight: 700, color: net >= 0 ? C.ok : C.danger }}>{won(net)}</span>;
     } },
@@ -191,6 +193,10 @@ export default function FinancePage() {
           {...cashNav}
           mid={<PeriodBar latest={latest} onRange={setRange} />}
           search={{ value: q, onChange: setQ, placeholder: '내용·계좌·계정' }}
+          view={<IconSeg value={view} onChange={setView} options={[
+            { key: 'card', label: '카드', icon: <LayoutGrid size={15} /> },
+            { key: 'excel', label: '엑셀', icon: <Table size={15} /> },
+          ]} />}
           actions={<Btn size="sm" onClick={() => openIngest('bank_tx')}>+ 계좌 담기</Btn>}
         />
       }
@@ -207,6 +213,9 @@ export default function FinancePage() {
 
       {loading ? <PageLoading />
         : rows.length === 0 ? <EmptyState>재무 자료 없음 — <TextLink onClick={() => openIngest('bank_tx')}>담기에서 계좌·CMS·카드 수집</TextLink></EmptyState>
+          : view === 'excel'
+            ? (ledger.length === 0 ? <EmptyState>거래 없음</EmptyState>
+              : <ExcelSheet cols={cols} rows={ledger.slice(0, 500)} rowKey={(r) => r.id} onRow={jumpCashRow} />)
           : order.map((id) => {
             if (id === 'f-uncl') {
               return (
@@ -240,7 +249,7 @@ export default function FinancePage() {
                 <Sec key={id} id={id} title="분류" n={aggs.length} desc="계정과목별 집계" onReorder={reorder}
                   right={<WorkPipe to="payments" />}>
                   {aggs.length === 0 ? <EmptyState variant="sec">집계 없음</EmptyState>
-                    : <DataTable cols={aggCols} rows={aggs} onRow={(a) => { setCat(a.label); goSec('f-ledger'); }} />}
+                    : <ExcelSheet cols={aggCols} rows={aggs} rowKey={(a) => a.label} onRow={(a) => { setCat(a.label); goSec('f-ledger'); }} />}
                 </Sec>
               );
             }
@@ -254,11 +263,11 @@ export default function FinancePage() {
                 {partyAggs.length > 0 && (
                   <div style={{ marginBottom: 12 }}>
                     <div style={{ fontSize: 11.5, color: C.faint, marginBottom: 6 }}>거래처 상위</div>
-                    <DataTable cols={partyCols} rows={partyAggs.slice(0, 15)} />
+                    <ExcelSheet cols={partyCols} rows={partyAggs.slice(0, 15)} rowKey={(a) => a.party} />
                   </div>
                 )}
                 {ledger.length === 0 ? <EmptyState variant="sec">거래 없음</EmptyState>
-                  : <DataTable cols={cols} rows={ledger.slice(0, 300)} onRow={jumpCashRow} />}
+                  : <ExcelSheet cols={cols} rows={ledger.slice(0, 300)} rowKey={(r) => r.id} onRow={jumpCashRow} />}
               </Sec>
             );
           })}

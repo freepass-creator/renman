@@ -3,7 +3,7 @@
  * 차량이동 — 업무. Sec: 현황 · 오늘 큐 · 출고 대기 · 반납 대상 · 재고.
  *   옛 ?tab=오늘|출고|반납 → 해당 Sec로 스크롤. /field·/m 흡수.
  */
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useSession } from '@/lib/session';
 import { type EntityRecord } from '@/lib/intake/entities';
 import { openCar, openIngest, openLog } from '@/lib/ui-bus';
@@ -20,8 +20,10 @@ import { buildFieldQueues, filterFieldRows, fieldTodayCount } from '@/lib/field-
 import { DeliveryWizard } from '@/components/DeliveryWizard';
 import { ReturnWizard } from '@/components/ReturnWizard';
 import { useEntityLists } from '@/lib/use-entity-lists';
+import { useSecOrder } from '@/lib/use-sec-order';
 
 type DState = '반납지남' | '반납임박' | '운행중' | '대여가능' | '정비' | '기타';
+const DISPATCH_SECS = ['dispatch-status', 'dispatch-quick', 'dispatch-today', 'dispatch-out', 'dispatch-in', 'dispatch-stock'] as const;
 const ORDER: DState[] = ['반납지남', '반납임박', '대여가능', '운행중', '정비', '기타'];
 function dispatchOf(n: VehicleNode): { key: DState; label: string; tone: 'red' | 'amber' | 'green' | 'blue' | 'gray' } {
   if (n.ownership !== '보유중') return { key: '기타', label: n.label, tone: 'gray' };
@@ -109,6 +111,7 @@ export default function DispatchPage() {
   const [facets, setFacets] = useState<Set<string>>(new Set());
   const [q, setQ] = useState('');
   const [wiz, setWiz] = useState<Wiz | null>(null);
+  const [order, reorder] = useSecOrder('jpk:order:dispatch', [...DISPATCH_SECS]);
 
   const toggleFacet = (label: string) => setFacets((s) => { const n = new Set(s); n.has(label) ? n.delete(label) : n.add(label); return n; });
   const resetFacets = () => setFacets(new Set());
@@ -173,80 +176,99 @@ export default function DispatchPage() {
     >
       {loading ? <PageLoading /> : (
         <>
-          <Sec id="dispatch-status" title="현황" desc="클릭 → 아래 섹션">
-            <Cards min={128} fit>
-              <Metric label="오늘 큐" value={`${todayN}건`} tone={todayN ? 'warn' : 'ink'} onClick={() => goSec('dispatch-today')} />
-              <Metric label="출고 대기" value={`${queues.deliverAll.length}건`} tone={queues.deliverAll.length ? 'warn' : 'ink'} onClick={() => goSec('dispatch-out')} />
-              <Metric label="반납 대상" value={`${queues.returnAll.length}건`} tone={queues.returnOverdue.length ? 'danger' : queues.returnAll.length ? 'warn' : 'ink'} onClick={() => goSec('dispatch-in')} />
-              <Metric label="대여가능" value={`${cnt('대여가능')}대`} tone={cnt('대여가능') ? 'ok' : 'ink'} onClick={() => { setF(['대여가능']); goSec('dispatch-stock'); }} />
-              <Metric label="운행중" value={`${running}대`} tone="ink" onClick={() => { setF(['운행중', '반납임박', '반납지남']); goSec('dispatch-stock'); }} />
-              <Metric label="반납지남" value={`${cnt('반납지남')}대`} tone={cnt('반납지남') ? 'danger' : 'ink'} onClick={() => { setF(['반납지남']); goSec('dispatch-stock'); }} />
-            </Cards>
-          </Sec>
-
-          <Sec title="빠른 입력" desc="메모·비용·면허 — 공용 엔진">
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: SPACE_M }}>
-              <Btn variant="ghost" onClick={() => openLog()}>메모</Btn>
-              <Btn variant="ghost" onClick={() => openIngest('history')}>비용·점검</Btn>
-              <Btn variant="ghost" onClick={() => openIngest('customer')}>면허증 OCR</Btn>
-            </div>
-          </Sec>
-
-          <Sec id="dispatch-today" title="오늘 큐" n={todayRows.length} desc="오늘 출고·반납·지남 — 탭하면 위저드">
-            <IoCards rows={todayRows} byPlate={byPlate} openIo={openIo} />
-          </Sec>
-
-          <Sec id="dispatch-out" title="출고 대기" n={outRows.length} desc="인도(출고) — 계기판·연료·사진·서명">
-            <IoCards rows={outRows} byPlate={byPlate} openIo={openIo} />
-          </Sec>
-
-          <Sec id="dispatch-in" title="반납 대상" n={inRows.length} desc="반납 — 계기판·연료·정산 · 임박순">
-            <IoCards rows={inRows} byPlate={byPlate} openIo={openIo} />
-          </Sec>
-
-          <Sec id="dispatch-stock" title="재고" n={shown.length} desc="보낼 수 있나 · 언제 돌아오나 · 좌측 필터">
-            {shown.length === 0 ? <EmptyState variant="sec">해당 차량 없음</EmptyState>
-              : <div style={{ display: 'flex', flexDirection: 'column', gap: SPACE_M }}>{shown.map(({ n, d }) => {
-                const av = n.activeContract;
-                const fields: [string, React.ReactNode][] = av ? [
-                  ['계약자', String(av.view.rec.contractorName || '—')],
-                  ['반납예정', av.view.endDate ? `${av.view.endDate}${av.view.dday != null ? (av.view.dday < 0 ? ` (${-av.view.dday}일 지남)` : ` (D-${av.view.dday})`) : ''}` : '—'],
-                  ['월대여료', av.view.monthlyRent ? won(av.view.monthlyRent) : '—'],
-                  ['검사만기', n.veh.inspectionTo ? String(n.veh.inspectionTo) : '—'],
-                ] : (() => {
-                  const reco = d.key === '대여가능' ? recommendNextRent(n, fleet.vehicles, rentCtx) : null;
-                  const f: [string, React.ReactNode][] = [
-                    ['차명', n.veh.carName ? String(n.veh.carName) : '—'],
-                    ['마지막 대여료', (() => { const lc = n.contracts[n.contracts.length - 1]; return lc?.view.rec.monthlyRent ? won(lc.view.rec.monthlyRent) : '—'; })()],
-                  ];
-                  if (reco) f.push(['추천 재렌트료', <span style={{ color: C.ok, fontWeight: 700 }}>{won(reco.recommended)} <span style={{ color: C.faint, fontWeight: 400 }}>({won(reco.low)}~{won(reco.high)})</span></span>]);
-                  else f.push(['거쳐간 손님', `${n.contracts.length}명`]);
-                  f.push(['검사만기', n.veh.inspectionTo ? String(n.veh.inspectionTo) : '—']);
-                  return f;
-                })();
-                const needReturn = (d.key === '반납지남' || d.key === '반납임박') && !!av;
-                return (
-                  <div key={n.plate} style={{ display: 'flex', flexDirection: 'column', gap: SPACE_M }}>
-                    <ObjCard
-                      badge={d.label}
-                      badgeTone={d.tone}
-                      plate={n.plate}
-                      name={av ? String(av.view.rec.contractorName || '—') : (n.veh.carName ? String(n.veh.carName) : '—')}
-                      carType={av && n.veh.carName ? String(n.veh.carName) : undefined}
-                      fields={fields}
-                      right={av && av.net > 0 ? <span style={{ color: C.danger }}>미수 {won(av.net)}</span> : undefined}
-                      onClick={() => openCar(n.plate)}
-                    />
-                    {(needReturn || d.key === '대여가능') && (
-                      <div style={{ display: 'flex', gap: SPACE_M, flexWrap: 'wrap' }}>
-                        {needReturn && av ? <Btn size="sm" onClick={() => openIo('반납', av.view.rec)}>반납</Btn> : null}
-                        {d.key === '대여가능' ? <Btn size="sm" variant="ghost" onClick={() => openCar(n.plate)}>360</Btn> : null}
-                      </div>
-                    )}
+          {order.map((id) => {
+            if (id === 'dispatch-status') {
+              return (
+                <Sec key={id} id={id} title="현황" desc="클릭 → 아래 섹션" onReorder={reorder}>
+                  <Cards min={128} fit>
+                    <Metric label="오늘 큐" value={`${todayN}건`} tone={todayN ? 'warn' : 'ink'} onClick={() => goSec('dispatch-today')} />
+                    <Metric label="출고 대기" value={`${queues.deliverAll.length}건`} tone={queues.deliverAll.length ? 'warn' : 'ink'} onClick={() => goSec('dispatch-out')} />
+                    <Metric label="반납 대상" value={`${queues.returnAll.length}건`} tone={queues.returnOverdue.length ? 'danger' : queues.returnAll.length ? 'warn' : 'ink'} onClick={() => goSec('dispatch-in')} />
+                    <Metric label="대여가능" value={`${cnt('대여가능')}대`} tone={cnt('대여가능') ? 'ok' : 'ink'} onClick={() => { setF(['대여가능']); goSec('dispatch-stock'); }} />
+                    <Metric label="운행중" value={`${running}대`} tone="ink" onClick={() => { setF(['운행중', '반납임박', '반납지남']); goSec('dispatch-stock'); }} />
+                    <Metric label="반납지남" value={`${cnt('반납지남')}대`} tone={cnt('반납지남') ? 'danger' : 'ink'} onClick={() => { setF(['반납지남']); goSec('dispatch-stock'); }} />
+                  </Cards>
+                </Sec>
+              );
+            }
+            if (id === 'dispatch-quick') {
+              return (
+                <Sec key={id} id={id} title="빠른 입력" desc="메모·비용·면허 — 공용 엔진" onReorder={reorder}>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: SPACE_M }}>
+                    <Btn variant="ghost" onClick={() => openLog()}>메모</Btn>
+                    <Btn variant="ghost" onClick={() => openIngest('history')}>비용·점검</Btn>
+                    <Btn variant="ghost" onClick={() => openIngest('customer')}>면허증 OCR</Btn>
                   </div>
-                );
-              })}</div>}
-          </Sec>
+                </Sec>
+              );
+            }
+            if (id === 'dispatch-today') {
+              return (
+                <Sec key={id} id={id} title="오늘 큐" n={todayRows.length} desc="오늘 출고·반납·지남 — 탭하면 위저드" onReorder={reorder}>
+                  <IoCards rows={todayRows} byPlate={byPlate} openIo={openIo} />
+                </Sec>
+              );
+            }
+            if (id === 'dispatch-out') {
+              return (
+                <Sec key={id} id={id} title="출고 대기" n={outRows.length} desc="인도(출고) — 계기판·연료·사진·서명" onReorder={reorder}>
+                  <IoCards rows={outRows} byPlate={byPlate} openIo={openIo} />
+                </Sec>
+              );
+            }
+            if (id === 'dispatch-in') {
+              return (
+                <Sec key={id} id={id} title="반납 대상" n={inRows.length} desc="반납 — 계기판·연료·정산 · 임박순" onReorder={reorder}>
+                  <IoCards rows={inRows} byPlate={byPlate} openIo={openIo} />
+                </Sec>
+              );
+            }
+            return (
+              <Sec key={id} id={id} title="재고" n={shown.length} desc="보낼 수 있나 · 언제 돌아오나 · 좌측 필터" onReorder={reorder}>
+                {shown.length === 0 ? <EmptyState variant="sec">해당 차량 없음</EmptyState>
+                  : <div style={{ display: 'flex', flexDirection: 'column', gap: SPACE_M }}>{shown.map(({ n, d }) => {
+                    const av = n.activeContract;
+                    const fields: [string, ReactNode][] = av ? [
+                      ['계약자', String(av.view.rec.contractorName || '—')],
+                      ['반납예정', av.view.endDate ? `${av.view.endDate}${av.view.dday != null ? (av.view.dday < 0 ? ` (${-av.view.dday}일 지남)` : ` (D-${av.view.dday})`) : ''}` : '—'],
+                      ['월대여료', av.view.monthlyRent ? won(av.view.monthlyRent) : '—'],
+                      ['검사만기', n.veh.inspectionTo ? String(n.veh.inspectionTo) : '—'],
+                    ] : (() => {
+                      const reco = d.key === '대여가능' ? recommendNextRent(n, fleet.vehicles, rentCtx) : null;
+                      const f: [string, ReactNode][] = [
+                        ['차명', n.veh.carName ? String(n.veh.carName) : '—'],
+                        ['마지막 대여료', (() => { const lc = n.contracts[n.contracts.length - 1]; return lc?.view.rec.monthlyRent ? won(lc.view.rec.monthlyRent) : '—'; })()],
+                      ];
+                      if (reco) f.push(['추천 재렌트료', <span style={{ color: C.ok, fontWeight: 700 }}>{won(reco.recommended)} <span style={{ color: C.faint, fontWeight: 400 }}>({won(reco.low)}~{won(reco.high)})</span></span>]);
+                      else f.push(['거쳐간 손님', `${n.contracts.length}명`]);
+                      f.push(['검사만기', n.veh.inspectionTo ? String(n.veh.inspectionTo) : '—']);
+                      return f;
+                    })();
+                    const needReturn = (d.key === '반납지남' || d.key === '반납임박') && !!av;
+                    return (
+                      <div key={n.plate} style={{ display: 'flex', flexDirection: 'column', gap: SPACE_M }}>
+                        <ObjCard
+                          badge={d.label}
+                          badgeTone={d.tone}
+                          plate={n.plate}
+                          name={av ? String(av.view.rec.contractorName || '—') : (n.veh.carName ? String(n.veh.carName) : '—')}
+                          carType={av && n.veh.carName ? String(n.veh.carName) : undefined}
+                          fields={fields}
+                          right={av && av.net > 0 ? <span style={{ color: C.danger }}>미수 {won(av.net)}</span> : undefined}
+                          onClick={() => openCar(n.plate)}
+                        />
+                        {(needReturn || d.key === '대여가능') && (
+                          <div style={{ display: 'flex', gap: SPACE_M, flexWrap: 'wrap' }}>
+                            {needReturn && av ? <Btn size="sm" onClick={() => openIo('반납', av.view.rec)}>반납</Btn> : null}
+                            {d.key === '대여가능' ? <Btn size="sm" variant="ghost" onClick={() => openCar(n.plate)}>360</Btn> : null}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}</div>}
+              </Sec>
+            );
+          })}
         </>
       )}
 

@@ -34,7 +34,7 @@ export default function TrashPage() {
 
   return (
     <Page title="휴지통" meta={`${companyLabel(companyId)} · ${items.length}건 · 소프트삭제 (복구 가능)`} tools={<WorkbenchBar />}>
-      <Sec title="삭제된 항목" n={items.length} desc="소프트삭제 · 복구 가능">
+      <Sec id="trash-list" title="삭제된 항목" n={items.length} desc="소프트삭제 · 복구 가능">
         {loading ? <PageLoading />
           : items.length === 0 ? <EmptyState>삭제된 항목 없음</EmptyState>
           : (

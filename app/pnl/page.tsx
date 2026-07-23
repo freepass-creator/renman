@@ -2,7 +2,7 @@
 import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSession } from '@/lib/session';
-import { FacetPage, Sec, Cards, Metric, DataTable, EmptyState, PeriodBar, won, C, PageLoading, type Col } from '@/components/ui';
+import { Page, Sec, Cards, Metric, ExcelSheet, EmptyState, PeriodBar, won, C, PageLoading, type SheetCol } from '@/components/ui';
 import { WorkbenchBar } from '@/components/WorkbenchBar';
 import { useCashHubNav } from '@/components/CashHubTabs';
 import { companyLabel } from '@/lib/companies';
@@ -58,15 +58,19 @@ export default function PnlPage() {
   const capFinIn = capFin.reduce((s, x) => s + x.inAmt, 0);
   const unclassAmt = unclass.reduce((s, x) => s + x.inAmt + x.outAmt, 0);
 
-  const cols = (base: number): Col<SubjectAgg>[] => [
-    { key: 'label', label: '계정과목', render: (s) => <b>{s.label}</b> },
-    { key: 'count', label: '건수', align: 'r', render: (s) => `${s.count}건` },
-    { key: 'amt', label: '금액', align: 'r', render: (s) => <b style={{ color: s.kind === '수입' ? 'var(--green-text)' : s.kind === '지출' ? C.danger : C.mute }}>{won(s.kind === '수입' ? s.inAmt : s.outAmt)}</b> },
-    { key: 'pct', label: '비중', align: 'r', render: (s) => { const amt = s.kind === '수입' ? s.inAmt : s.outAmt; return base ? `${Math.round((amt / base) * 100)}%` : '—'; } },
+  const cols = (base: number): SheetCol<SubjectAgg>[] => [
+    { key: 'label', label: '계정과목', render: (s) => <b>{s.label}</b>, text: (s) => s.label },
+    { key: 'count', label: '건수', align: 'r', render: (s) => `${s.count}건`, text: (s) => s.count, sortNum: true },
+    { key: 'amt', label: '금액', align: 'r', sortNum: true,
+      render: (s) => <b style={{ color: s.kind === '수입' ? 'var(--green-text)' : s.kind === '지출' ? C.danger : C.mute }}>{won(s.kind === '수입' ? s.inAmt : s.outAmt)}</b>,
+      text: (s) => (s.kind === '수입' ? s.inAmt : s.outAmt) },
+    { key: 'pct', label: '비중', align: 'r', sortNum: true,
+      render: (s) => { const amt = s.kind === '수입' ? s.inAmt : s.outAmt; return base ? `${Math.round((amt / base) * 100)}%` : '—'; },
+      text: (s) => { const amt = s.kind === '수입' ? s.inAmt : s.outAmt; return base ? Math.round((amt / base) * 100) : 0; } },
   ];
 
   return (
-    <FacetPage
+    <Page
       title="손익분석"
       meta={`${scopeAll ? '전체 회사' : companyLabel(companyId)}${range.from ? ` · ${range.from}~${range.to}` : ' · 전체'} · 현금 기준`}
       tools={<WorkbenchBar {...cashNav} mid={<PeriodBar latest={latest} initial="월간" onRange={setRange} />} />}
@@ -83,17 +87,17 @@ export default function PnlPage() {
           </Cards>
         </Sec>
         <Sec id="p-income" title="영업수입" n={opIncome.length} desc="계정과목별 · 큰 금액순">
-          {opIncome.length ? <DataTable cols={cols(totalIn)} rows={opIncome} /> : <EmptyState>이 기간 영업수입 없음</EmptyState>}
+          {opIncome.length ? <ExcelSheet cols={cols(totalIn)} rows={opIncome} rowKey={(s) => s.label} /> : <EmptyState>이 기간 영업수입 없음</EmptyState>}
         </Sec>
         <Sec id="p-expense" title="영업비용" n={opExpense.length} desc="할부이자 별도(아래) · 큰 금액순">
-          {opExpense.length ? <DataTable cols={cols(totalOut)} rows={opExpense} /> : <EmptyState>이 기간 영업비용 없음</EmptyState>}
+          {opExpense.length ? <ExcelSheet cols={cols(totalOut)} rows={opExpense} rowKey={(s) => s.label} /> : <EmptyState>이 기간 영업비용 없음</EmptyState>}
         </Sec>
         <Sec id="p-loan" title="할부·리스 (금융)" desc="원금=부채상환(손익 아님) · 이자=금융비용(위 반영). 상환스케줄 OCR 전 계산값">
           <div style={{ fontSize: 12.5, color: C.mute, lineHeight: 1.7 }}>
             우리 계산 상환({loan.cars}대): 상환액 <b style={{ color: C.ink }}>{won(loan.payment)}</b> = 원금 <b style={{ color: C.ink }}>{won(loan.principal)}</b> + <b style={{ color: C.warn }}>이자 {won(loan.interest)}</b> (이자비중 {loan.payment ? Math.round(loan.interest / loan.payment * 100) : 0}%)<br />
             {capFin.length ? <>실제 자금원장 자본·금융 지출: <b style={{ color: C.ink }}>{won(capFinOut)}</b>{capFinIn ? <> · 수입 {won(capFinIn)}</> : null} — 원금상환·차량매입 포함(손익 아님).</> : null}
           </div>
-          {capFin.length ? <div style={{ marginTop: 10 }}><DataTable cols={cols(capFinOut)} rows={capFin} /></div> : null}
+          {capFin.length ? <div style={{ marginTop: 10 }}><ExcelSheet cols={cols(capFinOut)} rows={capFin} rowKey={(s) => s.label} /></div> : null}
         </Sec>
         <Sec id="p-trend" title="월별 추이" desc="최근 12개월 영업손익 (수입=초록·비용=빨강 막대)">
           <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
@@ -110,6 +114,6 @@ export default function PnlPage() {
           </div>
         </Sec>
       </>}
-    </FacetPage>
+    </Page>
   );
 }
