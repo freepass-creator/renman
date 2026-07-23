@@ -66,6 +66,20 @@ export default function ReceivablesPage() {
   const stageSel = selectedInDim('미수', '연체단계', facets);
   const overdueSel = selectedInDim('미수', '연체기간', facets);
   const actionSel = selectedInDim('미수', '조치', facets);
+  // 칩별 매칭 건수(erp3식 '라벨(N)') — 전체 미수 정적 집계. 필터 술어와 동일 기준.
+  const counts = useMemo(() => {
+    const c: Record<string, number> = { 정상: 0, 경고: 0, 시동제어: 0, 내용증명: 0, 채권화: 0, '1~29일': 0, '30~89일': 0, '90일+': 0, 미조치: 0, 내용증명발송: 0, 시동제어중: 0 };
+    for (const r of D.rows) {
+      if (c[r.st.stage] != null) c[r.st.stage]++;
+      const d = r.v.overdueDays;
+      if (d >= 1 && d <= 29) c['1~29일']++; else if (d >= 30 && d <= 89) c['30~89일']++; else if (d >= 90) c['90일+']++;
+      const notice = !!r.rec.noticeSentDate, immob = !!r.rec.engineDisabled;
+      if (!notice && !immob) c['미조치']++;
+      if (notice) c['내용증명발송']++;
+      if (immob) c['시동제어중']++;
+    }
+    return c;
+  }, [D.rows]);
   const filtered = D.rows.filter((r) => {
     if (stageSel.length && !stageSel.includes(r.st.stage)) return false;
     if (overdueSel.length) {
@@ -155,7 +169,7 @@ export default function ReceivablesPage() {
       title="미수관리"
       meta={`${scopeAll ? '전체 회사' : companyLabel(companyId)} · 미수 ${D.count}건`}
       tools={<WorkbenchBar mid={<WorkHubBack />} search={{ value: q, onChange: setQ, placeholder: '손님·차량·계약' }} stat={<span style={{ fontSize: 13, fontWeight: 800, color: D.totalUnpaid > 0 ? C.danger : C.ok, whiteSpace: 'nowrap' }}>미수 {won(D.totalUnpaid)}</span>} />}
-      rail={!loading ? <FacetRail lensKey="미수" facets={facets} onToggle={toggleFacet} onReset={resetFacets} /> : null}
+      rail={!loading ? <FacetRail lensKey="미수" facets={facets} onToggle={toggleFacet} onReset={resetFacets} counts={counts} /> : null}
     >
       <Sec title="현황" desc="미수율 · 연체 분포 · 회수 조치 대상">
         <Cards min={128} fit>

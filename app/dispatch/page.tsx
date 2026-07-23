@@ -131,6 +131,8 @@ export default function DispatchPage() {
     && textMatch(q, n.plate, String(n.veh.carName || ''), n.activeContract?.customer || ''));
   const cnt = (k: DState) => nodes.filter((x) => x.d.key === k).length;
   const running = cnt('운행중') + cnt('반납임박') + cnt('반납지남');
+  // 칩별 매칭 건수(erp3식 '라벨(N)') — 전체 함대 정적 집계. cnt() 재사용.
+  const counts: Record<string, number> = { 대여가능: cnt('대여가능'), 운행중: cnt('운행중'), 반납임박: cnt('반납임박'), 반납지남: cnt('반납지남'), 정비: cnt('정비') };
 
   const byPlate = useMemo(() => {
     const m = new Map<string, EntityRecord>();
@@ -167,7 +169,7 @@ export default function DispatchPage() {
           }
         />
       }
-      rail={!loading ? <FacetRail lensKey="배차" facets={facets} onToggle={toggleFacet} onReset={resetFacets} /> : null}
+      rail={!loading ? <FacetRail lensKey="배차" facets={facets} onToggle={toggleFacet} onReset={resetFacets} counts={counts} /> : null}
     >
       {loading ? <PageLoading /> : (
         <>

@@ -12,6 +12,7 @@ export type FacetFilterApi = {
   facets: Set<string>;
   onToggle: (label: string) => void;
   onReset: () => void;
+  counts?: Record<string, number>;   // 칩별 매칭 건수(라벨→건수) — erp3식 '라벨(N)'. 없으면 숫자 미표시.
 };
 
 type Ctx = {
@@ -39,12 +40,13 @@ export function useRegisterFacetFilter(api: FacetFilterApi | null) {
   const facets = api?.facets;
   const onToggle = api?.onToggle;
   const onReset = api?.onReset;
+  const counts = api?.counts;
   useEffect(() => {
     if (!api || !groups?.length || !onToggle || !onReset) {
       setApi(null);
       return () => setApi(null);
     }
-    setApi({ groups, facets: facets ?? new Set(), onToggle, onReset });
+    setApi({ groups, facets: facets ?? new Set(), onToggle, onReset, counts });
     return () => setApi(null);
-  }, [api, groups, facets, onToggle, onReset, setApi]);
+  }, [api, groups, facets, onToggle, onReset, counts, setApi]);
 }

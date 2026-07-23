@@ -93,6 +93,18 @@ export default function RiskPage() {
   const inspCount = items.filter((it) => it.kind.includes('검사')).length;
   const insCount = items.filter((it) => it.kind.includes('보험')).length;
 
+  // 칩별 매칭 건수(erp3식 '라벨(N)') — 심각도=sev, 종류=riskKindMatch(단일 라벨) 재사용. 전체 정적 집계.
+  const counts = useMemo(() => {
+    const kinds = ['필수누락', '만기', '고아', '날짜역전', '미납', '보험불일치', '반납지남'];
+    const c: Record<string, number> = { 위험: 0, 주의: 0 };
+    for (const k of kinds) c[k] = 0;
+    for (const it of items) {
+      if (it.sev === 'high') c['위험']++; else if (it.sev === 'mid') c['주의']++;
+      for (const k of kinds) if (riskKindMatch(new Set([k]), it.kind)) c[k]++;
+    }
+    return c;
+  }, [items]);
+
   const cols: Col<RiskItem>[] = [
     ...(scopeAll ? [{ key: '_co', label: '회사', render: (it: RiskItem) => <span style={{ color: C.mute }}>{companyLabel(it.co)}</span> }] : []),
     { key: 'sev', label: '위험도', render: (it) => <SevTag high={it.sev === 'high'} /> },
@@ -110,7 +122,7 @@ export default function RiskPage() {
       title="리스크 관리"
       meta={`${scopeAll ? '전체 회사' : companyLabel(companyId)} · ${items.length}건`}
       tools={<WorkbenchBar search={{ value: q, onChange: setQ, placeholder: '대상·내용·종류' }} stat={<span style={{ fontSize: 13, fontWeight: 800, color: highCount ? C.danger : C.ok, whiteSpace: 'nowrap' }}>위험 {highCount}</span>} />}
-      rail={!loading ? <FacetRail lensKey="정합성" facets={facets} onToggle={toggleFacet} onReset={resetFacets} /> : null}
+      rail={!loading ? <FacetRail lensKey="정합성" facets={facets} onToggle={toggleFacet} onReset={resetFacets} counts={counts} /> : null}
     >
       <Sec id="i-summary" title="리스크 요약">
         <Cards min={128} fit>

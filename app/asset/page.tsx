@@ -117,6 +117,20 @@ export default function AssetPage() {
   const byOwn = (own: Ownership) => filtered.filter((n) => n.ownership === own);
   const cnt = (own: Ownership) => nodes.filter((n) => n.ownership === own).length;
 
+  // 칩별 매칭 건수(erp3식 '라벨(N)') — 전체 함대 정적 집계(교차필터 아님). 필터 술어와 동일 기준.
+  const counts = useMemo(() => {
+    const c: Record<string, number> = { 운행: 0, 휴차: 0, 정비: 0, 검사지남: 0, 검사30일: 0, 보험지남: 0, 보험30일: 0, 할부있음: 0, 보험없음: 0 };
+    for (const n of nodes) {
+      if (n.utilization && c[n.utilization] != null) c[n.utilization]++;
+      const insp = dday(n.veh.inspectionTo), ins = dday(n.veh.insuranceExpiryDate);
+      if (insp != null && insp < 0) c['검사지남']++; else if (insp != null && insp <= 30) c['검사30일']++;
+      if (ins != null && ins < 0) c['보험지남']++; else if (ins != null && ins <= 30) c['보험30일']++;
+      if (hasLoan(n)) c['할부있음']++;
+      if (noInsurance(n)) c['보험없음']++;
+    }
+    return c;
+  }, [nodes]);
+
   const renderCard = (n: VehicleNode) => {
     const av = n.activeContract, idleD = n.utilization === '휴차' ? idleDaysOf(n) : null;
     const fields: [string, ReactNode][] =
@@ -184,7 +198,7 @@ export default function AssetPage() {
           actions={<Btn size="sm" onClick={() => openIngest('vehicle')}>+ 차량 담기</Btn>}
         />
       }
-      rail={!loading ? <FacetRail lensKey="자산현황" facets={facets} onToggle={toggleFacet} onReset={resetFacets} /> : null}
+      rail={!loading ? <FacetRail lensKey="자산현황" facets={facets} onToggle={toggleFacet} onReset={resetFacets} counts={counts} /> : null}
     >
       <Sec title="생애" desc="현물자산 · 구매→등록→보유→처분" hideable={false}>
         <Cards min={100} fit>

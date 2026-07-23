@@ -167,6 +167,17 @@ export default function ContractWorkspace() {
   const nDebt = nodes.filter((n) => n.c.debt === '채권잔존').length;
 
   const customersAll = useMemo(() => aggregateCustomers(recs, TODAY).sort((a, b) => b.totalUnpaid - a.totalUnpaid), [recs]);
+  // 칩별 매칭 건수(erp3식 '라벨(N)') — 채권·만기=계약뷰, 손님=고객집계. 전체 정적 집계.
+  const counts = useMemo(() => {
+    const c: Record<string, number> = { 채권잔존: 0, 청산: 0, 만기경과: 0, '30일이내': 0, '60일이내': 0, 운행중: 0, 미수있음: 0 };
+    for (const n of nodes) {
+      if (n.c.debt === '채권잔존') c['채권잔존']++; else if (n.c.debt === '청산') c['청산']++;
+      const dd = n.v.dday;
+      if (dd != null) { if (dd < 0) c['만기경과']++; if (dd >= 0 && dd <= 30) c['30일이내']++; if (dd >= 0 && dd <= 60) c['60일이내']++; }
+    }
+    for (const cust of customersAll) { if (cust.activeCount > 0) c['운행중']++; if (cust.totalUnpaid > 0) c['미수있음']++; }
+    return c;
+  }, [nodes, customersAll]);
   const custStatus = selectedInDim('계약현황', '손님', facets);
   const customers = customersAll.filter((c) => {
     if (custStatus.length) {
@@ -225,7 +236,7 @@ export default function ContractWorkspace() {
           actions={<Btn size="sm" onClick={() => openIngest('contract')}>+ 신규 계약</Btn>}
         />
       }
-      rail={!loading ? <FacetRail lensKey="계약현황" facets={facets} onToggle={toggleFacet} onReset={resetFacets} /> : null}
+      rail={!loading ? <FacetRail lensKey="계약현황" facets={facets} onToggle={toggleFacet} onReset={resetFacets} counts={counts} /> : null}
     >
       <Sec title="생애" desc="계약자산 · 예정→중→완료" hideable={false}>
         <Cards min={100} fit>

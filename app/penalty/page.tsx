@@ -70,6 +70,18 @@ export default function PenaltyProcess() {
     return textMatch(q, r.p.plate, r.p.description, r.p.docType, r.renter, r.contractNo, r.p.violationDate);
   });
 
+  // 칩별 매칭 건수(erp3식 '라벨(N)') — 전체 데이터 정적 집계. 필터 술어와 동일 기준.
+  const counts: Record<string, number> = (() => {
+    const c: Record<string, number> = { 매칭: 0, 미매칭: 0, 접수: 0, 임차인확인: 0, 변경부과신청: 0, 변경부과완료: 0, 종결: 0, 지남: 0, 오늘: 0, 내일: 0, 이번주: 0, 이번달: 0 };
+    for (const r of rows) {
+      if (r.renter) c['매칭']++; else c['미매칭']++;
+      const st = String(r.p.reassignStatus || '접수'); if (c[st] != null) c[st]++;
+      const dd = dday(r.p.dueDate);
+      if (dd != null) { if (dd < 0) c['지남']++; else if (dd === 0) c['오늘']++; else if (dd === 1) c['내일']++; else if (dd <= 7) c['이번주']++; else if (dd <= 30) c['이번달']++; }
+    }
+    return c;
+  })();
+
   const cols: Col<Row>[] = [
     ...(scopeAll ? [{ key: '_co', label: '회사', render: (r: Row) => <span style={{ color: C.mute }}>{companyLabel(r.p.companyId)}</span> }] : []),
     { key: 'plate', label: '차량', render: (r) => (
@@ -111,7 +123,7 @@ export default function PenaltyProcess() {
           </>}
         />
       }
-      rail={!loading ? <FacetRail lensKey="과태료" facets={facets} onToggle={toggleFacet} onReset={resetFacets} /> : null}
+      rail={!loading ? <FacetRail lensKey="과태료" facets={facets} onToggle={toggleFacet} onReset={resetFacets} counts={counts} /> : null}
     >
       <Sec title="현황" desc="고지서 → 임차인 매칭 → 변경부과">
         <Cards min={128} fit>

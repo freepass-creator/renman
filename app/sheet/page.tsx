@@ -59,6 +59,22 @@ export default function SheetPage() {
     });
   }, [allRows, facets, q]);
 
+  // 칩별 매칭 건수(erp3식 '라벨(N)') — 전체 데이터 정적 집계(교차필터 아님). 필터 술어와 동일 기준.
+  const counts = useMemo(() => {
+    const c: Record<string, number> = { 보유: 0, 매각: 0, 운행: 0, 휴차: 0, 정비: 0, 미수있음: 0, '연체90일+': 0, 검사임박: 0, 보험임박: 0, 할부있음: 0, 보험없음: 0 };
+    for (const r of allRows) {
+      if (r.ownership !== '처분완료') c['보유']++; else c['매각']++;
+      if (c[r.util] != null) c[r.util]++;
+      if (r.net > 0) c['미수있음']++;
+      if (r.overdueDays >= 90) c['연체90일+']++;
+      const insp = dday(r.inspectionTo); if (insp != null && insp <= 30) c['검사임박']++;
+      const insE = dday(r.insEnd); if (insE != null && insE <= 30) c['보험임박']++;
+      if (r.loanCompany && r.loanCompany !== '현금') c['할부있음']++;
+      if (!r.insurer) c['보험없음']++;
+    }
+    return c;
+  }, [allRows]);
+
   // 기본뷰: 기본 컬럼 + «켜진 필터»에 대응하는 컬럼을 우측에 자동 노출(값 보며 거르기). 전체뷰: 전 컬럼.
   const cols = useMemo(() => {
     if (view === '전체') return FLEET_EXPANDED_COLS;
@@ -91,7 +107,7 @@ export default function SheetPage() {
           actions={<Btn size="sm" variant="ghost" onClick={exportCsv} disabled={!shown.length}><Download size={15} /></Btn>}
         />
       }
-      rail={!loading ? <FacetRail lensKey="운영시트" facets={facets} onToggle={toggleFacet} onReset={resetFacets} /> : null}
+      rail={!loading ? <FacetRail lensKey="운영시트" facets={facets} onToggle={toggleFacet} onReset={resetFacets} counts={counts} /> : null}
     >
       {loading ? <PageLoading />
         : !rows.length ? <EmptyState>표시할 차량이 없습니다</EmptyState>

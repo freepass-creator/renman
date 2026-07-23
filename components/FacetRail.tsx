@@ -13,10 +13,11 @@ import { haptic } from '@/lib/haptics';
 import { Btn, C, Drawer, IconBtn, ToggleChips, ctrlH } from '@/components/ui';
 import { SlidersHorizontal, ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react';
 
-function FacetGroups({ groups, facets, onToggle, touch }: {
+function FacetGroups({ groups, facets, onToggle, counts, touch }: {
   groups: FacetGroup[];
   facets: Set<string>;
   onToggle: (label: string) => void;
+  counts?: Record<string, number>;   // 칩별 매칭 건수 — erp3식 '라벨(N)'. 정적 칩은 0이어도 (0) 노출.
   touch?: boolean;
 }) {
   const mobile = useIsMobile();
@@ -70,7 +71,11 @@ function FacetGroups({ groups, facets, onToggle, touch }: {
               <ToggleChips
                 selected={facets}
                 onToggle={onToggle}
-                options={g.chips.map((c) => ({ key: c.label, label: c.label }))}
+                options={g.chips.map((c) => ({
+                  key: c.label,
+                  // erp3식 '라벨(N)' — 매칭건수 있으면 괄호로(공백없음). key는 순수 라벨(선택 로직 불변).
+                  label: counts && counts[c.label] != null ? `${c.label}(${counts[c.label]})` : c.label,
+                }))}
               />
             )}
           </div>
@@ -105,14 +110,14 @@ export function MobileFacetFilterBtn() {
             </>
           }
         >
-          <FacetGroups groups={api.groups} facets={api.facets} onToggle={api.onToggle} touch />
+          <FacetGroups groups={api.groups} facets={api.facets} onToggle={api.onToggle} counts={api.counts} touch />
         </Drawer>
       )}
     </>
   );
 }
 
-export function FacetRail({ lensKey, groups: groupsProp, facets, onToggle, onReset, top = 49 }: { lensKey?: string; groups?: FacetGroup[]; facets: Set<string>; onToggle: (label: string) => void; onReset: () => void; top?: number }) {
+export function FacetRail({ lensKey, groups: groupsProp, facets, onToggle, onReset, counts, top = 49 }: { lensKey?: string; groups?: FacetGroup[]; facets: Set<string>; onToggle: (label: string) => void; onReset: () => void; counts?: Record<string, number>; top?: number }) {
   const mobile = useIsMobile();
   const groups = groupsProp || (lensKey ? LENS_FILTERS[lensKey] : undefined) || [];
   const [hidden, setHidden] = useState(false);
@@ -120,8 +125,8 @@ export function FacetRail({ lensKey, groups: groupsProp, facets, onToggle, onRes
   const toggleHidden = () => setHidden((h) => { const n = !h; try { localStorage.setItem('jpk:rail', n ? '1' : '0'); } catch { /* 무시 */ } return n; });
 
   const api = useMemo(
-    () => (groups.length ? { groups, facets, onToggle, onReset } : null),
-    [groups, facets, onToggle, onReset],
+    () => (groups.length ? { groups, facets, onToggle, onReset, counts } : null),
+    [groups, facets, onToggle, onReset, counts],
   );
   useRegisterFacetFilter(api);
 
@@ -145,7 +150,7 @@ export function FacetRail({ lensKey, groups: groupsProp, facets, onToggle, onRes
         {facets.size > 0 && <button onClick={onReset} style={{ border: 'none', background: 'none', color: C.accent, fontSize: 11, fontWeight: 700, cursor: 'pointer', padding: 0 }}>초기화</button>}
       </div>
       <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '0 14px 12px' }}>
-        <FacetGroups groups={groups} facets={facets} onToggle={onToggle} />
+        <FacetGroups groups={groups} facets={facets} onToggle={onToggle} counts={counts} />
       </div>
       <button onClick={toggleHidden} title="필터 숨기기"
         style={{ flexShrink: 0, alignSelf: 'flex-start', border: 'none', background: 'none', color: C.faint, cursor: 'pointer', padding: '10px 14px 12px', display: 'inline-flex', opacity: 0.4 }}

@@ -86,6 +86,18 @@ export default function FinancePage() {
     return true;
   }), [rows, facets, range.from, range.to, isAll, q, aliases]);
 
+  // 칩별 매칭 건수(erp3식 '라벨(N)') — 기간(상단 소유)만 적용, 칩끼리 교차필터 안 함.
+  const counts = useMemo(() => {
+    const c: Record<string, number> = { 입금: 0, 출금: 0, 계좌: 0, CMS: 0, 카드: 0, 미분류: 0, 분류됨: 0 };
+    for (const r of rows) {
+      if (!isAll) { if (range.from && r.date < range.from) continue; if (range.to && r.date > range.to) continue; }
+      if (r.inAmt > 0) c['입금']++; else c['출금']++;
+      if (c[r.source] != null) c[r.source]++;
+      if (isUnclassified(r.category)) c['미분류']++; else c['분류됨']++;
+    }
+    return c;
+  }, [rows, range.from, range.to, isAll]);
+
   const totalIn = scoped.reduce((s, r) => s + r.inAmt, 0);
   const totalOut = scoped.reduce((s, r) => s + r.outAmt, 0);
   const unclassified = scoped.filter((r) => isUnclassified(r.category));
@@ -182,7 +194,7 @@ export default function FinancePage() {
           actions={<Btn size="sm" onClick={() => openIngest('bank_tx')}>+ 계좌 담기</Btn>}
         />
       }
-      rail={!loading ? <FacetRail lensKey="재무현황" facets={facets} onToggle={toggleFacet} onReset={resetFacets} /> : null}
+      rail={!loading ? <FacetRail lensKey="재무현황" facets={facets} onToggle={toggleFacet} onReset={resetFacets} counts={counts} /> : null}
     >
       <Sec title="생애" desc="자금자산 · 미분류→분류→원장" hideable={false}>
         <Cards min={128} fit>
