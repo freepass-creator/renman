@@ -12,7 +12,6 @@ import { FacetRail } from '@/components/FacetRail';
 import { WorkbenchBar } from '@/components/WorkbenchBar';
 import { WorkHubBack } from '@/components/WorkHubTabs';
 import { companyLabel } from '@/lib/companies';
-import { PenaltyUpload } from '@/components/PenaltyUpload';
 import { PenaltyDocs } from '@/components/PenaltyDocs';
 import { openCar, openCustomer } from '@/lib/ui-bus';
 import { customerKey } from '@/lib/customers';
@@ -40,7 +39,6 @@ export default function PenaltyProcess() {
   );
   const [facets, setFacets] = useState<Set<string>>(new Set());
   const [q, setQ] = useState('');
-  const [upload, setUpload] = useState(false);
   const [docs, setDocs] = useState(false);
   const [order, reorder] = useSecOrder('jpk:order:penalty', [...PEN_SECS]);
   const toggleFacet = (label: string) => setFacets((s) => { const n = new Set(s); n.has(label) ? n.delete(label) : n.add(label); return n; });
@@ -131,7 +129,7 @@ export default function PenaltyProcess() {
           stat={<span style={{ fontSize: 13, fontWeight: 800, color: C.warn, whiteSpace: 'nowrap' }}>총 {won(total)}</span>}
           actions={<>
             {matched > 0 && <Btn variant="ghost" onClick={() => setDocs(true)}><span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><FileText size={15} /> 변경부과 공문 ({matched})</span></Btn>}
-            <Btn onClick={() => setUpload(true)}><span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><UploadCloud size={15} /> 고지서 등록 (OCR)</span></Btn>
+            <Btn href="/penalty/upload"><span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><UploadCloud size={15} /> 고지서 등록 (OCR)</span></Btn>
           </>}
         />
       }
@@ -178,7 +176,6 @@ export default function PenaltyProcess() {
           </Sec>
         );
       })}
-      {upload && <PenaltyUpload onClose={() => setUpload(false)} onSaved={() => reload()} />}
       {docs && <PenaltyDocs penalties={rows.filter((r) => r.renter).map((r) => r.p)} companyId={companyId} onClose={() => setDocs(false)} onSubmitted={() => reload()} />}
     </FacetPage>
   );
