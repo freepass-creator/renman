@@ -2,7 +2,7 @@
 import { useState, useEffect, type CSSProperties } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { ChevronLeft, Menu, X, Home } from 'lucide-react';
+import { ChevronLeft, Menu, X, Home, Search as SearchIcon } from 'lucide-react';
 import { useSession, roleLabel } from '@/lib/session';
 import { useAppBarSlots } from '@/lib/appbar';
 import { useIsMobile } from '@/lib/use-mobile';
@@ -133,10 +133,13 @@ export default function TopBar() {
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 16px', background: C.taupeBg, borderBottom: `1px solid ${line}`, position: 'sticky', top: 0, zIndex: 30, minHeight: 48, boxSizing: 'border-box', flexWrap: 'wrap' }}>
         <NavMenu />
         <a href="/" style={{ fontSize: 15, fontWeight: 800, letterSpacing: '-0.03em', color: ink, textDecoration: 'none' }}>{OPERATOR_BRAND}</a>
-        {/* 가운데 = 현재 페이지명(앱바 SSOT). 상세(depth)는 자체 헤더가 있어 제외. */}
-        <span style={{ flex: 1, minWidth: 0, textAlign: 'center', fontSize: 14, fontWeight: 800, letterSpacing: '-0.02em', color: ink, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', padding: '0 10px' }}>
-          {!depth ? (slots.title ?? '') : ''}
-        </span>
+        {/* 가운데 = 전역 검색(⌘K 커맨드 팔레트) — 통상 ERP 상단바 활용. */}
+        <button onClick={() => window.dispatchEvent(new Event('jpk:command'))} title="검색 (Ctrl+K)"
+          style={{ flex: 1, minWidth: 0, maxWidth: 440, margin: '0 auto', display: 'inline-flex', alignItems: 'center', gap: 8, height: 30, padding: '0 12px', border: `1px solid ${line}`, borderRadius: 'var(--radius)', background: C.card, cursor: 'pointer', color: mute }}>
+          <SearchIcon size={14} style={{ flexShrink: 0 }} />
+          <span style={{ flex: 1, textAlign: 'left', fontSize: 12.5, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>차량·손님·계약 검색…</span>
+          <span style={{ flexShrink: 0, fontSize: 10.5, color: C.faint, border: `1px solid ${line}`, borderRadius: 4, padding: '1px 5px', fontWeight: 700 }}>Ctrl K</span>
+        </button>
         <span style={{ fontSize: 12, color: mute, fontWeight: 600, marginRight: 2, fontVariantNumeric: 'tabular-nums' }}>{todayLabel}</span>
         <div style={{ display: 'inline-flex', alignItems: 'baseline', gap: 6, paddingLeft: 2, whiteSpace: 'nowrap' }} title={user.email}>
           <span style={{ fontSize: 12.5, fontWeight: 700, color: ink }}>{user.name}</span>

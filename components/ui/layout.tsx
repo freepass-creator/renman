@@ -20,9 +20,9 @@ export function Page({ title, meta, left, mid, right, tools, children, fill, bac
 }) {
   const mobile = useIsMobile();
   const hasTitle = title != null && title !== '';
-  // 제목 = 상단바(앱바) 가운데 SSOT — 모바일·웹 공통. 본문 헤더엔 제목 안 그림(중복 제거). 상세(depth)만 예외.
+  // 모바일: 제목을 상단바 헤더로. 웹: 제목은 본문 헤더행 h1(통상 ERP — 제목이 그 페이지 툴바와 한 덩어리).
   useAppBar(
-    back || hasTitle ? { ...(back ? { back } : {}), ...(hasTitle ? { title } : {}) } : null,
+    back || (mobile && hasTitle) ? { ...(back ? { back } : {}), ...(mobile && hasTitle ? { title } : {}) } : null,
     [mobile, back, typeof title === 'string' ? title : 0],
   );
   // 모바일: meta는 상단바에 제목만 — 본문 헤더에 붙이면 회사필터/툴바 옆에 쌩뚱맞게 붙음.
@@ -31,7 +31,7 @@ export function Page({ title, meta, left, mid, right, tools, children, fill, bac
   return (
     <main style={{ maxWidth: 1680, margin: '0 auto', padding: mobile ? PAGE_PAD_M : '16px 24px 60px', ...(fill ? { flex: 1, minWidth: 0 } : {}) }}>
       <div style={{ display: 'flex', flexWrap: mobile ? 'nowrap' : 'wrap', alignItems: 'center', gap: mobile ? SPACE_M : 10, paddingBottom: mobile ? PAGE_HEAD_PB_M : 14, minHeight: mobile ? 0 : 36 }}>
-        {/* 제목은 상단바 가운데(앱바) — 본문 헤더엔 안 그림. */}
+        {!mobile && hasTitle && <h1 style={{ fontSize: 18, fontWeight: 800, letterSpacing: '-0.02em', margin: 0, flexShrink: 0 }}>{title}</h1>}
         {!shellOwnsCompany && !noCompany && <CompanyFilter />}
         {left != null ? (
           <div style={{ flex: 1, minWidth: 0 }}>{left}</div>
