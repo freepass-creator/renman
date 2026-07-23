@@ -321,10 +321,12 @@ function buildVehicles(wb: XLSX.WorkBook): SwitchplanVehicle[] {
 
 /** 자산 → 차량 EntityRecord (entities.ts vehicle 키). status/할부는 팩에서 병합.
  *  차종마스터가 로드돼 있으면(setCatalog/ensureCatalog) 자산 차종을 마스터에 스냅해 5단계 상위(제조사·모델·세부모델)를
- *  마스터 표준값으로 채운다("차종마스터 기본"). 미매칭·미로드면 엑셀 원값 유지(비파괴). 원문은 carName에 보존. */
+ *  마스터 표준값으로 채운다("차종마스터 기본").
+ *  · confidence==='high'(연식 적중)만 덮어씀.
+ *  · review(최신세대 폴백)·none → 엑셀 원값 유지(비파괴). 원문은 carName에 보존. */
 function vehicleRecord(a: SwitchplanVehicle): EntityRecord {
   const snap = classifyVehicle(a.fullModel || a.subModel || a.modelLine, a.firstRegisteredDate || String(a.year || ''));
-  const matched = snap.confidence !== 'none';
+  const matched = snap.confidence === 'high';
   const maker = matched ? snap.maker : clean(a.maker);
   const modelLine = matched ? snap.modelLine : clean(a.modelLine);
   const subModel = matched ? snap.subModel : clean(a.subModel);

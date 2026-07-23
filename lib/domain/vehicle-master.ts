@@ -97,9 +97,16 @@ function modelsForMaker(maker: string): Set<string> | null {
 export function inferImportModel(maker: string, text: string): string {
   const models = modelsForMaker(maker);
   if (!models) return '';
+  // 정확 일치 우선. 짧은 코드(C클래스·5시리즈)는 substring 금지 — 'c클래스'⊂'glc클래스' 오매칭 방지.
   const has = (label: string): string => {
     const n = nm(label);
-    for (const m of models) { const x = nm(m); if (x === n || x.includes(n) || n.includes(x)) return m; }
+    if (!n) return '';
+    for (const m of models) if (nm(m) === n) return m;
+    if (n.length < 6) return '';
+    for (const m of models) {
+      const x = nm(m);
+      if (x.length >= 6 && (x.includes(n) || n.includes(x))) return m;
+    }
     return '';
   };
   const mk = canonMk(maker);
@@ -217,9 +224,35 @@ export function catalogMakerByModel(model: string): string {
   if (n.length < 2) return '';
   const cats = Object.values(_index).filter((c) => c.model_root);
   for (const c of cats) if (norm(c.model_root) === n) return c.maker;      // 정확 일치
-  for (const c of cats) {                                                   // 부분일치 — 4자+(짧은코드 충돌 방지)
-    const nm = norm(c.model_root);
-    if (nm.length >= 4 && (n.includes(nm) || nm.includes(n))) return c.maker;
+  // 차명⊃루트(그랜저·K5 등 짧은 한글 루트 OK). 루트⊃쿼리는 4자+만(짧은 코드가 긴 루트에 먹히지 않게).
+  for (const c of cats) {
+    const nm0 = norm(c.model_root);
+    if (!nm0) continue;
+    if (nm0.length >= 2 && n.includes(nm0)) return c.maker;
+    if (n.length >= 4 && nm0.includes(n)) return c.maker;
+  }
+  return '';
+}
+
+// 차명 맨 앞 브랜드 토큰 — catalog model_root「제네시스」(현대 DH)가 브랜드 제네시스를 가로채지 않게 1순위.
+// JS `\b`는 한글에 안 먹히므로 startsWith(+구분)만 씀.
+const BRAND_HEAD: [string, string][] = [
+  ['제네시스', '제네시스'], ['genesis', '제네시스'],
+  ['bmw', 'BMW'],
+  ['벤츠', '벤츠'], ['mercedes', '벤츠'], ['benz', '벤츠'],
+  ['아우디', '아우디'], ['audi', '아우디'],
+  ['현대', '현대'], ['hyundai', '현대'],
+  ['기아', '기아'], ['kia', '기아'],
+];
+function headBrand(blob: string): string {
+  const low = blob.trim().toLowerCase();
+  for (const [tok, mk] of BRAND_HEAD) {
+    const t = tok.toLowerCase();
+    if (low === t) return mk;
+    if (!low.startsWith(t) || low.length <= t.length) continue;
+    const next = low[t.length]!;
+    // 공백·하이픈·영숫자(제네시스G80 · BMW530i). 한글 모델접미(제네시스는…)는 브랜드로 치지 않음.
+    if (next === ' ' || next === '-' || /[0-9a-z]/i.test(next)) return mk;
   }
   return '';
 }
@@ -246,9 +279,11 @@ const MAKER_PATTERNS: [RegExp, string][] = [
 ];
 
 export function inferMaker(model: string, text = ''): string {
+  const blob = `${model || ''} ${text || ''}`.trim();
+  const hb = headBrand(blob);
+  if (hb) return hb;
   const byCat = catalogMakerByModel(model);
   if (byCat) return byCat;
-  const blob = `${model || ''} ${text || ''}`;
   for (const [re, mk] of MAKER_PATTERNS) if (re.test(blob)) return mk;
   return '';
 }
@@ -266,9 +301,19 @@ export function catalogSubModelByYear(
   let cands = Object.values(_index).filter((c) => {
     if (!c.model_root) return false;
     const mk = !maker || canonMk(c.maker) === nMk || norm(c.maker).includes(norm(maker)) || norm(maker).includes(norm(c.maker));
-    const md = nm(c.model_root) === nMd || nMd.includes(nm(c.model_root)) || nm(c.model_root).includes(nMd);
+    const mdRoot = nm(c.model_root);
+    // 정확 일치 · 차명⊃루트. 루트⊃쿼리는 6자+만 — 'c클래스'⊂'glc클래스' 차단.
+    const md = mdRoot === nMd
+      || (mdRoot.length >= 2 && nMd.includes(mdRoot))
+      || (nMd.length >= 6 && mdRoot.includes(nMd));
     return mk && md;
   });
+  // 복수 루트 히트 시(차명에 짧은·긴 루트 동시) 가장 긴 model_root만 남김.
+  if (cands.length > 1) {
+    const bestLen = Math.max(...cands.map((c) => nm(c.model_root).length));
+    const longOnly = cands.filter((c) => nm(c.model_root).length === bestLen);
+    if (longOnly.length) cands = longOnly;
+  }
   if (!cands.length) return null;
   const base = cands.filter((c) => !/HEV|하이브리드/.test(c.title || ''));
   if (base.length) cands = base;
