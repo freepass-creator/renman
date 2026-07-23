@@ -79,6 +79,9 @@ curl -s -o /dev/null -w "%{http_code}" http://localhost:6006/<route>   # 200
 
 | 날짜 | 작업자 | 내용 | 상태 |
 |---|---|---|---|
+| 2026-07-23 | Claude | **UI/UX 통일 규격**(전수검사 24p): `docs/UIUX-SPEC.md` — 유형6종(현황조회·통합시트·업무·상세·입력큐·지표) 보기·필터·정렬·섹션·팝업·모바일 SSOT + 위반 15p 체크리스트. 공통: window.confirm/prompt 금지·DataTable→ExcelSheet·Sec에 id·FacetRail=데이터필터·팝업 최소화 | 규격 확정(수정 대기) |
+| 2026-07-23 | Claude | **운영시트=차량1대=1행 통합 마스터**(엑셀전용): `buildFleetRows` SSOT(자산+계약/손님+미수+보험조인+현위치) · 기본/전체 열토글(전체=기본+부가 우측) · FacetRail 운영시트렌즈(기본'보유') · 헤더필터/정렬 · 행클릭360 · 고아계약 노출(미수 안숨김) · 상태뱃지=상태톤·현위치 한칸하나 · 메뉴 최상단 승격 | 165행·보유113·미수1.42억·tsc0·/sheet200 |
+| 2026-07-23 | Claude | **'오늘' KST 통일**(`todayKST`): UTC toISOString 이 KST 00~09시 하루 이르던 것 — 미수도래·D-day·기록일 14곳 경유. 타임스탬프는 UTC 유지 | tsc0·test35 |
 | 2026-07-23 | Claude | **SM-1(P1) 불법전이 백스톱**: 범용 편집기 `/list/[entity]/[id]` 가 `canTransition` 없이 계약 status 를 그대로 저장 → 종료계약 부활(해지→운행) 가능하던 것. `canSetStatus`(status SSOT) 신설 + `commitUpdate` 커맨드층에서 강제(rec.status 우선·없으면 조회). 종료→운행/대기 부활만 차단, 전진·채권화·no-op 허용 | tsc 0 / test 35 |
 | 2026-07-23 | Claude | **얼린 시드 가명화**(PII): `tools/mask-switchplan-pii.ts` 신설 — 실명→고객NNN·전화·번호판·VIN·임차인 counterparty 결정적 치환(참조무결성·carry 보존). `rebuild-switchplan-frozen`이 기록 직전 자동 마스킹 → 재생성해도 실PII 안 들어감. 시드는 정적 import(번들)라 gitignore 불가 → 가명화가 정답 | 실PII 0·carry 142,315,000·163/177·tsc 0·test 32/32 |
 | 2026-07-22 | Cursor | frozen 시드 live 재생성(`rebuild-switchplan-frozen --write`): 차량 118→163 · 계약 147→177 · asOf 07-22 · carry≡net ₩1.42억·미수율34% · DocIssueDialog 미리보기 `C.head` · §2 B진행표 갱신 | tsc 0 / audit OK |
