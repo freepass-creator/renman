@@ -7,7 +7,7 @@ import { useSecOrder } from '@/lib/use-sec-order';
 import { type EntityRecord } from '@/lib/intake/entities';
 import { generateSchedules, recalcContract } from '@/lib/payments/payment-schedule';
 import type { Contract } from '@/lib/payments/types';
-import { Sec, Cards, Metric, ObjCard, Stepper, Btn, Badge, FormGrid, KV, HiddenSecs, EmptyState, Message, th, thR, td, tdR, won, C, SH, PageLoading, ctrlH, ctrlInputFs, useConfirm, type Step, type KVRow } from '@/components/ui';
+import { Sec, Cards, Metric, ObjCard, Stepper, Btn, TextLink, Badge, FormGrid, KV, HiddenSecs, EmptyState, Message, th, thR, td, tdR, won, C, SH, PageLoading, ctrlH, ctrlInputFs, useConfirm, type Step, type KVRow } from '@/components/ui';
 import { InfoDoc, type DocReplacePayload } from '@/components/InfoDoc';
 import { docHistory, pushDocVersion, latestDoc } from '@/lib/docs';
 import { deriveLocation, locationLabel } from '@/lib/vehicle-location';
@@ -587,9 +587,9 @@ export function Vehicle360({ plate, focus }: { plate: string; focus?: string }) 
               <div style={{ fontSize: 11.5, fontWeight: 700, color: C.mute, marginBottom: 6 }}>인도·반납 증거 (사진·서명)</div>
               <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap' }}>
                 {hd.map((d, i) => d.url ? (
-                  <button key={i} onClick={() => window.open(d.url, '_blank')} style={{ fontSize: 11.5, padding: '5px 10px', borderRadius: 'var(--radius)', border: `1px solid ${C.line}`, background: 'var(--bg-card)', color: C.accent, cursor: 'pointer', fontWeight: 700 }}>
+                  <Btn key={i} size="sm" variant="ghost" onClick={() => window.open(d.url, '_blank')}>
                     {d.reason || '인도 증거'} · {String(d.uploadedAt || '').slice(0, 10)} 열기
-                  </button>
+                  </Btn>
                 ) : null)}
               </div>
             </div>
@@ -729,7 +729,7 @@ export function Vehicle360({ plate, focus }: { plate: string; focus?: string }) 
                 <span style={{ flex: 1 }} />
                 {doc
                   ? (doc.url
-                      ? <button onClick={() => window.open(doc.url, '_blank')} style={{ border: 'none', background: 'none', cursor: 'pointer', padding: 0, fontSize: 11.5, fontWeight: 700, color: C.accent }}>{doc.type || '서류'} 열기</button>
+                      ? <TextLink onClick={() => window.open(doc.url, '_blank')}>{doc.type || '서류'} 열기</TextLink>
                       : <span style={{ color: C.faint }}>{doc.type || '서류'} · 미첨부</span>)
                   : <span style={{ color: C.faint }}>서류 미첨부</span>}
               </div>
