@@ -436,6 +436,8 @@ export function Vehicle360({ plate, focus }: { plate: string; focus?: string }) 
             <Metric label="반납예정" value={remainText(effectiveEndDate(active), TODAY)} tone={d != null && d < 0 ? 'danger' : d != null && d <= 7 ? 'warn' : 'ink'} />
             <Metric label="미수" value={won(totalUnpaid)} tone={totalUnpaid > 0 ? 'danger' : 'ink'} />
           </> : <>
+            <Metric label="상태" value={String(v?.status || (loc.work && loc.work !== '대기' ? loc.work : '유휴'))} tone={loc.work === '정비' || loc.work === '사고' ? 'warn' : 'ink'} />
+            <Metric label="계약" value="계약 없음" tone="ink" />
             <Metric label="위치" value={locStr} tone={loc.work === '정비' || loc.work === '사고' ? 'warn' : 'ink'} />
             <Metric label="대기 일수" value={idleDays != null ? `${idleDays}일` : '—'} tone={idleDays != null && idleDays > 180 ? 'danger' : idleDays != null && idleDays > 60 ? 'warn' : 'ink'} />
             <Metric label="최종 반납" value={lastReturn ? yy(lastReturn) : '—'} />
@@ -516,16 +518,21 @@ export function Vehicle360({ plate, focus }: { plate: string; focus?: string }) 
         <Cards min={340}>{olderIns.map((ins, i) => { const id = dday(ins.endDate); return <ObjCard key={i} badge="이전" badgeTone="gray" name={String(ins.insurer || '보험')} carType={ins.policyNo ? String(ins.policyNo) : undefined} right={id == null ? undefined : <span style={{ color: C.faint }}>{id < 0 ? `만료 ${-id}일` : `D-${id}`}</span>} fields={[['기간', `${ins.startDate || ''}~${ins.endDate || ''}`], ['보험료', ins.totalPremium ? won(ins.totalPremium) : '—']]} />; })}</Cards>
       </div> : null}
 
-      {/* 매입 · 할부 = 자산 취득/부채측(직접입력). 인라인 수정은 차량정보와 공유. */}
-      {(v || editInfo) ? <Sec id="v-purchase" order={secOrd('v-purchase')} onReorder={reorderSec} title="매입 · 할부" desc="취득가·매입처·할부" tone={editInfo ? 'ok' : undefined} right={
+      {/* 취득 · 구입 = 자산 취득/부채측(직접입력). 인라인 수정은 차량정보와 공유. 상환 회차표는 아래 '할부 상환 스케줄'. */}
+      {(v || editInfo) ? <Sec id="v-purchase" order={secOrd('v-purchase')} onReorder={reorderSec} title="취득 · 구입" desc="취득일·취득가·매입처 · 할부(사·원금·이율·개월)" tone={editInfo ? 'ok' : undefined} right={
         editInfo
           ? <span style={{ fontSize: 11.5, color: C.faint }}>함께 편집 중</span>
           : <Btn variant="ghost" onClick={startEdit}>수정</Btn>
       }>
         <KV editing={editInfo} form={form} onChange={chg} rows={[
-          ['매입가', 'acquisitionPrice', v?.acquisitionPrice ? won(v.acquisitionPrice) : ''],
+          ['취득일', 'acquisitionDate', String(v?.acquisitionDate ?? '')],
+          ['취득가·매입가', 'acquisitionPrice', v?.acquisitionPrice ? won(v.acquisitionPrice) : ''],
+          ['매입완료일', 'purchasedDate', String(v?.purchasedDate ?? '')],
           ['매입처', 'supplier', String(v?.supplier ?? '')],
-          ['할부/리스사', 'loanCompany', String(v?.loanCompany ?? '')],
+          ['할부사·리스사', 'loanCompany', String(v?.loanCompany ?? '')],
+          ['할부원금', 'loanPrincipal', v?.loanPrincipal ? won(v.loanPrincipal) : ''],
+          ['연이율(%)', 'loanRate', String(v?.loanRate ?? '')],
+          ['할부개월', 'loanMonths', String(v?.loanMonths ?? '')],
           ['잔여원금', 'loanRemainingPrincipal', v?.loanRemainingPrincipal ? won(v.loanRemainingPrincipal) : ''],
         ] as KVRow[]} />
       </Sec> : null}

@@ -1,11 +1,12 @@
 'use client';
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ENTITIES, type EntityRecord } from '@/lib/intake/entities';
 import { callOcrExtract, mapOcrToEntity, type OcrResult, type OcrOriginal } from '@/lib/ocr-client';
 import { uploadDoc, docPath, storageReady } from '@/lib/storage';
 import type { DocVersion } from '@/lib/docs';
-import { KV, Btn, Badge, OcrCrosscheck, Select, Input, C, type KVRow } from '@/components/ui';
+import { KV, Btn, Badge, OcrCrosscheck, Select, Input, C, ctrlH, type KVRow } from '@/components/ui';
 import { type CrosscheckResult } from '@/lib/ocr-crosscheck';
+import { useIsMobile } from '@/lib/use-mobile';
 import { ChevronDown, FileText } from 'lucide-react';
 import FileDrop from '@/components/FileDrop';
 
@@ -56,6 +57,7 @@ export function InfoDoc({
   id, order, title, desc, fields, editing, form, onChange, onEditToggle, onSave,
   docType, docLabel, docs, companyId, recordKey, onReplaceDoc, canEditDoc = true, hideSaveCancel = false,
 }: InfoDocProps) {
+  const mobile = useIsMobile();
   const [mode, setMode] = useState<'view' | 'replace'>('view');
   const [busy, setBusy] = useState(false);
   const [pending, setPending] = useState<{ url: string; ocr?: Record<string, unknown>; ocrOriginal?: OcrOriginal; crosscheck?: CrosscheckResult; fileName: string } | null>(null);
@@ -63,6 +65,11 @@ export function InfoDoc({
   const [reason, setReason] = useState(REASONS[0]);
   const [saving, setSaving] = useState(false);
   const [histOpen, setHistOpen] = useState(false);
+  // 접기 — Sec와 동일 키(jpk:sec:{id})로 지속. 등록증·보험도 다른 섹션처럼 접힘.
+  const collKey = id ? `jpk:sec:${id}` : '';
+  const [collapsed, setCollapsed] = useState(false);
+  useEffect(() => { if (collKey) { try { setCollapsed(localStorage.getItem(collKey) === 'collapsed'); } catch { /* 무시 */ } } }, [collKey]);
+  const toggleCollapse = () => setCollapsed((c) => { const n = !c; if (collKey) { try { localStorage.setItem(collKey, n ? 'collapsed' : 'open'); } catch { /* 무시 */ } } return n; });
 
   const current = docs[0] || null;
   const attached = !!(current && current.url);
@@ -101,19 +108,24 @@ export function InfoDoc({
 
   return (
     <div id={id} style={{ marginTop: 22, scrollMarginTop: 62, order }}>
-      {/* 헤더: 제목 + 첨부상태 배지 + 우측 액션(수정 / 서류 교체·재발급) */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 9, flexWrap: 'wrap' }}>
-        <span style={{ fontSize: 13.5, fontWeight: 800, letterSpacing: '-0.01em', color: C.ink }}>{title}</span>
+      {/* 헤더: 접기토글(제목) + 첨부상태 배지 + 우측 액션(수정 / 서류 교체·재발급). 접히면 본문 숨김. */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 9, flexWrap: mobile ? 'wrap' : 'nowrap', minHeight: ctrlH(mobile) }}>
+        <button type="button" onClick={toggleCollapse} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, border: 'none', background: 'none', cursor: 'pointer', padding: 0, WebkitTapHighlightColor: 'transparent' }}>
+          <ChevronDown size={15} color={C.sub} style={{ flexShrink: 0, transform: collapsed ? 'rotate(-90deg)' : 'none', transition: 'transform .15s' }} />
+          <span style={{ fontSize: 13.5, fontWeight: 800, letterSpacing: '-0.01em', color: C.ink }}>{title}</span>
+        </button>
         <Badge tone={attached ? 'green' : hasOcr ? 'amber' : 'gray'}>{attached ? '첨부됨 ✓' : hasOcr ? 'OCR만 · 미첨부' : '미첨부'}</Badge>
-        {desc ? <span style={{ fontSize: 11.5, color: C.faint, flex: 1, minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{desc}</span> : <span style={{ flex: 1 }} />}
-        {editing
+        {!collapsed && (desc ? <span style={{ fontSize: 11.5, color: C.faint, flex: 1, minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{desc}</span> : <span style={{ flex: 1 }} />)}
+        {collapsed && <span style={{ flex: 1 }} />}
+        {!collapsed && (editing
           ? (hideSaveCancel
               ? <span style={{ fontSize: 11.5, color: C.faint }}>함께 편집 중</span>
               : <span style={{ display: 'inline-flex', gap: 6 }}><Btn size="sm" onClick={onSave}>저장</Btn><Btn size="sm" variant="ghost" onClick={onEditToggle}>취소</Btn></span>)
-          : <Btn size="sm" variant="ghost" onClick={onEditToggle}>수정</Btn>}
-        {canEditDoc && <Btn size="sm" variant="ghost" onClick={() => (mode === 'replace' ? resetReplace() : setMode('replace'))}>서류 등록·변경</Btn>}
+          : <Btn size="sm" variant="ghost" onClick={onEditToggle}>수정</Btn>)}
+        {!collapsed && canEditDoc && <Btn size="sm" variant="ghost" onClick={() => (mode === 'replace' ? resetReplace() : setMode('replace'))}>서류 등록·변경</Btn>}
       </div>
 
+      {!collapsed && (<>
       {/* 정보 KV (인라인 편집 — 세부 360과 동일 패턴) */}
       <KV rows={fields} editing={editing} form={form} onChange={onChange} />
 
@@ -203,6 +215,7 @@ export function InfoDoc({
           )}
         </div>
       )}
+      </>)}
     </div>
   );
 }
