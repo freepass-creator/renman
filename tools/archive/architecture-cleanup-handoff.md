@@ -67,7 +67,7 @@ curl http://localhost:6006/api/migrate-source
 | 1 SSOT | ✅ | `TODAY`→`dashboard-consts` · migrate plate→`lib/plate` · scripts→`tools/archive` |
 | 2 migrate·audit | ✅ | 시드 단일 진입 + doc-audit integrity 엔진 |
 | 3 Cash hub | ✅ | 7개 자금 화면에 공용 탭 · SessionBar 메뉴 축소 |
-| 4 UI/CSS | ⬜ | `globals.css` 레거시 정리 |
+| 4 UI/CSS | ◐ | `globals.css` 죽은 셸(sidebar/topbar/page-shell/dashboard/panel/kpi) 제거(2026-07-22). `.btn` 등 class 프리미티브·레거시 잔여 |
 | 5 packages | ⬜ | 동작 안정 후 물리 폴더 이동 (선택) |
 
 **척추(건드리지 말 것):** `store`→`intake` · `domain/model` · `section-registry` · `WorkbenchBar`/`FacetPage` · `Vehicle360`/`Customer360` · `contract-ops` · `operating-snapshot`

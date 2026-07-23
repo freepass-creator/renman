@@ -5,7 +5,7 @@ import { ENTITIES, type EntityRecord } from '@/lib/intake/entities';
 import { computeAssetLedgerEntry } from '@/lib/payments/asset-ledger';
 import type { Vehicle } from '@/lib/payments/types';
 import { openIngest } from '@/lib/ui-bus';
-import { Page, Sec, Cards, Metric, DataTable, Btn, Badge, EmptyState, won, C, Panel, type Col, PageLoading } from '@/components/ui';
+import { Page, Sec, Cards, Metric, DataTable, Btn, Badge, EmptyState, TextLink, won, C, Panel, type Col, PageLoading } from '@/components/ui';
 import { WorkbenchBar } from '@/components/WorkbenchBar';
 import { companyLabel } from '@/lib/companies';
 import { TODAY } from '@/lib/dashboard-consts';
@@ -67,7 +67,7 @@ export default function ListPage() {
       </Sec>
       <Panel title="목록">
         {loading ? <PageLoading />
-          : records.length === 0 ? <EmptyState>아직 {entity.label} 없음 — <button type="button" data-ui="action" onClick={() => openIngest(entityKey)} style={{ border: 'none', background: 'none', padding: 0, color: C.accent, fontWeight: 700, cursor: 'pointer', font: 'inherit' }}>담기로 수집</button></EmptyState>
+          : records.length === 0 ? <EmptyState>아직 {entity.label} 없음 — <TextLink onClick={() => openIngest(entityKey)}>담기로 수집</TextLink></EmptyState>
           : <DataTable cols={cols} rows={records} onRow={(r) => router.push(rowHref(r))} />}
       </Panel>
     </Page>

@@ -11,7 +11,7 @@ import { useBusyAction } from '@/lib/use-busy-action';
 import { safeUpdate } from '@/lib/safe-update';
 import { selectedInDim } from '@/lib/lens-filters';
 import { textMatch } from '@/lib/search-match';
-import { FacetPage, Sec, Cards, Metric, ObjCard, Btn, EmptyState, won, C, SPACE_M, PageLoading } from '@/components/ui';
+import { FacetPage, Sec, Cards, Metric, ObjCard, Btn, EmptyState, won, C, SPACE_M, TOUCH, PageLoading } from '@/components/ui';
 import { FacetRail } from '@/components/FacetRail';
 import { WorkbenchBar } from '@/components/WorkbenchBar';
 import { WorkHubBack } from '@/components/WorkHubTabs';
@@ -181,7 +181,7 @@ export default function ReceivablesPage() {
             {filtered.map((r, i) => { const rec = r.rec; const immob = !!rec.engineDisabled; const needLock = !r.v.ended && !immob && (r.st.stage === '시동제어' || r.st.stage === '내용증명' || r.st.stage === '채권화'); const rowId = String(rec._key ?? `row-${i}`); const logOn = logKey === rowId; const checked = noticeSel.has(rowId); return (
               <div key={i} style={{ display: 'flex', flexDirection: 'column', gap: SPACE_M }}>
                 <div style={{ display: 'flex', gap: SPACE_M, alignItems: 'flex-start' }}>
-                  <label style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 44, height: 44, flexShrink: 0, marginTop: 4, cursor: 'pointer' }}>
+                  <label style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: TOUCH, height: TOUCH, flexShrink: 0, marginTop: 4, cursor: 'pointer' }}>
                     <input type="checkbox" checked={checked} onChange={() => toggleNoticeSel(rowId)}
                       style={{ width: 16, height: 16, cursor: 'pointer' }}
                       aria-label="내용증명 일괄 선택" />

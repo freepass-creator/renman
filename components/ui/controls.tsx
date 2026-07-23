@@ -263,6 +263,44 @@ export function PeriodBar({ latest, initial = '월간', onRange }: { latest?: st
   );
 }
 
+/** 표·카드 안 인라인 링크 버튼 — 번호판·임차인·EmptyState CTA. 손롤 `<button style>` 금지. */
+export type TextLinkTone = 'accent' | 'ink' | 'ok';
+export function TextLink({
+  onClick, children, mono, stop, tone = 'accent', disabled, style, title,
+}: {
+  onClick?: (e: React.MouseEvent<HTMLButtonElement>) => void;
+  children: React.ReactNode;
+  mono?: boolean;
+  /** 행 onClick과 겹칠 때 stopPropagation */
+  stop?: boolean;
+  tone?: TextLinkTone;
+  disabled?: boolean;
+  style?: React.CSSProperties;
+  title?: string;
+}) {
+  const color = disabled ? C.mute : tone === 'ink' ? C.ink : tone === 'ok' ? C.ok : C.accent;
+  return (
+    <button
+      type="button"
+      title={title}
+      disabled={disabled}
+      data-ui="action"
+      onClick={(e) => { if (stop) e.stopPropagation(); onClick?.(e); }}
+      style={{
+        border: 'none', background: 'none', padding: 0, margin: 0,
+        cursor: disabled ? 'default' : 'pointer',
+        color, fontWeight: 700, font: 'inherit', textAlign: 'left',
+        fontFamily: mono ? 'var(--font-mono)' : 'inherit',
+        fontVariantNumeric: mono ? 'tabular-nums' : undefined,
+        WebkitTapHighlightColor: 'transparent',
+        ...style,
+      }}
+    >
+      {children}
+    </button>
+  );
+}
+
 export function Search({ size = 'md', style, wrapStyle, ...rest }: Omit<React.InputHTMLAttributes<HTMLInputElement>, 'size'> & { size?: 'sm' | 'md'; wrapStyle?: React.CSSProperties }) {
   const mobile = useIsMobile();
   const cs: CtrlSize = size === 'sm' ? 'sm' : 'md';

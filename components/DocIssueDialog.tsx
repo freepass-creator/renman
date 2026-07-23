@@ -181,9 +181,8 @@ export function DocIssueDialog({ issued, onClose, onIssued }: {
             </div>
           ))}
         </div>
-        {/* 우측 미리보기 */}
-        {/* 우측 미리보기 — #eceef1 매핑표 외(미리보기 크로마). 토큰 후보 확인 전 유지 */}
-        <div style={{ background: '#eceef1', overflow: 'auto', maxHeight: '68vh', padding: 14, borderRadius: 8 }}>
+        {/* 우측 미리보기 크로마 — 종이(인쇄면)와 구분. 화면 크롬만 토큰. */}
+        <div style={{ background: C.head, overflow: 'auto', maxHeight: '68vh', padding: 14, borderRadius: 8 }}>
           <style dangerouslySetInnerHTML={{ __html: DOC_PRINT_CSS }} />
           {template
             ? <div className="doc-paper" style={{ position: 'relative', margin: '0 auto', boxShadow: '0 2px 12px rgba(0,0,0,0.18)' }}>

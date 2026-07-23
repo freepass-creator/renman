@@ -2,7 +2,7 @@
 import { type CSSProperties, useEffect, useMemo, useState } from 'react';
 import { useSession } from '@/lib/session';
 import { classifyTx } from '@/lib/classify-tx';
-import { FacetPage, Sec, Cards, Metric, DataTable, EmptyState, Badge, Btn, Select, won, C, type Col, PageLoading, PeriodBar } from '@/components/ui';
+import { FacetPage, Sec, Cards, Metric, DataTable, EmptyState, Badge, Btn, Select, TextLink, won, C, type Col, PageLoading, PeriodBar } from '@/components/ui';
 import { FacetRail } from '@/components/FacetRail';
 import { WorkbenchBar } from '@/components/WorkbenchBar';
 import { WorkPipe } from '@/components/WorkPipe';
@@ -127,10 +127,9 @@ export default function FinancePage() {
     { key: 'source', label: '소스', render: (r) => <span style={{ fontSize: 11.5, color: C.mute }}>{r.source}</span> },
     { key: 'account', label: '계좌', render: (r) => <span style={{ fontSize: 11.5, color: C.faint }}>{alias(r.account) || '—'}</span> },
     { key: 'party', label: '내용', render: (r) => (
-      <button type="button" onClick={(e) => { e.stopPropagation(); jumpCashRow(r); }}
-        style={{ border: 'none', background: 'none', cursor: 'pointer', padding: 0, textAlign: 'left', color: C.ink, fontWeight: 600 }}>
+      <TextLink stop tone="ink" onClick={() => jumpCashRow(r)}>
         {r.party || <span style={{ color: C.faint }}>—</span>}
-      </button>
+      </TextLink>
     ) },
     { key: 'cat', label: '계정과목', render: (r) => catPicker(r) },
     { key: 'in', label: '입금', align: 'r', render: (r) => (r.inAmt ? <span className="mono" style={{ color: C.ok }}>{won(r.inAmt)}</span> : <span style={{ color: C.faint }}>—</span>) },
@@ -195,7 +194,7 @@ export default function FinancePage() {
       </Sec>
 
       {loading ? <PageLoading />
-        : rows.length === 0 ? <EmptyState>재무 자료 없음 — <button type="button" data-ui="action" onClick={() => openIngest('bank_tx')} style={{ border: 'none', background: 'none', padding: 0, color: C.accent, fontWeight: 700, cursor: 'pointer', font: 'inherit' }}>담기에서 계좌·CMS·카드 수집</button></EmptyState>
+        : rows.length === 0 ? <EmptyState>재무 자료 없음 — <TextLink onClick={() => openIngest('bank_tx')}>담기에서 계좌·CMS·카드 수집</TextLink></EmptyState>
           : order.map((id) => {
             if (id === 'f-uncl') {
               return (

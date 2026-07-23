@@ -16,8 +16,7 @@ import { useIsMobile } from '@/lib/use-mobile';
 import { moveBefore } from '@/lib/use-sec-order';
 import { pageTier } from '@/lib/nav';
 import { tierIncludes, type Tier } from '@/lib/tier';
-import { Btn, C, SPACE_M } from '@/components/ui';
-import { toggleStyle } from '@/components/ui/tokens';
+import { Btn, C, SPACE_M, toggleStyle } from '@/components/ui';
 
 export type MobileTabId =
   | 'home' | 'mydesk' | 'search' | 'upload' | 'settings'

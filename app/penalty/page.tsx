@@ -7,7 +7,7 @@ import { matchPenalty } from '@/lib/penalty-match';
 import { dueMatcher, selectedInDim } from '@/lib/lens-filters';
 import { textMatch } from '@/lib/search-match';
 import { dday } from '@/lib/dashboard-consts';
-import { Sec, Cards, Metric, DataTable, EmptyState, Btn, FacetPage, won, C, type Col, PageLoading } from '@/components/ui';
+import { Sec, Cards, Metric, DataTable, EmptyState, Btn, FacetPage, TextLink, won, C, type Col, PageLoading } from '@/components/ui';
 import { FacetRail } from '@/components/FacetRail';
 import { WorkbenchBar } from '@/components/WorkbenchBar';
 import { WorkHubBack } from '@/components/WorkHubTabs';
@@ -72,17 +72,17 @@ export default function PenaltyProcess() {
   const cols: Col<Row>[] = [
     ...(scopeAll ? [{ key: '_co', label: '회사', render: (r: Row) => <span style={{ color: C.mute }}>{companyLabel(r.p.companyId)}</span> }] : []),
     { key: 'plate', label: '차량', render: (r) => (
-      <button type="button" onClick={(e) => { e.stopPropagation(); if (r.p.plate) openCar(r.p.plate, 'inspect'); }}
-        style={{ border: 'none', background: 'none', cursor: r.p.plate ? 'pointer' : 'default', padding: 0, fontWeight: 700, color: C.ink }}>{String(r.p.plate || '—')}</button>
+      <TextLink stop tone="ink" disabled={!r.p.plate} onClick={() => { if (r.p.plate) openCar(r.p.plate, 'inspect'); }}>
+        {String(r.p.plate || '—')}
+      </TextLink>
     ) },
     { key: 'desc', label: '위반내용', render: (r) => String(r.p.description || r.p.docType || '—') },
     { key: 'date', label: '위반일시', render: (r) => String(r.p.violationDate || '—') },
     { key: 'amount', label: '금액', align: 'r', render: (r) => won(r.p.amount) },
     { key: 'renter', label: '책임자(매칭)', render: (r) => r.renter
-        ? <button type="button" onClick={(e) => { e.stopPropagation(); openCustomer(customerKey(r.renter, '')); }}
-            style={{ border: 'none', background: 'none', cursor: 'pointer', padding: 0, color: C.ok, fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+        ? <TextLink stop tone="ok" onClick={() => openCustomer(customerKey(r.renter, ''))} style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
             <Check size={14} /> {r.renter} <span style={{ fontSize: 11, color: C.faint }}>({r.contractNo})</span>
-          </button>
+          </TextLink>
         : <span style={{ color: C.warn }}>미매칭 · 회사 부담</span> },
     { key: '_del', label: '', align: 'r', render: (r) => <Btn size="sm" variant="ghost" onClick={() => del(r)}><Trash2 size={14} /></Btn> },
   ];

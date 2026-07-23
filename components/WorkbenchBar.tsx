@@ -13,6 +13,7 @@
  */
 import React from 'react';
 import { useIsMobile } from '@/lib/use-mobile';
+// ui 배럴(index)은 layout→이 파일을 간접 소비 — 배럴로 끌어오면 순환. tokens/controls만 직수입.
 import { SPACE_M, SPACE_GROUP_M } from '@/components/ui/tokens';
 import { CompanyFilter, PillTabs } from '@/components/ui/controls';
 import { SearchBox, FilterBox } from '@/components/SearchBox';

@@ -23,7 +23,7 @@ import { useBusyAction } from '@/lib/use-busy-action';
 import { resolveWriteCompany, NEED_COMPANY } from '@/lib/scope';
 import { commitUpdate, commitAll } from '@/lib/commit';
 import { visibleSecs } from '@/lib/lens-filters';
-import { FacetPage, Sec, Cards, Metric, Badge, Btn, EmptyState, SCRIM, ListBox, ListRow, Input, C, won, SPACE_M, type BadgeTone, PageLoading } from '@/components/ui';
+import { FacetPage, Sec, Cards, Metric, Badge, Btn, EmptyState, Modal, ListBox, ListRow, Input, TextLink, C, won, SPACE_M, TOUCH, type BadgeTone, PageLoading } from '@/components/ui';
 import { FacetRail } from '@/components/FacetRail';
 import { WorkbenchBar } from '@/components/WorkbenchBar';
 import { WorkHubBack } from '@/components/WorkHubTabs';
@@ -274,7 +274,7 @@ export default function PaymentsPage() {
                   sub={`묶음 ${c.items.length}건 · 총액 ${won(c.itemsSum)} · 수수료 ${won(c.estimatedFee)} (${(c.feeRate * 100).toFixed(2)}%)`}
                   right={<span style={{ display: 'inline-flex', alignItems: 'center', gap: SPACE_M }}>
                     <Badge tone={CONF_TONE[c.confidence] || 'gray'}>{c.confidence}</Badge>
-                    <label style={{ display: 'inline-flex', width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }} onClick={(e) => e.stopPropagation()}>
+                    <label style={{ display: 'inline-flex', width: TOUCH, height: TOUCH, alignItems: 'center', justifyContent: 'center' }} onClick={(e) => e.stopPropagation()}>
                       <input type="checkbox" checked={on} onChange={() => toggleCms(c.depositId)} />
                     </label>
                   </span>}
@@ -300,16 +300,15 @@ export default function PaymentsPage() {
                   sub={
                     <span>
                       →{' '}
-                      <button type="button" onClick={(e) => { e.stopPropagation(); if (plate) openCar(plate, 'unpaid'); }}
-                        style={{ border: 'none', background: 'none', padding: 0, cursor: 'pointer', color: C.accent, fontWeight: 700, fontSize: 'inherit', fontFamily: 'inherit' }}>
+                      <TextLink stop onClick={() => { if (plate) openCar(plate, 'unpaid'); }}>
                         {r.candidate.contract.customerName} · {plate}
-                      </button>
+                      </TextLink>
                       {' · '}<b>{r.candidate.scheduleSeq}회차</b>
                     </span>
                   }
                   right={<span style={{ display: 'inline-flex', alignItems: 'center', gap: SPACE_M }}>
                     <Badge tone={CONF_TONE[r.candidate.confidence] || 'gray'}>{r.candidate.confidence}</Badge>
-                    <label style={{ display: 'inline-flex', width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }} onClick={(e) => e.stopPropagation()}>
+                    <label style={{ display: 'inline-flex', width: TOUCH, height: TOUCH, alignItems: 'center', justifyContent: 'center' }} onClick={(e) => e.stopPropagation()}>
                       <input type="checkbox" checked={on} onChange={() => toggle(r.tx.id)} />
                     </label>
                   </span>}
@@ -335,9 +334,9 @@ export default function PaymentsPage() {
                   sub={crec ? (
                     <span>
                       →{' '}
-                      <button type="button" onClick={() => ck && openCustomer(ck)} style={{ border: 'none', background: 'none', padding: 0, cursor: ck ? 'pointer' : 'default', color: C.accent, fontWeight: 700, fontSize: 'inherit', fontFamily: 'inherit' }}>{String(crec.contractorName || '')}</button>
+                      <TextLink disabled={!ck} onClick={() => { if (ck) openCustomer(ck); }}>{String(crec.contractorName || '')}</TextLink>
                       {' · '}
-                      <button type="button" onClick={() => plate && openCar(plate, 'unpaid')} style={{ border: 'none', background: 'none', padding: 0, cursor: plate ? 'pointer' : 'default', color: C.accent, fontWeight: 700, fontSize: 'inherit', fontFamily: 'inherit', fontVariantNumeric: 'tabular-nums' }}>{plate}</button>
+                      <TextLink mono disabled={!plate} onClick={() => { if (plate) openCar(plate, 'unpaid'); }}>{plate}</TextLink>
                     </span>
                   ) : String(t.matchedContractId)}
                   right={<span style={{ display: 'inline-flex', alignItems: 'center', gap: SPACE_M }}>
@@ -380,34 +379,35 @@ export default function PaymentsPage() {
       )}
 
       {manualTx && (
-        <div onClick={() => { setManualTx(null); setMq(''); }} style={{ position: 'fixed', inset: 0, background: SCRIM, zIndex: 60, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '10vh 16px 16px' }}>
-          <div onClick={(e) => e.stopPropagation()} style={{ background: C.taupeBg, border: `1px solid ${C.line}`, borderRadius: 'var(--radius)', boxShadow: 'var(--shadow-lg)', width: '100%', maxWidth: 440, padding: 16 }}>
-            <div style={{ fontSize: 14, fontWeight: 800, color: C.ink }}>입금 수동 연결</div>
-            <div style={{ fontSize: 12.5, color: C.mute, marginTop: 4 }}>{manualTx.txDate} · {manualTx.counterparty || '(적요없음)'} · <b style={{ color: C.ink }}>{won(manualTx.amount)}</b> → 계약 선택</div>
-            <Input autoFocus value={mq} onChange={(e) => setMq(e.target.value)} placeholder="계약자·차번·연락처 검색"
-              style={{ width: '100%', marginTop: SPACE_M }} />
-            <div style={{ marginTop: SPACE_M, maxHeight: 300, overflowY: 'auto' }}>
-              {mCands.length === 0 ? <div style={{ fontSize: 12, color: C.faint, padding: '12px 4px' }}>{mq.trim() ? '일치 계약 없음' : '검색어를 입력하세요'}</div>
-                : (
-                  <ListBox>
-                    {mCands.map((c) => {
-                      const v = computeContractView(c, TODAY);
-                      return (
-                        <ListRow
-                          key={String(c._key)}
-                          main={String(c.contractorName || '—')}
-                          sub={String(c.plate || '')}
-                          right={v.net > 0 ? <span style={{ fontSize: 11.5, color: C.danger, fontWeight: 700 }}>미수 {won(v.net)}</span> : <span style={{ fontSize: 11, color: C.faint }}>미수없음</span>}
-                          onClick={() => manualMatch(manualTx, c)}
-                        />
-                      );
-                    })}
-                  </ListBox>
-                )}
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: SPACE_M }}><Btn size="sm" variant="ghost" onClick={() => { setManualTx(null); setMq(''); }}>닫기</Btn></div>
+        <Modal
+          title="입금 수동 연결"
+          meta={`${manualTx.txDate} · ${manualTx.counterparty || '(적요없음)'} · ${won(manualTx.amount)} → 계약 선택`}
+          onClose={() => { setManualTx(null); setMq(''); }}
+          width={440}
+          footer={<Btn size="sm" variant="ghost" onClick={() => { setManualTx(null); setMq(''); }}>닫기</Btn>}
+        >
+          <Input autoFocus value={mq} onChange={(e) => setMq(e.target.value)} placeholder="계약자·차번·연락처 검색"
+            style={{ width: '100%' }} />
+          <div style={{ marginTop: SPACE_M, maxHeight: 300, overflowY: 'auto' }}>
+            {mCands.length === 0 ? <div style={{ fontSize: 12, color: C.faint, padding: '12px 4px' }}>{mq.trim() ? '일치 계약 없음' : '검색어를 입력하세요'}</div>
+              : (
+                <ListBox>
+                  {mCands.map((c) => {
+                    const v = computeContractView(c, TODAY);
+                    return (
+                      <ListRow
+                        key={String(c._key)}
+                        main={String(c.contractorName || '—')}
+                        sub={String(c.plate || '')}
+                        right={v.net > 0 ? <span style={{ fontSize: 11.5, color: C.danger, fontWeight: 700 }}>미수 {won(v.net)}</span> : <span style={{ fontSize: 11, color: C.faint }}>미수없음</span>}
+                        onClick={() => manualMatch(manualTx, c)}
+                      />
+                    );
+                  })}
+                </ListBox>
+              )}
           </div>
-        </div>
+        </Modal>
       )}
         </>
       )}

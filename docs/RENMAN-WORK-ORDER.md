@@ -171,6 +171,7 @@ const { data: [cs, hs], loading } = useEntityLists(['contract', 'history']);
 | `lib/domain/early-termination.ts` | 중도해지 위약금 |
 | `lib/payments/ledger-subjects.ts` | 계정과목 · `groupOfLabel` · `vatOfLabel` |
 | `components/ui` `Page`/`FacetPage` | 페이지 헤더 = `[제목][전체회사]` 자동 (페이지가 손롤 금지) |
+| `components/ui` `TextLink` | 표·카드 안 인라인 링크(번호판·임차인·EmptyState CTA) — 손롤 `<button style>` 금지 |
 | `components/WorkbenchBar` | 툴바 SSOT (검색·탭·뷰·액션) |
 
 ---

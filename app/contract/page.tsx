@@ -18,7 +18,7 @@ import { classifyContract, type ContractPhase, type ContractDebt } from '@/lib/d
 import { aggregateCustomers, customerKey, type CustomerAgg } from '@/lib/customers';
 import { dueMatcher, selectedInDim } from '@/lib/lens-filters';
 import { textMatch } from '@/lib/search-match';
-import { FacetPage, Sec, Cards, Metric, DataTable, ExcelSheet, IconSeg, Badge, StatusTag, Btn, Drawer, Section, DetailGrid, EmptyState, Input, won, th, thR, td, tdR, C, type Col, PageLoading } from '@/components/ui';
+import { FacetPage, Sec, Cards, Metric, DataTable, ExcelSheet, IconSeg, Badge, StatusTag, Btn, Drawer, Section, DetailGrid, EmptyState, Input, TextLink, won, th, thR, td, tdR, C, type Col, PageLoading } from '@/components/ui';
 import { LayoutGrid, Table } from 'lucide-react';
 import { CONTRACT_COLS } from '@/lib/sheet-cols';
 import { contractViewToRow } from '@/lib/sheet-rows';
@@ -181,12 +181,14 @@ export default function ContractWorkspace() {
     ...(scopeAll ? [{ key: '_co', label: '회사', render: (v: ContractView) => <span style={{ color: C.mute }}>{companyLabel(v.rec.companyId)}</span> }] : []),
     { key: 'no', label: '계약번호', render: (v) => String(v.rec.contractNo || '—') },
     { key: 'renter', label: '임차인', render: (v) => (
-      <button type="button" onClick={(e) => { e.stopPropagation(); openCustomer(customerKey(v.rec.contractorName, v.rec.contractorPhone)); }}
-        style={{ border: 'none', background: 'none', cursor: 'pointer', padding: 0, fontWeight: 700, color: C.ink }}>{String(v.rec.contractorName || '—')}</button>
+      <TextLink stop tone="ink" onClick={() => openCustomer(customerKey(v.rec.contractorName, v.rec.contractorPhone))}>
+        {String(v.rec.contractorName || '—')}
+      </TextLink>
     ) },
     { key: 'plate', label: '차량', render: (v) => (
-      <button type="button" onClick={(e) => { e.stopPropagation(); if (v.rec.plate) openCar(v.rec.plate); }}
-        style={{ border: 'none', background: 'none', cursor: v.rec.plate ? 'pointer' : 'default', padding: 0, color: C.accent, fontWeight: 600 }}>{String(v.rec.plate || '—')}</button>
+      <TextLink stop disabled={!v.rec.plate} onClick={() => { if (v.rec.plate) openCar(v.rec.plate); }}>
+        {String(v.rec.plate || '—')}
+      </TextLink>
     ) },
     { key: 'status', label: '상태', render: (v) => { const c = classifyContract(v); return <Badge tone={c.tone === 'danger' ? 'red' : c.tone === 'ok' ? 'green' : c.tone === 'warn' ? 'amber' : 'gray'}>{c.label}</Badge>; } },
     { key: 'term', label: '기간', render: (v) => <span style={{ fontSize: 12 }}>{v.startDate || '—'}~{v.endDate || '—'}{v.dday != null && <span style={{ marginLeft: 6, color: v.dday < 0 ? C.danger : v.dday <= 30 ? C.warn : C.faint }}>{v.dday < 0 ? `만기경과 ${-v.dday}일` : `D-${v.dday}`}</span>}</span> },
