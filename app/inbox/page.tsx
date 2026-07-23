@@ -19,7 +19,7 @@ import { TODAY } from '@/lib/dashboard-consts';
 import { resolveWriteCompany, NEED_COMPANY } from '@/lib/scope';
 import { commitUpdate, commitAll } from '@/lib/commit';
 import type { CommitUpdateArgs } from '@/lib/commit';
-import { Page, Sec, Btn, EmptyState, Input, PillTabs, Modal, ListBox, ListRow, ObjCard, won, C, PageLoading, SPACE_M } from '@/components/ui';
+import { Page, Sec, Btn, EmptyState, Input, PillTabs, ListBox, ListRow, ObjCard, won, C, PageLoading, SPACE_M } from '@/components/ui';
 import { WorkbenchBar } from '@/components/WorkbenchBar';
 import { WorkHubBack } from '@/components/WorkHubTabs';
 import { SignaturePad, dataUrlToFile } from '@/components/SignaturePad';
@@ -115,47 +115,55 @@ export default function InboxPage() {
         <div style={{ display: 'flex', gap: SPACE_M, flexWrap: 'wrap' }}>
           <Btn onClick={() => camRef.current?.click()} disabled={busy}><Camera size={15} /> 사진 촬영</Btn>
           <Btn variant="ghost" onClick={() => fileRef.current?.click()} disabled={busy}><Paperclip size={15} /> 파일 선택</Btn>
-          <Btn variant="ghost" onClick={() => setSign(true)} disabled={busy}><PenLine size={15} /> 서명</Btn>
+          <Btn variant={sign ? 'solid' : 'ghost'} onClick={() => { setSign((s) => !s); setSignData(null); }} disabled={busy}><PenLine size={15} /> 서명</Btn>
           {busy && <span style={{ fontSize: 12.5, color: C.mute, alignSelf: 'center' }}>업로드 중…</span>}
         </div>
         {!storageReady() && <div style={{ marginTop: 10, fontSize: 12, color: C.warn }}>※ 저장소(Firebase Storage) 미설정 — 실제 업로드는 설정 후 가능합니다.</div>}
-      </Sec>
-
-      {sign && (
-        <Modal title="서명" onClose={() => { setSign(false); setSignData(null); }} width={420}
-          footer={<><Btn variant="ghost" onClick={() => { setSign(false); setSignData(null); }}>취소</Btn><Btn onClick={saveSignature} disabled={!signData || busy}>업로드</Btn></>}>
-          <SignaturePad onChange={setSignData} />
-        </Modal>
-      )}
-
-      {matchRec && (
-        <Modal title={`매칭 — ${String(matchRec.kind || '')} · ${String(matchRec.filename || '')}`} onClose={() => { setMatchRec(null); setMq(''); }} width={440}
-          footer={<Btn size="sm" variant="ghost" onClick={() => { setMatchRec(null); setMq(''); }}>닫기</Btn>}>
-          <PillTabs size="sm" tabs={(['vehicle', 'contract', 'bank_tx'] as Target[]).map((t) => ({ key: t, label: TARGET_LABEL[t] }))} value={mTarget} onChange={(k) => { setMTarget(k as Target); setMq(''); }} />
-          <Input value={mq} onChange={(e) => setMq(e.target.value)} placeholder={mTarget === 'vehicle' ? '차번·차명' : mTarget === 'contract' ? '계약자·차번·연락처' : '적요·금액·날짜'} style={{ width: '100%', marginTop: 10 }} autoFocus />
-          <div style={{ maxHeight: 300, overflowY: 'auto' }}>
-            {cands.length === 0 ? <EmptyState>{mq.trim() ? '일치 없음' : '검색어를 입력하세요'}</EmptyState>
-              : <ListBox>
-                {cands.map((c) => (
-                  <ListRow key={c.key} onClick={() => attach(mTarget, c.rec)} main={c.title} sub={c.sub} />
-                ))}
-              </ListBox>}
+        {/* 서명 = 그 자리 인라인 캡처(팝업 아님). */}
+        {sign && (
+          <div style={{ marginTop: 12, padding: 12, border: `1px solid ${C.accent}`, borderRadius: 'var(--radius)', background: 'var(--bg-card)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+              <span style={{ fontSize: 12.5, fontWeight: 700, color: C.ink }}>서명</span>
+              <span style={{ flex: 1 }} />
+              <Btn size="sm" variant="ghost" onClick={() => { setSign(false); setSignData(null); }}>취소</Btn>
+              <Btn size="sm" onClick={saveSignature} disabled={!signData || busy}>업로드</Btn>
+            </div>
+            <SignaturePad onChange={setSignData} />
           </div>
-        </Modal>
-      )}
+        )}
+      </Sec>
 
       <Sec title="대기" n={pending.length} desc="차량·계약·자금에 매칭하면 정리됩니다">
         {loading ? <PageLoading />
           : pending.length === 0 ? <EmptyState>대기 중인 업로드 없음</EmptyState>
-            : <div style={{ display: 'flex', flexDirection: 'column', gap: SPACE_M }}>{pending.map((r) => (
-              <ObjCard
-                key={String(r._key || r.inboxKey)}
-                badge={String(r.kind || '문서')}
-                title={String(r.filename || '—')}
-                sub={`${String(r.uploadedBy || '')} · ${String(r.uploadedAt || '').slice(0, 16).replace('T', ' ')}`}
-                right={<Btn size="sm" variant="ghost" onClick={() => { setMatchRec(r); setMTarget('vehicle'); setMq(''); }}>매칭</Btn>}
-              />
-            ))}</div>}
+            : <div style={{ display: 'flex', flexDirection: 'column', gap: SPACE_M }}>{pending.map((r) => {
+              // 매칭 = 그 자리 인라인 패널(팝업 아님). payments 수동연결 패턴.
+              const isMatching = !!matchRec && String(matchRec._key || matchRec.inboxKey) === String(r._key || r.inboxKey);
+              return (
+                <div key={String(r._key || r.inboxKey)} style={{ display: 'flex', flexDirection: 'column', gap: SPACE_M }}>
+                  <ObjCard
+                    badge={String(r.kind || '문서')}
+                    title={String(r.filename || '—')}
+                    sub={`${String(r.uploadedBy || '')} · ${String(r.uploadedAt || '').slice(0, 16).replace('T', ' ')}`}
+                    right={<Btn size="sm" variant="ghost" onClick={() => { if (isMatching) { setMatchRec(null); setMq(''); } else { setMatchRec(r); setMTarget('vehicle'); setMq(''); } }}>{isMatching ? '닫기' : '매칭'}</Btn>}
+                  />
+                  {isMatching && (
+                    <div style={{ padding: 12, border: `1px solid ${C.accent}`, borderRadius: 'var(--radius)', background: 'var(--bg-card)' }}>
+                      <PillTabs size="sm" tabs={(['vehicle', 'contract', 'bank_tx'] as Target[]).map((t) => ({ key: t, label: TARGET_LABEL[t] }))} value={mTarget} onChange={(k) => { setMTarget(k as Target); setMq(''); }} />
+                      <Input value={mq} onChange={(e) => setMq(e.target.value)} placeholder={mTarget === 'vehicle' ? '차번·차명' : mTarget === 'contract' ? '계약자·차번·연락처' : '적요·금액·날짜'} style={{ width: '100%', marginTop: 10 }} autoFocus />
+                      <div style={{ maxHeight: 300, overflowY: 'auto' }}>
+                        {cands.length === 0 ? <EmptyState>{mq.trim() ? '일치 없음' : '검색어를 입력하세요'}</EmptyState>
+                          : <ListBox>
+                            {cands.map((c) => (
+                              <ListRow key={c.key} onClick={() => attach(mTarget, c.rec)} main={c.title} sub={c.sub} />
+                            ))}
+                          </ListBox>}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}</div>}
       </Sec>
 
       {matched.length > 0 && (
