@@ -42,6 +42,20 @@ export function nextStatus(from: unknown, action: ContractAction): LifeStatus | 
   return TRANSITIONS[String(from || '')]?.[action] ?? null;
 }
 
+/** 직접 status 쓰기 허용 여부 — 쓰기 퍼널(commitUpdate) 백스톱.
+ *  종료 계약(반납·해지·채권)을 운행/대기로 되살리는 **부활(불법 전이)** 을 차단한다.
+ *  no-op(동일)·최초 설정(빈→값)·전진 전이·채권화는 허용(정상 흐름 무영향).
+ *  ※ 액션 기반 canTransition 이 SSOT지만, status 필드를 직접 쓰는 범용 경로(범용 편집기·개발도구)는
+ *    action 이 없어 canTransition 을 못 태운다 → 이 술어로 최소 무결성(부활 금지)을 강제.
+ *    더 촘촘한 전진 전이 검증·서버측(rules) 강제는 후속(SECURITY.md). */
+const REACTIVATE = new Set<string>(['운행', '대기']);
+export function canSetStatus(from: unknown, to: unknown): boolean {
+  const f = String(from ?? '').trim();
+  const t = String(to ?? '').trim();
+  if (!t || !f || f === t) return true;                 // 미설정 / 최초설정 / no-op
+  return !(CONTRACT_ENDED.has(f) && REACTIVATE.has(t));  // 종료→활성 = 부활 금지
+}
+
 /* ── 계약 술어 (contract-ops 와 동일 의미) ── */
 export function isContractEndedStatus(status: unknown): boolean {
   return CONTRACT_ENDED.has(String(status || ''));

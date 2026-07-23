@@ -79,6 +79,7 @@ curl -s -o /dev/null -w "%{http_code}" http://localhost:6006/<route>   # 200
 
 | 날짜 | 작업자 | 내용 | 상태 |
 |---|---|---|---|
+| 2026-07-23 | Claude | **SM-1(P1) 불법전이 백스톱**: 범용 편집기 `/list/[entity]/[id]` 가 `canTransition` 없이 계약 status 를 그대로 저장 → 종료계약 부활(해지→운행) 가능하던 것. `canSetStatus`(status SSOT) 신설 + `commitUpdate` 커맨드층에서 강제(rec.status 우선·없으면 조회). 종료→운행/대기 부활만 차단, 전진·채권화·no-op 허용 | tsc 0 / test 35 |
 | 2026-07-23 | Claude | **얼린 시드 가명화**(PII): `tools/mask-switchplan-pii.ts` 신설 — 실명→고객NNN·전화·번호판·VIN·임차인 counterparty 결정적 치환(참조무결성·carry 보존). `rebuild-switchplan-frozen`이 기록 직전 자동 마스킹 → 재생성해도 실PII 안 들어감. 시드는 정적 import(번들)라 gitignore 불가 → 가명화가 정답 | 실PII 0·carry 142,315,000·163/177·tsc 0·test 32/32 |
 | 2026-07-22 | Cursor | frozen 시드 live 재생성(`rebuild-switchplan-frozen --write`): 차량 118→163 · 계약 147→177 · asOf 07-22 · carry≡net ₩1.42억·미수율34% · DocIssueDialog 미리보기 `C.head` · §2 B진행표 갱신 | tsc 0 / audit OK |
 | 2026-07-22 | Cursor | UI 통일 패스: `TextLink` 원자 · Vehicle360/mobile-tabs 배럴 흡수 · payments `Modal`+`TOUCH` · 링크 손롤(계약/과태료/자금/목록/이력) · globals.css 죽은 셸 ~24KB 제거(Phase4 일부). ※WorkbenchBar는 순환 때문에 ui 하위경로 유지 | tsc 0 / :6007 200 |

@@ -6,6 +6,7 @@
  */
 import { getStore } from './store';
 import { resolveWriteCompany, NEED_COMPANY } from './scope';
+import { canSetStatus } from './domain/status';
 import type { EntityRecord } from './intake/entities';
 
 export type CommitUpdateArgs = {
@@ -38,8 +39,28 @@ function resolveOrThrow(sessionCompanyId: string, rec?: { companyId?: unknown } 
   return companyId;
 }
 
+/**
+ * 계약 status 직접 쓰기 백스톱(SM-1) — 종료 계약 부활 등 불법 전이를 커맨드층에서 차단.
+ * 범용 편집기·개발도구 등 canTransition 을 안 태우는 경로도 여기서 덮인다.
+ * from 은 rec.status 우선, 없으면 현재 레코드를 조회. 판정 불가하면(둘 다 미상) 막지 않음.
+ */
+async function assertLegalContractStatus(args: CommitUpdateArgs, companyId: string): Promise<void> {
+  if (args.entity !== 'contract') return;
+  const to = (args.patch as EntityRecord | undefined)?.status;
+  if (to === undefined || to === null || to === '') return; // status 미포함/미변경
+  let from = (args.rec as EntityRecord | null | undefined)?.status;
+  if (from === undefined) {
+    const cur = await getStore().get('contract', companyId, args.key).catch(() => null);
+    from = (cur as EntityRecord | null)?.status as string | undefined;
+  }
+  if (!canSetStatus(from, to)) {
+    throw new Error(`종료된 계약(${String(from)})의 상태를 ${String(to)}(으)로 되돌릴 수 없습니다. 재개가 필요하면 새 계약을 만드세요.`);
+  }
+}
+
 export async function commitUpdate(args: CommitUpdateArgs): Promise<{ companyId: string }> {
   const companyId = resolveOrThrow(args.sessionCompanyId, args.rec);
+  await assertLegalContractStatus(args, companyId);
   await getStore().update(args.entity, companyId, args.key, args.patch);
   return { companyId };
 }
