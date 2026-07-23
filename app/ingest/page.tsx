@@ -140,7 +140,7 @@ export default function IngestPage() {
 
   return (
     <Page title="데이터센터" meta="모든 데이터 투입구 · OCR·엑셀·직접입력"
-      tools={<WorkbenchBar mid={<WorkHubBack />} actions={<Btn size="sm" variant="ghost" href="/ingest/bulk">대량 자동매칭</Btn>} />}
+      tools={<WorkbenchBar mid={<WorkHubBack />} actions={<><Btn size="sm" variant="ghost" href="/ingest/classify">차종 분류</Btn><Btn size="sm" variant="ghost" href="/ingest/bulk">대량 자동매칭</Btn></>} />}
       right={<a href="/trash" style={{ fontSize: 13, color: C.mute, textDecoration: 'none', fontWeight: 600 }}>휴지통 →</a>}>
       <p style={{ color: C.mute, fontSize: 13, marginTop: 6, lineHeight: 1.6 }}>
         <b>모든 데이터</b>를 한곳에서 넣습니다 — 원장(차량·계약·고객·보험·계좌)뿐 아니라 <b>업무 기록(정비·통화·과태료)</b>까지.
