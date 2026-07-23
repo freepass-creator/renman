@@ -7,6 +7,7 @@
 import { getStore } from './store';
 import { resolveWriteCompany, NEED_COMPANY } from './scope';
 import { canSetStatus } from './domain/status';
+import { syncVehicleToFreepass } from './freepass/product-sync';
 import type { EntityRecord } from './intake/entities';
 
 export type CommitUpdateArgs = {
@@ -62,12 +63,15 @@ export async function commitUpdate(args: CommitUpdateArgs): Promise<{ companyId:
   const companyId = resolveOrThrow(args.sessionCompanyId, args.rec);
   await assertLegalContractStatus(args, companyId);
   await getStore().update(args.entity, companyId, args.key, args.patch);
+  // 차량 상태가 상품대기/상품화면 프리패스 매물로 자동 등록(fire-and-forget·env 게이트).
+  if (args.entity === 'vehicle') syncVehicleToFreepass({ ...(args.rec as EntityRecord | null || {}), ...args.patch });
   return { companyId };
 }
 
 export async function commitSave(args: CommitSaveArgs): Promise<{ companyId: string }> {
   const companyId = resolveOrThrow(args.sessionCompanyId, args.rec ?? args.records[0]);
   await getStore().save(args.entity, companyId, args.records);
+  if (args.entity === 'vehicle') for (const r of args.records) syncVehicleToFreepass(r);
   return { companyId };
 }
 

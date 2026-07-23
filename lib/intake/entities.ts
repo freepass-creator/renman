@@ -98,6 +98,11 @@ export const ENTITIES: Record<string, Entity> = {
       { key: 'driveType', label: '구동방식', type: 'text', manual: true, note: '전륜/후륜/4WD/AWD' },
       { key: 'transmission', label: '변속기', type: 'text', manual: true, note: '자동/DCT/CVT 등' },
       { key: 'optionList', label: '선택옵션', type: 'text', manual: true, note: '콤마구분 자유텍스트' },
+      // ── 상품 정보(프리패스 매물 연동) — 상태 상품대기면 자동 등록 ──
+      { key: 'listRent', label: '대여료(월,원)', type: 'number', manual: true, note: '프리패스 매물 월대여료' },
+      { key: 'listDeposit', label: '보증금(원)', type: 'number', manual: true },
+      { key: 'listTerm', label: '기준 렌트기간(개월)', type: 'number', manual: true, note: '가격맵 기준 기간(기본 48)' },
+      { key: 'insuranceIncluded', label: '보험료 포함', type: 'select', options: ['포함', '별도'], manual: true },
     ],
   },
   // 차량 이력 — v5 HistoryEntry(scope=vehicle). 정비·사고·검사·세차·위반·부품교체·보험을 한 엔티티로.

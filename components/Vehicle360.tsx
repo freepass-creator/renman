@@ -15,6 +15,7 @@ import { contractSchedules, computeContractView, effectiveEndDate, patchDeliver,
 import { canTransition } from '@/lib/domain/status';
 import { isCashPurchase } from '@/lib/domain/vehicle-finance';
 import { computeVehicleTax } from '@/lib/domain/vehicle-tax';
+import { pushToFreepass, vehicleToProduct, isProductReady } from '@/lib/freepass/product-sync';
 import { FUEL_LEVELS } from '@/lib/domain/fuel';
 import { normPlate } from '@/lib/plate';
 import { isComm, matchesContract } from '@/lib/activity-match';
@@ -37,7 +38,7 @@ import { TODAY, dday } from '@/lib/dashboard-consts';
 
 // 자산상세 섹션 기본 순서 — 현황 → 계약조건→수납스케줄(계약 다음 그 계약의 수납이 바로) → 보증금·관제,
 //   사건·이력 중간, 스펙·문서·내부재무(할부) 아래. 드래그로 바꾸면 useSecOrder 저장 · '순서 초기화'로 복원.
-const SEC_DEFAULT = ['v-status', 'v-contract', 'v-schedule', 'v-deposit', 'v-gps', 'v-penalty', 'v-work', 'v-history', 'v-handover', 'v-info', 'v-reg', 'v-insurance', 'v-econ', 'v-purchase', 'v-loan'];
+const SEC_DEFAULT = ['v-status', 'v-contract', 'v-schedule', 'v-deposit', 'v-gps', 'v-penalty', 'v-work', 'v-history', 'v-handover', 'v-info', 'v-product', 'v-reg', 'v-insurance', 'v-econ', 'v-purchase', 'v-loan'];
 
 // 날짜 표시 = yy-mm-dd (2자리 연도). 2023-11-21 → 23-11-21
 const yy = (s: unknown) => { const t = String(s || ''); return /^\d{4}-\d{2}-\d{2}/.test(t) ? t.slice(2, 10) : (t || '—'); };
@@ -110,6 +111,7 @@ export function Vehicle360({ plate, focus }: { plate: string; focus?: string }) 
   const [recMode, setRecMode] = useState<'pay' | 'disc' | null>(null);
   const [recForm, setRecForm] = useState({ seq: '1', date: TODAY, amount: '', method: '계좌', reason: '기타' });
   const [editIns, setEditIns] = useState(false);          // 보험(증권) 인라인 편집
+  const [prodBusy, setProdBusy] = useState(false);        // 프리패스 상품 등록 진행
   const [insForm, setInsForm] = useState<EntityRecord>({});
   const [logOpen, setLogOpen] = useState(false);          // 빠른 기록 — 그 자리에서 인라인 펼침(팝업 X)
   const [workOpen, setWorkOpen] = useState(false);        // 수선/작업 — 그 자리에서 인라인 펼침(팝업 X)
@@ -256,6 +258,15 @@ export function Vehicle360({ plate, focus }: { plate: string; focus?: string }) 
       else await commitSave({ entity: 'vehicle', sessionCompanyId: companyId, rec: v, records: [{ ...form, plate }] });
       setEditInfo(false);
     } catch { toast(NEED_COMPANY, 'error'); }
+  };
+  // 프리패스 매물 수동 등록 — 상태 상품대기면 저장 시 자동 등록도 됨(commit 훅). 여기선 즉시 push.
+  const registerProduct = async () => {
+    if (!v) return;
+    setProdBusy(true);
+    const r = await pushToFreepass([vehicleToProduct(v)]);
+    setProdBusy(false);
+    if (r.ok) toast('프리패스 매물 등록됨', 'success');
+    else toast('등록 실패(연동 확인): ' + (r.error || r.body || ('HTTP ' + r.status)), 'error');
   };
   // 보험(증권) 인라인 편집
   const insChg = (k: string, val: string) => setInsForm((f) => ({ ...f, [k]: val }));
@@ -478,6 +489,22 @@ export function Vehicle360({ plate, focus }: { plate: string; focus?: string }) 
             ] as KVRow[]} />
           : <EmptyState variant="sec">차량 미등록</EmptyState>}
       </Sec>
+
+      {/* 상품 정보 = 프리패스 매물 연동(대여료·보증금·보험). 상태 상품대기면 저장 시 자동 등록(commit 훅). 정책은 프리패스 소관. */}
+      {(v || editInfo) ? <Sec id="v-product" order={secOrd('v-product')} onReorder={reorderSec} title="상품 정보" desc="대여료·보증금·보험 — 프리패스 매물 등록" tone={editInfo ? 'ok' : undefined} right={
+        editInfo ? <span style={{ fontSize: 11.5, color: C.faint }}>함께 편집 중</span> : <Btn variant="ghost" onClick={startEdit}>수정</Btn>
+      }>
+        <KV editing={editInfo} form={form} onChange={chg} rows={[
+          ['대여료(월)', 'listRent', v?.listRent ? won(v.listRent) : ''],
+          ['보증금', 'listDeposit', v?.listDeposit ? won(v.listDeposit) : ''],
+          ['기준 기간(개월)', 'listTerm', String(v?.listTerm ?? '')],
+          ['보험료', 'insuranceIncluded', String(v?.insuranceIncluded ?? '')],
+        ] as KVRow[]} />
+        <div style={{ display: 'flex', gap: 8, marginTop: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+          <Btn onClick={registerProduct} disabled={prodBusy || !v}>{prodBusy ? '등록 중…' : '프리패스 상품 등록'}</Btn>
+          <span style={{ fontSize: 11.5, color: C.faint }}>{isProductReady(v) ? '상태 상품대기 — 저장 시 자동 등록' : '상태를 «상품대기»로 두면 자동 등록'}</span>
+        </div>
+      </Sec> : null}
 
       {/* 등록증 = 정보 + 자동차등록증 원본 + 재발급 이력(InfoDoc). 인라인 수정은 차량정보와 공유. */}
       <InfoDoc id="v-reg" order={secOrd('v-reg')} title="등록증" desc="자동차등록증상 정보 전부 · 원본과 한 몸"
