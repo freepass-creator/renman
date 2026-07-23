@@ -6,7 +6,6 @@ import { ConfirmProvider } from '@/components/ui/confirm';
 import TopBar from '@/components/SessionBar';
 import { CommandPalette } from '@/components/CommandPalette';
 import { CarDrawer } from '@/components/CarDrawer';
-import { IngestHost } from '@/components/IngestHost';
 import { PrintHost } from '@/components/PrintHost';
 import { QuickLogHost } from '@/components/QuickLog';
 import ToastHost from '@/components/ToastHost';
@@ -31,7 +30,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <div style={{ minHeight: 'calc(100vh - 49px)' }}>{children}</div>
               <CommandPalette />
               <CarDrawer />
-              <IngestHost />
               <PrintHost />
               <QuickLogHost />
               <ToastHost />

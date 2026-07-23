@@ -25,9 +25,16 @@ export const openPrintDoc = (
 ) =>
   window.dispatchEvent(new CustomEvent('jpk:print-doc', { detail: { type, plate, ...(extra || {}) } }));
 export const openCommand = () => window.dispatchEvent(new Event('jpk:command'));
-export const openIngest = (type?: string, plate?: string) => window.dispatchEvent(new CustomEvent('jpk:ingest', { detail: { type: type || '', plate: plate || '' } }));
-// 기존 레코드 정정 — 공용 입력엔진(IngestDialog) 편집모드로. entityKey + 레코드 넘기면 prefill + update.
-export const openEntityEdit = (entityKey: string, rec: unknown) => window.dispatchEvent(new CustomEvent('jpk:ingest', { detail: { editType: entityKey, editRec: rec } }));
+// 신규 담기 = 팝업 아닌 «데이터센터 페이지»로 이동(규격 통일·SPA push). type=엔티티, plate=프리필.
+export const openIngest = (type?: string, plate?: string) => {
+  if (typeof window === 'undefined') return;
+  const qs = new URLSearchParams();
+  if (type) qs.set('type', type);
+  if (plate) qs.set('plate', plate);
+  const href = '/ingest' + (qs.toString() ? `?${qs.toString()}` : '');
+  window.dispatchEvent(new CustomEvent('jpk:navigate', { detail: { href } }));
+};
+// (기존 레코드 정정은 각 상세(360/계약 상세)에서 «그 자리 인라인 편집» — openEntityEdit 팝업 폐지)
 // 빠른 기록(활동 로그) — 실무자가 차/고객 맥락에서 소소하게: 이동·통화·문자·방문·메모·정비. 마찰 0.
 export const openLog = (ctx?: { plate?: string; customer?: string; contractNo?: string; companyId?: string }) => window.dispatchEvent(new CustomEvent('jpk:log', { detail: ctx || {} }));
 // 저장 반영 브로드캐스트 — 쓰기 계층(store)이 자동 발신 + 페이지가 수동 발신해도 중복 코얼레스(50ms).

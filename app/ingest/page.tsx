@@ -1,5 +1,6 @@
 'use client';
 import { useState, useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { ENTITY_LIST, ENTITIES, mapOcrToEntity, type EntityRecord } from '@/lib/intake/entities';
 import { parseCsv } from '@/lib/intake/csv';
 import { downloadXlsxTemplate, parseSpreadsheet } from '@/lib/intake/xlsx';
@@ -17,6 +18,9 @@ import { Page, Sec, Cards, Metric, Btn, FormGrid, Panel, PillTabs, Select, Input
 import { WorkbenchBar } from '@/components/WorkbenchBar';
 import { WorkHubBack } from '@/components/WorkHubTabs';
 import { layerOfEntity } from '@/lib/domain/layers';
+
+// 담기가 URL(?type·plate)로 진입하므로 정적 프리렌더 대신 요청시 렌더(useSearchParams bailout 방지).
+export const dynamic = 'force-dynamic';
 
 type Tab = 'ocr' | 'excel' | 'manual';
 
@@ -36,7 +40,8 @@ const ENTITY_GROUPS = (['ledger', 'event', 'system'] as const)
 
 export default function IngestPage() {
   const { companyId, user, scopeAll } = useSession();
-  const [entityKey, setEntityKey] = useState('vehicle');
+  const sp = useSearchParams();
+  const [entityKey, setEntityKey] = useState(() => sp.get('type') || 'vehicle');   // ?type= 프리셀렉트
   const [saveTarget, setSaveTarget] = useState('');
   // 운영자 합본(ALL)에서는 저장 대상 회사를 명시 선택, 그 외엔 현재 회사
   const company = scopeAll ? saveTarget : companyId;
@@ -73,7 +78,7 @@ export default function IngestPage() {
     setPeekSaved(true);
     reloadSaved();
   }
-  const [tab, setTab] = useState<Tab>('ocr');
+  const [tab, setTab] = useState<Tab>(() => sp.get('plate') ? 'manual' : 'ocr');   // 차번 프리필로 오면 직접입력 탭
   const [records, setRecords] = useState<EntityRecord[]>([]);
   const [ocrRaw, setOcrRaw] = useState<Record<string, unknown> | null>(null);   // 원본 OCR 보존 (감사추적)
   const [error, setError] = useState('');
@@ -117,7 +122,7 @@ export default function IngestPage() {
   }
 
   // ── 직접입력 ──
-  const [form, setForm] = useState<EntityRecord>({});
+  const [form, setForm] = useState<EntityRecord>(() => { const p = sp.get('plate'); return p ? { plate: p } : {}; });   // ?plate= 프리필
   function submitManual() {
     reset();
     const filled = Object.fromEntries(Object.entries(form).filter(([, v]) => v !== '' && v != null));

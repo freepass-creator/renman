@@ -25,7 +25,7 @@ import { contractViewToRow } from '@/lib/sheet-rows';
 import { FacetRail } from '@/components/FacetRail';
 import { WorkbenchBar } from '@/components/WorkbenchBar';
 import { WorkPipe } from '@/components/WorkPipe';
-import { openIngest, openEntityEdit, openCar, openCustomer } from '@/lib/ui-bus';
+import { openIngest, openCar, openCustomer } from '@/lib/ui-bus';
 import { commitUpdate, commitRemove } from '@/lib/commit';
 import { toast } from '@/lib/toast';
 import { TODAY } from '@/lib/dashboard-consts';
@@ -63,6 +63,18 @@ export default function ContractWorkspace() {
   const [openKey, setOpenKey] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [act, setAct] = useState<Act | null>(null);
+  const [editC, setEditC] = useState(false);            // 계약 정보 인라인 편집(정보수정 팝업 폐지)
+  const [cForm, setCForm] = useState<EntityRecord>({});
+  useEffect(() => { setEditC(false); }, [openKey]);     // 다른 계약 열면 편집 닫기
+  const saveContract = async () => {
+    if (!openKey) return;
+    const rec = recs.find((r) => String(r._key) === openKey);
+    if (!rec?._key) return;
+    try {
+      await commitUpdate({ entity: 'contract', sessionCompanyId: companyId, rec, key: String(rec._key), patch: cForm });
+      setEditC(false); reload(); toast('계약 정보 저장', 'success');
+    } catch (e) { toast('저장 실패: ' + (e as Error).message, 'error'); }
+  };
   const [order, reorder] = useSecOrder('jpk:order:contract', [...LIFE_SECS]);
   const toggleFacet = (label: string) => setFacets((s) => { const n = new Set(s); n.has(label) ? n.delete(label) : n.add(label); return n; });
   const resetFacets = () => setFacets(new Set());
@@ -295,7 +307,7 @@ export default function ContractWorkspace() {
               <Btn variant="ghost" onClick={() => startAct('return', open)} disabled={busy}>반납</Btn>
               <Btn variant="danger" onClick={() => startAct('terminate', open)} disabled={busy}>중도해지</Btn>
             </>}
-            <Btn variant="ghost" onClick={() => openEntityEdit('contract', open.rec)}>정보 수정</Btn>
+            <Btn variant={editC ? 'solid' : 'ghost'} onClick={() => { if (editC) setEditC(false); else { setCForm({ ...open.rec }); setEditC(true); } }}>{editC ? '편집 닫기' : '정보 수정'}</Btn>
             <Btn variant="danger" onClick={() => delContract(open)} disabled={busy}>삭제</Btn>
             <Btn variant="ghost" onClick={() => openCar(String(open.rec.plate || ''))}>차량 360</Btn>
             <Btn variant="ghost" onClick={() => openCustomer(customerKey(open.rec.contractorName, open.rec.contractorPhone))}>손님 360</Btn>
@@ -329,12 +341,29 @@ export default function ContractWorkspace() {
             {open.refund > 0 && <Metric label="반납 일할환불" value={won(open.refund)} tone="warn" />}
           </Cards>
           <Section title="계약 정보">
-            <DetailGrid rows={[
-              ['차량', `${open.rec.plate || ''} ${open.rec.carName || ''}`], ['기간', `${open.startDate} ~ ${open.endDate}`],
-              ['월대여료', won(open.monthlyRent)], ['보증금', won(open.rec.deposit)],
-              ['인도일', open.rec.deliveredDate], ['반납예정일', open.rec.returnScheduledDate],
-              ['반납/해지일', open.rec.returnedDate], ['종료사유', open.rec.endReason],
-            ]} />
+            {editC ? (
+              <div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 10 }}>
+                  {(([['계약번호', 'contractNo'], ['계약자', 'contractorName'], ['연락처', 'contractorPhone'], ['월대여료', 'monthlyRent'], ['보증금', 'deposit'], ['시작일', 'startDate'], ['종료일', 'endDate'], ['납부일', 'paymentDay']]) as [string, string][]).map(([lab, key]) => (
+                    <label key={key} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                      <span style={{ fontSize: 11, color: C.mute }}>{lab}</span>
+                      <Input value={String(cForm[key] ?? '')} onChange={(e) => setCForm((f) => ({ ...f, [key]: e.target.value }))} style={{ width: '100%' }} />
+                    </label>
+                  ))}
+                </div>
+                <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+                  <Btn onClick={saveContract} disabled={busy}>저장</Btn>
+                  <Btn variant="ghost" onClick={() => setEditC(false)}>취소</Btn>
+                </div>
+              </div>
+            ) : (
+              <DetailGrid rows={[
+                ['차량', `${open.rec.plate || ''} ${open.rec.carName || ''}`], ['기간', `${open.startDate} ~ ${open.endDate}`],
+                ['월대여료', won(open.monthlyRent)], ['보증금', won(open.rec.deposit)],
+                ['인도일', open.rec.deliveredDate], ['반납예정일', open.rec.returnScheduledDate],
+                ['반납/해지일', open.rec.returnedDate], ['종료사유', open.rec.endReason],
+              ]} />
+            )}
           </Section>
           <Section title={`수납 스케줄 (${sched.length}회차)`}>
             {sched.length ? (
