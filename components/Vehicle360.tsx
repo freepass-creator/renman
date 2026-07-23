@@ -335,6 +335,9 @@ export function Vehicle360({ plate, focus }: { plate: string; focus?: string }) 
       {/* 헤더 = 상태 배지 + 법인만. 미수·반납지남은 아래 미결·리스크 칩(정본)·현황으로 위임(중복 제거). */}
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap', marginBottom: 14 }}>
         <Badge tone={statusTone}>{status}</Badge>
+        {/* 차명·연식 = 상단 기본정보(차량번호는 DetailShell 타이틀). 모바일은 wrap. */}
+        {v?.carName ? <span style={{ fontSize: 13.5, fontWeight: 800, color: C.ink }}>{String(v.carName)}</span> : null}
+        {(() => { const yr = String(v?.modelYear || v?.yearMonth || (v?.firstReg ? String(v.firstReg).slice(0, 4) + '년식' : '')); return yr ? <span style={{ fontSize: 12.5, color: C.mute }}>{yr}</span> : null; })()}
         {v?.companyId ? <span style={{ fontSize: 12.5, color: C.faint }}>{companyLabel(String(v.companyId))}</span> : null}
       </div>
 
