@@ -64,3 +64,15 @@ firebase deploy --only firestore:rules
 
 ## 미설정이어도 안전
 - Firebase 없으면 LocalAdapter로 graceful 동작(단 **prod 빌드는 env 없으면 하드 차단** — 위 필수 게이트 1). 키를 단계적으로 붙여도 됨 (OCR → 저장 → Rules → Auth 순).
+
+## 회사 워크스페이스 Google Drive 파일 저장 (jpkerp5 이식)
+> 방침: **데이터=Firebase · 파일(등록증·보험·할부·계약서 스캔)=회사 Google Workspace Drive.**
+> 업로드 시 Firebase Storage(즉시 미리보기) + 회사 Drive 미러(시스템 보관, 폴더트리 `{회사}/{엔티티}/{레코드}`).
+> 코드: `lib/google/client.ts`(Service Account) · `app/api/google/drive/upload` · `lib/storage.ts`(uploadDoc 미러 훅).
+- env (**jpkerp5와 같은 값 재사용** — 이미 발급됨):
+  - `GOOGLE_SERVICE_ACCOUNT_KEY` — Service Account JSON(raw 또는 base64 한 줄). 서버 전용.
+  - `GOOGLE_IMPERSONATE_USER` — 도메인위임 대행 계정(예 `pyh@teamjpk.com`).
+  - `GOOGLE_DRIVE_ROOT_FOLDER_ID` · `GOOGLE_DRIVE_SHARED_DRIVE_ID` — 루트 폴더·공유드라이브 ID.
+  - `NEXT_PUBLIC_DRIVE_MIRROR=1` — 클라 미러 활성 스위치(끄면 Firebase만, 안전 폴백).
+- 활성 조건: 위 env 다 있고 `NEXT_PUBLIC_DRIVE_MIRROR=1` → 업로드가 회사 Drive에 자동 적재. creds 없으면 미러 skip(Firebase 원본 유효, 비파괴).
+- ⚠️ Drive route는 현재 `requireAuth`(API_SHARED_SECRET) 기준 — P0-3(ID Token 전환) 적용 시 함께 상향.
