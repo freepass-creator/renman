@@ -486,11 +486,18 @@ export function Vehicle360({ plate, focus }: { plate: string; focus?: string }) 
         companyId={target} recordKey={String(curIns?._key || curIns?.policyNo || '')} onReplaceDoc={onReplaceIns}
         fields={[
           ['보험사', 'insurer', String(curIns?.insurer ?? '')],
+          ['상품명', 'productName', String(curIns?.productName ?? '')],
           ['증권번호', 'policyNo', String(curIns?.policyNo ?? '')],
+          ['계약자', 'contractor', String(curIns?.contractor ?? '')],
+          ['피보험자', 'insured', String(curIns?.insured ?? '')],
           ['시작일', 'startDate', String(curIns?.startDate ?? '')],
           ['만기일', 'endDate', String(curIns?.endDate ?? '')],
           ['운전범위', 'driverScope', String(curIns?.driverScope ?? '')],
+          ['운전연령', 'driverAge', String(curIns?.driverAge ?? '')],
           ['물적할증(만원)', 'deductibleMan', String(curIns?.deductibleMan ?? '')],
+          ['총보험료(원)', 'totalPremium', String(curIns?.totalPremium ?? '')],
+          ['납입보험료(원)', 'paidPremium', String(curIns?.paidPremium ?? '')],
+          ['자동이체 은행', 'autoDebitBank', String(curIns?.autoDebitBank ?? '')],
         ] as KVRow[]} />
       {curIns ? (() => {
         const covs: [string, string][] = ([
