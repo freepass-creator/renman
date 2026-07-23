@@ -24,7 +24,7 @@ export default function ManagePage() {
   return (
     <Page title={`경영 현황 · ${scopeAll ? '전체 법인' : companyLabel(companyId)}`} tools={<WorkbenchBar {...cashNav} />}>
       {loading ? <PageLoading /> : <>
-        <Sec title="핵심 지표">
+        <Sec id="m-kpi" title="핵심 지표">
           <Cards min={150}>
             <Metric label="가동률" value={`${total.util}%`} hint="운행÷보유" tone={total.util >= 85 ? 'ok' : total.util >= 60 ? 'warn' : 'danger'} />
             <Metric label="운행 / 보유" value={`${total.running} / ${total.totalVehicles}`} hint="계약 파생" />
@@ -41,7 +41,7 @@ export default function ManagePage() {
           </Cards>
         </Sec>
 
-        <Sec title="미수 채권 aging" desc="연체 경과별 미수 분포">
+        <Sec id="m-aging" title="미수 채권 aging" desc="연체 경과별 미수 분포">
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             {total.aging.map((amt, i) => (
               <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -56,7 +56,7 @@ export default function ManagePage() {
         </Sec>
 
         {byCo.length > 0 && (
-          <Sec title="법인별 비교" desc="멀티법인 한눈에">
+          <Sec id="m-compare" title="법인별 비교" desc="멀티법인 한눈에">
             <div style={{ border: `1px solid ${C.line}`, borderRadius: 'var(--radius)', overflow: 'hidden', background: C.card, overflowX: 'auto' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', whiteSpace: 'nowrap' }}>
                 <thead><tr><th style={th}>법인</th><th style={thR}>보유</th><th style={thR}>운행</th><th style={thR}>가동률</th><th style={thR}>진행계약</th><th style={thR}>월청구</th><th style={thR}>총미수</th><th style={thR}>부채비율</th></tr></thead>

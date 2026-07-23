@@ -69,25 +69,25 @@ export default function FinancialsPage() {
   return (
     <FacetPage title="재무상태표" meta={`${scopeAll ? '전체 회사' : companyLabel(companyId)} · ${TODAY} 기준 · 계산값`} tools={<WorkbenchBar {...cashNav} />}>
       {loading ? <PageLoading /> : <>
-        <Sec title="요약" desc="자산 = 부채 + 자본 (오늘 기준 · 계산값)">
+        <Sec id="f-summary" title="요약" desc="자산 = 부채 + 자본 (오늘 기준 · 계산값)">
           <Cards min={140} fit>
             <Metric label="자산 총계" value={won(F.assets)} tone="ink" />
             <Metric label="부채 총계" value={won(F.liabilities)} tone="danger" />
             <Metric label="순자산(자본)" value={won(F.equity)} tone={F.equity >= 0 ? 'ok' : 'danger'} hint={`부채비율 ${F.equity > 0 ? Math.round(F.liabilities / F.equity * 100) : '∞'}%`} />
           </Cards>
         </Sec>
-        <Sec title="자산" desc="회사가 가진 것">
+        <Sec id="f-asset" title="자산" desc="회사가 가진 것">
           <Row label="차량 (장부가)" value={F.carBook} hint={`취득 ${won(F.acquisition)} − 감가 ${won(F.depreciation)}`} />
           <Row label="미수금" value={F.receivable} hint="운행중 계약 순미수" />
           <Row label="현금" value={F.cash} hint={F.cashIsReal ? '계좌 최신 잔액(실제)' : '자금원장 순증감(기초잔액 미반영)'} tone={F.cash < 0 ? C.danger : undefined} />
           <Row label="자산 총계" value={F.assets} strong />
         </Sec>
-        <Sec title="부채" desc="갚아야 할 것">
+        <Sec id="f-liability" title="부채" desc="갚아야 할 것">
           <Row label="할부·리스 잔여원금" value={F.loanRemain} hint="상환스케줄 계산값" />
           <Row label="보증금 예수" value={F.deposit} hint="손님 보증금(반환 대상)" />
           <Row label="부채 총계" value={F.liabilities} strong tone={C.danger} />
         </Sec>
-        <Sec title="자본" desc="자산 − 부채 = 순자산">
+        <Sec id="f-equity" title="자본" desc="자산 − 부채 = 순자산">
           <Row label="순자산(자본)" value={F.equity} strong tone={F.equity >= 0 ? 'var(--green-text)' : C.danger} />
           <div style={{ marginTop: 10, fontSize: 12, color: C.faint, lineHeight: 1.7 }}>※ {F.cashIsReal ? '현금은 계좌 최신 잔액(실제).' : '현금은 기초잔액 없이 자금원장 순증감이라 참고치.'} 감가(5년 정액·잔존10%)·할부잔여는 계산값 — 실사·상환스케줄표 OCR 시 실데이터로 교체됩니다.</div>
         </Sec>

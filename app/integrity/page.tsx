@@ -112,7 +112,7 @@ export default function RiskPage() {
       tools={<WorkbenchBar search={{ value: q, onChange: setQ, placeholder: '대상·내용·종류' }} stat={<span style={{ fontSize: 13, fontWeight: 800, color: highCount ? C.danger : C.ok, whiteSpace: 'nowrap' }}>위험 {highCount}</span>} />}
       rail={!loading ? <FacetRail lensKey="정합성" facets={facets} onToggle={toggleFacet} onReset={resetFacets} /> : null}
     >
-      <Sec title="리스크 요약">
+      <Sec id="i-summary" title="리스크 요약">
         <Cards min={128} fit>
           <Metric label="전체 리스크" value={loading ? '…' : items.length} tone={items.length ? 'warn' : 'ok'} onClick={resetFacets} />
           <Metric label="위험 / 주의" value={loading ? '…' : `${highCount} / ${midCount}`} tone={highCount ? 'danger' : 'warn'} />
@@ -121,7 +121,7 @@ export default function RiskPage() {
           <Metric label="보험·서류" value={loading ? '…' : insCount} tone={insCount ? 'warn' : 'ink'} />
         </Cards>
       </Sec>
-      <Sec title="위험 상세 목록" n={shown.length}>
+      <Sec id="i-list" title="위험 상세 목록" n={shown.length}>
         {loading ? <PageLoading />
           : items.length === 0 ? <EmptyState><span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: C.ok, fontWeight: 700 }}><CheckCircle2 size={15} /> 이상 없음 — 정합성 모두 일치</span></EmptyState>
           : shown.length === 0 ? <EmptyState>해당 리스크 없음</EmptyState>

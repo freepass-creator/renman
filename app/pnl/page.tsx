@@ -72,7 +72,7 @@ export default function PnlPage() {
       tools={<WorkbenchBar {...cashNav} mid={<PeriodBar latest={latest} initial="월간" onRange={setRange} />} />}
     >
       {loading ? <PageLoading /> : <>
-        <Sec title="손익" desc="영업손익(영업수입−영업비용) − 할부이자 = 세전이익 · 현금 기준">
+        <Sec id="p-pl" title="손익" desc="영업손익(영업수입−영업비용) − 할부이자 = 세전이익 · 현금 기준">
           <Cards min={132} fit>
             <Metric label="영업수입" value={won(totalIn)} tone="ok" hint={`${opIncome.length}개 과목`} />
             <Metric label="영업비용" value={won(totalOut)} tone="danger" hint={`${opExpense.length}개 과목`} />
@@ -82,20 +82,20 @@ export default function PnlPage() {
             {unclassAmt > 0 ? <Metric label="미분류" value={won(unclassAmt)} tone="warn" hint="분류하면 반영" onClick={() => router.push('/finance')} /> : null}
           </Cards>
         </Sec>
-        <Sec title="영업수입" n={opIncome.length} desc="계정과목별 · 큰 금액순">
+        <Sec id="p-income" title="영업수입" n={opIncome.length} desc="계정과목별 · 큰 금액순">
           {opIncome.length ? <DataTable cols={cols(totalIn)} rows={opIncome} /> : <EmptyState>이 기간 영업수입 없음</EmptyState>}
         </Sec>
-        <Sec title="영업비용" n={opExpense.length} desc="할부이자 별도(아래) · 큰 금액순">
+        <Sec id="p-expense" title="영업비용" n={opExpense.length} desc="할부이자 별도(아래) · 큰 금액순">
           {opExpense.length ? <DataTable cols={cols(totalOut)} rows={opExpense} /> : <EmptyState>이 기간 영업비용 없음</EmptyState>}
         </Sec>
-        <Sec title="할부·리스 (금융)" desc="원금=부채상환(손익 아님) · 이자=금융비용(위 반영). 상환스케줄 OCR 전 계산값">
+        <Sec id="p-loan" title="할부·리스 (금융)" desc="원금=부채상환(손익 아님) · 이자=금융비용(위 반영). 상환스케줄 OCR 전 계산값">
           <div style={{ fontSize: 12.5, color: C.mute, lineHeight: 1.7 }}>
             우리 계산 상환({loan.cars}대): 상환액 <b style={{ color: C.ink }}>{won(loan.payment)}</b> = 원금 <b style={{ color: C.ink }}>{won(loan.principal)}</b> + <b style={{ color: C.warn }}>이자 {won(loan.interest)}</b> (이자비중 {loan.payment ? Math.round(loan.interest / loan.payment * 100) : 0}%)<br />
             {capFin.length ? <>실제 자금원장 자본·금융 지출: <b style={{ color: C.ink }}>{won(capFinOut)}</b>{capFinIn ? <> · 수입 {won(capFinIn)}</> : null} — 원금상환·차량매입 포함(손익 아님).</> : null}
           </div>
           {capFin.length ? <div style={{ marginTop: 10 }}><DataTable cols={cols(capFinOut)} rows={capFin} /></div> : null}
         </Sec>
-        <Sec title="월별 추이" desc="최근 12개월 영업손익 (수입=초록·비용=빨강 막대)">
+        <Sec id="p-trend" title="월별 추이" desc="최근 12개월 영업손익 (수입=초록·비용=빨강 막대)">
           <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
             {trend.list.map((t) => (
               <div key={t.m} style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 12 }}>
