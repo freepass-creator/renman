@@ -16,8 +16,9 @@
  *    전역 계산)로 자금 도메인을 커버한다.
  */
 import { type ReactNode } from 'react';
-import { Sec, ObjCard, Cards, C, won, EmptyState, Ok } from '@/components/ui';
+import { Sec, ObjCard, Cards, C, won, EmptyState, Ok, Badge } from '@/components/ui';
 import { WorkPipe } from '@/components/WorkPipe';
+import { type PipeId } from '@/lib/work-hub';
 import { openCar, openCustomer, openPayments, openFinance } from '@/lib/ui-bus';
 import { collectionStage } from '@/lib/collection';
 import { penaltyStatus, penaltyTone } from '@/lib/penalty-reassign';
@@ -251,6 +252,36 @@ export function buildSectionCtx(args: { D: any; contracts: EntityRecord[]; histo
 /* ══════════════ 섹션 정의(한 번만) ══════════════ */
 export const SECTIONS: SectionDef[] = [
   /* ── 미결(콕핏) ── */
+  {
+    // 업무지시 — 미결 데이터를 "무엇을 어디서 하라" 지시문으로 합성. 홈 미결 맨 위 헤드라인.
+    id: 's-work-orders', label: '업무지시 (지금 할 일)', group: '미결',
+    render: ({ D, asset }, p) => {
+      const over = D.returnFlow.filter((v: any) => v.dday < 0);
+      const missDocs = ((asset as any)?.unreg || []).filter((r: any) => r.miss?.length);
+      const orders: { n: number; text: string; to: PipeId; danger?: boolean }[] = [];
+      if (over.length) orders.push({ n: over.length, text: '반납일이 지난 차 — 눌러서 차량360에서 «반납» 또는 «연장»을 처리하세요', to: 'dispatch', danger: true });
+      if (D.overduePay.length) orders.push({ n: D.overduePay.length, text: '미납(미수) — 미수관리에서 회수 조치(시동제어·내용증명 등)하세요', to: 'receivables', danger: true });
+      if (D.ghostPlates.length) orders.push({ n: D.ghostPlates.length, text: '등록증 없는 차 — 데이터센터에서 «자동차등록증»을 업로드하세요', to: 'ingest', danger: true });
+      if (missDocs.length) orders.push({ n: missDocs.length, text: '서류 빠진 차 — 데이터센터에서 보험가입증명서·등록증 등 빠진 서류를 업로드하세요', to: 'ingest' });
+      if (D.penaltyPending.length) orders.push({ n: D.penaltyPending.length, text: '과태료 — 과태료관리에서 임차인 매칭 후 «변경부과»를 신청하세요', to: 'penalty' });
+      if (D.expiring.length) orders.push({ n: D.expiring.length, text: '보험·검사 만기 — 갱신/검사 후 보험증권·등록증을 데이터센터에서 업로드하세요', to: 'ingest' });
+      if (D.unmatchedTx.length) orders.push({ n: D.unmatchedTx.length, text: '미분류 입출금 — 자금일보에서 거래를 계약에 «매칭»하세요', to: 'payments' });
+      return (
+        <Sec key="s-work-orders" id="s-work-orders" title="업무지시 (지금 할 일)" n={orders.length} tone={orders.some((o) => o.danger) ? 'danger' : orders.length ? 'warn' : undefined} desc="무엇을 어디서 처리할지 — 눌러서 이동" {...p}>
+          {orders.length === 0 ? <EmptyState variant="ok">지금 처리할 업무 없음 — 깔끔합니다</EmptyState> :
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {orders.map((o, i) => (
+                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', border: `1px solid ${C.line}`, borderLeft: `3px solid ${o.danger ? C.danger : C.warn}`, borderRadius: 8, background: 'var(--bg-card)' }}>
+                  <Badge tone={o.danger ? 'red' : 'amber'}>{o.n}건</Badge>
+                  <span style={{ flex: 1, fontSize: 13, color: C.ink, lineHeight: 1.5 }}>{o.text}</span>
+                  <WorkPipe to={o.to} />
+                </div>
+              ))}
+            </div>}
+        </Sec>
+      );
+    },
+  },
   {
     id: 's-return-over', label: '반납 지남 (회수·연장)', group: '미결',
     render: ({ D, dueMatch }, p) => { const over = D.returnFlow.filter((v: any) => v.dday < 0 && (!dueMatch || dueMatch(v.dday))); return over.length ? (
