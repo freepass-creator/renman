@@ -34,9 +34,9 @@ import { resolveWriteCompany, NEED_COMPANY } from '@/lib/scope';
 import { commitUpdate, commitSave, commitRemove } from '@/lib/commit';
 import { TODAY, dday } from '@/lib/dashboard-consts';
 
-// 자산상세 섹션 기본 순서 — 돈·조치(미수·보증금·계약·관제) 위, 사건·이력 중간, 스펙·문서·내부재무(할부) 아래.
-// 사용자가 접힌 섹션을 드래그해 바꾸면 useSecOrder가 저장 · 아래 '순서 초기화'로 이 기본값 복원.
-const SEC_DEFAULT = ['v-status', 'v-schedule', 'v-deposit', 'v-contract', 'v-gps', 'v-penalty', 'v-work', 'v-history', 'v-handover', 'v-info', 'v-reg', 'v-insurance', 'v-econ', 'v-purchase', 'v-loan'];
+// 자산상세 섹션 기본 순서 — 현황 → 계약조건→수납스케줄(계약 다음 그 계약의 수납이 바로) → 보증금·관제,
+//   사건·이력 중간, 스펙·문서·내부재무(할부) 아래. 드래그로 바꾸면 useSecOrder 저장 · '순서 초기화'로 복원.
+const SEC_DEFAULT = ['v-status', 'v-contract', 'v-schedule', 'v-deposit', 'v-gps', 'v-penalty', 'v-work', 'v-history', 'v-handover', 'v-info', 'v-reg', 'v-insurance', 'v-econ', 'v-purchase', 'v-loan'];
 
 // 날짜 표시 = yy-mm-dd (2자리 연도). 2023-11-21 → 23-11-21
 const yy = (s: unknown) => { const t = String(s || ''); return /^\d{4}-\d{2}-\d{2}/.test(t) ? t.slice(2, 10) : (t || '—'); };
