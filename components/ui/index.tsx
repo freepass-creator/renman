@@ -11,5 +11,6 @@ export * from './table';
 export * from './excel-sheet';
 export * from './detail';
 export * from './overlays';
+export * from './confirm';
 export * from './wizard';
 export * from './doc-upload';

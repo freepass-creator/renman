@@ -2,6 +2,7 @@ import './globals.css';
 import type { Metadata } from 'next';
 import { SessionProvider } from '@/lib/session';
 import { AppBarProvider } from '@/lib/appbar';
+import { ConfirmProvider } from '@/components/ui/confirm';
 import TopBar from '@/components/SessionBar';
 import { CommandPalette } from '@/components/CommandPalette';
 import { CarDrawer } from '@/components/CarDrawer';
@@ -25,14 +26,16 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body style={{ margin: 0, minHeight: '100vh', background: 'var(--bg-page)' }}>
         <SessionProvider>
           <AppBarProvider>
-            <TopBar />
-            <div style={{ minHeight: 'calc(100vh - 49px)' }}>{children}</div>
-            <CommandPalette />
-            <CarDrawer />
-            <IngestHost />
-            <PrintHost />
-            <QuickLogHost />
-            <ToastHost />
+            <ConfirmProvider>
+              <TopBar />
+              <div style={{ minHeight: 'calc(100vh - 49px)' }}>{children}</div>
+              <CommandPalette />
+              <CarDrawer />
+              <IngestHost />
+              <PrintHost />
+              <QuickLogHost />
+              <ToastHost />
+            </ConfirmProvider>
           </AppBarProvider>
         </SessionProvider>
       </body>
