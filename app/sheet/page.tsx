@@ -40,7 +40,7 @@ export default function SheetPage() {
 
   const rows = useMemo(() => {
     const bo = ['보유', '매각'].filter((x) => facets.has(x));
-    const util = ['운행', '유휴', '정비'].filter((x) => facets.has(x));
+    const util = ['운행', '휴차', '정비'].filter((x) => facets.has(x));
     const misu = ['미수있음', '연체90일+'].filter((x) => facets.has(x));
     const due = ['검사임박', '보험임박'].filter((x) => facets.has(x));
     const debt = ['할부있음', '보험없음'].filter((x) => facets.has(x));

@@ -411,9 +411,9 @@ export const SECTIONS: SectionDef[] = [
   {
     id: 'a-manage', label: '관리 필요', group: '자산',
     render: ({ asset }, p) => { const { manage } = asset; return (
-      <Sec key="a-manage" id="a-manage" title="관리 필요" n={manage.length} tone="warn" desc="정비·사고·검사만기·유휴" right={<WorkPipe to="repair" />} {...p}>
+      <Sec key="a-manage" id="a-manage" title="관리 필요" n={manage.length} tone="warn" desc="정비·사고·검사만기·휴차" right={<WorkPipe to="repair" />} {...p}>
         {manage.length === 0 ? <EmptyState variant="ok">관리 이슈 없음</EmptyState> :
-          <Cards min={280}>{manage.slice(0, 12).map((r: any, i: number) => { const reason = ['정비', '사고'].includes(r.status) ? r.status : IDLE.has(r.status) ? '유휴' : '검사만기'; return <ObjCard key={i} onClick={() => openCar(r.v.plate)} rail={reason === '검사만기' ? 'danger' : reason === '유휴' ? 'mute' : 'warn'} badge={reason} badgeTone={reason === '검사만기' ? 'red' : reason === '유휴' ? 'gray' : 'amber'} plate={String(r.v.plate)} carType={r.v.carName || undefined} sub={reason === '검사만기' ? `검사 ${r.v.inspectionTo}` : reason === '유휴' ? '투입 필요' : '처리 중'} />; })}</Cards>}
+          <Cards min={280}>{manage.slice(0, 12).map((r: any, i: number) => { const reason = ['정비', '사고'].includes(r.status) ? r.status : IDLE.has(r.status) ? '휴차' : '검사만기'; return <ObjCard key={i} onClick={() => openCar(r.v.plate)} rail={reason === '검사만기' ? 'danger' : reason === '휴차' ? 'mute' : 'warn'} badge={reason} badgeTone={reason === '검사만기' ? 'red' : reason === '휴차' ? 'gray' : 'amber'} plate={String(r.v.plate)} carType={r.v.carName || undefined} sub={reason === '검사만기' ? `검사 ${r.v.inspectionTo}` : reason === '휴차' ? '투입 필요' : '처리 중'} />; })}</Cards>}
       </Sec>
     ); },
   },

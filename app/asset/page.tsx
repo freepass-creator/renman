@@ -24,7 +24,7 @@ import { vehicleLoanView } from '@/lib/vehicle-asset';
 import { useSecOrder } from '@/lib/use-sec-order';
 import { useEntityLists } from '@/lib/use-entity-lists';
 
-const UTIL_LABELS = ['운행', '유휴', '정비'];
+const UTIL_LABELS = ['운행', '휴차', '정비'];
 const LIFE_SECS = ['a-buy', 'a-reg', 'a-hold', 'a-out-plan', 'a-out'] as const;
 type LifeSec = (typeof LIFE_SECS)[number];
 const SEC_OWN: Record<LifeSec, Ownership> = {
@@ -118,7 +118,7 @@ export default function AssetPage() {
   const cnt = (own: Ownership) => nodes.filter((n) => n.ownership === own).length;
 
   const renderCard = (n: VehicleNode) => {
-    const av = n.activeContract, idleD = n.utilization === '유휴' ? idleDaysOf(n) : null;
+    const av = n.activeContract, idleD = n.utilization === '휴차' ? idleDaysOf(n) : null;
     const fields: [string, ReactNode][] =
       n.ownership === '처분완료' || n.ownership === '처분예정' ? [
         ['매입', n.veh.acquisitionPrice ? won(n.veh.acquisitionPrice) : '—'],
@@ -159,7 +159,7 @@ export default function AssetPage() {
           right={right}
           onClick={() => openCar(n.plate, deep)}
         />
-        {n.ownership === '보유중' && (n.utilization === '유휴' || n.utilization === '정비') ? (
+        {n.ownership === '보유중' && (n.utilization === '휴차' || n.utilization === '정비') ? (
           <div style={{ display: 'flex', gap: SPACE_M, flexWrap: 'wrap' }}>
             <Btn variant={logPlate === n.plate ? 'solid' : 'ghost'} onClick={() => setLogPlate((p) => p === n.plate ? null : n.plate)}>{logPlate === n.plate ? '닫기' : '+ 기록'}</Btn>
             <Btn variant="ghost" onClick={() => openCar(n.plate, deep)}>360</Btn>

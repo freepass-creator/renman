@@ -35,7 +35,7 @@ export function computeDashboard(input: DashboardInput, today: string) {
   // 가동·보유 집계 = linkFleet/classifyVehicle SSOT (자산현황·경영 KPI와 동일)
   const heldNodes = fleet.vehicles.filter((n) => n.ownership !== '처분완료');
   const runningNodes = heldNodes.filter((n) => n.utilization === '운행');
-  const idleNodes = heldNodes.filter((n) => n.utilization === '유휴');
+  const idleNodes = heldNodes.filter((n) => n.utilization === '휴차');
   const soldNodes = fleet.vehicles.filter((n) => n.ownership === '처분완료');
   const util = heldNodes.length ? Math.round((runningNodes.length / heldNodes.length) * 100) : 0;
   const runningPlates = new Set(runningNodes.map((n) => n.plate));

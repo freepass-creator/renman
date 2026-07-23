@@ -54,7 +54,7 @@ export function classifyContract(v: ContractView): ContractClass {
 
 /* ─────────────── 자산 2축: 소유(5생애) × 가동 ─────────────── */
 export type Ownership = '구매예정' | '등록예정' | '보유중' | '처분예정' | '처분완료';
-export type Utilization = '운행' | '유휴' | '정비' | null;   // 보유중일 때만
+export type Utilization = '운행' | '휴차' | '정비' | null;   // 보유중일 때만
 export type VehicleClass = {
   ownership: Ownership;
   utilization: Utilization;
@@ -74,13 +74,13 @@ export function classifyVehicle(veh: EntityRecord, hasActiveContract: boolean): 
   else if (VEHICLE_REG_PLAN.has(s)) ownership = '등록예정';
   else ownership = '보유중';
   let utilization: Utilization = null;
-  if (ownership === '보유중') utilization = VEHICLE_REPAIR.has(s) ? '정비' : hasActiveContract ? '운행' : '유휴';
+  if (ownership === '보유중') utilization = VEHICLE_REPAIR.has(s) ? '정비' : hasActiveContract ? '운행' : '휴차';
   const label =
     ownership === '처분완료' ? (s || '매각')
       : ownership === '처분예정' ? (s || '처분예정')
         : ownership === '구매예정' ? (s || '구매예정')
           : ownership === '등록예정' ? (s || '등록예정')
-            : (utilization ?? '유휴');
+            : (utilization ?? '휴차');
   const tone: Tone =
     ownership === '처분완료' ? 'mute'
       : ownership === '처분예정' || ownership === '구매예정' || ownership === '등록예정' ? 'warn'

@@ -21,7 +21,7 @@ export function computeKPI(contracts: EntityRecord[], vehicles: EntityRecord[], 
   const fleet = linkFleet(vehicles, contracts, today, views);
   const held = fleet.vehicles.filter((n) => n.ownership !== '처분완료');
   const running = held.filter((n) => n.utilization === '운행');
-  const idle = held.filter((n) => n.utilization === '유휴');
+  const idle = held.filter((n) => n.utilization === '휴차');
   const util = held.length ? Math.round((running.length / held.length) * 100) : 0;
   const active = views.filter((v) => v.status === '운행');
   const recv = selectReceivables(contracts, today);

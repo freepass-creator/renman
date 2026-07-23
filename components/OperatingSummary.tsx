@@ -29,7 +29,7 @@ export function OperatingSummaryView({ s }: { s: OperatingSummary }) {
       <Stat label="계약차량(운행중 계약)" value={`${s.activeContracts}건`} tone="ok" />
       <Stat label="반납·종료 계약" value={`${s.endedContracts}건`} tone="mute" />
       <Stat label="할부(상환)" value={`${s.loanCount}대`} tone="ink" />
-      <Stat label="유휴(쉬는 차)" value={`${s.idle}대`} tone="mute" />
+      <Stat label="휴차(쉬는 차)" value={`${s.idle}대`} tone="mute" />
       <Stat label="현재 미수" value={won(s.misuActive)} sub={`${s.misuActiveCount}건 · 운행중`} tone={s.misuActive > 0 ? 'danger' : 'ink'} />
       <Stat label="계약종료 미수" value={won(s.misuReturned)} sub={`${s.misuReturnedCount}건 · 반납·해지 추심`} tone="mute" />
       <Stat label="자금 거래" value={`${s.txCount}건`} sub={`순증감 ${won(s.cashNet)}`} tone="ink" />

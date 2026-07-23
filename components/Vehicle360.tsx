@@ -436,7 +436,7 @@ export function Vehicle360({ plate, focus }: { plate: string; focus?: string }) 
             <Metric label="반납예정" value={remainText(effectiveEndDate(active), TODAY)} tone={d != null && d < 0 ? 'danger' : d != null && d <= 7 ? 'warn' : 'ink'} />
             <Metric label="미수" value={won(totalUnpaid)} tone={totalUnpaid > 0 ? 'danger' : 'ink'} />
           </> : <>
-            <Metric label="상태" value={String(v?.status || (loc.work && loc.work !== '대기' ? loc.work : '유휴'))} tone={loc.work === '정비' || loc.work === '사고' ? 'warn' : 'ink'} />
+            <Metric label="상태" value={String(v?.status || (loc.work && loc.work !== '대기' ? loc.work : '휴차'))} tone={loc.work === '정비' || loc.work === '사고' ? 'warn' : 'ink'} />
             <Metric label="계약" value="계약 없음" tone="ink" />
             <Metric label="위치" value={locStr} tone={loc.work === '정비' || loc.work === '사고' ? 'warn' : 'ink'} />
             <Metric label="대기 일수" value={idleDays != null ? `${idleDays}일` : '—'} tone={idleDays != null && idleDays > 180 ? 'danger' : idleDays != null && idleDays > 60 ? 'warn' : 'ink'} />
@@ -718,7 +718,7 @@ export function Vehicle360({ plate, focus }: { plate: string; focus?: string }) 
       {/* 차량 수선 · 정비·사고 — 모든 차에 항상 노출(대여중이어도 사고/정비 가능). history(_kind:'work').
           유휴차면 저장과 함께 자산상태 파생 전이(→ 휴차 워크벤치 자동 반영). 대여중이면 기록만(운행 유지). */}
       <Sec id="v-work" order={secOrd('v-work')} onReorder={reorderSec} title="차량 수선 · 정비·사고" n={workList.length} tone={workOpen ? 'ok' : undefined}
-        desc="정비·사고수리·상품화·세차 — 유휴차는 작업상태가 휴차 워크벤치에 자동 반영"
+        desc="정비·사고수리·상품화·세차 — 휴차는 작업상태가 휴차 워크벤치에 자동 반영"
         right={<Btn variant="ghost" onClick={() => setWorkOpen((o) => !o)}>{workOpen ? '닫기' : '+ 수선/작업'}</Btn>}>
         {workOpen ? <WorkForm plate={plate} companyId={target} vehicle={v} idle={!active} onDone={() => setWorkOpen(false)} onCancel={() => setWorkOpen(false)} style={{ marginBottom: 12 }} /> : null}
         {workList.length ? <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>{workList.map((h, i) => {
