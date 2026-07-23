@@ -23,17 +23,20 @@
 
 **A그룹 = ✅ 완료** (2026-07-20). A-0~A-3 코드 반영됨. WORK-ORDER 본문 상태도 맞춤.
 
-**다음 = B그룹** (권장 순서):
+**B그룹 진행** (2026-07-22 기준):
 
-| | 항목 | 한 줄 |
+| | 항목 | 상태 |
 |---|---|---|
-| **B-5** | 로딩층 이행 | 목록 페이지 대부분 이행됨 · 잔여=ingest/360/IngestDialog 등 특수 |
-| B-1 | 미수 원장 엔진 | 가장 중요·위험 — A-2 셀렉터 이후 숫자 대사 필수 |
-| B-3 | 상태 SSOT + 죽은코드 | B-2 선행 |
-| B-2 | 쓰기 단일 퍼널 `commit` | |
-| B-4 | 필드 스키마 SSOT | 마지막 |
+| B-5 | 로딩층 `useEntityLists` | ✅ 거의 완료 (특수=company/trash/settings) |
+| B-2 | 쓰기 퍼널 `commit*` | ✅ UI 핫스팟 · 엔진 잔여 |
+| B-3 | 상태 SSOT | ✅ 1차 · 산재 잔여 |
+| **B-1** | 미수 원장 엔진 | ⚠ 완화만 · **다음 본격** |
+| B-4 | 필드 스키마 | ⬜ 마지막 |
 
-지금: **B-5 잔여** 또는 **B-1** 선택.
+**데이터:** frozen 시드 live 사업현황 재생성(2026-07-22) — 차량 163·계약 177·carry≡net.  
+**오픈:** `DEPLOY.md` 게이트(Rules·env·마스터)는 배포/설정 작업.
+
+지금: **B-1** 또는 오픈 게이트.
 
 ---
 
@@ -76,6 +79,9 @@ curl -s -o /dev/null -w "%{http_code}" http://localhost:6006/<route>   # 200
 
 | 날짜 | 작업자 | 내용 | 상태 |
 |---|---|---|---|
+| 2026-07-23 | Claude | **얼린 시드 가명화**(PII): `tools/mask-switchplan-pii.ts` 신설 — 실명→고객NNN·전화·번호판·VIN·임차인 counterparty 결정적 치환(참조무결성·carry 보존). `rebuild-switchplan-frozen`이 기록 직전 자동 마스킹 → 재생성해도 실PII 안 들어감. 시드는 정적 import(번들)라 gitignore 불가 → 가명화가 정답 | 실PII 0·carry 142,315,000·163/177·tsc 0·test 32/32 |
+| 2026-07-22 | Cursor | frozen 시드 live 재생성(`rebuild-switchplan-frozen --write`): 차량 118→163 · 계약 147→177 · asOf 07-22 · carry≡net ₩1.42억·미수율34% · DocIssueDialog 미리보기 `C.head` · §2 B진행표 갱신 | tsc 0 / audit OK |
+| 2026-07-22 | Cursor | UI 통일 패스: `TextLink` 원자 · Vehicle360/mobile-tabs 배럴 흡수 · payments `Modal`+`TOUCH` · 링크 손롤(계약/과태료/자금/목록/이력) · globals.css 죽은 셸 ~24KB 제거(Phase4 일부). ※WorkbenchBar는 순환 때문에 ui 하위경로 유지 | tsc 0 / :6007 200 |
 | 2026-07-21 | Claude | **운영현황 = 함대 흐름**: 요약현황 섹션 삭제(지표 10개가 섹션 헤더와 중복·미수는 리스크탭) → KPI(보유·가동률)는 툴바 stat 한 줄 · 섹션 순서=인도대기→반납지남→휴차→만기임박→운행중→멈춘차(`useSecOrder ops-v2`) · 「곧비는차」를 지남/임박 2섹션으로 분리 | tsc 0 / 홈 200 |
 | 2026-07-21 | Claude | **분류 SSOT 버그**: 운영현황 운행102·유휴 목록이 요약과 안 맞던 것 — `buildAssetDerived`가 `v.status`로 다시 갈랐는데 지표는 계약기준(`D.running`). 이제 `D.running/idleCars/soldRows` 재사용, 그밖=차집합 · `a-running` 40대 조용한 절단 제거 | tsc 0 |
 | 2026-07-21 | Claude | **보기전환(카드↔엑셀)**: `IconSeg` 원자 신설 · `WorkbenchBar view` 슬롯(검색창 우측 고정) · `ExcelSheet mode` — 같은 cols로 표/카드 · CLAUDE.md 금지항목 "보기전환 손롤"로 정정(원자는 허용) · 헤더필터(ERP4 오토필터)·행호버 pin 수정·틀고정 제거 | tsc 0 / sheet 200 |

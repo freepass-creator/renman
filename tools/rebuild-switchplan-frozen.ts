@@ -17,6 +17,7 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { parseSwitchplanWorkbook, buildSwitchplanPackFromBuffer } from '../lib/migrate/switchplan-parse';
+import { maskSwitchplanPII, type SwitchplanSeed } from './mask-switchplan-pii';
 
 const FROZEN = resolve(__dirname, '../lib/migrate/switchplan-data.json');
 
@@ -107,5 +108,7 @@ if (!write) {
   process.exit(0);
 }
 
-writeFileSync(out, JSON.stringify(next, null, 2) + '\n', 'utf-8');
-console.log(`\n✔ 기록: ${out}`);
+// 기록 직전 가명화 — 실 xlsx에서 뽑은 실고객 PII가 커밋/푸시되지 않도록(SECURITY.md). 재무·carry 구조는 보존.
+const masked = maskSwitchplanPII(next as unknown as SwitchplanSeed);
+writeFileSync(out, JSON.stringify(masked, null, 2) + '\n', 'utf-8');
+console.log(`\n✔ 기록(가명화): ${out}`);
