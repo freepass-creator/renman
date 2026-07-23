@@ -11,9 +11,12 @@ import { useSession } from '@/lib/session';
 import { getStore } from '@/lib/store';
 import { type EntityRecord } from '@/lib/intake/entities';
 import { matchVehicles } from '@/lib/search-match';
+import { computeContractView } from '@/lib/contract-ops';
+import { normPlate } from '@/lib/plate';
+import { TODAY } from '@/lib/dashboard-consts';
 import { openCar } from '@/lib/ui-bus';
 import { Search as SearchIcon } from 'lucide-react';
-import { C } from '@/components/ui';
+import { C, won } from '@/components/ui';
 
 export function TopSearch() {
   const { companyId } = useSession();
@@ -35,6 +38,17 @@ export function TopSearch() {
 
   const results = useMemo(() => (q.trim() ? matchVehicles(q.trim(), vehicles, contracts, 8) : []), [q, vehicles, contracts]);
   const open = focused && q.trim().length > 0;
+
+  // 번호판 → 활성(미반납 우선) 계약. 검색 결과에 미수·계약조건 곁들이기(웹은 공간 여유).
+  const activeByPlate = useMemo(() => {
+    const m = new Map<string, EntityRecord>();
+    for (const c of contracts) {
+      const p = normPlate(c.plate); if (!p) continue;
+      const cur = m.get(p);
+      if (!cur || (!c.returnedDate && cur.returnedDate)) m.set(p, c);
+    }
+    return m;
+  }, [contracts]);
 
   useEffect(() => {
     if (!open) return;
@@ -66,18 +80,29 @@ export function TopSearch() {
         />
       </div>
       {open && (
-        <div style={{ position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0, background: C.card, border: `1px solid ${C.line}`, borderRadius: 'var(--radius)', boxShadow: 'var(--shadow-lg)', zIndex: 50, overflow: 'hidden', maxHeight: 380, overflowY: 'auto' }}>
-          {results.map((h, i) => (
-            <button
-              key={`${h.plate}-${i}`}
-              onMouseEnter={() => setSel(i)}
-              onClick={() => goCar(h.plate)}
-              style={{ display: 'flex', flexDirection: 'column', gap: 1, width: '100%', textAlign: 'left', padding: '8px 14px', border: 'none', background: sel === i ? C.hover : 'transparent', cursor: 'pointer', WebkitTapHighlightColor: 'transparent' }}
-            >
-              <span style={{ fontSize: 13, fontWeight: 600, color: C.ink }}>{h.label}</span>
-              {h.sub && <span style={{ fontSize: 11.5, color: C.mute }}>{h.sub}</span>}
-            </button>
-          ))}
+        <div style={{ position: 'absolute', top: 'calc(100% + 4px)', left: 0, minWidth: 460, maxWidth: 640, background: C.card, border: `1px solid ${C.line}`, borderRadius: 'var(--radius)', boxShadow: 'var(--shadow-lg)', zIndex: 50, overflow: 'hidden', maxHeight: 420, overflowY: 'auto' }}>
+          {results.map((h, i) => {
+            const c = activeByPlate.get(h.plate);
+            const v = c ? computeContractView(c, TODAY) : null;
+            const terms = v ? [v.monthlyRent ? `${won(v.monthlyRent)}/월` : '', v.endDate ? `~${String(v.endDate).slice(2, 10)}` : ''].filter(Boolean).join(' · ') : '';
+            const sub = [h.sub, terms].filter(Boolean).join(' · ');
+            return (
+              <button
+                key={`${h.plate}-${i}`}
+                onMouseEnter={() => setSel(i)}
+                onClick={() => goCar(h.plate)}
+                style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', textAlign: 'left', padding: '8px 14px', border: 'none', background: sel === i ? C.hover : 'transparent', cursor: 'pointer', WebkitTapHighlightColor: 'transparent' }}
+              >
+                <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 1 }}>
+                  <span style={{ fontSize: 13, fontWeight: 600, color: C.ink, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{h.label}</span>
+                  {sub && <span style={{ fontSize: 11.5, color: C.mute, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{sub}</span>}
+                </span>
+                {v && (v.net > 0
+                  ? <span style={{ flexShrink: 0, fontSize: 12, fontWeight: 700, color: C.danger }}>미수 {won(v.net)}</span>
+                  : <span style={{ flexShrink: 0, fontSize: 11, color: C.faint }}>{v.status}</span>)}
+              </button>
+            );
+          })}
           <button
             onClick={goAll}
             style={{ display: 'block', width: '100%', textAlign: 'left', padding: '9px 14px', border: 'none', borderTop: results.length ? `1px solid ${C.line}` : 'none', background: 'transparent', cursor: 'pointer', fontSize: 12.5, color: C.accent, fontWeight: 700 }}
