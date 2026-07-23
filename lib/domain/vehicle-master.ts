@@ -22,6 +22,7 @@ export type CatalogEntry = {
 
 let _index: Record<string, CatalogEntry> | null = null;
 let _ready: Promise<Record<string, CatalogEntry>> | null = null;
+let _modelsByMaker: Map<string, Set<string>> | null = null;   // canonMk → model_root 집합(수입 엔진코드 추론용, 지연구축)
 
 /** catalog _index.json 로드(1회 메모이즈). 부팅/페이지 진입 시 await. */
 export async function ensureCatalog(): Promise<Record<string, CatalogEntry>> {
@@ -31,6 +32,7 @@ export async function ensureCatalog(): Promise<Record<string, CatalogEntry>> {
     const res = await fetch('/data/car-master/_index.json');
     if (!res.ok) throw new Error('차종마스터 로드 실패: ' + res.status);
     _index = (await res.json()) as Record<string, CatalogEntry>;
+    _modelsByMaker = null;
     return _index;
   })();
   return _ready;
@@ -44,6 +46,7 @@ export function peekCatalog(): Record<string, CatalogEntry> | null {
 /** catalog 직접 주입 — 서버/노드(rebuild tsx)에서 readFileSync로 로드해 주입할 때 사용(fetch 불가 환경). */
 export function setCatalog(index: Record<string, CatalogEntry>): void {
   _index = index;
+  _modelsByMaker = null;
 }
 
 /** title 에서 maker 접두 제거 → 세부모델 표기. "기아 올 뉴 K3 BD" → "올 뉴 K3 BD" */
@@ -56,6 +59,73 @@ export function titleToSubModel(maker: string, title: string): string {
 
 const norm = (s: unknown) =>
   String(s || '').toLowerCase().replace(/\s+/g, '').replace(/the|신형|올뉴|디올뉴|더뉴|뉴/g, '');
+// 모델 비교용 — 하이픈까지 제거(E-클래스↔E클래스, 5-시리즈↔5시리즈).
+const nm = (s: unknown) => norm(s).replace(/-/g, '');
+// 제조사 별칭 정규화 — KGM=쌍용=KG모빌리티, 벤츠=benz=mercedes, 쉐보레=GM대우=한국GM 등.
+const MAKER_ALIAS: Record<string, string> = {
+  '쌍용': 'kgm', 'kg모빌리티': 'kgm', 'kgm': 'kgm', 'ssangyong': 'kgm',
+  'benz': '벤츠', 'mercedes': '벤츠', '메르세데스': '벤츠', '벤츠': '벤츠',
+  'gm대우': '쉐보레', '한국gm': '쉐보레', '대우': '쉐보레', '르노삼성': '르노', '르노코리아': '르노',
+};
+const canonMk = (s: unknown) => { const n = norm(s); return MAKER_ALIAS[n] || n; };
+
+// 수입 엔진코드 → SSOT 한글 모델 추론 (520d→5시리즈, C200→C클래스). erp3 ssot-snap.js MB_PAT 이식.
+const MB_PAT: [RegExp, string][] = [
+  [/glc/i, 'GLC-클래스'], [/gle/i, 'GLE-클래스'], [/gla/i, 'GLA-클래스'], [/glb/i, 'GLB-클래스'], [/gls/i, 'GLS-클래스'],
+  [/cls/i, 'CLS-클래스'], [/cla/i, 'CLA-클래스'], [/eqs/i, 'EQS'], [/eqe/i, 'EQE'], [/amg\s*gt/i, 'AMG GT'],
+  [/\bsl\b/i, 'SL-클래스'], [/\bv\s?\d{3}/i, 'V-클래스'],
+  [/\bs\s?\d{3}|s클래스/i, 'S-클래스'], [/\be\s?\d{3}|e클래스/i, 'E-클래스'], [/\bc\s?\d{3}|c클래스/i, 'C-클래스'],
+  [/\ba\s?\d{3}|a클래스/i, 'A-클래스'], [/\bg\s?\d{3}|g클래스/i, 'G-클래스'],
+];
+
+/** canonMk(maker) → 그 제조사의 catalog model_root 집합(지연구축). */
+function modelsForMaker(maker: string): Set<string> | null {
+  if (!_index) return null;
+  if (!_modelsByMaker) {
+    _modelsByMaker = new Map();
+    for (const c of Object.values(_index)) {
+      if (!c.model_root) continue;
+      const k = canonMk(c.maker);
+      if (!_modelsByMaker.has(k)) _modelsByMaker.set(k, new Set());
+      _modelsByMaker.get(k)!.add(c.model_root);
+    }
+  }
+  return _modelsByMaker.get(canonMk(maker)) || null;
+}
+
+/** 수입 엔진코드 문자열 → catalog의 실제 model_root(정규화 매칭). 벤츠·BMW·아우디. 없으면 ''. */
+export function inferImportModel(maker: string, text: string): string {
+  const models = modelsForMaker(maker);
+  if (!models) return '';
+  const has = (label: string): string => {
+    const n = nm(label);
+    for (const m of models) { const x = nm(m); if (x === n || x.includes(n) || n.includes(x)) return m; }
+    return '';
+  };
+  const mk = canonMk(maker);
+  let mm: RegExpMatchArray | null;
+  let r: string;
+  if (mk === '벤츠') { for (const [re, mo] of MB_PAT) { if (re.test(text)) { r = has(mo); if (r) return r; } } return ''; }
+  if (mk === 'bmw') {
+    if ((mm = text.match(/\bX\s?([1-7])\b/i)) && (r = has('X' + mm[1]))) return r;
+    if ((mm = text.match(/([1-8])\d{2}\s?[a-z]{0,2}/i)) && (r = has(mm[1] + '시리즈'))) return r;
+    return '';
+  }
+  if (mk === '아우디') {
+    if ((mm = text.match(/\bQ\s?([1-8])\b/i)) && (r = has('Q' + mm[1]))) return r;
+    if ((mm = text.match(/\bA\s?([1-8])\b/i)) && (r = has('A' + mm[1]))) return r;
+    return '';
+  }
+  return '';
+}
+
+/** 차명 전처리 — 연속 중복 토큰 제거(벤츠 벤츠) + 붙은 제조사-코드 분리(BMW530i→BMW 530i). */
+function preNormName(s: string): string {
+  const toks = String(s || '').replace(/\s+/g, ' ').trim().split(' ');
+  const out: string[] = [];
+  for (const w of toks) if (out[out.length - 1] !== w) out.push(w);
+  return out.join(' ').replace(/(BMW|벤츠|아우디|Audi)(\d)/gi, '$1 $2');
+}
 
 // ── 제조사 정렬 순위(국산 인기순 → 수입 인기순 → 가나다) ──
 const KOR_MAKER_RANK = ['현대', '기아', '제네시스', 'KGM', '쌍용', '쉐보레', '한국GM', 'GM대우', '르노', '르노삼성', '대우'];
@@ -191,12 +261,12 @@ export function catalogSubModelByYear(
   maker: string, model: string, regDate?: string,
 ): { subModel: string; catalogId: string; matched: 'year' | 'recent' } | null {
   if (!_index) return null;
-  const nMk = norm(maker), nMd = norm(model);
+  const nMk = canonMk(maker), nMd = nm(model);
   if (!nMd) return null;
   let cands = Object.values(_index).filter((c) => {
     if (!c.model_root) return false;
-    const mk = !nMk || norm(c.maker) === nMk || norm(c.maker).includes(nMk) || nMk.includes(norm(c.maker));
-    const md = norm(c.model_root) === nMd || nMd.includes(norm(c.model_root)) || norm(c.model_root).includes(nMd);
+    const mk = !maker || canonMk(c.maker) === nMk || norm(c.maker).includes(norm(maker)) || norm(maker).includes(norm(c.maker));
+    const md = nm(c.model_root) === nMd || nMd.includes(nm(c.model_root)) || nm(c.model_root).includes(nMd);
     return mk && md;
   });
   if (!cands.length) return null;
@@ -294,10 +364,12 @@ export type ClassifyResult = {
  */
 export function classifyVehicle(carName: string, regDate?: string): ClassifyResult {
   const empty: ClassifyResult = { maker: '', modelLine: '', subModel: '', catalogId: '', confidence: 'none' };
-  const name = String(carName || '').trim();
+  const name = preNormName(String(carName || '').trim());
   if (!name || !_index) return empty;
   const maker = inferMaker(name);
-  const sub = catalogSubModelByYear(maker, name, regDate);
+  let sub = catalogSubModelByYear(maker, name, regDate);
+  // 직접 매칭 실패 & 수입 브랜드 → 엔진코드로 모델 추론 후 재시도(C200→C클래스, 520d→5시리즈).
+  if (!sub && maker) { const im = inferImportModel(maker, name); if (im) sub = catalogSubModelByYear(maker, im, regDate); }
   if (!sub) return empty;
   const cat = getCatalogById(sub.catalogId);
   if (!cat) return empty;
