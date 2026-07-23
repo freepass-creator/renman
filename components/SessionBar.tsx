@@ -11,6 +11,7 @@ import { haptic } from '@/lib/haptics';
 import { C, SCRIM, ctrlH, IconBtn } from '@/components/ui';
 import { NAV_GROUPS } from '@/lib/nav';
 import { tierIncludes } from '@/lib/tier';
+import { TopSearch } from '@/components/TopSearch';
 
 // 상단 좌측 브랜드 = 이 ERP를 쓰는 운영사(테넌트) 이름. 임시 하드코딩 — 추후 로그인 유저의 소속회사로.
 const OPERATOR_BRAND = 'teamjpk';
@@ -117,6 +118,7 @@ export default function TopBar() {
           <span style={{ flex: 1, minWidth: 0, fontSize: headTitle === OPERATOR_BRAND ? 19 : 17, fontWeight: 800, letterSpacing: '-0.03em', color: ink, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
             {headTitle}
           </span>
+          {!showBack && <button onClick={() => router.push('/search')} aria-label="검색" style={tapTarget}><SearchIcon size={21} /></button>}
           {showBack
             ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>{slots.actions}</span>
             : <span style={{ fontSize: 12.5, fontWeight: 700, color: ink, padding: '0 8px', whiteSpace: 'nowrap' }} title={user.email}>{user.name}</span>}
@@ -133,13 +135,8 @@ export default function TopBar() {
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 16px', background: C.taupeBg, borderBottom: `1px solid ${line}`, position: 'sticky', top: 0, zIndex: 30, minHeight: 48, boxSizing: 'border-box', flexWrap: 'wrap' }}>
         <NavMenu />
         <a href="/" style={{ fontSize: 15, fontWeight: 800, letterSpacing: '-0.03em', color: ink, textDecoration: 'none' }}>{OPERATOR_BRAND}</a>
-        {/* 가운데 = 전역 검색(⌘K 커맨드 팔레트) — 통상 ERP 상단바 활용. */}
-        <button onClick={() => window.dispatchEvent(new Event('jpk:command'))} title="검색 (Ctrl+K)"
-          style={{ flex: 1, minWidth: 0, maxWidth: 440, margin: '0 auto', display: 'inline-flex', alignItems: 'center', gap: 8, height: 30, padding: '0 12px', border: `1px solid ${line}`, borderRadius: 'var(--radius)', background: C.card, cursor: 'pointer', color: mute }}>
-          <SearchIcon size={14} style={{ flexShrink: 0 }} />
-          <span style={{ flex: 1, textAlign: 'left', fontSize: 12.5, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>차량·손님·계약 검색…</span>
-          <span style={{ flexShrink: 0, fontSize: 10.5, color: C.faint, border: `1px solid ${line}`, borderRadius: 4, padding: '1px 5px', fontWeight: 700 }}>Ctrl K</span>
-        </button>
+        {/* 가운데 = 전역 검색(검색 전용 인라인 타입어헤드 — 창 안 뜨고 밑에 결과 바로). */}
+        <TopSearch />
         <span style={{ fontSize: 12, color: mute, fontWeight: 600, marginRight: 2, fontVariantNumeric: 'tabular-nums' }}>{todayLabel}</span>
         <div style={{ display: 'inline-flex', alignItems: 'baseline', gap: 6, paddingLeft: 2, whiteSpace: 'nowrap' }} title={user.email}>
           <span style={{ fontSize: 12.5, fontWeight: 700, color: ink }}>{user.name}</span>
