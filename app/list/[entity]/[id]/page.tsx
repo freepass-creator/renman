@@ -5,7 +5,7 @@ import { useSession } from '@/lib/session';
 import { getStore } from '@/lib/store';
 import { ENTITIES, type EntityRecord } from '@/lib/intake/entities';
 import { companyLabel } from '@/lib/companies';
-import { Page, DetailShell, Panel, Sec, Cards, Metric, FormGrid, Btn, EmptyState, Message, C, PageLoading } from '@/components/ui';
+import { Page, DetailShell, Panel, Sec, Cards, Metric, FormGrid, Btn, EmptyState, Message, C, PageLoading, usePrompt } from '@/components/ui';
 import { commitUpdate, commitRemove } from '@/lib/commit';
 
 export default function DetailPage() {
@@ -14,6 +14,7 @@ export default function DetailPage() {
   const entityKey = String(params.entity);
   const id = decodeURIComponent(String(params.id));
   const { companyId } = useSession();
+  const prompt = usePrompt();
   const entity = ENTITIES[entityKey];
   const [rec, setRec] = useState<EntityRecord | null>(null);
   const [form, setForm] = useState<EntityRecord>({});
@@ -33,7 +34,7 @@ export default function DetailPage() {
     } catch (e) { setMsg('저장 실패: ' + (e as Error).message); }
   }
   async function remove() {
-    const reason = window.prompt(`${entity.label} 삭제 사유 (취소=중단)`);
+    const reason = await prompt({ message: `${entity.label} 삭제 사유 (취소=중단)` });
     if (reason === null) return;
     try {
       await commitRemove({ entity: entityKey, sessionCompanyId: companyId, rec, key: id, reason });

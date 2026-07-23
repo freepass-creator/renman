@@ -3,17 +3,18 @@
 import { useState } from 'react';
 import { Plus, Trash2, Pencil, Check } from 'lucide-react';
 import { companyDefs, addCompany, updateCompany, removeCompany } from '@/lib/companies';
-import { Panel, Btn, Input, C } from '@/components/ui';
+import { Panel, Btn, Input, C, useConfirm } from '@/components/ui';
 
 export function CompanyRegistry() {
+  const confirm = useConfirm();
   const [, force] = useState(0);
   const rerender = () => force((n) => n + 1);
   const [edit, setEdit] = useState(false);
   const [nw, setNw] = useState({ label: '', short: '' });
   const defs = companyDefs();
 
-  const del = (id: string, label: string) => {
-    if (window.confirm(`법인 "${label}"을(를) 목록에서 제거합니다.\n(그 법인 데이터는 삭제되지 않지만 화면에서 사라집니다) 계속?`)) { removeCompany(id); rerender(); }
+  const del = async (id: string, label: string) => {
+    if (await confirm({ message: `법인 "${label}"을(를) 목록에서 제거합니다.\n(그 법인 데이터는 삭제되지 않지만 화면에서 사라집니다) 계속?`, danger: true })) { removeCompany(id); rerender(); }
   };
   const add = () => { if (addCompany(nw.label, nw.short)) { setNw({ label: '', short: '' }); rerender(); } };
 

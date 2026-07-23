@@ -12,7 +12,7 @@ import { getStore } from '@/lib/store';
 import { ENTITIES } from '@/lib/intake/entities';
 import { downloadCsv } from '@/lib/export-csv';
 import { todayKST } from '@/lib/contracts/dates'; // KST 기준 오늘(내보내기 파일명)
-import { Page, Panel, ListBox, ListRow, Btn, PillTabs, C, SPACE_M } from '@/components/ui';
+import { Page, Panel, ListBox, ListRow, Btn, PillTabs, C, SPACE_M, usePrompt } from '@/components/ui';
 import { WorkbenchBar } from '@/components/WorkbenchBar';
 import { closePeriod, reopenPeriod, useClosedPeriods } from '@/lib/finance/period-lock';
 import { MobileTabsSettings, useMobileTabs } from '@/lib/mobile-tabs';
@@ -49,16 +49,17 @@ function ExpandPad({ children }: { children: ReactNode }) {
 
 function ClosingBody({ companyId, actor }: { companyId: string; actor: string }) {
   const { closed, reload } = useClosedPeriods(companyId);
+  const prompt = usePrompt();
   const now = new Date();
   const months = Array.from({ length: 12 }, (_, i) => {
     const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
   });
 
-  const toggle = (ym: string) => {
+  const toggle = async (ym: string) => {
     try {
       if (closed.includes(ym)) {
-        const reason = window.prompt(`${ym} 마감 해제 사유 (필수)`, '');
+        const reason = await prompt({ message: `${ym} 마감 해제 사유 (필수)`, initial: '', required: true });
         if (!reason?.trim()) { toast('해제 사유를 입력해야 합니다', 'error'); return; }
         reopenPeriod(companyId, ym, actor, reason);
         toast(`${ym} 마감 해제`, 'info');

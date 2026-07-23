@@ -11,7 +11,7 @@ import { useBusyAction } from '@/lib/use-busy-action';
 import { safeUpdate } from '@/lib/safe-update';
 import { selectedInDim } from '@/lib/lens-filters';
 import { textMatch } from '@/lib/search-match';
-import { FacetPage, Sec, Cards, Metric, ObjCard, Btn, EmptyState, won, C, SPACE_M, TOUCH, PageLoading } from '@/components/ui';
+import { FacetPage, Sec, Cards, Metric, ObjCard, Btn, EmptyState, won, C, SPACE_M, TOUCH, PageLoading, useConfirm } from '@/components/ui';
 import { FacetRail } from '@/components/FacetRail';
 import { WorkbenchBar } from '@/components/WorkbenchBar';
 import { WorkHubBack } from '@/components/WorkHubTabs';
@@ -39,6 +39,7 @@ export default function ReceivablesPage() {
   const [notify, setNotify] = useState(false); // 문자 발송 다이얼로그
   const [noticeSel, setNoticeSel] = useState<Set<string>>(new Set());
   const [, runBusy] = useBusyAction();
+  const confirm = useConfirm();
   const toggleFacet = (label: string) => setFacets((s) => { const n = new Set(s); n.has(label) ? n.delete(label) : n.add(label); return n; });
   const resetFacets = () => setFacets(new Set());
 
@@ -117,9 +118,9 @@ export default function ReceivablesPage() {
   const toggleNoticeSel = (key: string) => setNoticeSel((s) => { const n = new Set(s); n.has(key) ? n.delete(key) : n.add(key); return n; });
   const noticeTargets = filtered.filter((r) => noticeSel.has(String(r.rec._key || '')));
   const noticeTodoFiltered = filtered.filter((r) => (r.st.stage === '내용증명' || r.st.stage === '채권화') && !r.rec.noticeSentDate);
-  const sendNoticeBulk = (recs: EntityRecord[]) => {
+  const sendNoticeBulk = async (recs: EntityRecord[]) => {
     if (recs.length === 0) return;
-    if (!window.confirm(`내용증명 ${recs.length}건을 일괄 발송(인쇄)·기록합니까?`)) return;
+    if (!(await confirm({ message: `내용증명 ${recs.length}건을 일괄 발송(인쇄)·기록합니까?` }))) return;
     void runBusy(async () => {
       const r = await safeUpdate(() => sendNoticeCertBulk({
         recs,
@@ -134,16 +135,16 @@ export default function ReceivablesPage() {
     });
   };
   // 시동제어 전환 — "물어보고"(확인) 걸고, engineDisabled 원자(patchEngineLock SSOT)에 사유·시각·담당 기록.
-  const toggleEngine = (r: { rec: EntityRecord; v: { net: number; overdueDays: number } }) => {
+  const toggleEngine = async (r: { rec: EntityRecord; v: { net: number; overdueDays: number } }) => {
     const rec = r.rec;
     const who = String(rec.contractorName || '—'), plate = String(rec.plate || '');
     const actor = user?.email || user?.name || '';
     if (rec.engineDisabled) {
-      if (!window.confirm(`${who} · ${plate}\n입금이 확인되어 시동제어를 해제합니까?`)) return;
+      if (!(await confirm({ message: `${who} · ${plate}\n입금이 확인되어 시동제어를 해제합니까?` }))) return;
       patch(rec, patchEngineLock(false, { today: TODAY, actor, reason: '' }));
       toast(`시동제어 해제 · ${plate}`);
     } else {
-      if (!window.confirm(`${who} · ${plate}\n미납 ${won(r.v.net)} · ${r.v.overdueDays}일 연체\n\n원격 시동제어를 겁니까?`)) return;
+      if (!(await confirm({ message: `${who} · ${plate}\n미납 ${won(r.v.net)} · ${r.v.overdueDays}일 연체\n\n원격 시동제어를 겁니까?`, danger: true }))) return;
       patch(rec, patchEngineLock(true, { today: TODAY, actor, reason: `미납 ${won(r.v.net)} · ${r.v.overdueDays}일 연체` }));
       toast(`시동제어 적용 · ${plate}`, 'info');
     }

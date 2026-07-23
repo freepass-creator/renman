@@ -7,7 +7,7 @@ import { useSecOrder } from '@/lib/use-sec-order';
 import { type EntityRecord } from '@/lib/intake/entities';
 import { generateSchedules, recalcContract } from '@/lib/payments/payment-schedule';
 import type { Contract } from '@/lib/payments/types';
-import { Sec, Cards, Metric, ObjCard, Stepper, Btn, Badge, FormGrid, KV, HiddenSecs, EmptyState, Message, th, thR, td, tdR, won, C, SH, PageLoading, ctrlH, ctrlInputFs, type Step, type KVRow } from '@/components/ui';
+import { Sec, Cards, Metric, ObjCard, Stepper, Btn, Badge, FormGrid, KV, HiddenSecs, EmptyState, Message, th, thR, td, tdR, won, C, SH, PageLoading, ctrlH, ctrlInputFs, useConfirm, type Step, type KVRow } from '@/components/ui';
 import { InfoDoc, type DocReplacePayload } from '@/components/InfoDoc';
 import { docHistory, pushDocVersion, latestDoc } from '@/lib/docs';
 import { deriveLocation, locationLabel } from '@/lib/vehicle-location';
@@ -88,6 +88,7 @@ const Add = ({ type, plate, label }: { type: string; plate: string; label: strin
 
 /** 한 자산(차)의 360 — 카드 언어. 편집=이벤트/담기(수정·추가), 파생은 읽기전용. */
 export function Vehicle360({ plate, focus }: { plate: string; focus?: string }) {
+  const confirm = useConfirm();
   const { companyId, user } = useSession();
   const { data: [allContracts = [], insAll = [], penAll = [], hisAll = [], allVehicles = []], loading } =
     useEntityLists(['contract', 'insurance', 'penalty', 'history', 'vehicle']);
@@ -150,7 +151,7 @@ export function Vehicle360({ plate, focus }: { plate: string; focus?: string }) 
   const master = v ? loadMaster(String(v.companyId || '')) : {}; // 법인 마스터(법인번호·소재지)
   // 차량 소프트삭제 — 잘못 등록한 차. 매각·처분은 삭제 아니라 상태. store.remove(deletedAt)→/trash 복구.
   async function delVehicle() {
-    if (!v || !window.confirm(`차량 ${plate}을(를) 삭제할까요? (휴지통에서 복구 가능)\n※ 매각·처분은 삭제가 아니라 상태(매각/말소)로 처리하세요.`)) return;
+    if (!v || !(await confirm({ message: `차량 ${plate}을(를) 삭제할까요? (휴지통에서 복구 가능)\n※ 매각·처분은 삭제가 아니라 상태(매각/말소)로 처리하세요.`, danger: true }))) return;
     try {
       await commitRemove({ entity: 'vehicle', sessionCompanyId: companyId, rec: v, key: plate, reason: '수기 삭제' });
       toast('차량 삭제 — 휴지통에서 복구 가능', 'info');
@@ -225,10 +226,10 @@ export function Vehicle360({ plate, focus }: { plate: string; focus?: string }) 
     const who = String(active.contractorName || plate);
     const actor = user?.email || user?.name || '';
     if (action === '해제') {
-      if (!window.confirm(`${who} · ${plate}\n입금이 확인되어 시동제어를 해제합니까?`)) return;
+      if (!(await confirm({ message: `${who} · ${plate}\n입금이 확인되어 시동제어를 해제합니까?` }))) return;
       await doTransition(patchEngineLock(false, { today: TODAY, actor, reason: '' }), String(active._key), active);
     } else {
-      if (!window.confirm(`${who} · ${plate}\n미납 ${won(vview.net)} · ${vview.overdueDays}일 연체\n\n원격 시동제어를 겁니까?`)) return;
+      if (!(await confirm({ message: `${who} · ${plate}\n미납 ${won(vview.net)} · ${vview.overdueDays}일 연체\n\n원격 시동제어를 겁니까?`, danger: true }))) return;
       await doTransition(patchEngineLock(true, { today: TODAY, actor, reason: `미납 ${won(vview.net)} · ${vview.overdueDays}일 연체` }), String(active._key), active);
     }
     await saveIntake('history', t, [{ plate, category: '시동제어', title: `시동 ${action}`, date: TODAY, author: user.name, memo: vview.net > 0 ? `미납 ${won(vview.net)}` : '', companyId: t, _kind: 'activity' }], { notify: false });

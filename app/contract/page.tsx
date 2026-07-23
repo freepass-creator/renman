@@ -18,7 +18,7 @@ import { classifyContract, type ContractPhase, type ContractDebt } from '@/lib/d
 import { aggregateCustomers, customerKey, type CustomerAgg } from '@/lib/customers';
 import { dueMatcher, selectedInDim } from '@/lib/lens-filters';
 import { textMatch } from '@/lib/search-match';
-import { FacetPage, Sec, Cards, Metric, DataTable, ExcelSheet, IconSeg, Badge, StatusTag, Btn, Drawer, Section, DetailGrid, EmptyState, Input, TextLink, won, th, thR, td, tdR, C, type Col, PageLoading } from '@/components/ui';
+import { FacetPage, Sec, Cards, Metric, DataTable, ExcelSheet, IconSeg, Badge, StatusTag, Btn, Drawer, Section, DetailGrid, EmptyState, Input, TextLink, won, th, thR, td, tdR, C, type Col, PageLoading, useConfirm } from '@/components/ui';
 import { LayoutGrid, Table } from 'lucide-react';
 import { CONTRACT_COLS } from '@/lib/sheet-cols';
 import { contractViewToRow } from '@/lib/sheet-rows';
@@ -50,6 +50,7 @@ type ActKind = 'deliver' | 'return' | 'terminate' | 'extend' | 'pay';
 type Act = { kind: ActKind; value: string };
 
 export default function ContractWorkspace() {
+  const confirm = useConfirm();
   const { companyId, scopeAll } = useSession();
   const { rows: recs, loading, reload } = useEntityList('contract');
   const views = useMemo(
@@ -77,7 +78,7 @@ export default function ContractWorkspace() {
   }, []);
 
   async function applyPatch(v: ContractView, patch: EntityRecord, confirmMsg?: string) {
-    if (confirmMsg && !window.confirm(confirmMsg)) return;
+    if (confirmMsg && !(await confirm({ message: confirmMsg, danger: true }))) return;
     setBusy(true);
     try {
       await commitUpdate({ entity: 'contract', sessionCompanyId: companyId, rec: v.rec, key: String(v.rec._key || ''), patch });
@@ -86,7 +87,7 @@ export default function ContractWorkspace() {
     finally { setBusy(false); }
   }
   async function delContract(v: ContractView) {
-    if (!window.confirm(`이 계약을 삭제할까요? (휴지통에서 복구 가능)\n${String(v.rec.contractorName || '')} · ${String(v.rec.plate || '')}`)) return;
+    if (!(await confirm({ message: `이 계약을 삭제할까요? (휴지통에서 복구 가능)\n${String(v.rec.contractorName || '')} · ${String(v.rec.plate || '')}`, danger: true }))) return;
     setBusy(true);
     try {
       await commitRemove({ entity: 'contract', sessionCompanyId: companyId, rec: v.rec, key: String(v.rec._key || ''), reason: '수기 삭제' });

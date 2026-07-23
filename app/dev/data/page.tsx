@@ -13,7 +13,7 @@ import { reflectCompany } from '@/lib/reflect';
 import { type OperatingSummary } from '@/lib/operating-snapshot';
 import { OperatingSummaryView } from '@/components/OperatingSummary';
 import { COMPANIES, companyLabel, companyShort } from '@/lib/companies';
-import { Page, Panel, Btn, C, LoadingOverlay, th, td } from '@/components/ui';
+import { Page, Panel, Btn, C, LoadingOverlay, th, td, useConfirm, usePrompt } from '@/components/ui';
 
 import { seedDemoData } from '@/lib/seed';
 
@@ -21,6 +21,8 @@ const REAL = new Set(['switchplan']); // 실데이터 보유 회사
 
 export default function DevDataPage() {
   const { user, isOperator } = useSession();
+  const confirm = useConfirm();
+  const prompt = usePrompt();
   const [counts, setCounts] = useState<Record<string, { vehicle: number; contract: number; bank_tx: number; insurance: number } | null>>({});
   const [busy, setBusy] = useState('');
   const [msg, setMsg] = useState('');
@@ -43,7 +45,7 @@ export default function DevDataPage() {
     const cnt = counts[c];
     const hasData = !!cnt && (cnt.vehicle + cnt.contract + cnt.bank_tx + cnt.insurance) > 0;
     // 반영 = 깨끗한 최신 적재 + 운영 스냅샷 산출(공용 reflect 엔진). 옛 1930·미분류 잔존 방지.
-    if (hasData && !window.confirm(`${companyLabel(c)}의 기존 데이터를 지우고 최신 실데이터로 다시 반영합니다. 계속?`)) return;
+    if (hasData && !(await confirm({ message: `${companyLabel(c)}의 기존 데이터를 지우고 최신 실데이터로 다시 반영합니다. 계속?`, danger: true }))) return;
     setBusy(c); setMsg('');
     try {
       const r = await reflectCompany(c);
@@ -55,8 +57,8 @@ export default function DevDataPage() {
     finally { setBusy(''); }
   }
   async function clearCompany(c: string) {
-    if (!window.confirm(`${companyLabel(c)}의 모든 데이터를 지웁니다(하드, 되돌릴 수 없음). 계속?`)) return;
-    const typed = window.prompt(`확인: 법인 코드 "${c}" 를 그대로 입력하세요.`);
+    if (!(await confirm({ message: `${companyLabel(c)}의 모든 데이터를 지웁니다(하드, 되돌릴 수 없음). 계속?`, danger: true }))) return;
+    const typed = await prompt({ message: `확인: 법인 코드 "${c}" 를 그대로 입력하세요.`, required: true });
     if (typed !== c) { setMsg('초기화 취소 — 법인 코드 불일치'); return; }
     setBusy(c); setMsg('');
     try { const r = await wipeCompany(c); setMsg(`${companyLabel(c)} 초기화 — ${r.deleted}건 삭제`); await load(); }
@@ -68,8 +70,8 @@ export default function DevDataPage() {
       setMsg('프로덕션 전체 초기화 차단 — NEXT_PUBLIC_ALLOW_HARD_WIPE=1 필요');
       return;
     }
-    if (!window.confirm('전 회사 데이터를 완전히 지웁니다(하드). 계속?')) return;
-    const typed = window.prompt('확인: WIPE-ALL 을 입력하세요.');
+    if (!(await confirm({ message: '전 회사 데이터를 완전히 지웁니다(하드). 계속?', danger: true }))) return;
+    const typed = await prompt({ message: '확인: WIPE-ALL 을 입력하세요.', required: true });
     if (typed !== 'WIPE-ALL') { setMsg('전체 초기화 취소'); return; }
     setBusy('__all__'); setMsg('');
     try { const r = await wipeAllData(); setMsg(`전체 초기화 — ${r.deleted}건 삭제`); await load(); }
@@ -77,7 +79,7 @@ export default function DevDataPage() {
     finally { setBusy(''); }
   }
   async function loadDemoAll() {
-    if (!window.confirm('전 법인 데이터를 비우고 데모 샘플(차량·계약·미수·과태료·미분류입금)을 넣습니다. 계속?')) return;
+    if (!(await confirm({ message: '전 법인 데이터를 비우고 데모 샘플(차량·계약·미수·과태료·미분류입금)을 넣습니다. 계속?', danger: true }))) return;
     setBusy('__demo__'); setMsg(''); setSnap(null);
     try {
       let total = 0;

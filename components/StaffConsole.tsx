@@ -5,11 +5,12 @@ import { useState } from 'react';
 import { Plus, Trash2, Pencil, Check } from 'lucide-react';
 import { staffDefs, addStaff, updateStaff, removeStaff, setStaffStatus, type StaffRole } from '@/lib/staff';
 import { companyDefs, companyLabel } from '@/lib/companies';
-import { Panel, Btn, Input, Select, Badge, C } from '@/components/ui';
+import { Panel, Btn, Input, Select, Badge, C, useConfirm } from '@/components/ui';
 
 const ROLES: StaffRole[] = ['본사', '법인'];
 
 export function StaffConsole() {
+  const confirm = useConfirm();
   const [, force] = useState(0);
   const rerender = () => force((n) => n + 1);
   const [edit, setEdit] = useState(false);
@@ -17,8 +18,8 @@ export function StaffConsole() {
   const rows = staffDefs();
   const companies = companyDefs();
 
-  const del = (id: string, name: string) => {
-    if (window.confirm(`직원 "${name}"을(를) 명단에서 제거합니다. 계속?`)) { removeStaff(id); rerender(); }
+  const del = async (id: string, name: string) => {
+    if (await confirm({ message: `직원 "${name}"을(를) 명단에서 제거합니다. 계속?`, danger: true })) { removeStaff(id); rerender(); }
   };
   const add = () => {
     const id = addStaff({ name: nw.name, email: nw.email, role: nw.role, companyId: nw.role === '법인' ? nw.companyId : null, department: nw.department, phone: nw.phone });

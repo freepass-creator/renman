@@ -7,7 +7,7 @@ import { matchPenalty } from '@/lib/penalty-match';
 import { dueMatcher, selectedInDim } from '@/lib/lens-filters';
 import { textMatch } from '@/lib/search-match';
 import { dday } from '@/lib/dashboard-consts';
-import { Sec, Cards, Metric, DataTable, EmptyState, Btn, FacetPage, TextLink, won, C, type Col, PageLoading } from '@/components/ui';
+import { Sec, Cards, Metric, DataTable, EmptyState, Btn, FacetPage, TextLink, won, C, type Col, PageLoading, useConfirm } from '@/components/ui';
 import { FacetRail } from '@/components/FacetRail';
 import { WorkbenchBar } from '@/components/WorkbenchBar';
 import { WorkHubBack } from '@/components/WorkHubTabs';
@@ -28,6 +28,7 @@ export default function PenaltyProcess() {
   const { companyId, scopeAll } = useSession();
   const router = useRouter();
   const { data: [pens = [], cons = []], loading, reload } = useEntityLists(['penalty', 'contract']);
+  const confirm = useConfirm();
   const rows = useMemo(
     () => pens.map((p) => {
       const m = matchPenalty(p, cons);
@@ -45,7 +46,7 @@ export default function PenaltyProcess() {
 
   // 소프트삭제 — store.remove(deletedAt+사유). /trash 에서 복구. (ERP 30원칙 Soft delete·Audit)
   const del = async (r: Row) => {
-    if (!window.confirm(`이 과태료를 삭제할까요? (휴지통에서 복구 가능)\n${String(r.p.plate || '')} · ${won(r.p.amount)}`)) return;
+    if (!(await confirm({ message: `이 과태료를 삭제할까요? (휴지통에서 복구 가능)\n${String(r.p.plate || '')} · ${won(r.p.amount)}`, danger: true }))) return;
     try {
       await commitRemove({ entity: 'penalty', sessionCompanyId: companyId, rec: r.p, key: String(r.p._key || ''), reason: '수기 삭제' });
       reload();

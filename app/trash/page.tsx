@@ -5,13 +5,14 @@ import { getStore } from '@/lib/store';
 import { useReloadOnSaved } from '@/lib/use-reload-on-saved';
 import { ENTITY_LIST, ENTITIES, type EntityRecord } from '@/lib/intake/entities';
 import { companyLabel } from '@/lib/companies';
-import { Page, Sec, EmptyState, ListBox, ListRow, Btn, C, PageLoading } from '@/components/ui';
+import { Page, Sec, EmptyState, ListBox, ListRow, Btn, C, PageLoading, useConfirm } from '@/components/ui';
 import { WorkbenchBar } from '@/components/WorkbenchBar';
 
 type Item = { entity: string; rec: EntityRecord };
 
 export default function TrashPage() {
   const { companyId, scopeAll } = useSession();
+  const confirm = useConfirm();
   const [items, setItems] = useState<Item[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -26,6 +27,7 @@ export default function TrashPage() {
   useReloadOnSaved(useCallback(() => load(true), [load]));
 
   async function restore(it: Item) {
+    if (!(await confirm({ message: '이 항목을 복원할까요?' }))) return;
     await getStore().restore(it.entity, companyId, String(it.rec._key || ''));
     load();
   }
