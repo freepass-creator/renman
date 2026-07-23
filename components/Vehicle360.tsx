@@ -453,47 +453,51 @@ export function Vehicle360({ plate, focus }: { plate: string; focus?: string }) 
       {!v && <div style={{ marginTop: 12, order: -1 }}><Message variant="warning">등록증이 아직 안 들어왔습니다. 계약·보험·과태료만 표시. <b>정보 담기</b>로 등록하세요.</Message></div>}
 
       {/* 차량 정보 = 제조사 스펙(등록증에 없음 · 직접입력/차종마스터). 인라인 수정(값칸만). */}
-      <Sec id="v-info" order={secOrd('v-info')} onReorder={reorderSec} title={editInfo ? '차량 정보 · 편집 중' : '차량 정보'} tone={editInfo ? 'ok' : undefined} desc="차종마스터 5단계 · 스펙 · 색상" right={
+      <Sec id="v-info" order={secOrd('v-info')} onReorder={reorderSec} title={editInfo ? '차량 정보 · 편집 중' : '차량 정보'} tone={editInfo ? 'ok' : undefined} desc="제조사 제공 — 5단계·선택옵션·색상" right={
         editInfo
           ? <span style={{ fontSize: 11.5, color: C.faint }}>함께 편집 중</span>
           : <Btn variant="ghost" onClick={startEdit}>{v ? '수정' : '+ 등록'}</Btn>
       }>
         {(v || editInfo)
           ? <KV editing={editInfo} form={form} onChange={chg} rows={[
-              // 차종마스터 5단계(제조사→모델→세부모델→모델구분→트림) + 등록증차명 + 차종
+              // 제조사 제공 정보 = 차종마스터 5단계(제조사→모델→세부모델→파워트레인→세부트림)+선택옵션.
+              // 등록증에 있는 항목(차명·차종·연식·배기량·연료·정원)은 등록증 섹션으로(중복 제거).
               ['제조사', 'maker', String(v?.maker ?? '')],
               ['모델', 'modelLine', String(v?.modelLine ?? '')],
               ['세부모델', 'subModel', String(v?.subModel ?? '')],
-              ['모델구분', 'variant', String(v?.variant ?? '')],
-              ['트림', 'trim', String(v?.trim ?? '')],
-              ['차명(등록증)', 'carName', String(v?.carName ?? '')],
-              ['차종', 'vehicleType', String(v?.vehicleType ?? '')],
-              // 스펙
-              ['연식', 'modelYear', String(v?.modelYear ?? '')],
-              ['배기량', 'displacement', String(v?.displacement ?? '')],
-              ['연료', 'fuel', String(v?.fuel ?? '')],
-              ['구동방식', 'driveType', String(v?.driveType ?? '')],
-              ['변속기', 'transmission', String(v?.transmission ?? '')],
-              ['승차정원', 'seats', String(v?.seats ?? '')],
-              // 색상 · 옵션
+              ['파워트레인', 'variant', String(v?.variant ?? '')],
+              ['세부트림', 'trim', String(v?.trim ?? '')],
+              ['선택옵션', 'optionList', String(v?.optionList ?? '')],
               ['외부색상', 'exteriorColor', String(v?.exteriorColor ?? '')],
               ['내부색상', 'interiorColor', String(v?.interiorColor ?? '')],
-              ['옵션', 'optionList', String(v?.optionList ?? '')],
+              ['구동방식', 'driveType', String(v?.driveType ?? '')],
+              ['변속기', 'transmission', String(v?.transmission ?? '')],
             ] as KVRow[]} />
           : <EmptyState variant="sec">차량 미등록</EmptyState>}
       </Sec>
 
       {/* 등록증 = 정보 + 자동차등록증 원본 + 재발급 이력(InfoDoc). 인라인 수정은 차량정보와 공유. */}
-      <InfoDoc id="v-reg" order={secOrd('v-reg')} title="등록증" desc="자동차등록증 원본과 한 몸"
+      <InfoDoc id="v-reg" order={secOrd('v-reg')} title="등록증" desc="자동차등록증상 정보 전부 · 원본과 한 몸"
         editing={editInfo} hideSaveCancel form={form} onChange={chg}
         onEditToggle={() => (editInfo ? cancelEdit() : startEdit())} onSave={saveInfo}
         docType="vehicle" docLabel="자동차등록증" docs={docHistory(v, 'vehicle')}
         companyId={target} recordKey={plate} onReplaceDoc={onReplaceReg}
         fields={[
+          // 등록증에 실제로 적힌 항목 전부(대부분 OCR 자동). 차량번호·법인번호는 파생(읽기전용).
           ['차량번호', null, plate],
-          ['차대번호', 'vin', String(v?.vin ?? '')],
-          ['최초등록', 'firstReg', String(v?.firstReg ?? '')],
+          ['차대번호(VIN)', 'vin', String(v?.vin ?? '')],
+          ['차명', 'carName', String(v?.carName ?? '')],
+          ['차종', 'vehicleType', String(v?.vehicleType ?? '')],
+          ['용도', 'usage', String(v?.usage ?? '')],
+          ['연식', 'modelYear', String(v?.modelYear ?? '')],
+          ['제작연월', 'yearMonth', String(v?.yearMonth ?? '')],
+          ['최초등록일', 'firstReg', String(v?.firstReg ?? '')],
+          ['배기량(cc)', 'displacement', String(v?.displacement ?? '')],
+          ['연료', 'fuel', String(v?.fuel ?? '')],
+          ['승차정원', 'seats', String(v?.seats ?? '')],
+          ['주행거리(km)', 'mileage', String(v?.mileage ?? '')],
           ['검사만기', 'inspectionTo', String(v?.inspectionTo ?? '')],
+          ['소유자', 'ownerName', String(v?.ownerName ?? '')],
           ['법인번호', null, String(master.bizNo ?? '')],
         ] as KVRow[]} />
 
