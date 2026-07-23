@@ -1,31 +1,32 @@
 'use client';
 /**
- * 표준 문서 발급 다이얼로그 — 양식 선택 → 폼 입력 → A4 미리보기 → 인쇄·발급. (v5 document-issue-dialog 이식)
- *   · 발급자 회사 = 활성 회사(회사마스터에서 사업자번호·대표·주소 자동). 합본이면 회사 선택.
- *   · 대상(직원/거래처) = 수기 입력. 발급 시 commitSave('issued_doc') → 감사로그 자동 기록.
- *   · 인쇄 = 격리 새창(window.open) — 앱 CSS 충돌 없이 A4 인쇄/PDF.
+ * 표준 문서 발급(신규) — 별도 페이지. 양식 선택 → 폼 입력 → A4 미리보기 → 인쇄·발급.
+ *   신규 발급은 팝업이 아니라 전용 페이지(UIUX-SPEC). 발급 후 /docs(발급 이력) 복귀.
+ *   발급 = commitSave('issued_doc') → 감사로그 자동. 인쇄 = 격리 새창(A4).
  */
 import { useEffect, useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { useSession } from '@/lib/session';
 import { COMPANIES, ALL_COMPANIES, companyLabel } from '@/lib/companies';
 import { loadMaster } from '@/lib/company-master';
-import { Modal, Btn, C, Input, Select, toggleStyle, fieldStyle } from '@/components/ui';
+import { Page, Btn, C, Input, Select, toggleStyle, fieldStyle } from '@/components/ui';
+import { WorkbenchBar } from '@/components/WorkbenchBar';
 import { useIsMobile } from '@/lib/use-mobile';
+import { useEntityList } from '@/lib/use-entity-lists';
 import { commitSave } from '@/lib/commit';
+import { toast } from '@/lib/toast';
 import {
   listTemplates, getTemplate, renderBody, buildDocNo, computeNextSeq, fmtKDate, fmtKMoney,
   DOC_CATEGORIES, DOC_PRINT_CSS, type DocCategory,
 } from '@/lib/doc-templates';
-import { todayKST } from '@/lib/contracts/dates'; // KST 기준 오늘
+import { todayKST } from '@/lib/contracts/dates';
 
 const today = todayKST;
 
-export function DocIssueDialog({ issued, onClose, onIssued }: {
-  issued: { docNo?: string }[];
-  onClose: () => void;
-  onIssued: () => void;
-}) {
+export default function DocIssuePage() {
+  const router = useRouter();
   const { user, companyId, scopeAll } = useSession();
+  const { rows: issued } = useEntityList('issued_doc');   // 문서번호 시퀀스 산정용
   const mobile = useIsMobile();
   const [category, setCategory] = useState<DocCategory>('인사');
   const [templateId, setTemplateId] = useState<string>('');
@@ -36,14 +37,12 @@ export function DocIssueDialog({ issued, onClose, onIssued }: {
 
   const template = templateId ? getTemplate(templateId) : undefined;
 
-  // 카테고리 변경 시 첫 양식
   useEffect(() => {
     if (template && template.category === category) return;
     const first = listTemplates({ category })[0];
     setTemplateId(first ? first.id : '');
   }, [category]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // 양식 변경 시 폼 기본값
   useEffect(() => {
     if (!template) { setFieldData({}); return; }
     const initial: Record<string, string> = {};
@@ -64,7 +63,7 @@ export function DocIssueDialog({ issued, onClose, onIssued }: {
         ? { name: fieldData._targetName || '', bizRegNo: fieldData._targetBizRegNo || '', ceo: fieldData._targetCeo || '', mainPhone: fieldData._targetPhone || '', address: fieldData._targetAddress || '' }
         : undefined;
 
-  const nextSeq = template ? computeNextSeq(issued, template.prefix) : 1;
+  const nextSeq = template ? computeNextSeq(issued as { docNo?: string }[], template.prefix) : 1;
   const docNo = template ? buildDocNo(template.prefix, nextSeq) : '';
 
   const previewBody = useMemo(() => {
@@ -84,7 +83,6 @@ export function DocIssueDialog({ issued, onClose, onIssued }: {
   function print() {
     const w = window.open('', '_blank', 'width=900,height=1200');
     if (!w) { setErr('팝업이 차단되었습니다 — 허용 후 다시 시도하세요.'); return; }
-    // 인쇄 격리 창 — #fff 고정(프린터는 테마 모름)
     w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>${docNo}</title><style>@page{size:A4;margin:0}body{margin:0;background:#fff}${DOC_PRINT_CSS}</style></head><body><div class="doc-paper" style="position:relative">${docNo ? `<div class="doc-no">${docNo}</div>` : ''}${previewBody}</div><script>window.onload=function(){setTimeout(function(){window.print()},250)}<\/script></body></html>`);
     w.document.close();
   }
@@ -104,11 +102,12 @@ export function DocIssueDialog({ issued, onClose, onIssued }: {
           docNo, templateId: template.id, templateTitle: template.title, category: template.category,
           targetType: template.target, targetName: targetScope?.name || '',
           data: fieldData, issuerCompanyName: companyLabel(issuerId),
-          bodyHtml: previewBody, // 발급시점 동결(재인쇄·감사)
+          bodyHtml: previewBody,
           issuedAt: new Date().toISOString(), issuedBy: user.name,
         }],
       });
-      onIssued();
+      toast(`문서 발급 · ${docNo}`, 'success');
+      router.push('/docs');
     } catch (e) { setErr(`발급 실패: ${(e as Error).message}`); setSaving(false); }
   }
 
@@ -116,17 +115,24 @@ export function DocIssueDialog({ issued, onClose, onIssued }: {
   const fld = { ...fieldStyle(false, mobile), width: '100%' } as React.CSSProperties;
 
   return (
-    <Modal title="표준 문서 발급" meta={template?.title} width={1120} onClose={onClose}
-      footer={<>
-        <Btn onClick={issue} disabled={saving || !template}>{saving ? '발급 중…' : '발급 (기록 저장)'}</Btn>
-        <Btn variant="ghost" onClick={print} disabled={!template}>인쇄 / PDF</Btn>
-        {err && <span style={{ fontSize: 12, color: C.danger }}>{err}</span>}
-        <span style={{ flex: 1 }} />
-        <span style={{ fontSize: 11.5, color: C.faint }}>문서번호 <b style={{ fontFamily: 'var(--font-mono)' }}>{docNo}</b> · {fmtKDate(today())}</span>
-      </>}>
-      <div style={{ display: 'grid', gridTemplateColumns: '300px 1fr', gap: 16, minHeight: 560 }}>
+    <Page
+      title="표준 문서 발급"
+      meta={template?.title || '재직·거래사실·입금확인·위임장'}
+      tools={
+        <WorkbenchBar
+          mid={<span style={{ fontSize: 11.5, color: C.faint, whiteSpace: 'nowrap' }}>문서번호 <b style={{ fontFamily: 'var(--font-mono)' }}>{docNo}</b> · {fmtKDate(today())}</span>}
+          actions={<>
+            <Btn variant="ghost" href="/docs">← 발급 이력</Btn>
+            <Btn variant="ghost" onClick={print} disabled={!template}>인쇄 / PDF</Btn>
+            <Btn onClick={issue} disabled={saving || !template}>{saving ? '발급 중…' : '발급 (기록 저장)'}</Btn>
+          </>}
+        />
+      }
+    >
+      {err && <div style={{ fontSize: 12, color: C.danger, marginBottom: 10 }}>{err}</div>}
+      <div style={{ display: 'grid', gridTemplateColumns: mobile ? '1fr' : '300px 1fr', gap: 16, minHeight: 560 }}>
         {/* 좌측 입력 */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12, overflowY: 'auto', maxHeight: '68vh', paddingRight: 4 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           <div>
             <div style={lbl}>분류</div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: mobile ? 8 : 6 }}>
@@ -151,7 +157,6 @@ export function DocIssueDialog({ issued, onClose, onIssued }: {
               </Select>
             </div>
           )}
-          {/* 대상 (수기) */}
           {template?.target === 'staff' && (
             <div style={{ display: 'grid', gap: 6 }}>
               <div style={lbl}>대상 직원</div>
@@ -170,7 +175,6 @@ export function DocIssueDialog({ issued, onClose, onIssued }: {
               <Input placeholder="주소" value={fieldData._targetAddress || ''} onChange={(e) => setF('_targetAddress', e.target.value)} style={{ width: '100%' }} />
             </div>
           )}
-          {/* 양식 필드 */}
           {template?.fields.map((f) => (
             <div key={f.key}>
               <div style={lbl}>{f.label}{f.required && <span style={{ color: C.danger, marginLeft: 2 }}>*</span>}</div>
@@ -182,8 +186,8 @@ export function DocIssueDialog({ issued, onClose, onIssued }: {
             </div>
           ))}
         </div>
-        {/* 우측 미리보기 크로마 — 종이(인쇄면)와 구분. 화면 크롬만 토큰. */}
-        <div style={{ background: C.head, overflow: 'auto', maxHeight: '68vh', padding: 14, borderRadius: 8 }}>
+        {/* 우측 미리보기 */}
+        <div style={{ background: C.head, overflow: 'auto', padding: 14, borderRadius: 8 }}>
           <style dangerouslySetInnerHTML={{ __html: DOC_PRINT_CSS }} />
           {template
             ? <div className="doc-paper" style={{ position: 'relative', margin: '0 auto', boxShadow: '0 2px 12px rgba(0,0,0,0.18)' }}>
@@ -193,6 +197,6 @@ export function DocIssueDialog({ issued, onClose, onIssued }: {
             : <div style={{ padding: 40, textAlign: 'center', color: C.faint, fontSize: 13 }}>양식을 선택하세요</div>}
         </div>
       </div>
-    </Modal>
+    </Page>
   );
 }

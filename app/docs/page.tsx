@@ -4,13 +4,12 @@
  *   · 발급 = DocIssueDialog → commitSave('issued_doc') (감사로그 자동 기록)
  *   · 목록 = 발급 이력(동결 본문 bodyHtml 보관) → 재인쇄는 격리 새창
  */
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { useSession } from '@/lib/session';
 import { companyLabel } from '@/lib/companies';
 import { Page, Sec, EmptyState, DataTable, Badge, Btn, C, type Col, type BadgeTone, PageLoading } from '@/components/ui';
 import { WorkbenchBar } from '@/components/WorkbenchBar';
 import { DOC_PRINT_CSS } from '@/lib/doc-templates';
-import { DocIssueDialog } from '@/components/DocIssueDialog';
 import { useEntityList } from '@/lib/use-entity-lists';
 
 type Doc = {
@@ -35,7 +34,6 @@ export default function DocsPage() {
     () => (raw as Doc[]).slice().sort((a, b) => (b.issuedAt || '').localeCompare(a.issuedAt || '')),
     [raw],
   );
-  const [dialog, setDialog] = useState(false);
 
   const cols: Col<Doc>[] = [
     { key: 'docNo', label: '문서번호', render: (d) => <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: C.mute }}>{d.docNo}</span> },
@@ -51,13 +49,12 @@ export default function DocsPage() {
   return (
     <Page title="문서 발급" meta={`${companyLabel(companyId)} · 발급 ${rows.length}건`}
       tools={<WorkbenchBar />}
-      right={<Btn onClick={() => setDialog(true)}>+ 신규 발급</Btn>}>
+      right={<Btn href="/docs/issue">+ 신규 발급</Btn>}>
       <Sec title="발급 이력" n={rows.length} desc="재직·거래사실·입금확인·위임장 — 발급 시 문서번호·발급자 기록(감사)" hideable={false}>
         {loading ? <PageLoading />
           : rows.length === 0 ? <EmptyState>발급된 문서가 없습니다 — 우측 상단 “신규 발급”</EmptyState>
             : <DataTable cols={scopeAll ? cols : cols.filter((c) => c.key !== 'issuer')} rows={rows} />}
       </Sec>
-      {dialog && <DocIssueDialog issued={rows} onClose={() => setDialog(false)} onIssued={() => setDialog(false)} />}
     </Page>
   );
 }
