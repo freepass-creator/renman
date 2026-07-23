@@ -13,7 +13,8 @@ import { companyLabel } from '@/lib/companies';
 import { useSession } from '@/lib/session';
 import { linkFleet } from '@/lib/domain/model';
 import { buildFleetRows, type FleetRow } from '@/lib/sheet-rows';
-import { FLEET_BASIC_COLS, FLEET_EXPANDED_COLS } from '@/lib/sheet-cols';
+import { FLEET_BASIC_COLS, FLEET_EXPANDED_COLS, FLEET_REVEAL_COLS } from '@/lib/sheet-cols';
+import type { SheetCol } from '@/components/ui';
 import { textMatch } from '@/lib/search-match';
 import { openCar } from '@/lib/ui-bus';
 import { downloadCsv } from '@/lib/export-csv';
@@ -58,7 +59,14 @@ export default function SheetPage() {
     });
   }, [allRows, facets, q]);
 
-  const cols = view === '전체' ? FLEET_EXPANDED_COLS : FLEET_BASIC_COLS;
+  // 기본뷰: 기본 컬럼 + «켜진 필터»에 대응하는 컬럼을 우측에 자동 노출(값 보며 거르기). 전체뷰: 전 컬럼.
+  const cols = useMemo(() => {
+    if (view === '전체') return FLEET_EXPANDED_COLS;
+    const seen = new Set(FLEET_BASIC_COLS.map((c) => c.key));
+    const extra: SheetCol<FleetRow>[] = [];
+    for (const label of facets) for (const c of (FLEET_REVEAL_COLS[label] || [])) if (!seen.has(c.key)) { seen.add(c.key); extra.push(c); }
+    return [...FLEET_BASIC_COLS, ...extra];
+  }, [view, facets]);
 
   // 헤더 필터 결과를 받아 건수·미수합계·CSV에 쓴다(페이지 재계산 금지).
   const [shown, setShown] = useState<FleetRow[]>([]);

@@ -148,3 +148,13 @@ export const FLEET_EXPANDED_COLS: SheetCol<FleetRow>[] = [
   FL.insurer, FL.insEnd, FL.insPrem,
   FL.od,
 ];
+
+/** 사이드필터 칩 → 기본뷰에서 «필터 걸면 자동 노출»할 대응 컬럼. 값을 보며 거른다.
+ *  (상태·미수·가동은 이미 기본 컬럼이라 생략 — 없는 것만.) */
+export const FLEET_REVEAL_COLS: Record<string, SheetCol<FleetRow>[]> = {
+  '검사임박': [FL.inspect],
+  '보험임박': [FL.insEnd],
+  '할부있음': [FL.loanCo, FL.loanAmt],
+  '보험없음': [FL.insurer],
+  '연체90일+': [FL.od],
+};
