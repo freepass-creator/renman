@@ -18,6 +18,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { parseSwitchplanWorkbook, buildSwitchplanPackFromBuffer } from '../lib/migrate/switchplan-parse';
 import { maskSwitchplanPII, type SwitchplanSeed } from './mask-switchplan-pii';
+import { setCatalog } from '../lib/domain/vehicle-master';
 
 const FROZEN = resolve(__dirname, '../lib/migrate/switchplan-data.json');
 
@@ -35,6 +36,14 @@ if (!src || src.startsWith('--')) {
 const write = process.argv.includes('--write');
 const out = arg('--out') || FROZEN;
 const asOf = arg('--as-of');
+
+// 차종마스터 로드(노드=fetch 불가 → readFileSync 주입) → 파서 차종마스터 스냅 활성화("차종마스터 기본으로 반영").
+try {
+  const catPath = resolve(__dirname, '../public/data/car-master/_index.json');
+  setCatalog(JSON.parse(readFileSync(catPath, 'utf-8')));
+} catch (e) {
+  console.warn('⚠ 차종마스터 미로드 — 5단계 스냅 생략(엑셀 원값 유지):', (e as Error).message);
+}
 
 const buf = readFileSync(resolve(src));
 const ab = buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) as ArrayBuffer;

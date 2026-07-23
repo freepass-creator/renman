@@ -41,6 +41,11 @@ export function peekCatalog(): Record<string, CatalogEntry> | null {
   return _index;
 }
 
+/** catalog 직접 주입 — 서버/노드(rebuild tsx)에서 readFileSync로 로드해 주입할 때 사용(fetch 불가 환경). */
+export function setCatalog(index: Record<string, CatalogEntry>): void {
+  _index = index;
+}
+
 /** title 에서 maker 접두 제거 → 세부모델 표기. "기아 올 뉴 K3 BD" → "올 뉴 K3 BD" */
 export function titleToSubModel(maker: string, title: string): string {
   if (!title) return '';

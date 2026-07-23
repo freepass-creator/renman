@@ -10,6 +10,7 @@
  */
 import { type EntityRecord } from '@/lib/intake/entities';
 import { buildSwitchplanPack } from '@/lib/migrate/switchplan';
+import { ensureCatalog } from '@/lib/domain/vehicle-master';
 import { buildDemoPack } from '@/lib/seed-demo';
 import switchplanInsurance from '@/lib/migrate/switchplan-insurance.json';
 import switchplanRegistration from '@/lib/migrate/switchplan-registration.json';
@@ -81,6 +82,8 @@ async function loadLivePack(): Promise<SwitchplanEntityPack | null> {
       const d = String(t.txDate || '');
       return d > mx ? d : mx;
     }, '') || undefined;
+    // 차종마스터 로드 → vehicleRecord 스냅 활성화("차종마스터 기본으로 반영"). 실패해도 반영은 진행(원값).
+    await ensureCatalog().catch(() => {});
     const pack = buildSwitchplanPackFromBuffer(b64ToBuf(j.biz.b64), asOf) as unknown as SwitchplanEntityPack;
     if (jbo) pack.bank_tx = jbo.bank_tx;
     if (!packHasRows(pack)) return null;

@@ -21,6 +21,7 @@ import type { EntityRecord } from '@/lib/intake/entities';
 import { generateSchedules } from '@/lib/payments/payment-schedule';
 import { normPlate } from '@/lib/plate';
 import { todayKST } from '@/lib/contracts/dates'; // KST 기준 오늘(기본 today)
+import { classifyVehicle, parseTrim } from '@/lib/domain/vehicle-master'; // 차종마스터 스냅(catalog 로드 시)·트림 분해
 
 /* ─────────────── 셀 유틸 (v5 그대로) ─────────────── */
 
@@ -318,8 +319,19 @@ function buildVehicles(wb: XLSX.WorkBook): SwitchplanVehicle[] {
   return out;
 }
 
-/** 자산 → 차량 EntityRecord (entities.ts vehicle 키). status/할부는 팩에서 병합. */
+/** 자산 → 차량 EntityRecord (entities.ts vehicle 키). status/할부는 팩에서 병합.
+ *  차종마스터가 로드돼 있으면(setCatalog/ensureCatalog) 자산 차종을 마스터에 스냅해 5단계 상위(제조사·모델·세부모델)를
+ *  마스터 표준값으로 채운다("차종마스터 기본"). 미매칭·미로드면 엑셀 원값 유지(비파괴). 원문은 carName에 보존. */
 function vehicleRecord(a: SwitchplanVehicle): EntityRecord {
+  const snap = classifyVehicle(a.fullModel || a.subModel || a.modelLine, a.firstRegisteredDate || String(a.year || ''));
+  const matched = snap.confidence !== 'none';
+  const maker = matched ? snap.maker : clean(a.maker);
+  const modelLine = matched ? snap.modelLine : clean(a.modelLine);
+  const subModel = matched ? snap.subModel : clean(a.subModel);
+  // 엑셀 트림 문자열 → 파워트레인(variant) + 트림 분해(erp3 parseTrim 규격).
+  const pt = parseTrim(a.trim || '');
+  const variant = pt.variant || undefined;
+  const trim = pt.trim && pt.trim !== '(기본)' ? pt.trim : clean(a.trim);
   return pruneUndefined({
     plate: a.vehiclePlate,
     vin: clean(a.vin),
@@ -327,17 +339,19 @@ function vehicleRecord(a: SwitchplanVehicle): EntityRecord {
     usage: clean(a.division),
     firstReg: clean(a.firstRegisteredDate),
     inspectionTo: clean(a.inspectionTo),
+    modelYear: a.year ? String(a.year) : undefined,     // 연식(제작연월과 별개)
     displacement: clean(a.displacementCc),
     fuel: clean(a.fuel),
-    maker: clean(a.maker),
-    modelLine: clean(a.modelLine),
-    subModel: clean(a.subModel),
-    trim: clean(a.trim),
+    maker, modelLine, subModel,
+    variant,                                            // 파워트레인(트림에서 분해)
+    trim,
+    optionList: clean(a.options),                       // 선택옵션(콤마구분)
     exteriorColor: clean(a.exteriorColor),
     interiorColor: clean(a.interiorColor),
     acquisitionDate: clean(a.acquisitionDate),
     // 실 매입가: 실제구입가격 대부분 공란 → 차량가격 fallback (v5 규칙)
     acquisitionPrice: clean(a.purchasePrice || a.vehiclePrice),
+    consumerPrice: clean(a.consumerPrice),              // 소비자가격 → 개소세 계산 기준
     gpsProvider: a.gps && a.gps !== '-' ? a.gps : undefined,
   });
 }
