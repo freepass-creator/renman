@@ -133,7 +133,10 @@ export default function TopBar() {
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 16px', background: C.taupeBg, borderBottom: `1px solid ${line}`, position: 'sticky', top: 0, zIndex: 30, minHeight: 48, boxSizing: 'border-box', flexWrap: 'wrap' }}>
         <NavMenu />
         <a href="/" style={{ fontSize: 15, fontWeight: 800, letterSpacing: '-0.03em', color: ink, textDecoration: 'none' }}>{OPERATOR_BRAND}</a>
-        <span style={{ flex: 1 }} />
+        {/* 가운데 = 현재 페이지명(앱바 SSOT). 상세(depth)는 자체 헤더가 있어 제외. */}
+        <span style={{ flex: 1, minWidth: 0, textAlign: 'center', fontSize: 14, fontWeight: 800, letterSpacing: '-0.02em', color: ink, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', padding: '0 10px' }}>
+          {!depth ? (slots.title ?? '') : ''}
+        </span>
         <span style={{ fontSize: 12, color: mute, fontWeight: 600, marginRight: 2, fontVariantNumeric: 'tabular-nums' }}>{todayLabel}</span>
         <div style={{ display: 'inline-flex', alignItems: 'baseline', gap: 6, paddingLeft: 2, whiteSpace: 'nowrap' }} title={user.email}>
           <span style={{ fontSize: 12.5, fontWeight: 700, color: ink }}>{user.name}</span>
