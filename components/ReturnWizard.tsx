@@ -1,5 +1,5 @@
 'use client';
-// 반납(입고) 현장 스텝 위저드 — 모바일 풀스크린 시트(Modal). 인도의 거울 + 정산 미리보기.
+// 반납(입고) 현장 스텝 위저드 — 인라인 스텝 패널(WizPanel). 인도의 거울 + 정산 미리보기.
 //   저장은 전부 기존 SSOT: 상태전이=patchReturn(단일 writer→반납) · 타임라인=saveIntake('history',category:'반납',_kind:'activity')
 //   · 정산=computeReturnSettlement(정산서와 동일 계산) · 증거=uploadDoc+pushDocVersion(type:'handover',reason:'반납…') 계약 _docs.
 import { useMemo, useState } from 'react';
@@ -16,7 +16,7 @@ import { toast } from '@/lib/toast';
 import { haptic } from '@/lib/haptics';
 import { resolveWriteCompany, NEED_COMPANY } from '@/lib/scope';
 import { FUEL_LEVELS } from '@/lib/domain/fuel';
-import { Modal, Stepper, Btn, Message, won, C, toggleStyle, WizCard, WizField, WizPhotos, wizInput, type Step } from '@/components/ui';
+import { Stepper, Btn, Message, won, C, toggleStyle, WizPanel, WizCard, WizField, WizPhotos, wizInput, type Step } from '@/components/ui';
 import { type EntityRecord } from '@/lib/intake/entities';
 import { todayKST as TODAY } from '@/lib/contracts/dates'; // KST 기준 오늘(반납일 기록)
 const STEP_LABELS = ['확인', '주행·연료', '정산', '사진·서명', '확정'];
@@ -117,7 +117,7 @@ export function ReturnWizard({ contract, vehicle, onClose, onDone }: {
   const last = step === STEP_LABELS.length - 1;
 
   return (
-    <Modal title={`반납 처리 · ${plate}`} meta={`${who}${carName ? ` · ${carName}` : ''}`} onClose={onClose} lock
+    <WizPanel title={`반납 처리 · ${plate}`} meta={`${who}${carName ? ` · ${carName}` : ''}`} onClose={onClose}
       footer={<>
         <Btn variant="ghost" size="lg" onClick={() => (step === 0 ? onClose() : setStep((s) => s - 1))} disabled={saving}>{step === 0 ? '취소' : '이전'}</Btn>
         <span style={{ flex: 1 }} />
@@ -213,7 +213,7 @@ export function ReturnWizard({ contract, vehicle, onClose, onDone }: {
           </div>
         )}
       </div>
-    </Modal>
+    </WizPanel>
   );
 }
 

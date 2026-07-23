@@ -173,6 +173,7 @@ const { data: [cs, hs], loading } = useEntityLists(['contract', 'history']);
 | `components/ui` `Page`/`FacetPage` | 페이지 헤더 = `[제목][전체회사]` 자동 (페이지가 손롤 금지) |
 | `components/ui` `TextLink` | 표·카드 안 인라인 링크(번호판·임차인·EmptyState CTA) — 손롤 `<button style>` 금지 |
 | `components/WorkbenchBar` | 툴바 SSOT (검색·탭·뷰·액션) |
+| `components/ui` `WizPanel` | 현장 위저드 인라인 껍데기(Modal 풀스크린 대체) — Delivery/Return |
 
 ---
 

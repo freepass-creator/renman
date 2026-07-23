@@ -37,6 +37,38 @@ export function WizField({ label, children }: { label: ReactNode; children: Reac
 }
 
 /**
+ * 인라인 스텝 패널 — Modal 풀스크린 대체(UIUX-SPEC 팝업 최소화).
+ *   페이지 본문에 끼워 넣는 현장 위저드 껍데기. 헤더·본문·하단 CTA.
+ */
+export function WizPanel({ title, meta, onClose, footer, children }: {
+  title: ReactNode; meta?: ReactNode; onClose: () => void; footer?: ReactNode; children: ReactNode;
+}) {
+  return (
+    <div style={{
+      border: `1px solid ${C.line}`, borderRadius: R, background: C.card,
+      boxShadow: SH.card, overflow: 'hidden',
+    }}>
+      <div style={{
+        display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap',
+        padding: '12px 16px', background: C.head,
+      }}>
+        <span style={{ fontSize: 15, fontWeight: 800, color: C.ink }}>{title}</span>
+        {meta != null && <span style={{ fontSize: 12, color: C.mute }}>{meta}</span>}
+        <span style={{ flex: 1 }} />
+        <Btn variant="ghost" size="sm" onClick={onClose}>닫기</Btn>
+      </div>
+      <div style={{ padding: 16 }}>{children}</div>
+      {footer != null && (
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap',
+          padding: '12px 16px', background: C.taupeBg,
+        }}>{footer}</div>
+      )}
+    </div>
+  );
+}
+
+/**
  * 현장 사진 촬영·첨부 — 후면카메라 직행(capture=environment) · 칩으로 목록 · 개별 삭제.
  * 삭제 히트영역 40 = 모바일 md(터치 최소 보장).
  */

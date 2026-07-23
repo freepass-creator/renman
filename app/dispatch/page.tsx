@@ -152,8 +152,12 @@ export default function DispatchPage() {
   const outRows = useMemo(() => filterFieldRows(queues.deliverAll.map((c) => ({ kind: '인도' as const, contract: c })), q), [queues, q]);
   const inRows = useMemo(() => filterFieldRows(queues.returnAll.map((c) => ({ kind: '반납' as const, contract: c })), q), [queues, q]);
 
-  const openIo = (kind: '인도' | '반납', c: EntityRecord) =>
+  const openIo = (kind: '인도' | '반납', c: EntityRecord) => {
     setWiz({ kind, contract: c, vehicle: byPlate.get(nkey(c.plate)) || null });
+    if (typeof document !== 'undefined') {
+      window.setTimeout(() => document.getElementById('dispatch-wiz')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
+    }
+  };
 
   return (
     <FacetPage
@@ -176,6 +180,13 @@ export default function DispatchPage() {
     >
       {loading ? <PageLoading /> : (
         <>
+          {wiz && (
+            <div id="dispatch-wiz" style={{ marginBottom: SPACE_M }}>
+              {wiz.kind === '인도'
+                ? <DeliveryWizard key={`인도:${String(wiz.contract._key || '')}`} contract={wiz.contract} vehicle={wiz.vehicle} onClose={() => setWiz(null)} onDone={() => { setWiz(null); reload(); }} />
+                : <ReturnWizard key={`반납:${String(wiz.contract._key || '')}`} contract={wiz.contract} vehicle={wiz.vehicle} onClose={() => setWiz(null)} onDone={() => { setWiz(null); reload(); }} />}
+            </div>
+          )}
           {order.map((id) => {
             if (id === 'dispatch-status') {
               return (
@@ -270,13 +281,6 @@ export default function DispatchPage() {
             );
           })}
         </>
-      )}
-
-      {wiz?.kind === '인도' && (
-        <DeliveryWizard contract={wiz.contract} vehicle={wiz.vehicle} onClose={() => setWiz(null)} onDone={() => { setWiz(null); reload(); }} />
-      )}
-      {wiz?.kind === '반납' && (
-        <ReturnWizard contract={wiz.contract} vehicle={wiz.vehicle} onClose={() => setWiz(null)} onDone={() => { setWiz(null); reload(); }} />
       )}
     </FacetPage>
   );

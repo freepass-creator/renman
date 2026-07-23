@@ -29,9 +29,11 @@ import { WorkHubBack } from '@/components/WorkHubTabs';
 import { WorkPipe } from '@/components/WorkPipe';
 import { TODAY } from '@/lib/dashboard-consts';
 import { useEntityLists } from '@/lib/use-entity-lists';
+import { useSecOrder } from '@/lib/use-sec-order';
 
 const CONF_TONE: Record<string, BadgeTone> = { high: 'green', medium: 'amber', low: 'gray' };
 const EMPTY = new Set<string>();
+const PAY_SECS = ['pay-status', 'pay-cms', 'pay-match', 'pay-matched', 'pay-pending'] as const;
 const FACET_SEC: Record<string, string> = { CMS: 'pay-cms', 매칭제안: 'pay-match', 매칭됨: 'pay-matched', 미매칭: 'pay-pending' };
 
 function toBankTx(rec: EntityRecord): BankTransaction {
@@ -69,6 +71,7 @@ export default function PaymentsPage() {
   const [manualTx, setManualTx] = useState<BankTransaction | null>(null);
   const [mq, setMq] = useState('');
   const [facets, setFacets] = useState<Set<string>>(EMPTY);
+  const [order, reorder] = useSecOrder('jpk:order:payments', [...PAY_SECS]);
   const toggleFacet = (label: string) => setFacets((s) => {
     const n = new Set(s);
     if (n.has(label)) n.delete(label); else n.add(label);
@@ -250,165 +253,171 @@ export default function PaymentsPage() {
       } />}
       rail={!loading ? <FacetRail lensKey="자금일보" facets={facets} onToggle={toggleFacet} onReset={resetFacets} /> : null}
     >
-      {loading ? <PageLoading /> : (
-        <>
-      {show('pay-status') && (
-      <Sec id="pay-status" title="현황" desc="미매칭 입금→계약 · CMS 명세→통장 집금 묶음" right={<WorkPipe to="finance" />}>
-        <Cards min={128} fit>
-          <Metric label="입금 거래" value={`${deposits.length}건`} tone="ink" />
-          <Metric label="미매칭 입금" value={`${pending.length}건`} tone={pending.length ? 'warn' : 'ok'} />
-          <Metric label="매칭 제안" value={results ? `${results.length}건` : '대기'} tone={results && results.length ? 'ok' : 'ink'} />
-          <Metric label="CMS 후보" value={cmsResults ? `${cmsResults.length}건` : '대기'} tone={cmsResults && cmsResults.length ? 'ok' : 'ink'} />
-          <Metric label="CMS 정산됨" value={`${cmsSettled}건`} tone={cmsSettled ? 'ok' : 'ink'} />
-        </Cards>
-        {msg && <div style={{ marginTop: SPACE_M, fontSize: 12.5, color: msg.startsWith('매칭 적용') || msg.startsWith('CMS') ? C.ok : C.mute }}>{msg}</div>}
-      </Sec>
-      )}
-
-      {show('pay-cms') && cmsResults && cmsResults.length > 0 && (
-        <Sec id="pay-cms" title="CMS 집금 후보" n={cmsResults.length} desc="통장 입금 1건 ↔ 자동이체 N건 · 수수료=합계−집금 · high만 기본선택 · 구성건은 자금원장에서 제외(이중계상 방지)" hideable={false}
-          right={<Btn onClick={applyCms} disabled={applying || busy || cmsSelCount === 0}>{applying || busy ? '적용 중…' : `선택 ${cmsSelCount}건 정산`}</Btn>}>
-          <ListBox>
-            {cmsResults.map((c) => {
-              const on = cmsSel.has(c.depositId);
-              return (
-                <ListRow
-                  key={c.depositId}
-                  main={`${c.depositDate} · ${won(c.depositAmount)}`}
-                  sub={`묶음 ${c.items.length}건 · 총액 ${won(c.itemsSum)} · 수수료 ${won(c.estimatedFee)} (${(c.feeRate * 100).toFixed(2)}%)`}
-                  right={<span style={{ display: 'inline-flex', alignItems: 'center', gap: SPACE_M }}>
-                    <Badge tone={CONF_TONE[c.confidence] || 'gray'}>{c.confidence}</Badge>
-                    <label style={{ display: 'inline-flex', width: TOUCH, height: TOUCH, alignItems: 'center', justifyContent: 'center' }} onClick={(e) => e.stopPropagation()}>
-                      <input type="checkbox" checked={on} onChange={() => toggleCms(c.depositId)} />
-                    </label>
-                  </span>}
-                  onClick={() => toggleCms(c.depositId)}
-                />
-              );
-            })}
-          </ListBox>
-        </Sec>
-      )}
-
-      {show('pay-match') && results && results.length > 0 && (
-        <Sec id="pay-match" title="매칭 제안" n={results.length} desc="체크 확인 후 적용 · high=이름/차번+금액 일치 · 매칭은 미수를 줄이기만" hideable={false}
-          right={<Btn onClick={apply} disabled={applying || busy || selCount === 0}>{applying || busy ? '적용 중…' : `선택 ${selCount}건 적용`}</Btn>}>
-          <ListBox>
-            {results.map((r) => {
-              const on = sel.has(r.tx.id);
-              const plate = r.candidate.contract.vehiclePlate;
-              return (
-                <ListRow
-                  key={r.tx.id}
-                  main={`${r.tx.txDate} · ${r.tx.counterparty || '(적요없음)'} · ${won(r.tx.amount)}`}
-                  sub={
-                    <span>
-                      →{' '}
-                      <TextLink stop onClick={() => { if (plate) openCar(plate, 'unpaid'); }}>
-                        {r.candidate.contract.customerName} · {plate}
-                      </TextLink>
-                      {' · '}<b>{r.candidate.scheduleSeq}회차</b>
-                    </span>
-                  }
-                  right={<span style={{ display: 'inline-flex', alignItems: 'center', gap: SPACE_M }}>
-                    <Badge tone={CONF_TONE[r.candidate.confidence] || 'gray'}>{r.candidate.confidence}</Badge>
-                    <label style={{ display: 'inline-flex', width: TOUCH, height: TOUCH, alignItems: 'center', justifyContent: 'center' }} onClick={(e) => e.stopPropagation()}>
-                      <input type="checkbox" checked={on} onChange={() => toggle(r.tx.id)} />
-                    </label>
-                  </span>}
-                  onClick={() => toggle(r.tx.id)}
-                />
-              );
-            })}
-          </ListBox>
-        </Sec>
-      )}
-
-      {show('pay-matched') && matched.length > 0 && (
-        <Sec id="pay-matched" title="매칭된 입금" n={matched.length} desc="계약 회차에 붙은 입금 — 잘못 붙었으면 해제(미수 원복)" hideable={false}>
-          <ListBox>
-            {matched.slice(0, 60).map((t) => {
-              const crec = csByKey.get(String(t.matchedContractId));
-              const plate = crec ? String(crec.plate || '') : '';
-              const ck = crec ? customerKey(crec.contractorName, crec.contractorPhone) : '';
-              return (
-                <ListRow
-                  key={t.id}
-                  main={`${t.txDate} · ${t.counterparty || '(적요없음)'}`}
-                  sub={crec ? (
-                    <span>
-                      →{' '}
-                      <TextLink disabled={!ck} onClick={() => { if (ck) openCustomer(ck); }}>{String(crec.contractorName || '')}</TextLink>
-                      {' · '}
-                      <TextLink mono disabled={!plate} onClick={() => { if (plate) openCar(plate, 'unpaid'); }}>{plate}</TextLink>
-                    </span>
-                  ) : String(t.matchedContractId)}
-                  right={<span style={{ display: 'inline-flex', alignItems: 'center', gap: SPACE_M }}>
-                    <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 700 }}>{won(t.amount)}</span>
-                    <Btn size="sm" variant="ghost" onClick={() => unmatch(t)}>해제</Btn>
-                  </span>}
-                />
-              );
-            })}
-          </ListBox>
-          {matched.length > 60 && <div style={{ fontSize: 11.5, color: C.faint, padding: '4px 2px' }}>외 {matched.length - 60}건 …</div>}
-        </Sec>
-      )}
-
-      {show('pay-pending') && (
-      <Sec id="pay-pending" title="미매칭 입금" n={pending.length} desc="자동매칭 안 된 입금 — 인라인 수동 연결" hideable={false}>
-        {pending.length === 0 ? <EmptyState>미매칭 입금 없음</EmptyState>
-          : (
-            <>
+      {loading ? <PageLoading /> : order.map((id) => {
+        if (!show(id)) return null;
+        if (id === 'pay-status') {
+          return (
+            <Sec key={id} id={id} title="현황" desc="미매칭 입금→계약 · CMS 명세→통장 집금 묶음" onReorder={reorder} right={<WorkPipe to="finance" />}>
+              <Cards min={128} fit>
+                <Metric label="입금 거래" value={`${deposits.length}건`} tone="ink" />
+                <Metric label="미매칭 입금" value={`${pending.length}건`} tone={pending.length ? 'warn' : 'ok'} />
+                <Metric label="매칭 제안" value={results ? `${results.length}건` : '대기'} tone={results && results.length ? 'ok' : 'ink'} />
+                <Metric label="CMS 후보" value={cmsResults ? `${cmsResults.length}건` : '대기'} tone={cmsResults && cmsResults.length ? 'ok' : 'ink'} />
+                <Metric label="CMS 정산됨" value={`${cmsSettled}건`} tone={cmsSettled ? 'ok' : 'ink'} />
+              </Cards>
+              {msg && <div style={{ marginTop: SPACE_M, fontSize: 12.5, color: msg.startsWith('매칭 적용') || msg.startsWith('CMS') ? C.ok : C.mute }}>{msg}</div>}
+            </Sec>
+          );
+        }
+        if (id === 'pay-cms') {
+          if (!cmsResults || cmsResults.length === 0) return null;
+          return (
+            <Sec key={id} id={id} title="CMS 집금 후보" n={cmsResults.length} desc="통장 입금 1건 ↔ 자동이체 N건 · 수수료=합계−집금 · high만 기본선택 · 구성건은 자금원장에서 제외(이중계상 방지)" hideable={false} onReorder={reorder}
+              right={<Btn onClick={applyCms} disabled={applying || busy || cmsSelCount === 0}>{applying || busy ? '적용 중…' : `선택 ${cmsSelCount}건 정산`}</Btn>}>
               <ListBox>
-                {pending.slice(0, 60).map((t) => {
-                  const suggested = results?.some((r) => r.tx.id === t.id);
-                  const open = manualTx?.id === t.id;
+                {cmsResults.map((c) => {
+                  const on = cmsSel.has(c.depositId);
                   return (
-                    <div key={t.id}>
-                      <ListRow
-                        main={`${t.txDate} · ${t.counterparty || '(적요 없음)'}`}
-                        sub={suggested ? '제안됨↑' : open ? '연결 중…' : undefined}
-                        right={<span style={{ display: 'inline-flex', alignItems: 'center', gap: SPACE_M, opacity: suggested ? 0.55 : 1 }}>
-                          <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 700 }}>{won(t.amount)}</span>
-                          <Btn size="sm" variant={open ? 'solid' : 'ghost'} onClick={() => { if (open) { setManualTx(null); setMq(''); } else { setManualTx(t); setMq(''); } }}>{open ? '닫기' : '연결'}</Btn>
-                        </span>}
-                      />
-                      {open && (
-                        <div style={{ padding: '8px 12px 12px 28px', borderBottom: `1px solid ${C.line}` }}>
-                          <Input autoFocus value={mq} onChange={(e) => setMq(e.target.value)} placeholder="계약자·차번·연락처 검색" style={{ width: '100%', maxWidth: 360 }} />
-                          <div style={{ marginTop: SPACE_M, maxHeight: 220, overflowY: 'auto' }}>
-                            {mCands.length === 0 ? <div style={{ fontSize: 12, color: C.faint, padding: '8px 4px' }}>{mq.trim() ? '일치 계약 없음' : '검색어를 입력하세요'}</div>
-                              : (
-                                <ListBox>
-                                  {mCands.map((c) => {
-                                    const v = computeContractView(c, TODAY);
-                                    return (
-                                      <ListRow
-                                        key={String(c._key)}
-                                        main={String(c.contractorName || '—')}
-                                        sub={String(c.plate || '')}
-                                        right={v.net > 0 ? <span style={{ fontSize: 11.5, color: C.danger, fontWeight: 700 }}>미수 {won(v.net)}</span> : <span style={{ fontSize: 11, color: C.faint }}>미수없음</span>}
-                                        onClick={() => manualMatch(manualTx, c)}
-                                      />
-                                    );
-                                  })}
-                                </ListBox>
-                              )}
-                          </div>
-                        </div>
-                      )}
-                    </div>
+                    <ListRow
+                      key={c.depositId}
+                      main={`${c.depositDate} · ${won(c.depositAmount)}`}
+                      sub={`묶음 ${c.items.length}건 · 총액 ${won(c.itemsSum)} · 수수료 ${won(c.estimatedFee)} (${(c.feeRate * 100).toFixed(2)}%)`}
+                      right={<span style={{ display: 'inline-flex', alignItems: 'center', gap: SPACE_M }}>
+                        <Badge tone={CONF_TONE[c.confidence] || 'gray'}>{c.confidence}</Badge>
+                        <label style={{ display: 'inline-flex', width: TOUCH, height: TOUCH, alignItems: 'center', justifyContent: 'center' }} onClick={(e) => e.stopPropagation()}>
+                          <input type="checkbox" checked={on} onChange={() => toggleCms(c.depositId)} />
+                        </label>
+                      </span>}
+                      onClick={() => toggleCms(c.depositId)}
+                    />
                   );
                 })}
               </ListBox>
-              {pending.length > 60 && <div style={{ fontSize: 11.5, color: C.faint, padding: '4px 2px' }}>외 {pending.length - 60}건 …</div>}
-            </>
-          )}
-      </Sec>
-      )}
-        </>
-      )}
+            </Sec>
+          );
+        }
+        if (id === 'pay-match') {
+          if (!results || results.length === 0) return null;
+          return (
+            <Sec key={id} id={id} title="매칭 제안" n={results.length} desc="체크 확인 후 적용 · high=이름/차번+금액 일치 · 매칭은 미수를 줄이기만" hideable={false} onReorder={reorder}
+              right={<Btn onClick={apply} disabled={applying || busy || selCount === 0}>{applying || busy ? '적용 중…' : `선택 ${selCount}건 적용`}</Btn>}>
+              <ListBox>
+                {results.map((r) => {
+                  const on = sel.has(r.tx.id);
+                  const plate = r.candidate.contract.vehiclePlate;
+                  return (
+                    <ListRow
+                      key={r.tx.id}
+                      main={`${r.tx.txDate} · ${r.tx.counterparty || '(적요없음)'} · ${won(r.tx.amount)}`}
+                      sub={
+                        <span>
+                          →{' '}
+                          <TextLink stop onClick={() => { if (plate) openCar(plate, 'unpaid'); }}>
+                            {r.candidate.contract.customerName} · {plate}
+                          </TextLink>
+                          {' · '}<b>{r.candidate.scheduleSeq}회차</b>
+                        </span>
+                      }
+                      right={<span style={{ display: 'inline-flex', alignItems: 'center', gap: SPACE_M }}>
+                        <Badge tone={CONF_TONE[r.candidate.confidence] || 'gray'}>{r.candidate.confidence}</Badge>
+                        <label style={{ display: 'inline-flex', width: TOUCH, height: TOUCH, alignItems: 'center', justifyContent: 'center' }} onClick={(e) => e.stopPropagation()}>
+                          <input type="checkbox" checked={on} onChange={() => toggle(r.tx.id)} />
+                        </label>
+                      </span>}
+                      onClick={() => toggle(r.tx.id)}
+                    />
+                  );
+                })}
+              </ListBox>
+            </Sec>
+          );
+        }
+        if (id === 'pay-matched') {
+          if (matched.length === 0) return null;
+          return (
+            <Sec key={id} id={id} title="매칭된 입금" n={matched.length} desc="계약 회차에 붙은 입금 — 잘못 붙었으면 해제(미수 원복)" hideable={false} onReorder={reorder}>
+              <ListBox>
+                {matched.slice(0, 60).map((t) => {
+                  const crec = csByKey.get(String(t.matchedContractId));
+                  const plate = crec ? String(crec.plate || '') : '';
+                  const ck = crec ? customerKey(crec.contractorName, crec.contractorPhone) : '';
+                  return (
+                    <ListRow
+                      key={t.id}
+                      main={`${t.txDate} · ${t.counterparty || '(적요없음)'}`}
+                      sub={crec ? (
+                        <span>
+                          →{' '}
+                          <TextLink disabled={!ck} onClick={() => { if (ck) openCustomer(ck); }}>{String(crec.contractorName || '')}</TextLink>
+                          {' · '}
+                          <TextLink mono disabled={!plate} onClick={() => { if (plate) openCar(plate, 'unpaid'); }}>{plate}</TextLink>
+                        </span>
+                      ) : String(t.matchedContractId)}
+                      right={<span style={{ display: 'inline-flex', alignItems: 'center', gap: SPACE_M }}>
+                        <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 700 }}>{won(t.amount)}</span>
+                        <Btn size="sm" variant="ghost" onClick={() => unmatch(t)}>해제</Btn>
+                      </span>}
+                    />
+                  );
+                })}
+              </ListBox>
+              {matched.length > 60 && <div style={{ fontSize: 11.5, color: C.faint, padding: '4px 2px' }}>외 {matched.length - 60}건 …</div>}
+            </Sec>
+          );
+        }
+        return (
+          <Sec key={id} id={id} title="미매칭 입금" n={pending.length} desc="자동매칭 안 된 입금 — 인라인 수동 연결" hideable={false} onReorder={reorder}>
+            {pending.length === 0 ? <EmptyState>미매칭 입금 없음</EmptyState>
+              : (
+                <>
+                  <ListBox>
+                    {pending.slice(0, 60).map((t) => {
+                      const suggested = results?.some((r) => r.tx.id === t.id);
+                      const open = manualTx?.id === t.id;
+                      return (
+                        <div key={t.id}>
+                          <ListRow
+                            main={`${t.txDate} · ${t.counterparty || '(적요 없음)'}`}
+                            sub={suggested ? '제안됨↑' : open ? '연결 중…' : undefined}
+                            right={<span style={{ display: 'inline-flex', alignItems: 'center', gap: SPACE_M, opacity: suggested ? 0.55 : 1 }}>
+                              <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 700 }}>{won(t.amount)}</span>
+                              <Btn size="sm" variant={open ? 'solid' : 'ghost'} onClick={() => { if (open) { setManualTx(null); setMq(''); } else { setManualTx(t); setMq(''); } }}>{open ? '닫기' : '연결'}</Btn>
+                            </span>}
+                          />
+                          {open && (
+                            <div style={{ padding: '8px 12px 12px 28px', borderBottom: `1px solid ${C.line}` }}>
+                              <Input autoFocus value={mq} onChange={(e) => setMq(e.target.value)} placeholder="계약자·차번·연락처 검색" style={{ width: '100%', maxWidth: 360 }} />
+                              <div style={{ marginTop: SPACE_M, maxHeight: 220, overflowY: 'auto' }}>
+                                {mCands.length === 0 ? <div style={{ fontSize: 12, color: C.faint, padding: '8px 4px' }}>{mq.trim() ? '일치 계약 없음' : '검색어를 입력하세요'}</div>
+                                  : (
+                                    <ListBox>
+                                      {mCands.map((c) => {
+                                        const v = computeContractView(c, TODAY);
+                                        return (
+                                          <ListRow
+                                            key={String(c._key)}
+                                            main={String(c.contractorName || '—')}
+                                            sub={String(c.plate || '')}
+                                            right={v.net > 0 ? <span style={{ fontSize: 11.5, color: C.danger, fontWeight: 700 }}>미수 {won(v.net)}</span> : <span style={{ fontSize: 11, color: C.faint }}>미수없음</span>}
+                                            onClick={() => manualMatch(manualTx, c)}
+                                          />
+                                        );
+                                      })}
+                                    </ListBox>
+                                  )}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </ListBox>
+                  {pending.length > 60 && <div style={{ fontSize: 11.5, color: C.faint, padding: '4px 2px' }}>외 {pending.length - 60}건 …</div>}
+                </>
+              )}
+          </Sec>
+        );
+      })}
     </FacetPage>
   );
 }

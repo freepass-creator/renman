@@ -34,10 +34,10 @@
 - [x] **/contract-history** (a): 카드↔엑셀 · FacetRail(지난계약) · Sec
 - [x] **/finance** (a): IconSeg + ExcelSheet(헤더정렬)
 - [x] **/integrity** (a): ExcelSheet + Sec id
-- [x] **/penalty** (c): ObjCard 큐 + useSecOrder · Upload/Docs 오버레이는 잔여(OCR·공문)
-- [x] **/dispatch** (c): useSecOrder · ※ Wizard 풀스크린은 잔여(인라인 스텝은 후속)
+- [x] **/penalty** (c): ObjCard 큐 + useSecOrder · Upload=`/penalty/upload` · Docs=`/penalty/docs`
+- [x] **/dispatch** (c): useSecOrder · Delivery/Return=`WizPanel` 인라인
 - [x] **/receivables** (c): useSecOrder
-- [x] **/payments** (c): FacetRail 데이터필터 · 수동연결 인라인 · ※ Sec 재정렬은 후속
+- [x] **/payments** (c): FacetRail 데이터필터 · 수동연결 인라인 · useSecOrder
 - [x] **/repair** (c): 데이터필터 + useSecOrder
 - [x] **/ingest** (e): 셸 위임(WorkbenchBar) — 페이지레벨 useIsMobile 불필요
 - [x] **/inbox** (e): 상태/시간 기본 정렬
@@ -51,6 +51,4 @@
 `/`(홈)·`/ops`·`/asset`·`/contract`(뷰/필터/섹션 축)·`/sheet`(운영시트=b형 신규) 은 대체로 부합. 홈·/ops 는 모바일 페이지레벨 분기까지 완비(모범).
 
 ## 잔여(후속)
-- 배차 Delivery/Return Wizard → 인라인 스텝 패널
-- 과태료 Upload/Docs 풀스크린 → 인라인/전용 라우트
-- 자금일보 Sec `useSecOrder` 배선
+- (없음 — UIUX-SPEC 위반 체크리스트 이행 완료)

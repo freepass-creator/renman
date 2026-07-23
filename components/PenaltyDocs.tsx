@@ -32,8 +32,8 @@ export function PenaltyDocs({ penalties, companyId, onClose, onSubmitted }: { pe
   const ready = !loading;
   const [busy, setBusy] = useState(false);
 
-  // 매칭된 것만 문서 대상(임차인 확인 가능)
-  const items: P[] = penalties.map((p) => { const m = matchPenalty(p, contracts); return m ? { p, c: m.contract } : null; }).filter(Boolean) as P[];
+  // 매칭된 것만 문서 대상(임차인 확인 가능) — renter 공란이면 실운전자 확인 불가라 제외(공란 명의 공문 방지).
+  const items: P[] = penalties.map((p) => { const m = matchPenalty(p, contracts); return m && m.renter ? { p, c: m.contract } : null; }).filter(Boolean) as P[];
   // (회사, 발급기관)별 그룹 — 공문은 수신처(발급기관)마다 1장
   const groups = new Map<string, P[]>();
   for (const it of items) { const key = `${String(it.p.companyId || companyId)}||${String(it.p.issuer || '발급기관')}`; (groups.get(key) || groups.set(key, []).get(key)!).push(it); }
@@ -54,10 +54,10 @@ export function PenaltyDocs({ penalties, companyId, onClose, onSubmitted }: { pe
   }
 
   return (
-    <div style={{ position: 'fixed', inset: 0, zIndex: 200, background: C.line, overflowY: 'auto' }}>
+    <>
       <style>{`@media print { body { visibility: hidden !important; } .print-doc, .print-doc * { visibility: visible !important; } .print-doc { position: static !important; box-shadow: none !important; margin: 0 auto !important; } .no-print { display: none !important; } } @page { size: A4; margin: 12mm; }`}</style>
-      <div className="no-print" style={{ maxWidth: 794, margin: '18px auto 12px', display: 'flex', gap: 8, padding: '0 10px', alignItems: 'center' }}>
-        <Btn variant="ghost" onClick={onClose}>← 닫기</Btn>
+      <div className="no-print" style={{ maxWidth: 794, margin: '0 auto 12px', display: 'flex', gap: 8, padding: '0 10px', alignItems: 'center', flexWrap: 'wrap' }}>
+        <Btn variant="ghost" onClick={onClose}>← 과태료</Btn>
         <span style={{ fontSize: 12.5, color: C.mute }}>매칭 {items.length}건 · 공문 {groups.size}장 + 사실확인서 {items.length}부</span>
         <span style={{ flex: 1 }} />
         <Btn variant="ghost" onClick={submit} disabled={busy || !items.length}>{busy ? '처리 중…' : '변경부과 신청 처리'}</Btn>
@@ -137,6 +137,6 @@ export function PenaltyDocs({ penalties, companyId, onClose, onSubmitted }: { pe
               );
             })}
           </>}
-    </div>
+    </>
   );
 }

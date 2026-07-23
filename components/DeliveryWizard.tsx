@@ -1,5 +1,5 @@
 'use client';
-// 인도(출차) 현장 스텝 위저드 — 모바일 풀스크린 시트(Modal). 계기판·연료·사진·서명을 단계로 받아 인도 확정.
+// 인도(출차) 현장 스텝 위저드 — 인라인 스텝 패널(WizPanel). 계기판·연료·사진·서명을 단계로 받아 인도 확정.
 //   저장은 전부 기존 SSOT로: 상태전이=patchDeliver(단일 writer) · 타임라인=saveIntake('history',_kind:'activity')
 //   · 증거=uploadDoc+pushDocVersion(type:'handover') 계약 _docs 첨부. 새 저장로직(손롤) 없음.
 import { useState } from 'react';
@@ -16,7 +16,7 @@ import { toast } from '@/lib/toast';
 import { haptic } from '@/lib/haptics';
 import { resolveWriteCompany, NEED_COMPANY } from '@/lib/scope';
 import { FUEL_LEVELS } from '@/lib/domain/fuel';
-import { Modal, Stepper, Btn, Message, C, toggleStyle, WizCard, WizField, WizPhotos, wizLabel, wizInput, type Step } from '@/components/ui';
+import { Stepper, Btn, Message, C, toggleStyle, WizPanel, WizCard, WizField, WizPhotos, wizInput, type Step } from '@/components/ui';
 import { type EntityRecord } from '@/lib/intake/entities';
 import { todayKST as TODAY } from '@/lib/contracts/dates'; // KST 기준 오늘(인도일 기록)
 const STEP_LABELS = ['확인', '주행·연료', '사진·서명', '확정'];
@@ -105,7 +105,7 @@ export function DeliveryWizard({ contract, vehicle, onClose, onDone }: {
   const last = step === STEP_LABELS.length - 1;
 
   return (
-    <Modal title={`인도 처리 · ${plate}`} meta={`${who}${carName ? ` · ${carName}` : ''}`} onClose={onClose} lock
+    <WizPanel title={`인도 처리 · ${plate}`} meta={`${who}${carName ? ` · ${carName}` : ''}`} onClose={onClose}
       footer={<>
         <Btn variant="ghost" size="lg" onClick={() => (step === 0 ? onClose() : setStep((s) => s - 1))} disabled={saving}>{step === 0 ? '취소' : '이전'}</Btn>
         <span style={{ flex: 1 }} />
@@ -177,7 +177,7 @@ export function DeliveryWizard({ contract, vehicle, onClose, onDone }: {
           </div>
         )}
       </div>
-    </Modal>
+    </WizPanel>
   );
 }
 

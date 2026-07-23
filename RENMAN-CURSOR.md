@@ -79,6 +79,7 @@ curl -s -o /dev/null -w "%{http_code}" http://localhost:6006/<route>   # 200
 
 | 날짜 | 작업자 | 내용 | 상태 |
 |---|---|---|---|
+| 2026-07-24 | Cursor | UIUX 잔여 3건: WizPanel(Delivery/Return 인라인) · `/penalty/docs` 전용 · payments `useSecOrder` | tsc0 · UIUX 체크리스트 완료 |
 | 2026-07-23 | Cursor | UIUX-SPEC 위반 1차 이행: ExcelSheet/IconSeg(a·f) · DetailShell(contract) · ObjCard큐(penalty) · FacetRail 데이터필터(payments/repair) · useSecOrder(recv/dispatch/repair/penalty) · 지난계약 FacetPage · confirm/prompt는 기반영 | tsc0 · 잔여=Wizard/Docs 인라인 |
 | 2026-07-23 | Cursor | frozen 시드 `--write` 재생성(스냅 H1~H3 반영): 163/177 · carry ₩142,315,000 · C→GLC 0 · 제네시스→현대 0 · 그랜저 IG=엑셀유지 | tsc0 · 가명화 기록 |
 | 2026-07-23 | Cursor | 차종스냅 H2→H3→H1: `has`/catalogSubModel 짧은코드⊂긴루트 차단(C→GLC) · 브랜드헤드(제네시스≠현대DH) · `vehicleRecord`는 confidence=`high`만 덮어씀(review=엑셀유지) | tsc0 · 프로브 OK · frozen 미재생성(명시 요청 시 `--write`) |
