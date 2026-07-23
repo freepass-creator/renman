@@ -11,6 +11,8 @@
  *   · GPU 재판독(오프라인 대량 금액 대조)은 scripts/ocr_crosscheck_gpu 로 별도 트랙.
  */
 
+import { todayKST } from './contracts/dates'; // KST 기준 오늘
+
 export type CrosscheckLevel = 'ok' | 'warn' | 'error';
 
 export interface CrosscheckIssue {
@@ -152,7 +154,7 @@ export function crosscheckVehicleReg(raw: Record<string, unknown>): CrosscheckRe
   }
   const first = ymd(raw.first_registration_date); // 스키마 필드명 정합 (구 first_registered_date는 미발화였음)
   if (first) {
-    const d = daysBetween(new Date().toISOString().slice(0, 10), first);
+    const d = daysBetween(todayKST(), first);
     if (d != null && d > 0) issues.push({ field: 'first_registration_date', message: `최초등록일(${first})이 미래 — 날짜 오독 의심`, severity: 'warn' });
   }
   return summarize(issues);

@@ -2,8 +2,11 @@
 // (홈 page.tsx에 흩어져 있던 TODAY·dday·IDLE·OUT을 한 곳으로.)
 // ★ 페이지·컴포넌트에서 `const TODAY = new Date()…` 재선언 금지 — 여기만 import.
 // IDLE/OUT 파티션 본문 = lib/domain/status (호환 re-export).
+import { todayKST } from './contracts/dates';
 
-export const TODAY = new Date().toISOString().slice(0, 10);
+// ★ 오늘은 KST 기준(todayKST). UTC toISOString 은 KST 00~09시에 하루 이르다 — 재선언 금지, 여기/todayKST만.
+export { todayKST };
+export const TODAY = todayKST();
 
 /** ISO(yyyy-mm-dd) 대비 오늘까지 남은 일수. 음수=경과. 형식 아니면 null. */
 export function dday(d: unknown): number | null {

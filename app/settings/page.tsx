@@ -11,6 +11,7 @@ import { resetPassword } from '@/lib/firebase/auth';
 import { getStore } from '@/lib/store';
 import { ENTITIES } from '@/lib/intake/entities';
 import { downloadCsv } from '@/lib/export-csv';
+import { todayKST } from '@/lib/contracts/dates'; // KST 기준 오늘(내보내기 파일명)
 import { Page, Panel, ListBox, ListRow, Btn, PillTabs, C, SPACE_M } from '@/components/ui';
 import { WorkbenchBar } from '@/components/WorkbenchBar';
 import { closePeriod, reopenPeriod, useClosedPeriods } from '@/lib/finance/period-lock';
@@ -130,7 +131,7 @@ export default function SettingsPage() {
       const records = await getStore().list(entityKey, companyId);
       const headers = ['회사', ...ent.fields.map((f) => f.label)];
       const rows = records.map((r) => [companyLabel(r.companyId), ...ent.fields.map((f) => { const v = r[f.key]; return v == null || typeof v === 'object' ? '' : String(v); })]);
-      downloadCsv(`${ent.label}_${new Date().toISOString().slice(0, 10)}`, headers, rows);
+      downloadCsv(`${ent.label}_${todayKST()}`, headers, rows);
       setMsg(`${ent.label} ${records.length}건 엑셀 내보냄.`);
     } catch (e) {
       setMsg(`${ent.label} 내보내기 실패: ${(e as Error).message || String(e)}`);

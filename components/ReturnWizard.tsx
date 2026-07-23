@@ -18,8 +18,7 @@ import { resolveWriteCompany, NEED_COMPANY } from '@/lib/scope';
 import { FUEL_LEVELS } from '@/lib/domain/fuel';
 import { Modal, Stepper, Btn, Message, won, C, toggleStyle, WizCard, WizField, WizPhotos, wizInput, type Step } from '@/components/ui';
 import { type EntityRecord } from '@/lib/intake/entities';
-
-const TODAY = () => new Date().toISOString().slice(0, 10);
+import { todayKST as TODAY } from '@/lib/contracts/dates'; // KST 기준 오늘(반납일 기록)
 const STEP_LABELS = ['확인', '주행·연료', '정산', '사진·서명', '확정'];
 
 export function ReturnWizard({ contract, vehicle, onClose, onDone }: {

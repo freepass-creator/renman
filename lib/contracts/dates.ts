@@ -1,5 +1,11 @@
 /** 계약 날짜 헬퍼 SSOT — contract-ops 코어와 patches·settlement·filters 공용(순환참조 방지). */
 
+/** 오늘(KST, yyyy-mm-dd) — 서버/브라우저 로컬 TZ 무관. `new Date().toISOString()`(UTC)은
+ *  KST 00:00~09:00 구간에 하루 이르므로(미수 도래·D-day·기록일 오작동) 반드시 이 함수로. */
+export function todayKST(): string {
+  return new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10);
+}
+
 /** 'YYYY-MM-DD…' → 'YYYY-MM-DD'(형식 아니면 ''). */
 export function ymd(d: unknown): string {
   const s = String(d || '');

@@ -12,6 +12,7 @@ import {
   workCategoryTone, type WorkCategory,
 } from '@/lib/work-ops';
 import { Btn, Badge, Input, Select, C, fieldStyle, toggleStyle, ctrlH, ctrlFs } from '@/components/ui';
+import { todayKST } from '@/lib/contracts/dates'; // KST 기준 오늘
 import { useIsMobile } from '@/lib/use-mobile';
 import { UploadCloud } from 'lucide-react';
 
@@ -53,7 +54,7 @@ const FIELDS: Record<WorkCategory, WF[]> = {
   ],
 };
 const DOC_KINDS = ['견적서', '수선사진'] as const;
-const today = () => new Date().toISOString().slice(0, 10);
+const today = todayKST;
 
 // 사고수리 전용 추가필드 — jpkerp4 사고접수 이식. 보험 처리 유형(복수선택) + 우리쪽/상대쪽 보험.
 // 위 FIELDS['사고수리']와 함께 한 레코드로 저장(같은 vals 상태). 다른 작업구분엔 안 뜸.

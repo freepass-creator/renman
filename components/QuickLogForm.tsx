@@ -4,6 +4,7 @@ import { useSession } from '@/lib/session';
 import { saveIntake } from '@/lib/intake';
 import { resolveWriteCompany, NEED_COMPANY } from '@/lib/scope';
 import { Btn, Input, C, fieldStyle, toggleStyle } from '@/components/ui';
+import { todayKST } from '@/lib/contracts/dates'; // KST 기준 오늘
 import { useIsMobile } from '@/lib/use-mobile';
 
 export type QuickLogCtx = { plate?: string; customer?: string; contractNo?: string; companyId?: string };
@@ -21,7 +22,7 @@ const HINTS: Record<string, string> = {
   '사고': '사고 내용',
   '검사': '검사 내용',
 };
-const today = () => new Date().toISOString().slice(0, 10);
+const today = todayKST;
 
 /** 빠른 기록 폼 — 그 자리에서 인라인(팝업 X). 종류 칩 + 텍스트 + 후속 체크·날짜 + 저장/취소.
  *  저장·취소 모두 onDone/onCancel 콜백으로 상위(펼침 상태)를 접는다. 저장 로직은 전역 QuickLog와 동일. */

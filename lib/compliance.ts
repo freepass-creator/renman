@@ -1,6 +1,7 @@
 // 렌터카 법령·정책 능동 컴플라이언스 체크 — 위반 소지를 시스템이 먼저 짚어줌(업무 편의).
 // 여객자동차 운수사업법(운전자격 확인 제34조의2)·자배법(의무보험)·표준약관 정합. 순수 primitive.
 import type { EntityRecord } from './intake/entities';
+import { todayKST } from './contracts/dates'; // KST 기준 오늘
 
 export interface ComplianceFlag {
   code: string;
@@ -13,7 +14,7 @@ export interface ComplianceFlag {
 export function ageFromBirth(birth: unknown, today?: string): number {
   const b = String(birth || '').slice(0, 10);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(b)) return 0;
-  const t = today && /^\d{4}-\d{2}-\d{2}$/.test(today) ? today : new Date().toISOString().slice(0, 10);
+  const t = today && /^\d{4}-\d{2}-\d{2}$/.test(today) ? today : todayKST();
   let age = Number(t.slice(0, 4)) - Number(b.slice(0, 4));
   if (t.slice(5) < b.slice(5)) age--; // 생일 안 지났으면 -1
   return age > 0 && age < 120 ? age : 0;

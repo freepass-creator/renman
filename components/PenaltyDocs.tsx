@@ -69,7 +69,7 @@ export function PenaltyDocs({ penalties, companyId, onClose, onSubmitted }: { pe
           : <>
             {Array.from(groups.entries()).map(([key, gr]) => {
               const co = key.split('||')[0]; const issuer = key.split('||')[1]; const m = loadMaster(co);
-              const docNo = `PCR-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${(co + (issuer || '').replace(/[^가-힣0-9A-Za-z]/g, '').slice(0, 2)).toUpperCase()}`;
+              const docNo = `PCR-${TODAY.replace(/-/g, '')}-${(co + (issuer || '').replace(/[^가-힣0-9A-Za-z]/g, '').slice(0, 2)).toUpperCase()}`;
               return (
                 <div className="print-doc" style={sheet} key={key}>
                   <div style={{ textAlign: 'right', fontSize: 11, color: INK_SUB, marginBottom: 6, fontFamily: 'monospace' }}>문서번호 {docNo}</div>

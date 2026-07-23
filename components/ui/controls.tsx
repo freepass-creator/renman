@@ -10,6 +10,7 @@ import { Drawer } from './overlays';
 import { type Period, PERIODS, periodRange, shiftPeriod, periodTitle } from '@/lib/finance/period';
 import { useSession } from '@/lib/session';
 import { useIsMobile } from '@/lib/use-mobile';
+import { todayKST } from '@/lib/contracts/dates'; // KST 기준 오늘
 import { ALL_COMPANIES, COMPANIES, companyLabel, companyShort } from '@/lib/companies';
 
 /* 입력·버튼·탭·칩 — 인터랙션 컨트롤 원자. 높이·폰트 = CTRL (ERP4 동기). */
@@ -224,7 +225,7 @@ export function Select({ size = 'md', style, children, ...rest }: Omit<React.Sel
 
 export function PeriodBar({ latest, initial = '월간', onRange }: { latest?: string; initial?: Period; onRange: (r: { from: string; to: string }) => void }) {
   const mobile = useIsMobile();
-  const today = React.useMemo(() => new Date().toISOString().slice(0, 10), []);
+  const today = React.useMemo(() => todayKST(), []);
   const [period, setPeriod] = React.useState<Period>(initial);
   const [ref, setRef] = React.useState<string | null>(null);
   const [custom, setCustom] = React.useState<{ from: string; to: string } | null>(null);

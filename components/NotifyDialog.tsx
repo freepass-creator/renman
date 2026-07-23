@@ -11,6 +11,7 @@ import { saveIntake } from '@/lib/intake';
 import { notifySaved } from '@/lib/ui-bus';
 import { apiAuthHeaders } from '@/lib/api-headers';
 import { Modal, Btn, C, toggleStyle } from '@/components/ui';
+import { todayKST } from '@/lib/contracts/dates'; // KST 기준 오늘
 import { useIsMobile } from '@/lib/use-mobile';
 
 export type NotifyRecipient = {
@@ -50,7 +51,7 @@ function fill(body: string, r: NotifyRecipient): string {
     .replace(/\{\{보증금미수령\}\}/g, won(r.depositUnreceived))
     .replace(/\{\{보증금환불\}\}/g, won(r.depositRefund));
 }
-const today = () => new Date().toISOString().slice(0, 10);
+const today = todayKST;
 
 export function NotifyDialog({ recipients, onClose, onSent }: {
   recipients: NotifyRecipient[];

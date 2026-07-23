@@ -16,8 +16,9 @@ import {
   listTemplates, getTemplate, renderBody, buildDocNo, computeNextSeq, fmtKDate, fmtKMoney,
   DOC_CATEGORIES, DOC_PRINT_CSS, type DocCategory,
 } from '@/lib/doc-templates';
+import { todayKST } from '@/lib/contracts/dates'; // KST 기준 오늘
 
-const today = () => new Date().toISOString().slice(0, 10);
+const today = todayKST;
 
 export function DocIssueDialog({ issued, onClose, onIssued }: {
   issued: { docNo?: string }[];

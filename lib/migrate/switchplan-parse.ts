@@ -20,6 +20,7 @@ import * as XLSX from 'xlsx';
 import type { EntityRecord } from '@/lib/intake/entities';
 import { generateSchedules } from '@/lib/payments/payment-schedule';
 import { normPlate } from '@/lib/plate';
+import { todayKST } from '@/lib/contracts/dates'; // KST 기준 오늘(기본 today)
 
 /* ─────────────── 셀 유틸 (v5 그대로) ─────────────── */
 
@@ -827,7 +828,7 @@ export type SwitchplanPackLive = {
  *  - contract: 채권+반납, net미수=carry 역산.
  *  - bank_tx: [] (자금일보는 switchplan-jbo-parse 로 별도 파싱).
  */
-export function buildSwitchplanPackFromBuffer(buf: ArrayBuffer, today: string = new Date().toISOString().slice(0, 10)): SwitchplanPackLive {
+export function buildSwitchplanPackFromBuffer(buf: ArrayBuffer, today: string = todayKST()): SwitchplanPackLive {
   const parsed = parseSwitchplanWorkbook(buf, today);
 
   // 할부 인덱스 (plate → 할부필드)

@@ -18,6 +18,7 @@ import type { EntityRecord } from '@/lib/intake/entities';
 import { generateSchedules } from '@/lib/payments/payment-schedule';
 import { suggestSubject, type SubjectInput } from '@/lib/finance/classify-subject';
 import raw from './switchplan-data.json';
+import { todayKST } from '@/lib/contracts/dates'; // KST 기준 오늘(기본 today)
 
 type RawContract = {
   contractNo: string;
@@ -169,7 +170,7 @@ function classifyBankTx(tx: EntityRecord, contractorNames: Set<string>): string 
 }
 
 /** 스위치플랜 전체 샘플 팩. today 기준으로 순미수(net)=원본 carry 가 되도록 계약을 역산. */
-export function buildSwitchplanPack(today: string = new Date().toISOString().slice(0, 10)): SwitchplanPack {
+export function buildSwitchplanPack(today: string = todayKST()): SwitchplanPack {
   const contractorNames = new Set(data.contracts.map((c) => String(c.contractorName || '').replace(/[\s\d]/g, '')).filter(Boolean));
   const vehDateKeys = ['firstReg', 'inspectionTo', 'acquisitionDate', 'saleDate', 'loanStartDate'];
   const insDateKeys = ['startDate', 'endDate'];
