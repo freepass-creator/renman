@@ -140,11 +140,11 @@ export function Sec({ id, title, n, desc, tone, right, hideable = true, onReorde
   const nc = tone === 'danger' ? C.danger : tone === 'ok' ? C.ok : tone === 'warn' ? C.warn : C.sub;
   if (state === 'hidden') return null;
   const canReorder = !!(id && onReorder);
-  const canDrag = canReorder && state === 'collapsed';
+  const canDrag = canReorder && state === 'collapsed' && !mobile;   // 모바일=드래그 재정렬 숨김(헤더 잡동사니 제거)
   const hit = mobile ? 40 : 22;
   // 모바일: 무리끼리 SPACE_GROUP_M · 무리 안(제목↔본문·버튼) SPACE_M
   const mt = mobile ? SPACE_GROUP_M : 22;
-  const hasTrail = (state !== 'collapsed' && right != null) || canDrag || (!!hideable && !!id);
+  const hasTrail = (state !== 'collapsed' && right != null) || canDrag || (!!hideable && !!id && !mobile);
   return (
     <section id={id} style={{ marginTop: mt, scrollMarginTop: mobile ? 68 : 62, outline: over ? `2px solid ${C.accent}` : 'none', outlineOffset: 6, borderRadius: R, transition: 'outline-color .1s', order }}
       onDragOver={canReorder ? (e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; if (!over) setOver(true); } : undefined}
@@ -179,7 +179,7 @@ export function Sec({ id, title, n, desc, tone, right, hideable = true, onReorde
                 <GripVertical size={mobile ? 18 : 15} />
               </span>
             )}
-            {hideable && id && <button onClick={() => set('hidden')} title="이 섹션 숨기기(맨 아래로)" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: hit, height: hit, border: 'none', background: 'none', cursor: 'pointer', color: C.faint, WebkitTapHighlightColor: 'transparent' }}><EyeOff size={mobile ? 16 : 13} /></button>}
+            {hideable && id && !mobile && <button onClick={() => set('hidden')} title="이 섹션 숨기기(맨 아래로)" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: hit, height: hit, border: 'none', background: 'none', cursor: 'pointer', color: C.faint, WebkitTapHighlightColor: 'transparent' }}><EyeOff size={mobile ? 16 : 13} /></button>}
           </span>
         )}
       </div>
