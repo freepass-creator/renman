@@ -64,15 +64,15 @@ describe('B-1 회귀 가드 — 반납/해지 계약도 carry 유실 없음', ()
   });
 });
 
-describe('일반 계약(carry 없음) — 도래분만 미수, 미도래는 제외', () => {
-  it('전액 도래 → net == Σ도래 회차', () => {
-    // 400k × 6개월, 2026-01~07, TODAY 07-22 → 6회차 전부 도래
-    expect(net({ monthlyRent: 400_000, rentalMonths: 6, startDate: '2026-01-01', endDate: '2026-07-01' })).toBe(2_400_000);
+describe('일반 계약(carry 없음) — 도래분만 미수, 미도래·선불1회차는 제외', () => {
+  it('전액 도래 → net == Σ(2회차부터) 도래 회차 (선불 1회차=인도납부 제외)', () => {
+    // 400k × 6개월, 2026-01~06, TODAY 07-22 → 6회차 전부 도래. 선불 1회차(인도납부) 제외 → 5회차분.
+    expect(net({ monthlyRent: 400_000, rentalMonths: 6, startDate: '2026-01-01', endDate: '2026-07-01' })).toBe(2_000_000);
   });
 
-  it('미도래 회차는 net에 안 들어간다 (핵심 정책)', () => {
-    // 결제일 1일 · start 2026-07-01 · 선불 12개월 · TODAY 07-22 → 1회차(07-01)만 도래, 2회차(08-01)~는 미도래
-    expect(net({ monthlyRent: 500_000, rentalMonths: 12, startDate: '2026-07-01', endDate: '2027-07-01', paymentDay: 1 })).toBe(500_000);
+  it('미도래·선불1회차는 net에 안 들어간다 (핵심 정책)', () => {
+    // 결제일 1일 · start 2026-06-01 · 선불 · TODAY 07-22 → 1회차(06-01)=인도납부(제외), 2회차(07-01)=도래 미납, 3회차(08-01)~ 미도래
+    expect(net({ monthlyRent: 500_000, rentalMonths: 12, startDate: '2026-06-01', endDate: '2027-06-01', paymentDay: 1 })).toBe(500_000);
   });
 
   it('결제일 미도래면 net 0 (시작했어도 첫 결제일 전이면 미수 아님)', () => {

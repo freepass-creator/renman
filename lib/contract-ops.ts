@@ -58,12 +58,23 @@ function buildContract(rec: EntityRecord, today: string): Contract {
   //   분배를 건너뛰어 회차표·헤드라인이 어긋나는 스위칭 버그였다.
   const paidTotal = Number(rec._paidTotal) || 0;
   const hasCarry = rec._carryUnpaid !== undefined && rec._carryUnpaid !== null;
-  if (schedules.length && (hasCarry || paidTotal > 0)) {
+  // 선불 = 1회차(인도 시 결제) 완료 고정 → 미수/carry는 «2회차부터» 분배. (후불은 1회차부터 미수 가능 = 무변경.)
+  //   1회차 dueDate가 도래(인도 완료)했을 때만 적용. 미래 시작 계약은 아직 인도 전이라 제외.
+  const prepaidFirst = timing === '선불' && schedules.length > 0 && String(schedules[0].dueDate || '') <= today;
+  if (prepaidFirst) {
+    const h = schedules[0];
+    // 런타임엔 payments 보유(distributeUnpaid와 동일) — 요소 타입엔 미선언이라 캐스팅.
+    schedules[0] = { ...h, status: '완료', paidAmount: h.amount, paidAt: h.dueDate,
+      payments: [{ date: h.dueDate, amount: h.amount, source: '정산', synthetic: true, memo: '선불 1회차(인도 시 납부)' }] } as (typeof schedules)[number];
+  }
+  const distTarget = prepaidFirst ? schedules.slice(1) : schedules;   // 선불이면 2회차부터 분배
+  if (distTarget.length && (hasCarry || paidTotal > 0)) {
     const rd = ymd(rec.returnedDate);
     const cutoff = rd && rd < today ? rd : today;
-    const pastDue = schedules.filter((sc) => String(sc.dueDate || '') <= cutoff).reduce((sum, sc) => sum + sc.amount, 0);
+    const pastDue = distTarget.filter((sc) => String(sc.dueDate || '') <= cutoff).reduce((sum, sc) => sum + sc.amount, 0);
     const unpaid = hasCarry ? Math.max(0, Number(rec._carryUnpaid) || 0) : Math.max(0, pastDue - paidTotal);
-    schedules = distributeUnpaid(schedules, unpaid, cutoff, '');
+    const distributed = distributeUnpaid(distTarget, unpaid, cutoff, '');
+    schedules = prepaidFirst ? [schedules[0], ...distributed] : distributed;
   }
   if (schedules.length && (pays.length || discs.length)) {
     const bySeq = new Map<number, number>(schedules.map((s, i) => [s.seq, i]));

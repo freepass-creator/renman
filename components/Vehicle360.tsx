@@ -673,6 +673,19 @@ export function Vehicle360({ plate, focus }: { plate: string; focus?: string }) 
           ['연료(인수→반납)', null, (active.fuelOut || active.fuelIn) ? `${active.fuelOut || '?'} → ${active.fuelIn || '?'}` : ''],
           ['주행거리(출고→반납)', null, (active.mileageOut || active.returnMileage) ? `${active.mileageOut || '?'} → ${active.returnMileage || '?'} km` : ''],
         ] as [string, string | null, React.ReactNode][]} /> : <EmptyState variant="sec">진행 중 계약 없음</EmptyState>}
+        {active && (
+          <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, flexWrap: 'wrap' }}>
+            <span style={{ color: C.mute }}>납부시점</span>
+            {(['선불', '후불'] as const).map((tm) => {
+              const on = String(active.paymentTiming || '선불') === tm;
+              return (
+                <Btn key={tm} size="sm" variant={on ? 'solid' : 'ghost'}
+                  onClick={() => { if (!on) void doTransition({ paymentTiming: tm }, String(active._key), active); }}>{tm}</Btn>
+              );
+            })}
+            <span style={{ color: C.faint, fontSize: 11 }}>선불=1회차 인도 시 납부(1회차 미수 없음) · 후불=1회차부터 미수 가능</span>
+          </div>
+        )}
         {active && (() => {
           const hd = docHistory(active, 'handover');   // 현장 인도·반납 위저드가 첨부한 출차/입고 사진·서명(분쟁 물증)
           return hd.length ? (
