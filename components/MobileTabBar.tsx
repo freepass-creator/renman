@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { haptic } from '@/lib/haptics';
 import { useMobileTabs } from '@/lib/mobile-tabs';
-import { C, SH } from '@/components/ui/tokens';
+import { C } from '@/components/ui/tokens';
 
 export function MobileTabBar() {
   const pathname = usePathname();
@@ -22,7 +22,7 @@ export function MobileTabBar() {
     <nav style={{
       position: 'fixed', left: 0, right: 0, bottom: 0, zIndex: 56, display: 'flex',
       background: C.card, borderTop: `1px solid ${C.line}`,
-      paddingBottom: 'env(safe-area-inset-bottom)', boxShadow: SH.rest,
+      paddingBottom: 'env(safe-area-inset-bottom)', boxShadow: '0 -3px 14px rgba(15,23,42,0.07)',   // 바닥 바 = 위로 뜨는 그림자(erp4)
     }}>
       {tabs.map((t) => {
         const active = t.match(pathname);

@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation';
 import { useAppBarSlots } from '@/lib/appbar';
 import { useIsMobile } from '@/lib/use-mobile';
 import { haptic } from '@/lib/haptics';
-import { C, SH } from '@/components/ui/tokens';
+import { C } from '@/components/ui/tokens';
 import { Btn } from '@/components/ui/controls';
 
 /**
@@ -24,7 +24,7 @@ export function MobileActionBar() {
   return (
     <div style={{
       position: 'fixed', left: 0, right: 0, bottom: 'var(--fp-tabbar-h, 0px)', zIndex: 55,
-      background: C.taupeBg, borderTop: `1px solid ${C.line}`, boxShadow: SH.rest,
+      background: C.taupeBg, borderTop: `1px solid ${C.line}`, boxShadow: '0 -3px 14px rgba(15,23,42,0.07)',   // 바닥 도크 = 위로 뜨는 그림자(erp4)
       paddingBottom: 'var(--fp-dock-safe, env(safe-area-inset-bottom))',
     }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, height: 'var(--fp-bar-h)', boxSizing: 'border-box', padding: '0 var(--fp-bar-pad-x, 14px)' }}>
