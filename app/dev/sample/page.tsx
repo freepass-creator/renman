@@ -99,6 +99,12 @@ export default function SamplePage() {
       {/* ── 상태바: 제목 + 요약 + 구간 + 보기 ── */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 18, flexWrap: 'wrap', padding: '14px 18px 12px', borderBottom: `1px solid ${C.line}`, background: C.card }}>
         <span style={{ fontSize: 19, fontWeight: 800, letterSpacing: '-0.015em', color: C.ink }}>운영 현황</span>
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }} title="기간(월 구간)으로 보기 — 계약기간이 이 구간과 겹치는 차량만">
+          <input type="month" value={fromM} max={toM || undefined} onChange={(e) => setFromM(e.target.value)} style={MONTH_INPUT} aria-label="시작월" />
+          <span style={{ color: C.faint, fontSize: 12 }}>~</span>
+          <input type="month" value={toM} min={fromM || undefined} onChange={(e) => setToM(e.target.value)} style={MONTH_INPUT} aria-label="종료월" />
+          {(fromM || toM) && <Btn variant="ghost" size="sm" onClick={() => { setFromM(''); setToM(''); }}>전체</Btn>}
+        </span>
         <div style={{ display: 'flex', gap: 18 }}>
           {[['보유', heldCnt, undefined], ['휴차', idleCnt, undefined], ['미수', net ? won(net) : '0', net ? C.danger : undefined]].map(([label, val, color]) => (
             <div key={label as string} style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.15 }}>
@@ -108,12 +114,6 @@ export default function SamplePage() {
           ))}
         </div>
         <span style={{ flex: 1 }} />
-        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }} title="계약기간이 이 구간과 겹치는 차량만">
-          <input type="month" value={fromM} max={toM || undefined} onChange={(e) => setFromM(e.target.value)} style={MONTH_INPUT} aria-label="시작월" />
-          <span style={{ color: C.faint, fontSize: 12 }}>~</span>
-          <input type="month" value={toM} min={fromM || undefined} onChange={(e) => setToM(e.target.value)} style={MONTH_INPUT} aria-label="종료월" />
-          {(fromM || toM) && <Btn variant="ghost" size="sm" onClick={() => { setFromM(''); setToM(''); }}>전체</Btn>}
-        </span>
         <div style={{ display: 'inline-flex', border: `1px solid ${C.line}`, borderRadius: 8, overflow: 'hidden' }}>
           {(['기본', '상세'] as const).map((v) => (
             <button key={v} onClick={() => setView(v)} style={{ border: 'none', padding: '6px 13px', fontSize: 12.5, fontWeight: view === v ? 700 : 600, cursor: 'pointer', background: view === v ? C.brand : C.card, color: view === v ? C.inverse : C.mute, fontFamily: 'inherit' }}>{v}</button>
