@@ -66,9 +66,13 @@ function MobileMenu({ open, onClose }: { open: boolean; onClose: () => void }) {
   if (!open) return null;
   return (
     <>
-      <div onClick={onClose} style={{ position: 'fixed', top: 'var(--fp-bar-h)', left: 0, right: 0, bottom: 0, zIndex: 58, background: SCRIM, animation: 'fadeIn .15s ease' }} />
-      <div style={{ position: 'fixed', top: 'var(--fp-bar-h)', left: 0, right: 0, zIndex: 59, maxHeight: 'calc(100dvh - var(--fp-bar-h))', overflowY: 'auto', overscrollBehavior: 'contain', background: C.taupeBg, borderBottom: `1px solid ${line}`, boxShadow: 'var(--shadow-lg)', animation: 'menuDrop .18s cubic-bezier(.2,.8,.2,1)', WebkitOverflowScrolling: 'touch' }}>
+      <div onClick={onClose} style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 58, background: SCRIM, animation: 'fadeIn .15s ease' }} />
+      <div style={{ position: 'fixed', top: 0, left: 0, right: 0, zIndex: 59, maxHeight: '100dvh', overflowY: 'auto', overscrollBehavior: 'contain', background: C.taupeBg, borderBottom: `1px solid ${line}`, boxShadow: 'var(--shadow-lg)', animation: 'menuDrop .18s cubic-bezier(.2,.8,.2,1)', WebkitOverflowScrolling: 'touch' }}>
         <div style={{ padding: '4px 0 16px' }}>
+          {/* 상단 앱바가 없으므로 메뉴 자체에 닫기(X) */}
+          <div style={{ display: 'flex', justifyContent: 'flex-end', padding: '4px 12px 0' }}>
+            <button onClick={onClose} aria-label="닫기" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 40, height: 40, border: 'none', background: 'none', cursor: 'pointer', color: ink, WebkitTapHighlightColor: 'transparent' }}><X size={22} /></button>
+          </div>
           {navGroups(isOperator, true).map((g, gi) => (
             <div key={gi} style={{ padding: '3px 0' }}>
               {g.title && <div style={{ fontSize: 11.5, color: weak, fontWeight: 700, padding: '9px 20px 3px', letterSpacing: '0.02em' }}>{g.title}</div>}
@@ -103,6 +107,12 @@ export default function TopBar() {
   const showBottom = !!(slots.back || slots.actions);
   const showActionBar = !!(slots.back || slots.actions || slots.depth);   // 모바일 하단 액션바(이전+주액션)
   useEffect(() => { setMenuOpen(false); }, [pathname]);
+  // 상단 앱바 제거 → 메뉴 토글은 툴바 햄버거가 쏘는 이벤트로. (모바일 전용)
+  useEffect(() => {
+    const on = () => setMenuOpen((o) => !o);
+    window.addEventListener('jpk:toggle-menu', on);
+    return () => window.removeEventListener('jpk:toggle-menu', on);
+  }, []);
   useEffect(() => {
     // 모바일 하단 도크: 뎁스=액션바 1개(있으면) · 허브=탭바(+액션 있으면 2개). 콘텐츠 마지막 줄 가림 방지.
     document.body.style.paddingBottom = mobile
@@ -119,20 +129,10 @@ export default function TopBar() {
   const barBtn: CSSProperties = { display: 'inline-flex', alignItems: 'center', gap: 4, height: bh, boxSizing: 'border-box', padding: '0 12px', border: `1px solid ${line}`, borderRadius: 'var(--radius)', background: C.taupeBg, cursor: 'pointer', fontSize: 12.5, fontWeight: 600, color: ink, textDecoration: 'none' };
 
   if (mobile) {
-    const tapTarget: CSSProperties = { display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 44, height: 44, flexShrink: 0, border: 'none', background: 'none', cursor: 'pointer', color: ink, WebkitTapHighlightColor: 'transparent' };
-    const showBack = !!(slots.back || depth);
-    const headTitle = showBack ? (slots.title ?? '') : (slots.title ?? OPERATOR_BRAND);
+    // 모바일 = 상단 앱바 «없음»(갈아엎기). 페이지 최상단 = 툴바(WorkbenchBar→MobileToolbar, 햄버거 포함).
+    //   이동=하단 탭바(허브) · 이전+주액션=하단 액션바(뎁스) · 메뉴=툴바 햄버거→jpk:toggle-menu.
     return (
       <>
-        {/* erp4식 얇은 상단바 — 불투명 · 타이틀 좌 · 햄버거 우측 · 로그인정보/검색 없음(검색은 페이지 툴바로) */}
-        <header style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '0 6px', minHeight: 'var(--fp-bar-h)', background: C.taupeBg, borderBottom: `1px solid ${line}`, position: 'sticky', top: 0, zIndex: 30 }}>
-          <span style={{ flex: 1, minWidth: 0, fontSize: headTitle === OPERATOR_BRAND ? 19 : 17, fontWeight: 800, letterSpacing: '-0.03em', color: ink, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', paddingLeft: 8 }}>
-            {headTitle}
-          </span>
-          {/* 우측 = 햄버거만. 이전·주액션은 하단 액션바(MobileActionBar)로 일원화. */}
-          <button onClick={() => { haptic.tap(); setMenuOpen((o) => !o); }} aria-label="메뉴" style={tapTarget}>{menuOpen ? <X size={23} /> : <Menu size={23} />}</button>
-        </header>
-        {/* 이동=탭바(허브) · 이전+주액션=하단 액션바(뎁스). */}
         {!depth && <MobileTabBar />}
         <MobileActionBar />
         <MobileMenu open={menuOpen} onClose={() => setMenuOpen(false)} />

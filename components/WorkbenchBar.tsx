@@ -12,6 +12,7 @@
  *   false = 검색 슬롯 숨김(예외)
  */
 import React from 'react';
+import { Menu } from 'lucide-react';
 import { useIsMobile } from '@/lib/use-mobile';
 // ui 배럴(index)은 layout→이 파일을 간접 소비 — 배럴로 끌어오면 순환. tokens/controls만 직수입.
 import { SPACE_M, SPACE_GROUP_M } from '@/components/ui/tokens';
@@ -92,6 +93,8 @@ export function WorkbenchBar<T extends string = string>({
         search={hasSearch ? <SearchSlot search={resolved!} /> : undefined}
         view={view}
         filter={hasFacet ? <FacetFilterBtn /> : undefined}
+        menu={<button type="button" aria-label="메뉴" onClick={() => window.dispatchEvent(new Event('jpk:toggle-menu'))}
+          style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 40, height: 40, flexShrink: 0, border: 'none', background: 'none', cursor: 'pointer', color: 'var(--text-main)', WebkitTapHighlightColor: 'transparent' }}><Menu size={22} /></button>}
         tabs={(tabs || subTabs || mid) ? tabRow : undefined}
         stat={stat}
         actions={actions}
