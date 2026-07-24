@@ -56,10 +56,20 @@ export function Cards({ min = 240, fit, children }: { min?: number; fit?: boolea
     if (mobile) return <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: GAP_M }}>{children}</div>;
     return <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'stretch' }}>{children}</div>;
   }
-  // 모바일 목록 = 세로 스택 + 터치 간격(웹 그리드 유지)
-  if (mobile) return <div style={{ display: 'flex', flexDirection: 'column', gap: GAP_M }}>{children}</div>;
+  // 모바일 목록 = erp4 상세식 «그룹 박스»(한 테두리 + 구분선 행). 개별 카드 박스 흩뿌림 제거 → 플랫폼식 «박스 나열» 탈피.
+  if (mobile) return (
+    <div style={{ border: `1px solid ${C.line}`, borderRadius: 'var(--radius)', overflow: 'hidden', background: C.card }}>
+      <CardGroupContext.Provider value={true}>
+        {React.Children.map(children, (c, i) => (
+          <div style={{ borderTop: i ? `1px solid ${C.line2}` : undefined }}>{c}</div>
+        ))}
+      </CardGroupContext.Provider>
+    </div>
+  );
   return <div style={{ display: 'grid', gridTemplateColumns: `repeat(auto-fill, minmax(min(100%, ${min}px), 1fr))`, gap: 8, alignItems: 'start' }}>{children}</div>;
 }
+// 그룹 카드 컨텍스트 — 그룹 박스 안 ObjCard는 개별 테두리·그림자 제거(구분선은 그룹이 그림). erp4 상세 «box + 행» 규격.
+const CardGroupContext = React.createContext(false);
 // 카드 공통 — 살짝 뜬 그림자 + 자연스러운 통일 호버(떠오름). 절제(눈 안 아프게). 그림자=SH SSOT.
 function useHover() { const [h, setH] = React.useState(false); return { h, on: { onMouseEnter: () => setH(true), onMouseLeave: () => setH(false) } }; }
 function cardStyle(h: boolean, click: boolean): React.CSSProperties {
@@ -86,7 +96,7 @@ export function Metric({ label, value, hint, tone, onClick }: { label: React.Rea
     </div>
   );
 }
-// 객체 카드 = 목록의 단일 원자(2행 신원카드). 웹=56px · 모바일=min 72(터치).
+// 객체 카드 = 목록의 단일 원자(2행 신원카드). 웹·모바일 높이 56(= freepass ERP4 ObjCard).
 //  1행 신원: [회사][상태배지][차량번호(모노·무잘림) 또는 이름][차종(축소가능)] …[우측 핵심수치]
 //  2행 원자: fields(라벨-값, 우선순위 상위 3 + ＋n) 또는 sub(자유문). 좌측 2px 레일=위험 신호.
 //  호출부는 "필요한 원자만" 넘긴다. 차번=plate, 비차량 주체(자금 상대방·고객)=name, 부가식별=carType.
@@ -103,6 +113,7 @@ export function ObjCard({ badge, badgeTone = 'gray', co, rail = 'none', plate, n
 }) {
   const mobile = useIsMobile();
   const { h, on } = useHover();
+  const grouped = React.useContext(CardGroupContext);   // 그룹 박스 안 → 개별 테두리·그림자 제거
   const rl = RAIL[rail];
   const usingFields = sub == null && !!fields && fields.length > 0;
   const shown = usingFields ? fields!.slice(0, ATOM_CAP) : [];
@@ -118,16 +129,17 @@ export function ObjCard({ badge, badgeTone = 'gray', co, rail = 'none', plate, n
       : <span style={{ flex: '0 1 auto', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: mobile ? 14 : 12.5, fontWeight: 600, color: C.ink }}>{title}</span>;
   return (
     <div onClick={onClick} {...on} style={{
-      ...cardStyle(h, !!onClick),
+      ...(grouped
+        ? { background: h && !!onClick ? C.hover : 'transparent', cursor: onClick ? 'pointer' : 'default', transition: 'background .12s ease' }
+        : cardStyle(h, !!onClick)),
       position: 'relative', overflow: 'hidden',
-      height: mobile ? 'auto' : 56,
-      minHeight: mobile ? 72 : 56,
-      padding: mobile ? '11px 14px 11px 16px' : '0 12px 0 14px',
+      height: mobile ? 'auto' : 56, minHeight: mobile ? 60 : 56,
+      padding: mobile ? '10px 14px' : '0 12px 0 14px',
       display: 'flex', alignItems: 'center', minWidth: 0,
       WebkitTapHighlightColor: 'transparent',
     }}>
       <span style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 2, background: rl.c, opacity: rl.o }} />
-      <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: mobile ? 5 : 3 }}>
+      <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 3 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 7, minWidth: 0, overflow: 'hidden' }}>
           {co ? <span style={{ flex: '0 0 auto' }}><CompanyBadge co={co} /></span> : null}
           {badge != null && <span style={{ flex: '0 0 auto' }}><Badge tone={badgeTone}>{badge}</Badge></span>}

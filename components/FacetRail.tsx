@@ -162,12 +162,21 @@ export function FacetRail({ lensKey, groups: groupsProp, facets, onToggle, onRes
     </div>
   );
 
-  // 모바일 = 아래서 올라오는 바텀시트(erp4식). 시트가 제목·[적용][해제][닫기] 푸터를 소유.
-  if (mobile) return (
-    <FilterSheet open={open} onClose={() => setOpen(false)} onClear={facets.size > 0 ? onReset : undefined}>
-      <FacetGroups groups={groups} facets={facets} onToggle={onToggle} counts={counts} touch />
-    </FilterSheet>
-  );
+  // 모바일 = 바텀시트(ERP4). 푸터=[해제·info·닫기](footer=filter/std).
+  if (mobile) {
+    const VIEW_SCOPE = ['보유', '전체', '매각'];
+    const n = [...facets].filter((f) => !VIEW_SCOPE.includes(f)).length;
+    return (
+      <FilterSheet
+        open={open}
+        onClose={() => setOpen(false)}
+        onClear={facets.size > 0 ? onReset : undefined}
+        footerInfo={n > 0 ? `선택 ${n}` : undefined}
+      >
+        <FacetGroups groups={groups} facets={facets} onToggle={onToggle} counts={counts} touch />
+      </FilterSheet>
+    );
+  }
 
   // 데스크톱 = 좌측 인-플로우 열(sticky). 콘텐츠를 민다(FacetPage flex row).
   const hgt = `calc(100vh - ${top}px)`;

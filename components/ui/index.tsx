@@ -12,6 +12,7 @@ export * from './excel-sheet';
 export * from './detail';
 export * from './overlays';
 export * from './bottom-sheet';
+export * from './page-toolbar';
 export * from './mobile-toolbar';
 export * from './confirm';
 export * from './wizard';

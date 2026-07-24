@@ -9,7 +9,7 @@
 - **정렬**: 헤더 클릭 정렬이 ExcelSheet에만. 공용 DataTable은 정렬 불가 → 표 쓰는 페이지 전부 정렬 죽음.
 - **섹션**: `Sec`에 `id`/`onReorder` 안 넘긴 페이지(/integrity·/manage·/pnl·/financials 등)는 접기·숨김·재정렬 전부 죽음.
 - **팝업**: 담기·Wizard·수동연결·문서발급 풀스크린 모달 남발 + `window.confirm/prompt` 혼재.
-- **모바일**: /payments·/ingest·/inbox 은 `useIsMobile` 0건 + 셸 위임도 부분적 → 사실상 미대응.
+- **모바일**: 셸/원자 위임 표준 (`WorkbenchBar`·`FacetPage`·`Sec`). 뎁스=상단 제목·하단 이전(=ERP4).
 
 ## 유형별 규격
 

@@ -79,6 +79,13 @@ curl -s -o /dev/null -w "%{http_code}" http://localhost:6006/<route>   # 200
 
 | 날짜 | 작업자 | 내용 | 상태 |
 |---|---|---|---|
+| 2026-07-24 | Cursor | 모바일 메뉴=ERP4: 열리면 TopBar 상태가「☰ 메뉴」+우측 X · 패널 bar 아래 펼침 | tsc0 |
+| 2026-07-24 | Cursor | 모바일 메뉴=ERP4: TopBar z80 유지·햄버거↔X · 패널/스크림은 bar 아래만 | tsc0 |
+| 2026-07-24 | Cursor | BottomSheet 푸터=ERP4 std/filter/commit: 검색[지우기·닫기] · 필터[해제·선택N·닫기] · 회사/보기[닫기] · SCRIM | tsc0 |
+| 2026-07-24 | Cursor | 모바일 2단 크롬 정합: TopBar↓PageToolBar 밀착(상단 음수마진·pad 제거) · 홈 tools슬롯 · --topbar-h=56 | tsc0(수동확인권장) |
+| 2026-07-24 | Cursor | 모바일 TopBar 복구(ERP4): 허브·뎁스 공통 상단 제목+메뉴 · 메뉴는 TopBar · PageToolBar에서 메뉴툴 제거 · sticky top=bar-h | tsc0 |
+| 2026-07-24 | Cursor | 모바일 툴바=ERP4 PageToolBar 이식: 균등 검색·필터·보기·회사·메뉴 → 시트. 회사칩+사각아이콘 행 폐기 | tsc0 |
+| 2026-07-24 | Cursor | 모바일↔ERP4 패리티: 뎁스 상단제목 · TabBar 토큰 · bar56 · ObjCard56 · WorkbenchBar ctrlH/PillTabs md · ActionBar SH | tsc0 |
 | 2026-07-24 | Cursor | UIUX 잔여 3건: WizPanel(Delivery/Return 인라인) · `/penalty/docs` 전용 · payments `useSecOrder` | tsc0 · UIUX 체크리스트 완료 |
 | 2026-07-23 | Cursor | UIUX-SPEC 위반 1차 이행: ExcelSheet/IconSeg(a·f) · DetailShell(contract) · ObjCard큐(penalty) · FacetRail 데이터필터(payments/repair) · useSecOrder(recv/dispatch/repair/penalty) · 지난계약 FacetPage · confirm/prompt는 기반영 | tsc0 · 잔여=Wizard/Docs 인라인 |
 | 2026-07-23 | Cursor | frozen 시드 `--write` 재생성(스냅 H1~H3 반영): 163/177 · carry ₩142,315,000 · C→GLC 0 · 제네시스→현대 0 · 그랜저 IG=엑셀유지 | tsc0 · 가명화 기록 |

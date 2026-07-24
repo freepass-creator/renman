@@ -64,17 +64,19 @@ function MobileMenu({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { isOperator } = useSession();
   const line = 'var(--border)', ink = 'var(--text-main)', mute = 'var(--text-sub)', weak = 'var(--text-weak)';
   if (!open) return null;
+  // 상단바(z80) 아래에서만 — ERP4 NavMenu. 스크림·패널 모두 top=bar-h.
   return (
     <>
-      <div onClick={onClose} style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 58, background: SCRIM, animation: 'fadeIn .15s ease' }} />
-      <div style={{ position: 'fixed', top: 0, left: 0, right: 0, zIndex: 59, maxHeight: '100dvh', overflowY: 'auto', overscrollBehavior: 'contain', background: C.taupeBg, borderBottom: `1px solid ${line}`, boxShadow: 'var(--shadow-lg)', animation: 'menuDrop .18s cubic-bezier(.2,.8,.2,1)', WebkitOverflowScrolling: 'touch' }}>
+      <div onClick={onClose} style={{ position: 'fixed', top: 'var(--fp-bar-h)', left: 0, right: 0, bottom: 0, zIndex: 70, background: SCRIM, animation: 'fadeIn .15s ease' }} />
+      <div style={{
+        position: 'fixed', top: 'var(--fp-bar-h)', left: 0, right: 0, bottom: 0, zIndex: 71,
+        overflowY: 'auto', overscrollBehavior: 'contain', background: C.taupeBg,
+        animation: 'menuDrop .18s ease', WebkitOverflowScrolling: 'touch',
+        paddingBottom: 'calc(24px + env(safe-area-inset-bottom))',
+      }}>
         <div style={{ padding: '4px 0 16px' }}>
-          {/* 상단 앱바가 없으므로 메뉴 자체에 닫기(X) */}
-          <div style={{ display: 'flex', justifyContent: 'flex-end', padding: '4px 12px 0' }}>
-            <button onClick={onClose} aria-label="닫기" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 40, height: 40, border: 'none', background: 'none', cursor: 'pointer', color: ink, WebkitTapHighlightColor: 'transparent' }}><X size={22} /></button>
-          </div>
           {navGroups(isOperator, true).map((g, gi) => (
-            <div key={gi} style={{ padding: '3px 0' }}>
+            <div key={gi} style={{ padding: '3px 0', borderTop: gi ? `1px solid ${line}` : 'none' }}>
               {g.title && <div style={{ fontSize: 11.5, color: weak, fontWeight: 700, padding: '9px 20px 3px', letterSpacing: '0.02em' }}>{g.title}</div>}
               {g.items.map((it) => (
                 <Link key={it.href} href={it.href} onClick={() => { haptic.nav(); onClose(); }}
@@ -84,7 +86,6 @@ function MobileMenu({ open, onClose }: { open: boolean; onClose: () => void }) {
               ))}
             </div>
           ))}
-          {/* 배포 버전 — 메뉴 하단(erp4식). */}
           <div style={{ borderTop: `1px solid ${line}`, margin: '4px 20px 0', padding: '12px 0 4px', fontSize: 12, color: weak, fontFamily: 'var(--font-mono)', letterSpacing: '0.02em' }}>
             {OPERATOR_BRAND} · v{APP_VERSION}
           </div>
@@ -102,25 +103,20 @@ export default function TopBar() {
   const pathname = usePathname();
   const router = useRouter();
   const [menuOpen, setMenuOpen] = useState(false);
-  // 모바일 크롬 SSOT — 허브=메뉴·탭 / 뎁스=상단←만(하단 이전 중복 금지).
+  // 모바일 크롬 SSOT — 허브=메뉴·탭 / 뎁스=상단 제목(ERP4 TopBar) · 하단 이전+액션(탭 숨김).
   const depth = !!slots.depth;
   const showBottom = !!(slots.back || slots.actions);
   const showActionBar = !!(slots.back || slots.actions || slots.depth);   // 모바일 하단 액션바(이전+주액션)
   useEffect(() => { setMenuOpen(false); }, [pathname]);
-  // 상단 앱바 제거 → 메뉴 토글은 툴바 햄버거가 쏘는 이벤트로. (모바일 전용)
   useEffect(() => {
-    const on = () => setMenuOpen((o) => !o);
-    window.addEventListener('jpk:toggle-menu', on);
-    return () => window.removeEventListener('jpk:toggle-menu', on);
-  }, []);
-  useEffect(() => {
-    // 모바일 하단 도크: 뎁스=액션바 1개(있으면) · 허브=탭바(+액션 있으면 2개). 콘텐츠 마지막 줄 가림 방지.
+    // 모바일: 상단 TopBar 항상(ERP4) · 하단 도크=탭/액션.
+    document.body.style.paddingTop = mobile ? 'var(--fp-bar-h)' : '';
     document.body.style.paddingBottom = mobile
       ? (depth
           ? (showActionBar ? 'calc(var(--fp-bar-h) + env(safe-area-inset-bottom))' : 'env(safe-area-inset-bottom)')
           : (showActionBar ? 'calc(2 * var(--fp-bar-h) + env(safe-area-inset-bottom))' : 'calc(var(--fp-bar-h) + env(safe-area-inset-bottom))'))
-      : (showBottom ? '54px' : '');
-    return () => { document.body.style.paddingBottom = ''; };
+      : (showBottom ? 'calc(var(--fp-bar-h) + 8px)' : '');
+    return () => { document.body.style.paddingTop = ''; document.body.style.paddingBottom = ''; };
   }, [showBottom, showActionBar, mobile, depth]);
   const [todayLabel, setTodayLabel] = useState('');
   useEffect(() => { const n = new Date(); setTodayLabel(`${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}-${String(n.getDate()).padStart(2, '0')} (${['일', '월', '화', '수', '목', '금', '토'][n.getDay()]})`); }, []);
@@ -132,10 +128,64 @@ export default function TopBar() {
   if (pathname === '/m' || pathname.startsWith('/m/')) return null;
 
   if (mobile) {
-    // 모바일 = 상단 앱바 «없음»(갈아엎기). 페이지 최상단 = 툴바(WorkbenchBar→MobileToolbar, 햄버거 포함).
-    //   이동=하단 탭바(허브) · 이전+주액션=하단 액션바(뎁스) · 메뉴=툴바 햄버거→jpk:toggle-menu.
+    // ERP4: 메뉴 열림 → 상태창이「☰ 메뉴」로 바뀌고 우측 X · 패널은 bar 아래 펼침.
+    const status = slots.title ?? OPERATOR_BRAND;
+    const mh = ctrlH(true);
+    const menuLabel = (
+      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 15, fontWeight: 800, color: ink, letterSpacing: '-0.01em' }}>
+        <Menu size={20} strokeWidth={2.4} /> 메뉴
+      </span>
+    );
     return (
       <>
+        <header style={{
+          position: 'fixed', top: 0, left: 0, right: 0, zIndex: 80,
+          height: 'var(--fp-bar-h)', boxSizing: 'border-box',
+          display: 'flex', alignItems: 'center', gap: 8,
+          padding: '0 10px 0 var(--fp-bar-pad-x, 14px)',
+          background: C.taupeBg, borderBottom: `1px solid ${line}`,
+        }}>
+          <div
+            role="button"
+            tabIndex={0}
+            aria-label={menuOpen ? '메뉴 닫기' : '페이지'}
+            onClick={() => {
+              if (menuOpen) { haptic.tap(); setMenuOpen(false); return; }
+            }}
+            onKeyDown={(e) => {
+              if (!menuOpen) return;
+              if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setMenuOpen(false); }
+            }}
+            style={{
+              flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 8,
+              cursor: menuOpen ? 'pointer' : 'default',
+              WebkitTapHighlightColor: 'transparent',
+            }}
+          >
+            {!menuOpen && slots.left != null && <span style={{ flex: '0 0 auto' }}>{slots.left}</span>}
+            <div style={{
+              flex: 1, minWidth: 0,
+              ...(menuOpen ? {} : {
+                fontSize: 15, fontWeight: 800, color: ink,
+                letterSpacing: '-0.01em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+              }),
+            }}>{menuOpen ? menuLabel : status}</div>
+          </div>
+          <button
+            type="button"
+            aria-label={menuOpen ? '메뉴 닫기' : '메뉴'}
+            aria-expanded={menuOpen}
+            onClick={() => { haptic.tap(); setMenuOpen((o) => !o); }}
+            style={{
+              display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+              width: mh, height: mh, marginRight: -6, flexShrink: 0,
+              border: 'none', background: 'none', color: ink, cursor: 'pointer',
+              WebkitTapHighlightColor: 'transparent',
+            }}
+          >
+            {menuOpen ? <X size={24} /> : <Menu size={23} />}
+          </button>
+        </header>
         {!depth && <MobileTabBar />}
         <MobileActionBar />
         <MobileMenu open={menuOpen} onClose={() => setMenuOpen(false)} />

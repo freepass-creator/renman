@@ -96,7 +96,7 @@ export default function Home() {
   return (
     <FacetPage
       title="홈"
-      left={
+      tools={
         <WorkbenchBar
           company
           search

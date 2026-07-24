@@ -1,10 +1,10 @@
 'use client';
 /**
  * 셸 툴바 SSOT — 탭·기간·검색·필터·요약·액션 자리·순서 고정.
- *   모바일 1행 = [회사(전체)] [검색] [필터] — 한 줄·공간 효율. 빠른필터 칩바 없음.
+ *   모바일 = ERP4: TopBar(제목·메뉴) + PageToolBar 균등 [검색|필터|보기|회사] → 시트.
  *
  * Desktop: [tabs?][subTabs?][mid?] ──spacer── [search?][stat?][actions?]
- * Mobile:  1행 [회사][search?][필터?] / 2행 [tabs·sub·mid] / 3행 [stat·actions]
+ * Mobile:  PageToolBar · tabs · stat/actions
  *
  * search (기본=true · 공통 점프 검색 — 페이지가 빼려면 false):
  *   true/생략 = 점프 SearchBox(차량 360·/search)
@@ -12,33 +12,59 @@
  *   false = 검색 슬롯 숨김(예외)
  */
 import React from 'react';
-import { Menu, Search } from 'lucide-react';
+import { Search, SlidersHorizontal, Building2, LayoutGrid, Check } from 'lucide-react';
 import { useIsMobile } from '@/lib/use-mobile';
-// ui 배럴(index)은 layout→이 파일을 간접 소비 — 배럴로 끌어오면 순환. tokens/controls만 직수입.
-import { SPACE_M, SPACE_GROUP_M } from '@/components/ui/tokens';
-import { CompanyFilter, PillTabs } from '@/components/ui/controls';
+import { useSession } from '@/lib/session';
+import { haptic } from '@/lib/haptics';
+import { SPACE_M, C } from '@/components/ui/tokens';
+import { PillTabs } from '@/components/ui/controls';
 import { SearchBox, FilterBox } from '@/components/SearchBox';
 import { FacetFilterBtn } from '@/components/FacetRail';
-import { MobileToolbar } from '@/components/ui/mobile-toolbar';   // 직접경로 — ui 배럴은 layout→WorkbenchBar 순환
-import { BottomSheet } from '@/components/ui/bottom-sheet';       // 검색 시트(모바일 아이콘툴)
-import { useFacetFilterApi } from '@/lib/facet-filter-ctx';
+import { MobileToolbar } from '@/components/ui/mobile-toolbar';
+import type { PageToolItem } from '@/components/ui/page-toolbar';
+import { BottomSheet } from '@/components/ui/bottom-sheet';
+import { useFacetFilterApi, useFacetFilterOpen } from '@/lib/facet-filter-ctx';
+import { ALL_COMPANIES, COMPANIES, companyLabel } from '@/lib/companies';
 
 export type WorkbenchTab<T extends string = string> = { key: T; label: React.ReactNode; title?: string; badge?: number };
 export type WorkbenchSearch = boolean | { value: string; onChange: (q: string) => void; placeholder?: string };
+
+type SheetKind = 'search' | 'company' | 'view' | null;
 
 function SearchSlot({ search }: { search: Exclude<WorkbenchSearch, false> }) {
   if (search === true) return <SearchBox />;
   return <FilterBox value={search.value} onChange={search.onChange} placeholder={search.placeholder} />;
 }
 
-/** 모바일 검색 아이콘 툴(erp4식) — 탭하면 검색 바텀시트. 값 있으면 점 표시, 시트 열림=brand 채움. */
-function SearchToolBtn({ open, active, onClick }: { open: boolean; active: boolean; onClick: () => void }) {
+function CompanySheetBody({ onDone }: { onDone: () => void }) {
+  const { companyId, setCompanyId, isOperator } = useSession();
+  if (!isOperator) {
+    return <div style={{ fontSize: 15, fontWeight: 700, color: C.ink, padding: '8px 4px' }}>{companyLabel(companyId)}</div>;
+  }
+  const options = [ALL_COMPANIES, ...COMPANIES];
   return (
-    <button type="button" aria-label="검색" aria-pressed={open} onClick={onClick}
-      style={{ position: 'relative', flexShrink: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 40, height: 40, boxSizing: 'border-box', padding: 0, borderRadius: 'var(--radius)', cursor: 'pointer', WebkitTapHighlightColor: 'transparent', border: `1px solid ${open ? 'var(--brand)' : 'var(--border)'}`, background: open ? 'var(--brand)' : 'var(--bg-card)', color: open ? '#fff' : (active ? 'var(--brand)' : 'var(--text-sub)') }}>
-      <Search size={18} strokeWidth={2.2} />
-      {active && !open && <span style={{ position: 'absolute', top: 5, right: 5, width: 6, height: 6, borderRadius: 999, background: 'var(--brand)' }} />}
-    </button>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+      {options.map((c) => {
+        const on = companyId === c;
+        return (
+          <button
+            key={c}
+            type="button"
+            onClick={() => { haptic.tap(); setCompanyId(c); onDone(); }}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 10, width: '100%', minHeight: 48,
+              padding: '12px 4px', border: 'none', background: 'none', cursor: 'pointer', textAlign: 'left',
+              borderBottom: `1px solid ${C.line}`, WebkitTapHighlightColor: 'transparent',
+            }}
+          >
+            <span style={{ width: 18, flexShrink: 0 }}>{on ? <Check size={16} color={C.accent} /> : null}</span>
+            <span style={{ fontSize: 16, fontWeight: on ? 800 : 600, color: C.ink }}>
+              {c === ALL_COMPANIES ? '전체 (모든 회사)' : companyLabel(c)}
+            </span>
+          </button>
+        );
+      })}
+    </div>
   );
 }
 
@@ -57,7 +83,7 @@ export function WorkbenchBar<T extends string = string>({
   stat,
   actions,
 }: {
-  /** @deprecated 모바일은 WorkbenchBar가 회사필터를 1행에 둠. 데스크톱은 Page 헤더. */
+  /** @deprecated 모바일은 PageToolBar «회사» 툴. 데스크톱은 Page 헤더. */
   company?: boolean;
   tabs?: WorkbenchTab<T>[];
   tab?: T;
@@ -69,29 +95,33 @@ export function WorkbenchBar<T extends string = string>({
   mid?: React.ReactNode;
   /** 기본 true(점프 검색). 목록 필터는 객체. 숨기려면 false. */
   search?: WorkbenchSearch;
-  /** 보기 모드 전환(IconSeg) — 자리는 «검색창 바로 오른쪽» 고정. 페이지마다 다른 데 두지 말 것. */
+  /** 보기 모드 전환(IconSeg) — 모바일=«보기» 툴→시트. 웹=검색 오른쪽. */
   view?: React.ReactNode;
   stat?: React.ReactNode;
   actions?: React.ReactNode;
 }) {
   const mobile = useIsMobile();
-  const [searchOpen, setSearchOpen] = React.useState(false);
+  const { companyId, isOperator } = useSession();
+  const [sheet, setSheet] = React.useState<SheetKind>(null);
+  const facetApi = useFacetFilterApi();
+  const { open: filterOpen, setOpen: setFilterOpen } = useFacetFilterOpen();
   const resolved: Exclude<WorkbenchSearch, false> | null =
     search === false ? null : (search === true || search == null ? true : search);
   const hasSearch = resolved != null;
-  const hasFacet = !!useFacetFilterApi()?.groups.length;
+  const hasFacet = !!facetApi?.groups.length;
+  const toggleSheet = (k: Exclude<SheetKind, null>) => setSheet((s) => (s === k ? null : k));
+
   const tabRow = (
     <>
-      {/* 모바일 렌즈(일정·미결·리스크)=lg 터치. sm 강제 금지(웹 축소). */}
-      {tabs && tab != null && onTab && <PillTabs tabs={tabs} value={tab} onChange={onTab} size={mobile ? 'lg' : tabSize} />}
-      {subTabs && subTab != null && onSubTab && <PillTabs tabs={subTabs} value={subTab} onChange={onSubTab} size={mobile ? 'lg' : 'sm'} />}
+      {tabs && tab != null && onTab && <PillTabs tabs={tabs} value={tab} onChange={onTab} size={tabSize} />}
+      {subTabs && subTab != null && onSubTab && <PillTabs tabs={subTabs} value={subTab} onChange={onSubTab} size="sm" />}
       {mid}
     </>
   );
   const trail = (
     <>
       {hasSearch && <SearchSlot search={resolved!} />}
-      {hasFacet && <FacetFilterBtn />}{/* 검색창 옆 필터 버튼(erp4식) — 좌측 레일 폐지 */}
+      {hasFacet && <FacetFilterBtn />}
       {view}
       {stat}
       {actions}
@@ -99,24 +129,77 @@ export function WorkbenchBar<T extends string = string>({
   );
 
   if (mobile) {
-    // 모바일 = MobileToolbar 원자로 조립(웹 WorkbenchBar 구조를 얹지 않음). 회사필터는 여기서 1개 렌더(Page는 shellOwnsCompany로 숨김).
     const searchActive = !!(resolved && resolved !== true && resolved.value.trim());
+    const VIEW_SCOPE = ['보유', '전체', '매각'];
+    const filterN = facetApi
+      ? [...facetApi.facets].filter((f) => !VIEW_SCOPE.includes(f)).length
+      : 0;
+    const companyOn = isOperator && companyId !== ALL_COMPANIES;
+    const tools: PageToolItem[] = [];
+    if (hasSearch) {
+      tools.push({
+        key: 'search', label: '검색', icon: Search,
+        badge: searchActive ? 1 : undefined, active: searchActive, pressed: sheet === 'search',
+        onClick: () => { setFilterOpen(false); toggleSheet('search'); },
+      });
+    }
+    if (hasFacet) {
+      tools.push({
+        key: 'filter', label: '필터', icon: SlidersHorizontal,
+        badge: filterN || undefined, badgeTone: 'accent',
+        active: filterN > 0, pressed: filterOpen,
+        onClick: () => { setSheet(null); setFilterOpen((o) => !o); },
+      });
+    }
+    if (view != null) {
+      tools.push({
+        key: 'view', label: '보기', icon: LayoutGrid,
+        pressed: sheet === 'view',
+        onClick: () => { setFilterOpen(false); toggleSheet('view'); },
+      });
+    }
+    tools.push({
+      key: 'company', label: '회사', icon: Building2,
+      active: companyOn, pressed: sheet === 'company',
+      badge: companyOn ? 1 : undefined,
+      onClick: () => { setFilterOpen(false); toggleSheet('company'); },
+    });
+
     return (
       <>
         <MobileToolbar
-          company={<CompanyFilter />}
-          search={hasSearch ? <SearchToolBtn open={searchOpen} active={searchActive} onClick={() => setSearchOpen((o) => !o)} /> : undefined}
-          view={view}
-          filter={hasFacet ? <FacetFilterBtn /> : undefined}
-          menu={<button type="button" aria-label="메뉴" onClick={() => window.dispatchEvent(new Event('jpk:toggle-menu'))}
-            style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 40, height: 40, flexShrink: 0, border: 'none', background: 'none', cursor: 'pointer', color: 'var(--text-main)', WebkitTapHighlightColor: 'transparent' }}><Menu size={22} /></button>}
+          tools={tools}
           tabs={(tabs || subTabs || mid) ? tabRow : undefined}
           stat={stat}
           actions={actions}
         />
         {hasSearch && (
-          <BottomSheet open={searchOpen} onClose={() => setSearchOpen(false)} title="검색">
-            <SearchSlot search={resolved!} />
+          <BottomSheet
+            open={sheet === 'search'}
+            onClose={() => setSheet(null)}
+            title="검색"
+            maxHeight="auto"
+            pad={false}
+            footer="std"
+            clearLabel="지우기"
+            closeLabel="닫기"
+            onClear={
+              resolved && resolved !== true
+                ? () => { resolved.onChange(''); haptic.select(); }
+                : undefined
+            }
+          >
+            <div style={{ padding: '4px 16px 8px' }}>
+              <SearchSlot search={resolved!} />
+            </div>
+          </BottomSheet>
+        )}
+        <BottomSheet open={sheet === 'company'} onClose={() => setSheet(null)} title="회사 선택" footer="std" closeLabel="닫기">
+          <CompanySheetBody onDone={() => setSheet(null)} />
+        </BottomSheet>
+        {view != null && (
+          <BottomSheet open={sheet === 'view'} onClose={() => setSheet(null)} title="보기" footer="std" closeLabel="닫기" maxHeight="auto">
+            <div style={{ display: 'flex', justifyContent: 'center', padding: `${SPACE_M}px 0` }}>{view}</div>
           </BottomSheet>
         )}
       </>

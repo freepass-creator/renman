@@ -93,10 +93,10 @@
   --button-height: 32px;
   --cell-padding:  6px 8px;
   --sidebar-w:     172px;
-  --topbar-h:      48px;
+  --topbar-h:      56px; /* = --fp-bar-h (모바일 TopBar·툴바 정합) */
   --bottombar-h:   42px;
-  /* 모바일 바 높이 SSOT — 상단바·페이지툴바·하단탭 공통(erp4 --fp-bar-h 상당). 값 하나로 전역 정합. */
-  --fp-bar-h:      54px;
+  /* 모바일 바 높이 SSOT — 상단바·페이지툴바·하단탭 공통(= freepass ERP4). md40+pad8×2=56. */
+  --fp-bar-h:      56px;
   --fp-bar-pad-x:  14px;  /* 모바일 바(상단·하단액션) 좌우 패딩 */
   --fp-tabbar-h:   0px;   /* 하단 탭바 표시 시 세팅 → 콘텐츠 도크 정렬 */
   --fp-dock-safe:  env(safe-area-inset-bottom, 0px);
@@ -910,6 +910,56 @@ input[type="radio"]:disabled {
   /* 모바일 가로스크롤 가드 — 삐져나오는 요소가 있어도 뷰포트 넘는 좌우 스크롤 금지. 우측 스크롤바 여백(gutter)도 해제. */
   html, body { overflow-x: hidden; max-width: 100%; }
   html { scrollbar-gutter: auto; }
+
+  /* 페이지 툴바 SSOT (= freepass ERP4) — 아이콘+라벨 균등 행. 시트는 바닥.
+     sticky 헤더가 이미 풀블리드(bleed) — 추가 음수마진 금지. */
+  .fp-page-toolbar.is-page-tools {
+    display: flex; flex-direction: column; align-items: stretch; gap: 0;
+    height: auto; min-height: var(--fp-bar-h);
+    padding: 0; overflow: visible; width: 100%;
+    background: var(--bg-card);
+    border-bottom: 1px solid var(--border);
+    box-sizing: border-box;
+  }
+  .fp-page-tool-row {
+    display: flex; align-items: stretch;
+    height: var(--fp-bar-h); min-height: var(--fp-bar-h);
+    padding: 0 4px;
+    box-sizing: border-box;
+  }
+  .fp-page-tool {
+    position: relative;
+    flex: 1 1 0; min-width: 0;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 2px;
+    border: none; background: none; cursor: pointer;
+    color: var(--text-sub); font-weight: 600; font-size: 11px; line-height: 1.1;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .fp-page-tool[aria-pressed="true"],
+  .fp-page-tool[data-active="1"] {
+    color: var(--brand); font-weight: 700;
+  }
+  .fp-page-tool-badge {
+    position: absolute; top: 4px; right: max(4px, 10%);
+    pointer-events: none;
+    transform: scale(1.05);
+  }
+  .fp-page-tool-hints {
+    display: flex; align-items: center; gap: 8px;
+    min-height: 32px; padding: 4px 12px 8px;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg-selected);
+    box-sizing: border-box;
+  }
+  .fp-page-tool-hints-label {
+    flex: 0 0 auto; font-size: 11px; font-weight: 700; color: var(--brand);
+  }
+  .fp-page-tool-hints-text {
+    flex: 1 1 0; min-width: 0;
+    font-size: 12px; font-weight: 600; color: var(--text-main);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
 }
 
 .dialog-header {

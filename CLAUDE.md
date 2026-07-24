@@ -88,8 +88,8 @@
 
 | 화면 | 상단 | 하단 | 비고 |
 |---|---|---|---|
-| **허브** (홈·메뉴·탭 진입 목록) | 메뉴 · 제목 · 이름 | 탭바 · (Facet면) 1행 `[전체][검색][필터]` | 홈과 동일. `back` 붙이지 말 것 |
-| **뎁스** (`DetailShell` depth) | ← · 제목 · 액션 | 없음(탭 숨김) | 차량360·손님360·엔티티상세만 |
+| **허브** (홈·메뉴·탭 진입 목록) | TopBar(제목·메뉴) · PageToolBar | 탭바 · (Facet면) 필터시트 | ERP4와 동일 골격 |
+| **뎁스** (`DetailShell` depth) | TopBar(제목·메뉴) | 이전 + 액션(탭 숨김) | 차량360·손님360·엔티티상세 |
 | **오버레이** (`DetailShell fixed`) | 제목만 | 이전 + 액션 | SessionBar 밖, 하단 1곳 |
 
 새 화면은 위 표만 따른다. 메뉴로 가는 허브에 `back={router.back}` 금지. 페이지에 이전/홈/탭을 손롤하지 말 것.
@@ -98,8 +98,8 @@
 - 웹: **md=32** · **sm=28**. 모바일: **md=40** · **sm=36**. 칩=웹28 / 모바일40 (`ctrlChipH`).
 - 헬퍼: `ctrlH` · `ctrlFs` · `ctrlInputFs` · `ctrlChipH` (`components/ui/tokens`). 모바일 입력·버튼 폰트 **16**(iOS 줌 방지).
 - 현장 CTA만 `Btn lg`/`toggleStyle lg`=48 유지.
-- 셸 툴바는 **`WorkbenchBar` 하나**. 모바일 1행 = `[회사][검색][필터]`.
-- **목록 보기 = 카드 하나.** `ObjCard` 웹=56 · 모바일=min 72.
+- 셸 툴바는 **`WorkbenchBar` 하나**. 모바일 = **TopBar**(제목·메뉴) + **PageToolBar**(검색·필터·보기·회사 균등 행→시트).
+- **목록 보기 = 카드 하나.** `ObjCard` 웹·모바일=**56**(= freepass ERP4).
 
 **금지 데코:** 타이틀 밑줄(`borderBottom`) · 박스 그룹(Panel/StatBar 테두리) · 가로/세로 데코선. 카드 1px 테두리·테이블 행선은 **원자라 유지**. 색·치수는 토큰(`C.*`, `var(--radius)`)만, 하드코딩 금지.
 

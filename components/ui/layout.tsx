@@ -23,43 +23,47 @@ export function Page({ title, meta, left, mid, right, tools, children, fill, fra
   const mobile = useIsMobile();
   const frameMode = !!frame && !mobile;
   const hasTitle = title != null && title !== '';
-  // 모바일: 제목을 상단바 헤더로. 웹: 제목은 본문 헤더행 h1(통상 ERP — 제목이 그 페이지 툴바와 한 덩어리).
+  // 모바일: 제목→TopBar 상태창(ERP4). 웹: 본문 h1.
   useAppBar(
-    back || (mobile && hasTitle) ? { ...(back ? { back } : {}), ...(mobile && hasTitle ? { title } : {}) } : null,
+    mobile && hasTitle
+      ? { ...(back ? { back } : {}), title }
+      : (back ? { back } : null),
     [mobile, back, typeof title === 'string' ? title : 0],
   );
-  // 모바일: meta는 상단바에 제목만 — 본문 헤더에 붙이면 회사필터/툴바 옆에 쌩뚱맞게 붙음.
+  // 모바일: 회사=PageToolBar «회사» 툴(시트). meta/회사칩을 본문 헤더에 붙이지 않음.
   const shellOwnsCompany = mobile && (tools != null || left != null);
   const showMeta = meta != null && !mobile;
+  const mobileChrome = mobile && shellOwnsCompany; // TopBar + PageToolBar 2단
   return (
     <main style={{
       // frame(엑셀 시트)=전폭·뷰포트 꽉 채워 자체 스크롤(헤더 틀고정)·페이지 스크롤 없음.
       // 그 외(카드·문서)=1680 캡+가운데 — 가로형 카드가 뷰포트 전체로 늘어나 «표»처럼 보이지 않게.
-      padding: mobile ? PAGE_PAD_M : (frameMode ? '16px 24px 20px' : '16px 24px 60px'),
+      // 모바일 2단 크롬: body paddingTop=TopBar · 본문 padTop 0 → 툴바가 상단바 바로 아래(ERP4).
+      padding: mobileChrome ? '0 14px 48px' : (mobile ? PAGE_PAD_M : (frameMode ? '16px 24px 20px' : '16px 24px 60px')),
       ...(frameMode
-        ? { flex: 1, minWidth: 0, height: 'calc(100vh - 49px)', overflow: 'hidden', display: 'flex', flexDirection: 'column' }
+        ? { flex: 1, minWidth: 0, height: 'calc(100vh - var(--fp-bar-h))', overflow: 'hidden', display: 'flex', flexDirection: 'column' }
         : fill
           ? { flex: 1, minWidth: 0, maxWidth: 1680, margin: '0 auto', width: '100%' }
           : { maxWidth: 1680, margin: '0 auto' }),
     }}>
-      {/* 모바일: 툴바(tools=WorkbenchBar)를 상단바 바로 아래 sticky 고정 — 스크롤에 안 사라짐(P0④).
-          main 패딩(12/14)을 음수마진으로 bleed해 전폭 배경, 콘텐츠는 그 아래로 스크롤. */}
-      <div style={{ display: 'flex', flexWrap: mobile ? 'nowrap' : 'wrap', alignItems: 'center', gap: mobile ? SPACE_M : 10, minHeight: mobile ? 0 : 36, flexShrink: 0,
-        ...(mobile
-          ? ((tools != null || left != null)
-              ? { position: 'sticky' as const, top: 0, zIndex: 20, background: 'var(--bg-page)', margin: '-12px -14px 0', padding: '10px 14px 8px', borderBottom: `1px solid ${C.line}` }
-              : { paddingBottom: PAGE_HEAD_PB_M })
-          : { paddingBottom: 14 }),
+      {/* 모바일: TopBar(fixed) 바로 아래 PageToolBar sticky — 두 줄이 한 크롬(ERP4).
+          좌우만 bleed. 상단 음수마진 금지(상단바와 겹침). */}
+      <div style={{ display: 'flex', flexWrap: mobile ? 'nowrap' : 'wrap', alignItems: mobileChrome ? 'stretch' : 'center', gap: mobile ? SPACE_M : 10, minHeight: mobile ? 0 : 36, flexShrink: 0,
+        ...(mobileChrome
+          ? { position: 'sticky' as const, top: 'var(--fp-bar-h)', zIndex: 20, background: 'var(--bg-page)', margin: '0 -14px', padding: 0, borderBottom: 'none', width: 'calc(100% + 28px)', boxSizing: 'border-box' as const }
+          : mobile
+            ? { paddingBottom: PAGE_HEAD_PB_M }
+            : { paddingBottom: 14 }),
       }}>
         {!mobile && hasTitle && <h1 style={{ fontSize: 18, fontWeight: 800, letterSpacing: '-0.02em', margin: 0, flexShrink: 0 }}>{title}</h1>}
         {!shellOwnsCompany && !noCompany && <CompanyFilter />}
         {left != null ? (
-          <div style={{ flex: 1, minWidth: 0 }}>{left}</div>
+          <div style={{ flex: 1, minWidth: 0, width: '100%' }}>{left}</div>
         ) : (
-          <div style={{ display: 'flex', alignItems: 'center', gap: mobile ? SPACE_M : 10, minWidth: 0, flexWrap: mobile ? 'nowrap' : 'wrap', flex: 1 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: mobile ? SPACE_M : 10, minWidth: 0, flexWrap: mobile ? 'nowrap' : 'wrap', flex: 1, width: mobileChrome ? '100%' : undefined }}>
             {showMeta ? <span style={{ fontSize: 12.5, color: C.faint, whiteSpace: 'nowrap', flexShrink: 0 }}>{meta}</span> : null}
             {mid}
-            {tools != null && <div style={{ flex: 1, minWidth: 0 }}>{tools}</div>}
+            {tools != null && <div style={{ flex: 1, minWidth: 0, width: mobileChrome ? '100%' : undefined }}>{tools}</div>}
           </div>
         )}
         {right != null && <><span style={{ flex: tools != null ? 0 : 1, minWidth: tools != null ? 0 : 8 }} />{right}</>}
@@ -89,7 +93,7 @@ export function FacetPage({ title, meta, left, mid, right, tools, rail, frame, b
   return (
     <FacetFilterProvider>
       {mobile || !usesRail ? page : (
-        <div style={{ display: 'flex', alignItems: 'stretch', minHeight: 'calc(100vh - 49px)' }}>
+        <div style={{ display: 'flex', alignItems: 'stretch', minHeight: 'calc(100vh - var(--fp-bar-h))' }}>
           {/* 데스크톱: 좌측 인-플로우 열(닫히면 null→전폭). 로딩중(rail=null)엔 200px 자리를 잡아 완료 시 흔들림 방지
               — open은 마운트마다 true로 시작하므로 로딩 자리(200)와 완료 레일(200)이 일치 = shift 0. */}
           {hasRail ? rail : <div aria-hidden style={{ flex: '0 0 200px', borderRight: '1px solid var(--border)', background: 'var(--bg-card)' }} />}
@@ -203,7 +207,7 @@ export function HiddenSecs() {
 
 /**
  * 세부 진입 통일 껍데기.
- *   라우트 뎁스(차량·손님): SessionBar 상단 ←·제목·액션 / 하단 없음(탭 숨김). depth=true.
+ *   라우트 뎁스(차량·손님): SessionBar 상단 제목 · 하단 이전+액션 / 탭 숨김. depth=true.
  *   fixed 오버레이: SessionBar 밖 → 모바일은 하단만 이전+액션(상단 이전 중복 X).
  */
 export function DetailShell({ title, meta, onBack, actions, fixed, maxWidth = 1000, children }: { title?: React.ReactNode; meta?: React.ReactNode; onBack?: () => void; actions?: React.ReactNode; fixed?: boolean; maxWidth?: number; children: React.ReactNode }) {
