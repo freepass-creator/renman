@@ -1,0 +1,42 @@
+---
+description: renman 리디자인 — PageDef 공용화 · ObjRow 목록화 · /m 5탭 · 지켜야 할 것 (진행 중)
+alwaysApply: true
+---
+
+# renman 리디자인 — 지켜야 할 것 (진행 중, 브랜치 redesign/pagedef-p0)
+
+옛 반응형 UI를 «1 정의 2 렌더러» 구조로 갈아엎는 중. **껍데기만** 바꾼다 — 도메인 로직·데이터는 불변.
+
+## ⛔ 절대 규칙
+- **`npm run build` 금지** (dev 서버 6006 상시). 검증 = `npx tsc --noEmit` + `curl -s -o /dev/null -w "%{http_code}" http://localhost:6006/<path>`(=200).
+- **도메인 불변**: `lib/domain/*`·`lib/contract-ops`·selector·`lib/sheet-rows`의 계산부 접촉 금지. 재빌드·페이지 도메인 재작성 금지.
+- **토큰 SSOT만**: `components/ui/tokens.tsx`의 `C·CTRL·SPACE_M(12)·SPACE_GROUP_M(20)·R·NUM·METRIC_FS`. px·hex·rgba 하드코딩 금지(SCRIM 예외).
+- 커밋: `git -c user.name=dudguq -c user.email=dudguq@gmail.com commit --author="dudguq <dudguq@gmail.com>"` + `Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>`. push는 지시 있을 때만. 변경=작은 커밋 1개(되돌림 단위). 롤백 앵커 태그 `pre-redesign`.
+
+## 📐 기준
+- **디자인 목표 = `app/dev/sample/page.tsx`(`/dev/sample`)** — 확정된 예쁜 웹 룩. 실제 페이지를 여기에 맞춘다.
+- **규격 문서**: 세션 스크래치패드 `renman-redesign-spec.md`(원자·조립·이행 통합). 없으면 이 파일 규칙이 최소 기준.
+
+## 🧱 아키텍처 불변
+- **«1 정의 2 렌더러»**: 페이지 = `PageDef`(`lib/pagedef/defs/*`) 선언 → `components/pagedef/WebPage.tsx`(웹) / `MobilePage.tsx`(모바일)가 소비. 라우트 파일은 위임 1줄. 표준 예시 = `/sheet`=`FLEET_DEF`.
+- **목록 = `ObjRow`+`Rows`**(`components/ui/obj-row.tsx`): 행마다 border/radius/shadow 금지(테두리는 `Rows` 컨테이너 전유), 레일 3px, **행 안 버튼·input 금지**(bulk 선택 체크박스만). 카드(`ObjCard`)는 리치·소수(≤10)만.
+- **레일색·정렬 SSOT = `lib/sheet-rows.ts`의 `statusRank`·`fleetRail`** 하나만. `RailTone`(7톤: none·brand·danger·violet·warn·ok·mute)은 `components/ui/misc.tsx` SSOT.
+- **데이터형태 → 원자 1:1**: 집계=Metric · 라벨값=KV · 훑는목록=ObjRow · 다열표=ExcelSheet · 태그=Badge · 구획=Sec. 대안 금지.
+- 상태 레일 정렬순: 인도예정(brand,0)>만기경과(danger,1)>휴차(violet,2)>마감임박 dday≤30(warn,3)>운행중(ok,4)>정비(5)>처분예정(7)>처분완료(8). 미수(net>0)는 레일 아님 → 우측 금액색 danger.
+
+## 📱 모바일 `/m`
+- **하단 5탭이 전부**(홈·운영·리스크·입력·설정). **햄버거 없음.** 셸 = `components/m/{MTabBar,MHead,MBackBar}`. 상단 = MHead(제목+3px 탭색), 이동 = 탭.
+- `SessionBar`는 `/m`·`/dev/preview`에서 `null`(웹 크롬 숨김) — 유지.
+- 드릴인: 모바일 = `/m/vehicle/[plate]`(Vehicle360 재사용), 웹 = `openCar`. def의 `mDrill`(모바일)·`drill`(웹) 분리.
+- 탭루트 = MTabBar / 스택(vehicle·q·biz·entry/*) = MBackBar (`app/m/layout.tsx`).
+
+## ▶ 다음 순서
+1. `/dev/sample` 디자인(큰 상태바 · 기간=제목옆 · 색점 그리드)을 **`WebPage`(E-grid)에 반영** → `/sheet` 자동 반영.
+2. **자산현황**(순수 그리드, 안전) → 재무 → **계약현황은 신중히**.
+3. P3: 구 반응형 크램 제거(`MobileTabBar`/`MobileActionBar`/`MobileToolbar`·ExcelSheet 카드 폴백).
+
+## ⚠ 하지 말 것
+- **계약현황을 단일 그리드로 블라인드 전환 금지** — 손님 뷰·상세 액션(인도·반납·해지·연장·입금·삭제)이 사라짐. 이관 방법 정하고 신중히.
+- 샘플 확정 전 `/sheet` 겉모습 변경 금지.
+- `DataTable`(`table.tsx`) 삭제 금지 — 7곳 사용(계약·부가세·docs·ingest×3·list) 이관 전엔 동결.
+- grouped `Cards`/`CardGroupContext` 삭제 전 모든 사용처 먼저 이관.
