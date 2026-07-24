@@ -45,11 +45,12 @@ export default function Home() {
   // 초기 화면 — 세션당 1회. mydesk→/ops · home→유지. 옛 field→입출고.
   useEffect(() => {
     try {
-      const landing = localStorage.getItem('jpk:landing');
+      const landing = localStorage.getItem('jpk:landing') || '';
       if (sessionStorage.getItem('jpk:landed')) return;
       let to = '';
       if (landing === 'mydesk') to = '/ops';
       else if (landing === 'field') to = '/dispatch?tab=오늘'; // 옛 현장 초기화면
+      else if (landing && landing !== 'home' && landing !== '/' && landing.startsWith('/')) to = landing; // 메뉴 어디든 지정 가능
       if (to) { sessionStorage.setItem('jpk:landed', '1'); router.replace(to); }
     } catch { /* 무시 */ }
     // eslint-disable-next-line react-hooks/exhaustive-deps

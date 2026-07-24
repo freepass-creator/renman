@@ -103,12 +103,13 @@ export function buildContractRows(contracts: ContractNode[]): ContractRow[] {
 export type FleetRow = {
   plate: string; companyId: string; company: string;
   // 자산
-  ownership: string; util: string; status: string; location: string; carName: string; maker: string; subModel: string; year: string; vin: string;
+  ownership: string; util: string; status: string; location: string; carName: string; maker: string; subModel: string; year: string; vin: string; note: string;
   acqDate: string; acqPrice: number; inspectionTo: string; gps: string;
   // 할부
   loanCompany: string; loanPrincipal: number; loanRate: number; loanMonths: number; loanStart: string;
   // 계약(활성)
   customer: string; phone: string; rent: number; deposit: number; termMonths: number; start: string; end: string; dday: number | null;
+  paymentDay: number; paymentTiming: string; roundDue: number; roundTotal: number;
   // 보험
   insurer: string; insEnd: string; insPremium: number;
   // 미수
@@ -152,6 +153,7 @@ export function buildFleetRows(vehicles: VehicleNode[], insurance: EntityRecord[
       subModel: String(veh?.subModel || veh?.modelLine || ''),
       year: String(veh?.firstReg || veh?.yearMonth || '').slice(0, 4),
       vin: String(veh?.vin || ''),
+      note: String(veh?.note ?? veh?.memo ?? ''),
       acqDate: String(veh?.acquisitionDate || ''),
       acqPrice: Number(veh?.acquisitionPrice) || 0,
       inspectionTo: String(veh?.inspectionTo || ''),
@@ -169,6 +171,10 @@ export function buildFleetRows(vehicles: VehicleNode[], insurance: EntityRecord[
       start: String(v?.rec.startDate || v?.rec.deliveredDate || ''),
       end: String(v?.rec.endDate || ''),
       dday: v?.dday ?? null,
+      paymentDay: active ? (Number(v?.rec.paymentDay) >= 1 && Number(v?.rec.paymentDay) <= 31 ? Number(v?.rec.paymentDay) : 25) : 0,
+      paymentTiming: active ? (v?.rec.paymentTiming === '후불' ? '후불' : '선불') : '',
+      roundDue: v?.roundDue ?? 0,
+      roundTotal: v?.roundTotal ?? 0,
       insurer: String(ins?.insurer || ''),
       insEnd: String(ins?.endDate || ''),
       insPremium: Number(ins?.totalPremium) || 0,

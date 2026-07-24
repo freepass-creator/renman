@@ -6,7 +6,7 @@
  * 행 클릭 → 차량360. 금액·상태·미수는 computeContractView/linkFleet 파생(재계산 손롤 금지).
  *   열 문법 = lib/sheet-cols SSOT(FLEET_BASIC_COLS/FLEET_EXPANDED_COLS).
  */
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type CSSProperties } from 'react';
 import { Download } from 'lucide-react';
 import { TODAY, dday } from '@/lib/dashboard-consts';
 import { companyLabel } from '@/lib/companies';
@@ -25,12 +25,16 @@ import { WorkbenchBar } from '@/components/WorkbenchBar';
 
 type View = '기본' | '상세';
 const VIEWS: View[] = ['기본', '상세'];
+// 기간(월) 구간 선택 입력 — 툴바 컨트롤 높이(32) 규격.
+const MONTH_INPUT: CSSProperties = { height: 32, boxSizing: 'border-box', border: '1px solid var(--border)', borderRadius: 7, padding: '0 6px', fontSize: 12, background: 'var(--bg-card)', color: 'inherit', fontFamily: 'inherit' };
 
 export default function SheetPage() {
   const { companyId, scopeAll } = useSession();
   const { data: [vs = [], cs = [], ins = [], hs = []], loading } = useEntityLists(['vehicle', 'contract', 'insurance', 'history']);
   const [q, setQ] = useState('');
   const [view, setView] = useState<View>('기본');
+  const [fromM, setFromM] = useState('');  // 기간뷰 시작월(YYYY-MM, 빈값=무제한)
+  const [toM, setToM] = useState('');      // 기간뷰 종료월
   const [facets, setFacets] = useState<Set<string>>(new Set(['보유'])); // 기본: 보유차량만(단일선택 라디오의 기본 눌린 값)
   // 보유/전체/매각 = 단일선택(라디오) — 하나만. 나머지 칩은 다중 토글.
   const OWN = ['보유', '전체', '매각'];
@@ -71,10 +75,17 @@ export default function SheetPage() {
         || (ct.includes('반납지남') && r.dday != null && r.dday < 0)
         || (ct.includes('계약없음') && !r.customer)
       )) return false;
+      // 기간(월) 구간뷰 — 계약기간[시작,만기]이 [fromM,toM]과 겹치는 차량만(계약 없으면 제외).
+      if (fromM || toM) {
+        const s = r.start.slice(0, 7), e = r.end.slice(0, 7);
+        if (!s) return false;                       // 계약 없음 → 기간뷰 제외
+        if (toM && s > toM) return false;            // 계약 시작이 구간보다 뒤
+        if (fromM && e && e < fromM) return false;   // 계약 만기가 구간보다 앞(만기 없으면 진행중 통과)
+      }
       if (q.trim() && !textMatch(q, r.plate, r.carName, r.customer, r.company, r.status, r.loanCompany, r.insurer, r.phone)) return false;
       return true;
     });
-  }, [allRows, facets, q]);
+  }, [allRows, facets, q, fromM, toM]);
 
   // 칩별 매칭 건수(erp3식 '라벨(N)') — 전체 데이터 정적 집계(교차필터 아님). 필터 술어와 동일 기준.
   const counts = useMemo(() => {
@@ -128,7 +139,17 @@ export default function SheetPage() {
           /* 대수·미수는 탭이 바꾼 결과라 탭 바로 뒤(mid)에 붙여야 읽힌다. */
           mid={<span style={{ fontSize: 12.5, color: C.faint, whiteSpace: 'nowrap' }}>{`${scopeAll ? '전체 회사' : companyLabel(companyId)} · ${shown.length}대${netTotal > 0 ? ` · 미수 ${won(netTotal)}` : ''}`}</span>}
           search={{ value: q, onChange: setQ, placeholder: '차번·차명·계약자·할부사·보험사' }}
-          actions={<Btn variant="ghost" onClick={exportCsv} disabled={!shown.length}><Download size={15} /></Btn>}
+          actions={
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }} title="계약기간이 이 구간과 겹치는 차량만 표시">
+                <input type="month" value={fromM} max={toM || undefined} onChange={(e) => setFromM(e.target.value)} style={MONTH_INPUT} aria-label="기간 시작월" />
+                <span style={{ color: C.faint, fontSize: 12 }}>~</span>
+                <input type="month" value={toM} min={fromM || undefined} onChange={(e) => setToM(e.target.value)} style={MONTH_INPUT} aria-label="기간 종료월" />
+                {(fromM || toM) && <Btn variant="ghost" size="sm" onClick={() => { setFromM(''); setToM(''); }}>전체</Btn>}
+              </span>
+              <Btn variant="ghost" onClick={exportCsv} disabled={!shown.length}><Download size={15} /></Btn>
+            </span>
+          }
         />
       }
       rail={!loading ? <FacetRail lensKey="운영시트" facets={facets} onToggle={toggleFacet} onReset={resetFacets} counts={counts} /> : null}

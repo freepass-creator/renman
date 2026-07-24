@@ -2,7 +2,7 @@
 // 설정 = 통상 앱 설정 스타일(그룹 헤더 + ListBox 행 · 탭하면 펼침).
 import { useEffect, useState, type ReactNode } from 'react';
 import {
-  KeyRound, Download, Home, LayoutDashboard, Trash2, Building2, FileText,
+  KeyRound, Download, Trash2, Building2, FileText,
   ShieldAlert, History, BarChart3, Wrench, Settings2, ChevronRight, ChevronDown,
 } from 'lucide-react';
 import { useSession, roleLabel } from '@/lib/session';
@@ -12,7 +12,8 @@ import { getStore } from '@/lib/store';
 import { ENTITIES } from '@/lib/intake/entities';
 import { downloadCsv } from '@/lib/export-csv';
 import { todayKST } from '@/lib/contracts/dates'; // KST 기준 오늘(내보내기 파일명)
-import { Page, Panel, ListBox, ListRow, Btn, PillTabs, C, SPACE_M, usePrompt } from '@/components/ui';
+import { Page, Panel, ListBox, ListRow, Btn, C, SPACE_M, usePrompt } from '@/components/ui';
+import { NAV_GROUPS } from '@/lib/nav';
 import { WorkbenchBar } from '@/components/WorkbenchBar';
 import { closePeriod, reopenPeriod, useClosedPeriods } from '@/lib/finance/period-lock';
 import { MobileTabsSettings, useMobileTabs } from '@/lib/mobile-tabs';
@@ -41,6 +42,11 @@ const HUB: HubLink[] = [
 function Chevron({ open }: { open?: boolean }) {
   const Icon = open ? ChevronDown : ChevronRight;
   return <Icon size={16} color={C.faint} strokeWidth={2} />;
+}
+
+// 접었다 폈다 하는 행 — 펼침 마크(>/⌄)를 라벨 «좌측»에 둔다(> 초기화면).
+function CollMain({ open, children }: { open: boolean; children: ReactNode }) {
+  return <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}><Chevron open={open} />{children}</span>;
 }
 
 function ExpandPad({ children }: { children: ReactNode }) {
@@ -100,18 +106,17 @@ export default function SettingsPage() {
   const [sending, setSending] = useState(false);
   const [exporting, setExporting] = useState('');
   const [open, setOpen] = useState<OpenKey>(null);
-  const [landing, setLanding] = useState<'home' | 'mydesk'>('home');
+  const [landing, setLanding] = useState<string>('/');  // 초기화면 = 메뉴 어느 href든(홈='/')
   useEffect(() => {
     try {
-      const v = localStorage.getItem('jpk:landing');
-      if (v === 'mydesk') setLanding('mydesk');
-      else {
-        setLanding('home');
-        if (v === 'field') localStorage.setItem('jpk:landing', 'home'); // 옛 현장 초기화면 정리
-      }
+      const v = localStorage.getItem('jpk:landing') || '';
+      if (v === 'mydesk') setLanding('/ops');            // 레거시 키 → href
+      else if (v === 'field') setLanding('/dispatch');
+      else if (!v || v === 'home') setLanding('/');
+      else setLanding(v);
     } catch { /* 무시 */ }
   }, []);
-  const pickLanding = (v: 'home' | 'mydesk') => { setLanding(v); try { localStorage.setItem('jpk:landing', v); sessionStorage.removeItem('jpk:landed'); } catch { /* 무시 */ } };
+  const pickLanding = (href: string) => { setLanding(href); try { localStorage.setItem('jpk:landing', href === '/' ? 'home' : href); sessionStorage.removeItem('jpk:landed'); } catch { /* 무시 */ } };
   const toggle = (k: OpenKey) => setOpen((cur) => (cur === k ? null : k));
 
   async function sendReset() {
@@ -140,7 +145,9 @@ export default function SettingsPage() {
   }
 
   const hub = HUB.filter((h) => !h.hqOnly || isOperator);
-  const landingLabel = landing === 'mydesk' ? '마이페이지' : '홈';
+  // 초기화면 후보 = 햄버거 메뉴 전 항목(권한 필터). 홈 포함.
+  const landingItems = NAV_GROUPS.flatMap((g) => g.items).filter((it) => !it.hqOnly || isOperator);
+  const landingLabel = landingItems.find((it) => it.href === landing)?.label || '홈';
 
   return (
     <Page title="설정" meta={`${user.name} · ${roleLabel(user.role)}`} tools={<WorkbenchBar />}>
@@ -157,34 +164,37 @@ export default function SettingsPage() {
       <Panel title="화면">
         <ListBox>
           <ListRow
-            main="초기 화면"
-            sub="앱을 열 때 처음 보이는 화면"
-            right={<span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><span style={{ fontSize: 12.5, color: C.mute }}>{landingLabel}</span><Chevron open={open === 'landing'} /></span>}
+            main={<CollMain open={open === 'landing'}>초기 화면</CollMain>}
+            sub="앱을 열 때 처음 보이는 화면 — 메뉴 어디든 지정"
+            right={<span style={{ fontSize: 12.5, color: C.mute }}>{landingLabel}</span>}
             onClick={() => toggle('landing')}
           />
           {open === 'landing' && (
             <ExpandPad>
-              <PillTabs
-                tabs={[
-                  { key: 'home', label: <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7 }}><Home size={15} /> 홈</span> },
-                  { key: 'mydesk', label: <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7 }}><LayoutDashboard size={15} /> 마이</span> },
-                ]}
-                value={landing}
-                onChange={(k) => pickLanding(k as 'home' | 'mydesk')}
-              />
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                {landingItems.map((it) => {
+                  const Icon = it.icon;
+                  const on = landing === it.href;
+                  return (
+                    <Btn key={it.href} size="sm" variant={on ? 'solid' : 'ghost'} onClick={() => pickLanding(it.href)}>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><Icon size={14} /> {it.label}</span>
+                    </Btn>
+                  );
+                })}
+              </div>
             </ExpandPad>
           )}
           <ListRow
-            main="마이페이지 섹션"
+            main={<CollMain open={open === 'mydesk'}>마이페이지 섹션</CollMain>}
             sub="내 업무에 담을 섹션"
-            right={<span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><span style={{ fontSize: 12.5, color: C.mute }}>{picked.length}개</span><Chevron open={open === 'mydesk'} /></span>}
+            right={<span style={{ fontSize: 12.5, color: C.mute }}>{picked.length}개</span>}
             onClick={() => toggle('mydesk')}
           />
           {open === 'mydesk' && <ExpandPad><MyDeskSettings /></ExpandPad>}
           <ListRow
-            main="모바일 하단 메뉴"
+            main={<CollMain open={open === 'tabs'}>모바일 하단 메뉴</CollMain>}
             sub="하단 탭 구성"
-            right={<span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><span style={{ fontSize: 12.5, color: C.mute }}>{tabIds.length}개</span><Chevron open={open === 'tabs'} /></span>}
+            right={<span style={{ fontSize: 12.5, color: C.mute }}>{tabIds.length}개</span>}
             onClick={() => toggle('tabs')}
           />
           {open === 'tabs' && <ExpandPad><MobileTabsSettings /></ExpandPad>}
@@ -209,9 +219,8 @@ export default function SettingsPage() {
         <Panel title="회계">
           <ListBox>
             <ListRow
-              main="회계 마감"
+              main={<CollMain open={open === 'closing'}>회계 마감</CollMain>}
               sub="마감월 쓰기 차단"
-              right={<Chevron open={open === 'closing'} />}
               onClick={() => toggle('closing')}
             />
             {open === 'closing' && (
@@ -232,9 +241,9 @@ export default function SettingsPage() {
             onClick={() => { if (!sending && user.email) void sendReset(); }}
           />
           <ListRow
-            main="엑셀 내보내기"
+            main={<CollMain open={open === 'export'}>엑셀 내보내기</CollMain>}
             sub={`${scopeAll ? '전체 법인' : companyLabel(companyId)} CSV`}
-            right={<span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><Download size={15} color={C.faint} /><Chevron open={open === 'export'} /></span>}
+            right={<Download size={15} color={C.faint} />}
             onClick={() => toggle('export')}
           />
           {open === 'export' && (

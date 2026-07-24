@@ -34,6 +34,8 @@ export type ContractView = {
   refund: number;              // 반납 일할 환불(있으면)
   monthlyRent: number;
   overdueDays: number;         // 가장 오래된 미납 회차 경과일(0=미납없음) — 회수 SLA 단계 판정용
+  roundDue: number;            // 도래(경과) 회차 수
+  roundTotal: number;          // 총 회차 수(= 대여기간 개월)
 };
 
 /** 계약 레코드 → v5 Contract(스케줄 포함) 빌드. 저장된 수기 입금(_payments)·청구할인(_discounts) 적용. */
@@ -166,6 +168,10 @@ export function computeContractView(rec: EntityRecord, today: string): ContractV
   const count = seedNet != null && !hasPerSeq
     ? (seedNet > 0 ? Math.max(1, rent0 > 0 ? Math.ceil(seedNet / rent0) : 1) : 0)
     : (rc.unpaidSeqCount || 0);
+  // 회차 — 도래(dueDate≤기준일)/총. 스케줄 없으면(도래창 결손) 총=대여기간 폴백.
+  const scheds = rc.schedules || [];
+  const roundTotal = scheds.length || Number(rec.rentalMonths) || 0;
+  const roundDue = scheds.length ? scheds.filter((s) => s.dueDate && String(s.dueDate) <= asOf).length : 0;
 
   return {
     rec, status, delivered, ended, startDate: start, endDate: end,
@@ -173,6 +179,7 @@ export function computeContractView(rec: EntityRecord, today: string): ContractV
     gross, paid, net, count, refund,
     monthlyRent: Number(rec.monthlyRent) || 0,
     overdueDays,
+    roundDue, roundTotal,
   };
 }
 
