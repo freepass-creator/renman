@@ -80,7 +80,7 @@ export function pageLayer(role: PageRole): DataLayer | 'mixed' {
   return layerOfPageRole(role);
 }
 
-export type NavItem = { href: string; label: string; icon: LucideIcon; tier?: Tier; hqOnly?: boolean };
+export type NavItem = { href: string; label: string; icon: LucideIcon; tier?: Tier; hqOnly?: boolean; webOnly?: boolean };
 export type NavGroup = { title: string; items: NavItem[] };
 
 /**
@@ -99,7 +99,7 @@ export type NavGroup = { title: string; items: NavItem[] };
 export const NAV_GROUPS: NavGroup[] = [
   { title: '', items: [
     { href: '/', label: '홈', icon: Home, tier: '라이트' },
-    { href: '/sheet', label: '운영시트', icon: Table2, tier: '라이트' },  // 차량1대=1행 통합 엑셀 마스터(전체 한눈)
+    { href: '/sheet', label: '운영시트', icon: Table2, tier: '라이트', webOnly: true },  // 차량1대=1행 통합 엑셀 마스터 — 데스크톱 전용(모바일 메뉴 숨김)
     { href: '/ops', label: '마이페이지', icon: LayoutDashboard, tier: '라이트' },
     { href: '/ingest', label: '데이터센터', icon: Upload, tier: '스탠다드' },
   ] },
