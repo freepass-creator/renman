@@ -131,10 +131,6 @@ export default function TopBar() {
     // ERP4: 메뉴 열림 → 상태창이「☰ 메뉴」로 바뀌고 우측 X · 패널은 bar 아래 펼침.
     const status = slots.title ?? OPERATOR_BRAND;
     const mh = ctrlH(true);
-    // 열린 상태 좌측 라벨 = «메뉴» 텍스트만. 햄버거 아이콘 금지(우측 X가 닫기 담당 — 열렸는데 ☰ 있으면 헷갈림).
-    const menuLabel = (
-      <span style={{ fontSize: 15, fontWeight: 800, color: ink, letterSpacing: '-0.01em' }}>메뉴</span>
-    );
     return (
       <>
         <header style={{
@@ -144,31 +140,10 @@ export default function TopBar() {
           padding: '0 10px 0 var(--fp-bar-pad-x, 14px)',
           background: C.taupeBg, borderBottom: `1px solid ${line}`,
         }}>
-          <div
-            role="button"
-            tabIndex={0}
-            aria-label={menuOpen ? '메뉴 닫기' : '페이지'}
-            onClick={() => {
-              if (menuOpen) { haptic.tap(); setMenuOpen(false); return; }
-            }}
-            onKeyDown={(e) => {
-              if (!menuOpen) return;
-              if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setMenuOpen(false); }
-            }}
-            style={{
-              flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 8,
-              cursor: menuOpen ? 'pointer' : 'default',
-              WebkitTapHighlightColor: 'transparent',
-            }}
-          >
-            {!menuOpen && slots.left != null && <span style={{ flex: '0 0 auto' }}>{slots.left}</span>}
-            <div style={{
-              flex: 1, minWidth: 0,
-              ...(menuOpen ? {} : {
-                fontSize: 15, fontWeight: 800, color: ink,
-                letterSpacing: '-0.01em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-              }),
-            }}>{menuOpen ? menuLabel : status}</div>
+          {/* 좌측 = 제목/브랜드 고정 (erp4 동일 — 메뉴 열려도 제목 유지). 열기·닫기는 «우측 햄버거↔X» 하나로. */}
+          <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
+            {slots.left != null && <span style={{ flex: '0 0 auto' }}>{slots.left}</span>}
+            <span style={{ flex: 1, minWidth: 0, fontSize: 15, fontWeight: 800, color: ink, letterSpacing: '-0.01em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{status}</span>
           </div>
           <button
             type="button"
