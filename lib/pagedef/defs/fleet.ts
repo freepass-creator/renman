@@ -23,6 +23,7 @@ export const FLEET_DEF: PageDef<FleetRow> = {
   title: '운영시트',
   rowKey: (r) => r.plate,
   drill: (r) => openCar(r.plate),
+  mDrill: (r) => `/m/vehicle/${encodeURIComponent(r.plate)}`,
 
   // 모바일 리스트 — 상태 레일 + 차번 + 차종/고객 + 우측 미수(danger). 상태별 그룹.
   row: (r) => ({

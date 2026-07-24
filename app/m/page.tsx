@@ -1,15 +1,16 @@
 'use client';
 /** /m 홈 — 대시보드(A). 지표 2×2 + 주의 목록(만기경과·임박·미수) ObjRow. 행 탭 → 자산360. */
 import { useMemo } from 'react';
+import { useRouter } from 'next/navigation';
 import { TODAY } from '@/lib/dashboard-consts';
 import { linkFleet } from '@/lib/domain/model';
 import { buildFleetRows, fleetRail, type FleetRow } from '@/lib/sheet-rows';
 import { useEntityLists } from '@/lib/use-entity-lists';
-import { openCar } from '@/lib/ui-bus';
 import { Metric, Rows, ObjRow, EmptyState, PageLoading, won, C } from '@/components/ui';
 import { MHead } from '@/components/m/MHead';
 
 export default function MHome() {
+  const router = useRouter();
   const { data: [vs = [], cs = [], ins = [], hs = []], loading } = useEntityLists(['vehicle', 'contract', 'insurance', 'history']);
   const rows = useMemo(() => {
     const f = linkFleet(vs, cs, TODAY);
@@ -26,7 +27,7 @@ export default function MHome() {
   const row = (r: FleetRow) => (
     <ObjRow key={r.plate} rail={fleetRail(r)} co={r.companyId} plate={r.plate} meta={r.carName}
       sub={`${r.customer || '계약없음'}${r.end ? ` · 만기 ${r.end.slice(2)}` : ''}`}
-      right={r.net > 0 ? won(r.net) : undefined} rightTone="danger" onClick={() => openCar(r.plate)} />
+      right={r.net > 0 ? won(r.net) : undefined} rightTone="danger" onClick={() => router.push(`/m/vehicle/${encodeURIComponent(r.plate)}`)} />
   );
 
   return (

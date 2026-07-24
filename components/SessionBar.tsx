@@ -124,8 +124,8 @@ export default function TopBar() {
   const bh = ctrlH(false);
   const barBtn: CSSProperties = { display: 'inline-flex', alignItems: 'center', gap: 4, height: bh, boxSizing: 'border-box', padding: '0 12px', border: `1px solid ${line}`, borderRadius: 'var(--radius)', background: C.taupeBg, cursor: 'pointer', fontSize: 12.5, fontWeight: 600, color: ink, textDecoration: 'none' };
 
-  // /m(모바일 미리보기)는 웹 크롬 없이 — 프리뷰 프레임만. 웹 상단바 숨김.
-  if (pathname === '/m' || pathname.startsWith('/m/')) return null;
+  // /m(모바일 전용 트리)·/dev/preview(모바일 미리보기)는 웹 크롬 없이 — 자체/프레임 셸만. 웹 상단바 숨김.
+  if (pathname === '/m' || pathname.startsWith('/m/') || pathname === '/dev/preview') return null;
 
   if (mobile) {
     // ERP4: 메뉴 열림 → 상태창이「☰ 메뉴」로 바뀌고 우측 X · 패널은 bar 아래 펼침.

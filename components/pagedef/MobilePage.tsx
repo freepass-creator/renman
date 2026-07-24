@@ -5,6 +5,7 @@
  *   기본 facet(예: 보유)만 적용 — 상세 필터(FilterSheet)는 P2.
  */
 import { useMemo } from 'react';
+import { useRouter } from 'next/navigation';
 import { Metric, Rows, ObjRow, EmptyState, PageLoading } from '@/components/ui';
 import { MHead } from '@/components/m/MHead';
 import type { PageDef } from '@/lib/pagedef/types';
@@ -28,11 +29,12 @@ function MGrid<R>({ def, tabColor }: { def: PageDef<R>; tabColor?: string }) {
     return def.sort ? [...arr].sort(def.sort) : arr;
   }, [allRows, facets, def.filter, def.sort]);
 
+  const router = useRouter();
   const groups = def.groups ?? [];
-  const drill = def.drill;
   const renderRow = (r: R) => {
     const p = def.row ? def.row(r) : {};
-    return <ObjRow key={def.rowKey(r)} {...p} onClick={drill ? () => drill(r) : undefined} />;
+    const onClick = def.mDrill ? () => router.push(def.mDrill!(r)) : def.drill ? () => def.drill!(r) : undefined;
+    return <ObjRow key={def.rowKey(r)} {...p} onClick={onClick} />;
   };
 
   return (

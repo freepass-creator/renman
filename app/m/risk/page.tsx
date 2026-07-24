@@ -4,12 +4,13 @@ import { useMemo } from 'react';
 import { TODAY, dday } from '@/lib/dashboard-consts';
 import { linkFleet } from '@/lib/domain/model';
 import { buildFleetRows, fleetRail, type FleetRow } from '@/lib/sheet-rows';
+import { useRouter } from 'next/navigation';
 import { useEntityLists } from '@/lib/use-entity-lists';
-import { openCar } from '@/lib/ui-bus';
 import { Metric, Rows, ObjRow, EmptyState, PageLoading, won, C } from '@/components/ui';
 import { MHead } from '@/components/m/MHead';
 
 export default function MRisk() {
+  const router = useRouter();
   const { data: [vs = [], cs = [], ins = [], hs = []], loading } = useEntityLists(['vehicle', 'contract', 'insurance', 'history']);
   const rows = useMemo(() => {
     const f = linkFleet(vs, cs, TODAY);
@@ -27,7 +28,7 @@ export default function MRisk() {
 
   const R = (r: FleetRow, sub: string, right?: React.ReactNode) => (
     <ObjRow key={r.plate} rail={fleetRail(r)} co={r.companyId} plate={r.plate} meta={r.carName}
-      sub={sub} right={right} rightTone="danger" onClick={() => openCar(r.plate, right ? 'unpaid' : undefined)} />
+      sub={sub} right={right} rightTone="danger" onClick={() => router.push(`/m/vehicle/${encodeURIComponent(r.plate)}${right ? '?do=unpaid' : ''}`)} />
   );
 
   const empty = !misu.length && !overdue.length && !soon.length && !insSoon.length && !noIns.length && !inspSoon.length;
