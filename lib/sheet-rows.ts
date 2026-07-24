@@ -13,6 +13,7 @@ import { type EntityRecord } from './intake/entities';
 import { normPlate } from './plate';
 import { deriveLocation } from './vehicle-location';
 import { companyShort } from './companies';
+import { rowWarnings, type SheetWarning } from './sheet-warnings';
 
 export type SheetRow = {
   plate: string;
@@ -112,6 +113,8 @@ export type FleetRow = {
   insurer: string; insEnd: string; insPremium: number;
   // 미수
   net: number; overdueDays: number;
+  // 인라인 경고(무보험·검사만료·반납지남·미수단계·면허 등) — sheet-warnings 합성. ⚠ 열·'경고' 필터가 씀.
+  warnings: SheetWarning[];
   tone: 'ok' | 'warn' | 'danger' | 'mute';
 };
 
@@ -166,6 +169,13 @@ export function buildFleetRows(vehicles: VehicleNode[], insurance: EntityRecord[
       insEnd: String(ins?.endDate || ''),
       insPremium: Number(ins?.totalPremium) || 0,
       net, overdueDays,
+      warnings: rowWarnings({
+        held: asset.ownership !== '처분완료' && asset.status !== '차량없음',
+        active: !!active, contractRec: active?.view.rec ?? null, veh,
+        util: asset.util, customer: active?.customer || '',
+        dday: v?.dday ?? null, rent: Number(v?.rec.monthlyRent) || 0,
+        overdueDays, insEnd: String(ins?.endDate || ''), inspectionTo: String(veh?.inspectionTo || ''), today,
+      }),
       // 상태 뱃지는 «상태» 톤(운행=초록·유휴=회색·정비=주의). 미수는 미수/연체 열 색으로 별도 표시.
       tone: asset.tone,
     };

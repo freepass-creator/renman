@@ -7,7 +7,7 @@ import { C, R, SCRIM } from './tokens';
 /* 드로어 · 모달 — 오버레이 원자. */
 
 /* 공통 상세 드로어 — 모든 목록 상세가 이 하나 재사용. ↑↓ 이동 · URL 동기화 · ↗전체화면. */
-export function Drawer({ title, meta, onClose, children, footer, width = 560, onPrev, onNext, expandHref }: { title: React.ReactNode; meta?: React.ReactNode; onClose: () => void; children: React.ReactNode; footer?: React.ReactNode; width?: number; onPrev?: () => void; onNext?: () => void; expandHref?: string }) {
+export function Drawer({ title, meta, onClose, children, footer, width = 560, side = 'right', onPrev, onNext, expandHref }: { title: React.ReactNode; meta?: React.ReactNode; onClose: () => void; children: React.ReactNode; footer?: React.ReactNode; width?: number; side?: 'left' | 'right'; onPrev?: () => void; onNext?: () => void; expandHref?: string }) {
   React.useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if (e.key === 'Escape') onClose();
@@ -21,8 +21,8 @@ export function Drawer({ title, meta, onClose, children, footer, width = 560, on
   const navBtn: React.CSSProperties = { border: `1px solid ${C.line}`, background: C.card, borderRadius: R, width: mobile ? 44 : 26, height: mobile ? 44 : 26, cursor: 'pointer', color: C.mute, fontSize: mobile ? 18 : 13, lineHeight: 1 };
   // 모바일 = 하단 바텀시트. z=70 > MobileTabBar(56).
   return (
-    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: SCRIM, zIndex: 70, display: 'flex', justifyContent: mobile ? 'stretch' : 'flex-end', alignItems: mobile ? 'flex-end' : 'stretch' }}>
-      <div onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: mobile ? '100%' : width, height: mobile ? 'auto' : '100vh', maxHeight: mobile ? '92dvh' : undefined, background: C.card, boxShadow: mobile ? '0 -8px 32px rgba(0,0,0,0.2)' : '-10px 0 32px rgba(0,0,0,0.16)', display: 'flex', flexDirection: 'column', borderLeft: mobile ? 'none' : `1px solid ${C.line}`, borderRadius: mobile ? '16px 16px 0 0' : 0, animation: mobile ? 'sheetUp .24s cubic-bezier(.2,.8,.2,1)' : undefined }}>
+    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: SCRIM, zIndex: 70, display: 'flex', justifyContent: mobile ? 'stretch' : (side === 'left' ? 'flex-start' : 'flex-end'), alignItems: mobile ? 'flex-end' : 'stretch' }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: mobile ? '100%' : width, height: mobile ? 'auto' : '100vh', maxHeight: mobile ? '92dvh' : undefined, background: C.card, boxShadow: mobile ? '0 -8px 32px rgba(0,0,0,0.2)' : (side === 'left' ? '10px 0 32px rgba(0,0,0,0.16)' : '-10px 0 32px rgba(0,0,0,0.16)'), display: 'flex', flexDirection: 'column', borderLeft: (!mobile && side === 'right') ? `1px solid ${C.line}` : 'none', borderRight: (!mobile && side === 'left') ? `1px solid ${C.line}` : 'none', borderRadius: mobile ? '16px 16px 0 0' : 0, animation: mobile ? 'sheetUp .24s cubic-bezier(.2,.8,.2,1)' : undefined }}>
         {mobile && <div style={{ display: 'flex', justifyContent: 'center', padding: '8px 0 0' }}><div style={{ width: 40, height: 4, borderRadius: 2, background: C.line2 }} /></div>}
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: mobile ? '9px 14px 10px' : '11px 16px', borderBottom: `1px solid ${C.line}`, background: mobile ? C.card : C.head }}>
           <div style={{ minWidth: 0, display: 'flex', alignItems: 'baseline', gap: 8 }}>

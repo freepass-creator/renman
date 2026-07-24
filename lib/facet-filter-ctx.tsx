@@ -18,19 +18,27 @@ export type FacetFilterApi = {
 type Ctx = {
   api: FacetFilterApi | null;
   setApi: (api: FacetFilterApi | null) => void;
+  open: boolean;                                   // 필터 인-플로우 패널 열림(오버레이 아님 — 콘텐츠를 민다)
+  setOpen: (o: boolean | ((p: boolean) => boolean)) => void;
 };
 
-const FacetFilterCtx = createContext<Ctx>({ api: null, setApi: () => {} });
+const FacetFilterCtx = createContext<Ctx>({ api: null, setApi: () => {}, open: true, setOpen: () => {} });
 
 export function FacetFilterProvider({ children }: { children: ReactNode }) {
   const [api, setApiState] = useState<FacetFilterApi | null>(null);
   const setApi = useCallback((next: FacetFilterApi | null) => setApiState(next), []);
-  const value = useMemo(() => ({ api, setApi }), [api, setApi]);
+  const [open, setOpen] = useState(true);   // 기본 열림(기존 좌측 레일처럼). 검색창 옆 버튼으로 토글.
+  const value = useMemo(() => ({ api, setApi, open, setOpen }), [api, setApi, open]);
   return <FacetFilterCtx.Provider value={value}>{children}</FacetFilterCtx.Provider>;
 }
 
 export function useFacetFilterApi() {
   return useContext(FacetFilterCtx).api;
+}
+/** 필터 패널 열림 상태 — 검색창 옆 버튼(토글) ↔ FacetRail(인-플로우 패널) 공유. */
+export function useFacetFilterOpen() {
+  const c = useContext(FacetFilterCtx);
+  return { open: c.open, setOpen: c.setOpen };
 }
 
 /** FacetRail 마운트 시 등록. 언마운트·그룹 없으면 해제. */

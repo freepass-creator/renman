@@ -48,6 +48,7 @@ export const LENS_FILTERS: Record<string, FacetGroup[]> = {
   운영시트: [  // 차량 1대=1행 통합 마스터 사이드필터. 기본 '보유' 선택(매각/처분은 명시 선택 시 노출).
     { dim: '보유', chips: [{ label: '보유' }, { label: '매각' }] },
     { dim: '가동', chips: [{ label: '운행' }, { label: '휴차' }, { label: '정비' }] },
+    { dim: '경고', chips: [{ label: '경고있음' }, { label: '위험만' }] },
     { dim: '미수', chips: [{ label: '미수있음' }, { label: '연체90일+' }] },
     { dim: '만기', chips: [{ label: '검사임박' }, { label: '보험임박' }] },
     { dim: '부채·보험', chips: [{ label: '할부있음' }, { label: '보험없음' }] },

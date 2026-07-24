@@ -5,6 +5,9 @@
 import React from 'react';
 import { Badge, won, C, type SheetCol } from '@/components/ui';
 import { type SheetRow, type ContractRow, type FleetRow } from './sheet-rows';
+import { collectionStage } from './domain/status';
+import { dday } from './dashboard-consts';
+import { AlertTriangle } from 'lucide-react';
 
 const toneBadge = (t: SheetRow['tone']): 'green' | 'amber' | 'red' | 'gray' =>
   t === 'ok' ? 'green' : t === 'warn' ? 'amber' : t === 'danger' ? 'red' : 'gray';
@@ -91,6 +94,15 @@ export const DEBT_COLS: SheetCol<ContractRow>[] = [
  *   자리 고정 — 전체는 기본 열 사이에 «끼워넣지» 말고 뒤로 확장(눈이 같은 데를 본다). */
 const won0 = (n: number) => (n ? won(n) : '—');
 const ymd = (s: string) => s ? s.slice(0, 10) : '—';
+// 만기 셀 — «한 셀 한 값»: 날짜 하나만, 긴급도는 색으로(만료·D-7=빨강 / D-30=주황 / 그 외 기본). 검사·보험 공용.
+const ddayCell = (s: string) => {
+  if (!s) return '—';
+  const t = ymd(s);
+  const d = dday(s);
+  if (d == null) return t;
+  const color = d < 0 ? C.danger : d <= 7 ? C.danger : d <= 30 ? C.warn : undefined;
+  return color ? <span style={{ color, fontWeight: 700 }}>{t}</span> : t;
+};
 const FL = {
   plate: { key: 'plate', label: '차량번호', render: (r) => r.plate || '—', text: (r) => r.plate },
   co: { key: 'co', label: '법인', render: (r) => r.company || '—', text: (r) => r.company },
@@ -101,7 +113,7 @@ const FL = {
   vin: { key: 'vin', label: '차대번호', render: (r) => r.vin || '—', text: (r) => r.vin },
   acqDate: { key: 'acqDate', label: '취득일', render: (r) => ymd(r.acqDate), text: (r) => r.acqDate },
   acqPrice: { key: 'acqPrice', label: '취득가', align: 'r', render: (r) => won0(r.acqPrice), text: (r) => r.acqPrice },
-  inspect: { key: 'inspect', label: '검사만기', render: (r) => ymd(r.inspectionTo), text: (r) => r.inspectionTo },
+  inspect: { key: 'inspect', label: '검사만기', render: (r) => ddayCell(r.inspectionTo), text: (r) => r.inspectionTo },
   gps: { key: 'gps', label: 'GPS', render: (r) => r.gps || '—', text: (r) => r.gps },
   loanCo: { key: 'loanCo', label: '할부사', render: (r) => r.loanCompany || '—', text: (r) => r.loanCompany },
   loanAmt: { key: 'loanAmt', label: '할부원금', align: 'r', render: (r) => won0(r.loanPrincipal), text: (r) => r.loanPrincipal },
@@ -118,7 +130,7 @@ const FL = {
     text: (r) => r.dday ?? '',
   },
   insurer: { key: 'insurer', label: '보험사', render: (r) => r.insurer || '—', text: (r) => r.insurer },
-  insEnd: { key: 'insEnd', label: '보험만기', render: (r) => ymd(r.insEnd), text: (r) => r.insEnd },
+  insEnd: { key: 'insEnd', label: '보험만기', render: (r) => ddayCell(r.insEnd), text: (r) => r.insEnd },
   insPrem: { key: 'insPrem', label: '보험료', align: 'r', render: (r) => won0(r.insPremium), text: (r) => r.insPremium },
   net: {
     key: 'net', label: '미수', align: 'r',
@@ -130,23 +142,52 @@ const FL = {
     render: (r) => r.overdueDays > 0 ? <span style={{ color: r.overdueDays >= 90 ? C.danger : C.warn, fontWeight: 700 }}>{r.overdueDays}일</span> : '—',
     text: (r) => r.overdueDays,
   },
+  own: { key: 'own', label: '소유', render: (r) => r.ownership || '—', text: (r) => r.ownership },
+  util: { key: 'util', label: '가동', render: (r) => r.util || '—', text: (r) => r.util },
+  loanStart: { key: 'loanStart', label: '할부시작', render: (r) => ymd(r.loanStart), text: (r) => r.loanStart },
+  stage: {
+    key: 'stage', label: '회수단계',
+    render: (r) => {
+      if (r.overdueDays <= 0) return '—';
+      const cs = collectionStage(r.overdueDays);
+      const col = (cs.tone === 'red' || cs.tone === 'purple') ? C.danger : cs.tone === 'orange' ? C.warn : C.mute;
+      return <span style={{ color: col, fontWeight: 700 }}>{cs.stage}</span>;
+    },
+    text: (r) => (r.overdueDays > 0 ? collectionStage(r.overdueDays).stage : ''),
+  },
+  // 인라인 경고 — 최고심각도 톤(위험 빨강·경고 주황) + 건수. hover(title)=사유 나열. 값=sheet-warnings.
+  warn: {
+    key: 'warn', label: '⚠',
+    render: (r) => {
+      const ws = r.warnings;
+      if (!ws.length) return <span style={{ color: C.faint }}>—</span>;
+      const high = ws.some((w) => w.sev === 'high');
+      return (
+        <span title={ws.map((w) => w.label).join(' · ')} style={{ display: 'inline-flex', alignItems: 'center', gap: 3, color: high ? C.danger : C.warn, fontWeight: 800, whiteSpace: 'nowrap' }}>
+          <AlertTriangle size={13} /> {ws.length}
+        </span>
+      );
+    },
+    text: (r) => r.warnings.map((w) => w.label).join(' · '),
+  },
 } satisfies Record<string, SheetCol<FleetRow>>;
 
 /** 기본 = 자산식별 + 계약자·연락처 + 기간·D-day + 월렌트 + 미수 (운영현황 스캔 필수, erp5 운영현황 준거). */
 export const FLEET_BASIC_COLS: SheetCol<FleetRow>[] = [
   FL.plate, FL.co, FL.status, FL.loc, FL.car,
   FL.cust, FL.phone, FL.start, FL.end, FL.dday, FL.rent,
-  FL.net,
+  FL.net, FL.warn,
 ];
 
 /** 전체 = 기본 열 «그대로» + 부가 열이 우측에 쭉 붙음(연식·VIN·취득·검사·GPS·할부·보험·연체).
  *  기본 열 순서·자리는 고정(눈이 같은 데를 본다) — 확장은 앞에 끼워넣지 않고 뒤로만. */
 export const FLEET_EXPANDED_COLS: SheetCol<FleetRow>[] = [
   ...FLEET_BASIC_COLS,
+  FL.own, FL.util,
   FL.year, FL.vin, FL.acqDate, FL.acqPrice, FL.inspect, FL.gps,
-  FL.loanCo, FL.loanAmt, FL.loanRate, FL.loanMon,
+  FL.loanCo, FL.loanAmt, FL.loanRate, FL.loanMon, FL.loanStart,
   FL.insurer, FL.insEnd, FL.insPrem,
-  FL.od,
+  FL.od, FL.stage,
 ];
 
 /** 사이드필터 칩 → 기본뷰에서 «필터 걸면 자동 노출»할 대응 컬럼. 값을 보며 거른다.
@@ -154,7 +195,7 @@ export const FLEET_EXPANDED_COLS: SheetCol<FleetRow>[] = [
 export const FLEET_REVEAL_COLS: Record<string, SheetCol<FleetRow>[]> = {
   '검사임박': [FL.inspect],
   '보험임박': [FL.insEnd],
-  '할부있음': [FL.loanCo, FL.loanAmt],
+  '할부있음': [FL.loanCo, FL.loanAmt, FL.loanStart],
   '보험없음': [FL.insurer],
-  '연체90일+': [FL.od],
+  '연체90일+': [FL.od, FL.stage],
 };

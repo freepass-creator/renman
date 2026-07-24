@@ -29,7 +29,11 @@ export function Page({ title, meta, left, mid, right, tools, children, fill, bac
   const shellOwnsCompany = mobile && (tools != null || left != null);
   const showMeta = meta != null && !mobile;
   return (
-    <main style={{ maxWidth: 1680, margin: '0 auto', padding: mobile ? PAGE_PAD_M : '16px 24px 60px', ...(fill ? { flex: 1, minWidth: 0 } : {}) }}>
+    <main style={{
+      // fill(업무=FacetPage 레일 모드)=폭 꽉 채움+좌우 대칭(캡·가운데정렬 제거→필터 숨기면 공간 회수). 비-fill=캡+가운데(가독).
+      padding: mobile ? PAGE_PAD_M : '16px 24px 60px',
+      ...(fill ? { flex: 1, minWidth: 0 } : { maxWidth: 1680, margin: '0 auto' }),
+    }}>
       <div style={{ display: 'flex', flexWrap: mobile ? 'nowrap' : 'wrap', alignItems: 'center', gap: mobile ? SPACE_M : 10, paddingBottom: mobile ? PAGE_HEAD_PB_M : 14, minHeight: mobile ? 0 : 36 }}>
         {!mobile && hasTitle && <h1 style={{ fontSize: 18, fontWeight: 800, letterSpacing: '-0.02em', margin: 0, flexShrink: 0 }}>{title}</h1>}
         {!shellOwnsCompany && !noCompany && <CompanyFilter />}
@@ -56,29 +60,28 @@ export function FacetPage({ title, meta, left, mid, right, tools, rail, back, ch
 }) {
   const mobile = useIsMobile();
   const hasRail = rail != null;
-  const deskRail = hasRail && !mobile;
-  /* 레일 «자리»는 내용보다 먼저 잡는다.
-     페이지들이 로딩 중엔 rail={null}을 넘긴다 → 자리를 안 잡으면
-     로딩=전체폭 → 완료=레일 삽입 으로 본문이 한 번 쪼그라든다(메뉴 이동마다 보이던 흔들림).
-     단 rail prop 자체를 «안 주는» 화면(손익·부가세·재무상태)은 레일이 없는 게 정상이라 자리도 잡지 않는다.
-     → undefined = 레일 안 씀 / null = 쓰는데 아직 로딩 중. 이 구분이 이 컴포넌트의 계약이다. */
+  /* 필터 = 인-플로우(오버레이 아님). 데스크톱=좌측 열이 콘텐츠를 민다(flex row) · 모바일=콘텐츠 위 블록.
+     열림은 FacetFilterBtn(검색창 옆) 토글 → 닫히면 FacetRail이 null 반환 → 콘텐츠 전폭(fill).
+     undefined = 필터 안 씀(손익·부가세=maxWidth 가운데). */
   const usesRail = rail !== undefined;
   const page = (
     <Page title={title} meta={meta} left={left} mid={mid} right={right} tools={tools} fill={usesRail && !mobile} back={back}>
-      {/* 모바일: rail 마운트만(UI null) → 검색 옆 필터 등록. 데스크톱 레일은 바깥. */}
-      {mobile && hasRail ? rail : null}
+      {mobile && hasRail ? rail : null}{/* 모바일: 인-플로우 블록(닫히면 null) */}
       {children}
     </Page>
   );
-  const wrapped = mobile || !usesRail
-    ? page
-    : (
-      <div style={{ display: 'flex', alignItems: 'stretch', minHeight: 'calc(100vh - 49px)' }}>
-        {deskRail ? rail : <div aria-hidden style={{ flex: '0 0 200px' }} />}
-        {page}
-      </div>
-    );
-  return <FacetFilterProvider>{wrapped}</FacetFilterProvider>;
+  return (
+    <FacetFilterProvider>
+      {mobile || !usesRail ? page : (
+        <div style={{ display: 'flex', alignItems: 'stretch', minHeight: 'calc(100vh - 49px)' }}>
+          {/* 데스크톱: 좌측 인-플로우 열(닫히면 null→전폭). 로딩중(rail=null)엔 200px 자리를 잡아 완료 시 흔들림 방지
+              — open은 마운트마다 true로 시작하므로 로딩 자리(200)와 완료 레일(200)이 일치 = shift 0. */}
+          {hasRail ? rail : <div aria-hidden style={{ flex: '0 0 200px', borderRight: '1px solid var(--border)', background: 'var(--bg-card)' }} />}
+          {page}
+        </div>
+      )}
+    </FacetFilterProvider>
+  );
 }
 
 // Panel = 무박스 타이틀 섹션(Sec와 같은 규격). 박스·그림자 제거 → 원자(카드/폼)가 직접 흐름. 규격통일.

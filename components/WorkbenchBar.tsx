@@ -17,7 +17,7 @@ import { useIsMobile } from '@/lib/use-mobile';
 import { SPACE_M, SPACE_GROUP_M } from '@/components/ui/tokens';
 import { CompanyFilter, PillTabs } from '@/components/ui/controls';
 import { SearchBox, FilterBox } from '@/components/SearchBox';
-import { MobileFacetFilterBtn } from '@/components/FacetRail';
+import { FacetFilterBtn } from '@/components/FacetRail';
 import { useFacetFilterApi } from '@/lib/facet-filter-ctx';
 
 export type WorkbenchTab<T extends string = string> = { key: T; label: React.ReactNode; title?: string; badge?: number };
@@ -76,6 +76,7 @@ export function WorkbenchBar<T extends string = string>({
   const trail = (
     <>
       {hasSearch && <SearchSlot search={resolved!} />}
+      {hasFacet && <FacetFilterBtn />}{/* 검색창 옆 필터 버튼(erp4식) — 좌측 레일 폐지 */}
       {view}
       {stat}
       {actions}
@@ -92,7 +93,7 @@ export function WorkbenchBar<T extends string = string>({
           ) : (
             <span style={{ flex: 1, minWidth: 0 }} />
           )}
-          {(hasFacet) && <MobileFacetFilterBtn />}
+          {hasFacet && <FacetFilterBtn />}
         </div>
         {(tabs || subTabs || mid) && (
           <div style={{ display: 'flex', alignItems: 'center', gap: SPACE_M, flexWrap: 'wrap', overflowX: 'auto' }}>{tabRow}</div>

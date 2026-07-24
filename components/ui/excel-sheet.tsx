@@ -190,8 +190,9 @@ export function ExcelSheet<T>({ cols, rows, onRow, rowKey, onFiltered, mode = 'e
 
   return (
     <>
+      {/* 세로 캡 제거 — 세로는 페이지 스크롤 하나만(박스=내용 높이), 가로만 박스 내부 스크롤. 이중 스크롤·하단 갭 방지. */}
       <div style={{
-        overflow: 'auto', maxHeight: 'calc(100dvh - 160px)',
+        overflowX: 'auto',
         border: `1px solid ${C.line}`, borderRadius: 4, background: C.card,
       }}>
         <table style={{ borderCollapse: 'separate', borderSpacing: 0, fontSize: 12, width: 'max-content', minWidth: '100%' }}>
