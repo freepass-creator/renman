@@ -7,6 +7,7 @@ import { useSession, roleLabel } from '@/lib/session';
 import { useAppBarSlots } from '@/lib/appbar';
 import { useIsMobile } from '@/lib/use-mobile';
 import { MobileTabBar } from '@/components/MobileTabBar';
+import { MobileActionBar } from '@/components/MobileActionBar';
 import { haptic } from '@/lib/haptics';
 import { C, SCRIM, ctrlH, IconBtn } from '@/components/ui';
 import { NAV_GROUPS } from '@/lib/nav';
@@ -100,13 +101,17 @@ export default function TopBar() {
   // 모바일 크롬 SSOT — 허브=메뉴·탭 / 뎁스=상단←만(하단 이전 중복 금지).
   const depth = !!slots.depth;
   const showBottom = !!(slots.back || slots.actions);
+  const showActionBar = !!(slots.back || slots.actions || slots.depth);   // 모바일 하단 액션바(이전+주액션)
   useEffect(() => { setMenuOpen(false); }, [pathname]);
   useEffect(() => {
+    // 모바일 하단 도크: 뎁스=액션바 1개(있으면) · 허브=탭바(+액션 있으면 2개). 콘텐츠 마지막 줄 가림 방지.
     document.body.style.paddingBottom = mobile
-      ? (depth ? 'env(safe-area-inset-bottom)' : 'calc(var(--fp-bar-h) + env(safe-area-inset-bottom))')
+      ? (depth
+          ? (showActionBar ? 'calc(var(--fp-bar-h) + env(safe-area-inset-bottom))' : 'env(safe-area-inset-bottom)')
+          : (showActionBar ? 'calc(2 * var(--fp-bar-h) + env(safe-area-inset-bottom))' : 'calc(var(--fp-bar-h) + env(safe-area-inset-bottom))'))
       : (showBottom ? '54px' : '');
     return () => { document.body.style.paddingBottom = ''; };
-  }, [showBottom, mobile, depth]);
+  }, [showBottom, showActionBar, mobile, depth]);
   const [todayLabel, setTodayLabel] = useState('');
   useEffect(() => { const n = new Date(); setTodayLabel(`${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}-${String(n.getDate()).padStart(2, '0')} (${['일', '월', '화', '수', '목', '금', '토'][n.getDay()]})`); }, []);
   const goBack = () => { haptic.back(); if (slots.back) slots.back(); else router.back(); };
@@ -121,16 +126,15 @@ export default function TopBar() {
       <>
         {/* erp4식 얇은 상단바 — 불투명 · 타이틀 좌 · 햄버거 우측 · 로그인정보/검색 없음(검색은 페이지 툴바로) */}
         <header style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '0 6px', minHeight: 'var(--fp-bar-h)', background: C.taupeBg, borderBottom: `1px solid ${line}`, position: 'sticky', top: 0, zIndex: 30 }}>
-          {showBack && <button onClick={goBack} aria-label="이전" style={tapTarget}><ChevronLeft size={27} /></button>}
-          <span style={{ flex: 1, minWidth: 0, fontSize: headTitle === OPERATOR_BRAND ? 19 : 17, fontWeight: 800, letterSpacing: '-0.03em', color: ink, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', paddingLeft: showBack ? 0 : 8 }}>
+          <span style={{ flex: 1, minWidth: 0, fontSize: headTitle === OPERATOR_BRAND ? 19 : 17, fontWeight: 800, letterSpacing: '-0.03em', color: ink, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', paddingLeft: 8 }}>
             {headTitle}
           </span>
-          {showBack
-            ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>{slots.actions}</span>
-            : <button onClick={() => { haptic.tap(); setMenuOpen((o) => !o); }} aria-label="메뉴" style={tapTarget}>{menuOpen ? <X size={23} /> : <Menu size={23} />}</button>}
+          {/* 우측 = 햄버거만. 이전·주액션은 하단 액션바(MobileActionBar)로 일원화. */}
+          <button onClick={() => { haptic.tap(); setMenuOpen((o) => !o); }} aria-label="메뉴" style={tapTarget}>{menuOpen ? <X size={23} /> : <Menu size={23} />}</button>
         </header>
-        {/* 허브=탭 · 뎁스=하단 없음(이전은 상단←만) */}
+        {/* 이동=탭바(허브) · 이전+주액션=하단 액션바(뎁스). */}
         {!depth && <MobileTabBar />}
+        <MobileActionBar />
         <MobileMenu open={menuOpen} onClose={() => setMenuOpen(false)} />
       </>
     );

@@ -1,6 +1,7 @@
 'use client';
 // 모바일 하단 탭바 — 루트·스택목록 1차 네비. 뎁스(depth)에서는 SessionBar가 숨김(이전은 상단←만).
 //   고른 탭 = useMobileTabs SSOT (기본: 홈 · 마이 · 검색 · 업로드 · 설정).
+import { useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { haptic } from '@/lib/haptics';
@@ -9,6 +10,12 @@ import { useMobileTabs } from '@/lib/mobile-tabs';
 export function MobileTabBar() {
   const pathname = usePathname();
   const { tabs } = useMobileTabs();
+  // 탭바 높이를 --fp-tabbar-h로 발행 → 하단 액션바(그 위 스택)·콘텐츠 도크가 var 하나로 정합. 언마운트=0.
+  useEffect(() => {
+    const r = document.documentElement;
+    if (tabs.length) r.style.setProperty('--fp-tabbar-h', 'calc(var(--fp-bar-h) + env(safe-area-inset-bottom, 0px))');
+    return () => r.style.setProperty('--fp-tabbar-h', '0px');
+  }, [tabs.length]);
   if (!tabs.length) return null;
   return (
     <nav style={{
