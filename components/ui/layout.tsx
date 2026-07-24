@@ -46,7 +46,7 @@ export function Page({ title, meta, left, mid, right, tools, children, fill, fra
           main 패딩(12/14)을 음수마진으로 bleed해 전폭 배경, 콘텐츠는 그 아래로 스크롤. */}
       <div style={{ display: 'flex', flexWrap: mobile ? 'nowrap' : 'wrap', alignItems: 'center', gap: mobile ? SPACE_M : 10, minHeight: mobile ? 0 : 36, flexShrink: 0,
         ...(mobile
-          ? (tools != null
+          ? ((tools != null || left != null)
               ? { position: 'sticky' as const, top: 'var(--fp-bar-h)', zIndex: 20, background: 'var(--bg-page)', margin: '-12px -14px 0', padding: '10px 14px 8px', borderBottom: `1px solid ${C.line}` }
               : { paddingBottom: PAGE_HEAD_PB_M })
           : { paddingBottom: 14 }),
