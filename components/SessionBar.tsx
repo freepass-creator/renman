@@ -128,6 +128,9 @@ export default function TopBar() {
   const bh = ctrlH(false);
   const barBtn: CSSProperties = { display: 'inline-flex', alignItems: 'center', gap: 4, height: bh, boxSizing: 'border-box', padding: '0 12px', border: `1px solid ${line}`, borderRadius: 'var(--radius)', background: C.taupeBg, cursor: 'pointer', fontSize: 12.5, fontWeight: 600, color: ink, textDecoration: 'none' };
 
+  // /m(모바일 미리보기)는 웹 크롬 없이 — 프리뷰 프레임만. 웹 상단바 숨김.
+  if (pathname === '/m' || pathname.startsWith('/m/')) return null;
+
   if (mobile) {
     // 모바일 = 상단 앱바 «없음»(갈아엎기). 페이지 최상단 = 툴바(WorkbenchBar→MobileToolbar, 햄버거 포함).
     //   이동=하단 탭바(허브) · 이전+주액션=하단 액션바(뎁스) · 메뉴=툴바 햄버거→jpk:toggle-menu.
