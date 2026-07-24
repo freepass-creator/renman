@@ -107,8 +107,10 @@ function buildContractRecord(c: RawContract, today: string): EntityRecord {
   const elapsed = start ? monthDiff(start, cutoff) + 1 : 0;
   const rentalMonths = Math.max(realTerm, elapsed, 1);
 
-  // 결제일 = 시작일의 일자(선불) → 1회차 dueDate=시작일 → 반납일 이전 회차 확보(미수 배치처). 없으면 25.
-  const payDay = /^\d{4}-\d{2}-(\d{2})/.test(start) ? Math.min(31, Math.max(1, Number(start.slice(8, 10)))) : PAYMENT_DAY;
+  // 결제일 = 채권/반납 시트 실 결제일(c.paymentDay) 우선 → 없으면 시작일의 일자 → 그것도 없으면 25.
+  const sheetPayDay = Number(c.paymentDay);
+  const payDay = (sheetPayDay >= 1 && sheetPayDay <= 31) ? sheetPayDay
+    : (/^\d{4}-\d{2}-(\d{2})/.test(start) ? Math.min(31, Math.max(1, Number(start.slice(8, 10)))) : PAYMENT_DAY);
   const carry = Math.max(0, c._carry || 0);
   // pastDue = Σ(회차금액 where dueDate ≤ cutoff) — buildContract 와 동일 엔진
   let paidTotal = 0;
@@ -130,6 +132,7 @@ function buildContractRecord(c: RawContract, today: string): EntityRecord {
     monthlyRent: c.monthlyRent,
     deposit: c.deposit,
     paymentDay: payDay,
+    paymentTiming: '선불',   // 소스에 선/후불 없음 — 기본 선불(계약 편집에서 후불로 변경)
     paymentMethod: '이체',
     status: c.status,
     deliveredDate: ymd(c.deliveredDate) || start,

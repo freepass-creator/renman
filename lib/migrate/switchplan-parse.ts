@@ -791,7 +791,8 @@ function buildContractRecord(c: EntityRecord, today: string): EntityRecord {
   if (realTerm < 1) realTerm = returned ? Math.max(1, monthDiffIso(start, cutoff) + 1) : 12;
   const elapsed = start ? monthDiffIso(start, cutoff) + 1 : 0;
   const rentalMonths = Math.max(realTerm, elapsed, 1);
-  const payDay = start ? dayOfMonth(start) : PAYMENT_DAY;
+  const sheetPayDay = Number(c.paymentDay);
+  const payDay = (sheetPayDay >= 1 && sheetPayDay <= 31) ? sheetPayDay : (start ? dayOfMonth(start) : PAYMENT_DAY);
 
   let paidTotal = 0;
   // 개시 납부 표시값 = 도래분 − 실미수(carry). 헤드라인 net은 _carryUnpaid 앵커.
@@ -816,6 +817,7 @@ function buildContractRecord(c: EntityRecord, today: string): EntityRecord {
     monthlyRent: rent,
     deposit: Number(c.deposit) || 0,
     paymentDay: payDay,
+    paymentTiming: '선불',   // 소스에 선/후불 없음 — 기본 선불(계약 편집에서 후불로 변경)
     paymentMethod: '이체',
     status: c.status,
     deliveredDate: ymd(c.deliveredDate) || start,
