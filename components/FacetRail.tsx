@@ -10,7 +10,7 @@ import { LENS_FILTERS, type FacetGroup } from '@/lib/lens-filters';
 import { useIsMobile } from '@/lib/use-mobile';
 import { useRegisterFacetFilter, useFacetFilterApi, useFacetFilterOpen } from '@/lib/facet-filter-ctx';
 import { haptic } from '@/lib/haptics';
-import { C, R, NUM, ToggleChips, ctrlH } from '@/components/ui';
+import { C, R, NUM, ToggleChips, ctrlH, FilterSheet } from '@/components/ui';
 import { SlidersHorizontal, ChevronDown } from 'lucide-react';
 
 /** 선택 개수 박스 — freepasserp4 CountPill 스펙 그대로.
@@ -145,7 +145,7 @@ export const MobileFacetFilterBtn = FacetFilterBtn;
 export function FacetRail({ lensKey, groups: groupsProp, facets, onToggle, onReset, counts, top = 49 }: { lensKey?: string; groups?: FacetGroup[]; facets: Set<string>; onToggle: (label: string) => void; onReset: () => void; counts?: Record<string, number>; top?: number }) {
   const mobile = useIsMobile();
   const groups = groupsProp || (lensKey ? LENS_FILTERS[lensKey] : undefined) || [];
-  const { open } = useFacetFilterOpen();
+  const { open, setOpen } = useFacetFilterOpen();
   const api = useMemo(
     () => (groups.length ? { groups, facets, onToggle, onReset, counts } : null),
     [groups, facets, onToggle, onReset, counts],
@@ -162,12 +162,11 @@ export function FacetRail({ lensKey, groups: groupsProp, facets, onToggle, onRes
     </div>
   );
 
-  // 모바일 = 콘텐츠 위 인-플로우 블록(오버레이 아님).
+  // 모바일 = 아래서 올라오는 바텀시트(erp4식). 시트가 제목·[적용][해제][닫기] 푸터를 소유.
   if (mobile) return (
-    <div style={{ borderBottom: `1px solid ${C.line}`, marginBottom: 10, paddingBottom: 8 }}>
-      {header}
+    <FilterSheet open={open} onClose={() => setOpen(false)} onClear={facets.size > 0 ? onReset : undefined}>
       <FacetGroups groups={groups} facets={facets} onToggle={onToggle} counts={counts} touch />
-    </div>
+    </FilterSheet>
   );
 
   // 데스크톱 = 좌측 인-플로우 열(sticky). 콘텐츠를 민다(FacetPage flex row).

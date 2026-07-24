@@ -27,7 +27,8 @@ const FacetFilterCtx = createContext<Ctx>({ api: null, setApi: () => {}, open: t
 export function FacetFilterProvider({ children }: { children: ReactNode }) {
   const [api, setApiState] = useState<FacetFilterApi | null>(null);
   const setApi = useCallback((next: FacetFilterApi | null) => setApiState(next), []);
-  const [open, setOpen] = useState(true);   // 기본 열림(기존 좌측 레일처럼). 검색창 옆 버튼으로 토글.
+  // 기본 열림: 데스크톱=열림(좌측 레일) · 모바일=닫힘(바텀시트는 필터 버튼 탭 시 올라옴). SSR=데스크톱 가정.
+  const [open, setOpen] = useState(() => typeof window === 'undefined' || window.innerWidth >= 760);
   const value = useMemo(() => ({ api, setApi, open, setOpen }), [api, setApi, open]);
   return <FacetFilterCtx.Provider value={value}>{children}</FacetFilterCtx.Provider>;
 }
