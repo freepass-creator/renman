@@ -6,7 +6,7 @@
 import { useMemo } from 'react';
 import { TODAY, dday } from '@/lib/dashboard-consts';
 import { linkFleet } from '@/lib/domain/model';
-import { buildFleetRows, statusRank, type FleetRow } from '@/lib/sheet-rows';
+import { buildFleetRows, statusRank, fleetRail, type FleetRow } from '@/lib/sheet-rows';
 import { FLEET_BASIC_COLS, FLEET_EXPANDED_COLS, FLEET_REVEAL_COLS } from '@/lib/sheet-cols';
 import { useEntityLists } from '@/lib/use-entity-lists';
 import { openCar } from '@/lib/ui-bus';
@@ -23,6 +23,25 @@ export const FLEET_DEF: PageDef<FleetRow> = {
   title: '운영시트',
   rowKey: (r) => r.plate,
   drill: (r) => openCar(r.plate),
+
+  // 모바일 리스트 — 상태 레일 + 차번 + 차종/고객 + 우측 미수(danger). 상태별 그룹.
+  row: (r) => ({
+    rail: fleetRail(r),
+    co: r.companyId,
+    plate: r.plate,
+    meta: r.carName,
+    sub: `${r.customer || '계약없음'}${r.end ? ` · 만기 ${r.end.slice(2)}` : ''}`,
+    right: r.net > 0 ? won(r.net) : undefined,
+    rightTone: 'danger',
+  }),
+  groups: [
+    { key: 'deliver', label: '인도예정', tone: 'blue', match: (r) => statusRank(r) === 0 },
+    { key: 'overdue', label: '만기경과', tone: 'red', match: (r) => statusRank(r) === 1 },
+    { key: 'idle', label: '휴차', tone: 'purple', match: (r) => statusRank(r) === 2 },
+    { key: 'soon', label: '마감임박', tone: 'amber', match: (r) => statusRank(r) === 3 },
+    { key: 'run', label: '운행중', tone: 'green', match: (r) => statusRank(r) === 4 },
+    { key: 'etc', label: '기타', tone: 'gray', match: (r) => statusRank(r) >= 5 },
+  ],
 
   useData() {
     const { data: [vs = [], cs = [], ins = [], hs = []], loading } = useEntityLists(['vehicle', 'contract', 'insurance', 'history']);

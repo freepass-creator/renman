@@ -5,7 +5,15 @@
  *   B/A/C/D 필드(queues·sections 등)는 해당 렌더러 착수(P2) 시 확장.
  */
 import type { ReactNode } from 'react';
-import type { SheetCol } from '@/components/ui';
+import type { SheetCol, ObjRowProps, BadgeTone } from '@/components/ui';
+
+/** 모바일 리스트 그룹(상태별 섹션) — 각 그룹이 Rows 하나. */
+export interface RowGroup<R> {
+  key: string;
+  label: string;
+  tone?: BadgeTone;
+  match: (r: R) => boolean;
+}
 
 export type Archetype = 'A-dash' | 'B-worklist' | 'C-metrics' | 'D-input' | 'E-grid' | 'F-system';
 export type MTab = 'home' | 'ops' | 'risk' | 'entry' | 'me';
@@ -34,6 +42,10 @@ export interface PageDef<R = unknown> {
   useData: () => { rows: R[]; loading: boolean };
   rowKey: (r: R) => string;
   drill?: (r: R) => void;    // 행 클릭 → 자산360 (openCar 등)
+
+  // ── 모바일 리스트(ObjRow 투영) ──
+  row?: (r: R) => ObjRowProps;   // 행 → ObjRow 매핑 (모바일)
+  groups?: RowGroup<R>[];        // 상태별 그룹(생략 시 평면 리스트)
 
   // ── E-grid (현황 그리드) ──
   colSets?: ColSet<R>[];                         // 보기 탭 (첫 항목이 기본)
