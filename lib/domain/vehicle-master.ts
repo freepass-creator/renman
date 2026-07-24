@@ -57,8 +57,12 @@ export function titleToSubModel(maker: string, title: string): string {
   return m ? m[1].trim() : title.trim();
 }
 
+// 로마숫자(봉고Ⅲ·포터Ⅱ 등 등록증 표기) → 아라비아. 매칭 정규화 최상단에서 흡수(카탈로그 root '봉고3'과 일치).
+//   매핑 대상 10자(ⅠⅡⅢⅣⅤ + 소문자)만 명시 — 범위연산자 대신 문자집합으로 Ⅵ~Ⅿ 오염 차단.
+const ROMAN_NUM: Record<string, string> = { 'Ⅰ': '1', 'Ⅱ': '2', 'Ⅲ': '3', 'Ⅳ': '4', 'Ⅴ': '5', 'ⅰ': '1', 'ⅱ': '2', 'ⅲ': '3', 'ⅳ': '4', 'ⅴ': '5' };
 const norm = (s: unknown) =>
-  String(s || '').toLowerCase().replace(/\s+/g, '').replace(/the|신형|올뉴|디올뉴|더뉴|뉴/g, '');
+  String(s || '').replace(/[ⅠⅡⅢⅣⅤⅰⅱⅲⅳⅴ]/g, (c) => ROMAN_NUM[c] || c)
+    .toLowerCase().replace(/\s+/g, '').replace(/the|신형|올뉴|디올뉴|더뉴|뉴/g, '');
 // 모델 비교용 — 하이픈까지 제거(E-클래스↔E클래스, 5-시리즈↔5시리즈).
 const nm = (s: unknown) => norm(s).replace(/-/g, '');
 // 제조사 별칭 정규화 — KGM=쌍용=KG모빌리티, 벤츠=benz=mercedes, 쉐보레=GM대우=한국GM 등.
@@ -131,7 +135,10 @@ function preNormName(s: string): string {
   const toks = String(s || '').replace(/\s+/g, ' ').trim().split(' ');
   const out: string[] = [];
   for (const w of toks) if (out[out.length - 1] !== w) out.push(w);
-  return out.join(' ').replace(/(BMW|벤츠|아우디|Audi)(\d)/gi, '$1 $2');
+  // 벤츠 축약 표기 '벤츠C'(제조사+단일 클래스문자)만 'C클래스'로 펴줌 → MB_PAT c클래스/catalog root 매칭.
+  //   2문자+ 코드(벤츠GLC·벤츠CLA)·숫자 동반(벤츠S450)은 제외 — GLC·CLS 등 오확장 방지.
+  const expanded = out.map((w) => { const m = /^벤츠([acegs])$/i.exec(w); return m ? m[1].toLowerCase() + '클래스' : w; });
+  return expanded.join(' ').replace(/(BMW|벤츠|아우디|Audi)(\d)/gi, '$1 $2');
 }
 
 // ── 제조사 정렬 순위(국산 인기순 → 수입 인기순 → 가나다) ──
