@@ -2,7 +2,7 @@
 import { useState, useEffect, type CSSProperties } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { ChevronLeft, Menu, X, Home, Search as SearchIcon } from 'lucide-react';
+import { ChevronLeft, Menu, X, Home } from 'lucide-react';
 import { useSession, roleLabel } from '@/lib/session';
 import { useAppBarSlots } from '@/lib/appbar';
 import { useIsMobile } from '@/lib/use-mobile';
@@ -65,8 +65,8 @@ function MobileMenu({ open, onClose }: { open: boolean; onClose: () => void }) {
   if (!open) return null;
   return (
     <>
-      <div onClick={onClose} style={{ position: 'fixed', top: 54, left: 0, right: 0, bottom: 0, zIndex: 58, background: SCRIM, animation: 'fadeIn .15s ease' }} />
-      <div style={{ position: 'fixed', top: 54, left: 0, right: 0, zIndex: 59, maxHeight: 'calc(100dvh - 54px)', overflowY: 'auto', overscrollBehavior: 'contain', background: C.taupeBg, borderBottom: `1px solid ${line}`, boxShadow: 'var(--shadow-lg)', animation: 'menuDrop .18s cubic-bezier(.2,.8,.2,1)', WebkitOverflowScrolling: 'touch' }}>
+      <div onClick={onClose} style={{ position: 'fixed', top: 'var(--fp-bar-h)', left: 0, right: 0, bottom: 0, zIndex: 58, background: SCRIM, animation: 'fadeIn .15s ease' }} />
+      <div style={{ position: 'fixed', top: 'var(--fp-bar-h)', left: 0, right: 0, zIndex: 59, maxHeight: 'calc(100dvh - var(--fp-bar-h))', overflowY: 'auto', overscrollBehavior: 'contain', background: C.taupeBg, borderBottom: `1px solid ${line}`, boxShadow: 'var(--shadow-lg)', animation: 'menuDrop .18s cubic-bezier(.2,.8,.2,1)', WebkitOverflowScrolling: 'touch' }}>
         <div style={{ padding: '4px 0 16px' }}>
           {navGroups(isOperator).map((g, gi) => (
             <div key={gi} style={{ padding: '3px 0' }}>
@@ -103,7 +103,7 @@ export default function TopBar() {
   useEffect(() => { setMenuOpen(false); }, [pathname]);
   useEffect(() => {
     document.body.style.paddingBottom = mobile
-      ? (depth ? 'env(safe-area-inset-bottom)' : 'calc(54px + env(safe-area-inset-bottom))')
+      ? (depth ? 'env(safe-area-inset-bottom)' : 'calc(var(--fp-bar-h) + env(safe-area-inset-bottom))')
       : (showBottom ? '54px' : '');
     return () => { document.body.style.paddingBottom = ''; };
   }, [showBottom, mobile, depth]);
@@ -119,19 +119,15 @@ export default function TopBar() {
     const headTitle = showBack ? (slots.title ?? '') : (slots.title ?? OPERATOR_BRAND);
     return (
       <>
-        <header style={{ display: 'flex', alignItems: 'center', gap: 2, padding: '0 6px', minHeight: 54, background: 'rgba(255,255,255,0.94)', backdropFilter: 'saturate(180%) blur(12px)', WebkitBackdropFilter: 'saturate(180%) blur(12px)', borderBottom: `1px solid ${line}`, position: 'sticky', top: 0, zIndex: 30 }}>
-          {showBack ? (
-            <button onClick={goBack} aria-label="이전" style={tapTarget}><ChevronLeft size={27} /></button>
-          ) : (
-            <button onClick={() => { haptic.tap(); setMenuOpen((o) => !o); }} aria-label="메뉴" style={tapTarget}>{menuOpen ? <X size={23} /> : <Menu size={23} />}</button>
-          )}
-          <span style={{ flex: 1, minWidth: 0, fontSize: headTitle === OPERATOR_BRAND ? 19 : 17, fontWeight: 800, letterSpacing: '-0.03em', color: ink, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+        {/* erp4식 얇은 상단바 — 불투명 · 타이틀 좌 · 햄버거 우측 · 로그인정보/검색 없음(검색은 페이지 툴바로) */}
+        <header style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '0 6px', minHeight: 'var(--fp-bar-h)', background: C.taupeBg, borderBottom: `1px solid ${line}`, position: 'sticky', top: 0, zIndex: 30 }}>
+          {showBack && <button onClick={goBack} aria-label="이전" style={tapTarget}><ChevronLeft size={27} /></button>}
+          <span style={{ flex: 1, minWidth: 0, fontSize: headTitle === OPERATOR_BRAND ? 19 : 17, fontWeight: 800, letterSpacing: '-0.03em', color: ink, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', paddingLeft: showBack ? 0 : 8 }}>
             {headTitle}
           </span>
-          {!showBack && <button onClick={() => router.push('/search')} aria-label="검색" style={tapTarget}><SearchIcon size={21} /></button>}
           {showBack
             ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>{slots.actions}</span>
-            : <span style={{ fontSize: 12.5, fontWeight: 700, color: ink, padding: '0 8px', whiteSpace: 'nowrap' }} title={user.email}>{user.name}</span>}
+            : <button onClick={() => { haptic.tap(); setMenuOpen((o) => !o); }} aria-label="메뉴" style={tapTarget}>{menuOpen ? <X size={23} /> : <Menu size={23} />}</button>}
         </header>
         {/* 허브=탭 · 뎁스=하단 없음(이전은 상단←만) */}
         {!depth && <MobileTabBar />}

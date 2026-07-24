@@ -95,6 +95,10 @@
   --sidebar-w:     172px;
   --topbar-h:      48px;
   --bottombar-h:   42px;
+  /* 모바일 바 높이 SSOT — 상단바·페이지툴바·하단탭 공통(erp4 --fp-bar-h 상당). 값 하나로 전역 정합. */
+  --fp-bar-h:      54px;
+  --fp-tabbar-h:   0px;   /* 하단 탭바 표시 시 세팅 → 콘텐츠 도크 정렬 */
+  --fp-dock-safe:  env(safe-area-inset-bottom, 0px);
   /* 본문 기본 400 · 강조는 semibold/bold + brand 색 */
   --font-weight:        400;
   --font-weight-medium: 500;
