@@ -97,6 +97,7 @@
   --bottombar-h:   42px;
   /* 모바일 바 높이 SSOT — 상단바·페이지툴바·하단탭 공통(erp4 --fp-bar-h 상당). 값 하나로 전역 정합. */
   --fp-bar-h:      54px;
+  --fp-bar-pad-x:  14px;  /* 모바일 바(상단·하단액션) 좌우 패딩 */
   --fp-tabbar-h:   0px;   /* 하단 탭바 표시 시 세팅 → 콘텐츠 도크 정렬 */
   --fp-dock-safe:  env(safe-area-inset-bottom, 0px);
   /* 본문 기본 400 · 강조는 semibold/bold + brand 색 */
@@ -906,6 +907,9 @@ input[type="radio"]:disabled {
 @media (max-width: 760px) {
   :root { --font-size: 13px; --text-base: 13px; --text-md: 14px; }
   input:not([type="checkbox"]):not([type="radio"]), select, textarea { font-size: 16px !important; }
+  /* 모바일 가로스크롤 가드 — 삐져나오는 요소가 있어도 뷰포트 넘는 좌우 스크롤 금지. 우측 스크롤바 여백(gutter)도 해제. */
+  html, body { overflow-x: hidden; max-width: 100%; }
+  html { scrollbar-gutter: auto; }
 }
 
 .dialog-header {

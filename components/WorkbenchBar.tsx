@@ -18,6 +18,7 @@ import { SPACE_M, SPACE_GROUP_M } from '@/components/ui/tokens';
 import { CompanyFilter, PillTabs } from '@/components/ui/controls';
 import { SearchBox, FilterBox } from '@/components/SearchBox';
 import { FacetFilterBtn } from '@/components/FacetRail';
+import { MobileToolbar } from '@/components/ui/mobile-toolbar';   // 직접경로 — ui 배럴은 layout→WorkbenchBar 순환
 import { useFacetFilterApi } from '@/lib/facet-filter-ctx';
 
 export type WorkbenchTab<T extends string = string> = { key: T; label: React.ReactNode; title?: string; badge?: number };
@@ -84,28 +85,17 @@ export function WorkbenchBar<T extends string = string>({
   );
 
   if (mobile) {
+    // 모바일 = MobileToolbar 원자로 조립(웹 WorkbenchBar 구조를 얹지 않음). 회사필터는 여기서 1개 렌더(Page는 shellOwnsCompany로 숨김).
     return (
-      <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: SPACE_GROUP_M }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: SPACE_M, width: '100%', minWidth: 0 }}>
-          <CompanyFilter />
-          {hasSearch ? (
-            <div style={{ flex: 1, minWidth: 0 }}><SearchSlot search={resolved!} /></div>
-          ) : (
-            <span style={{ flex: 1, minWidth: 0 }} />
-          )}
-          {hasFacet && <FacetFilterBtn />}
-        </div>
-        {(tabs || subTabs || mid) && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: SPACE_M, flexWrap: 'wrap', paddingTop: 8 }}>{tabRow}</div>
-        )}
-        {(view || stat || actions) && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: SPACE_M, flexWrap: 'wrap' }}>
-            {view}
-            {stat}
-            {actions}
-          </div>
-        )}
-      </div>
+      <MobileToolbar
+        company={<CompanyFilter />}
+        search={hasSearch ? <SearchSlot search={resolved!} /> : undefined}
+        view={view}
+        filter={hasFacet ? <FacetFilterBtn /> : undefined}
+        tabs={(tabs || subTabs || mid) ? tabRow : undefined}
+        stat={stat}
+        actions={actions}
+      />
     );
   }
 
