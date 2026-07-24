@@ -14,6 +14,7 @@ import { normPlate } from './plate';
 import { deriveLocation } from './vehicle-location';
 import { companyShort } from './companies';
 import { rowWarnings, type SheetWarning } from './sheet-warnings';
+import type { RailTone as RowRail } from '@/components/ui';   // 타입 전용 — 런타임 커플링 없음
 
 export type SheetRow = {
   plate: string;
@@ -213,6 +214,28 @@ export function buildFleetRows(vehicles: VehicleNode[], insurance: EntityRecord[
   }
 
   return rows.sort((a, b) => a.plate.localeCompare(b.plate, 'ko'));
+}
+
+/**
+ * 상태 정렬 우선순위 SSOT (사장님 지정): 인도예정>만기경과>휴차>마감임박>운행중>정비 등>처분예정>처분완료.
+ *   app/sheet/page.tsx 지역 statusRank 승격 — /sheet 정렬·ObjRow 레일·홈 섹션이 공용.
+ */
+export function statusRank(r: Pick<FleetRow, 'ownership' | 'util' | 'dday'>): number {
+  if (r.ownership === '처분완료') return 8;
+  if (r.ownership === '처분예정') return 7;
+  if (r.ownership === '구매예정' || r.ownership === '등록예정') return 0;  // 인도(입고)예정
+  if (r.dday != null && r.dday < 0) return 1;                             // 만기경과(반납지남)
+  if (r.util === '휴차') return 2;                                        // 휴차
+  if (r.dday != null && r.dday >= 0 && r.dday <= 30) return 3;            // 마감임박(만기임박)
+  if (r.util === '운행') return 4;                                        // 운행중
+  return 5;                                                                // 정비 등 기타
+}
+
+/** FleetRow → ObjRow 레일색(상태축). statusRank와 같은 술어. 미수는 레일 아님(우측 금액색 danger). */
+export function fleetRail(r: Pick<FleetRow, 'ownership' | 'util' | 'dday'>): RowRail {
+  const rank = statusRank(r);
+  return rank === 0 ? 'brand' : rank === 1 ? 'danger' : rank === 2 ? 'violet'
+    : rank === 3 ? 'warn' : rank === 4 ? 'ok' : rank === 5 ? 'warn' : 'mute';
 }
 
 export function buildSheetRows(vehicles: VehicleNode[]): SheetRow[] {

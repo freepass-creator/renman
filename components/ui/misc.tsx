@@ -100,10 +100,11 @@ export function Metric({ label, value, hint, tone, onClick }: { label: React.Rea
 //  1행 신원: [회사][상태배지][차량번호(모노·무잘림) 또는 이름][차종(축소가능)] …[우측 핵심수치]
 //  2행 원자: fields(라벨-값, 우선순위 상위 3 + ＋n) 또는 sub(자유문). 좌측 2px 레일=위험 신호.
 //  호출부는 "필요한 원자만" 넘긴다. 차번=plate, 비차량 주체(자금 상대방·고객)=name, 부가식별=carType.
-export type RailTone = 'none' | 'danger' | 'warn' | 'ok' | 'mute';
+// 레일 톤 SSOT — ObjCard(2px 유령레일 포함)·ObjRow(3px 솔리드) 공용. brand·violet은 ObjRow 상태축용.
+export type RailTone = 'none' | 'brand' | 'danger' | 'warn' | 'violet' | 'ok' | 'mute';
 const RAIL: Record<RailTone, { c: string; o: number }> = {
   none: { c: C.faint, o: 0.28 }, mute: { c: C.faint, o: 0.5 },
-  danger: { c: C.danger, o: 1 }, warn: { c: C.warn, o: 1 }, ok: { c: C.ok, o: 1 },
+  brand: { c: C.brand, o: 1 }, danger: { c: C.danger, o: 1 }, warn: { c: C.warn, o: 1 }, violet: { c: C.violet, o: 1 }, ok: { c: C.ok, o: 1 },
 };
 const ATOM_CAP = 3; // 2행 원자 표시 상한 — 넘으면 ＋n(우선순위 상위만 생존, 픽셀측정 대신 count-cap)
 export function ObjCard({ badge, badgeTone = 'gray', co, rail = 'none', plate, name, carType, title, sub, right, fields, onClick }: {

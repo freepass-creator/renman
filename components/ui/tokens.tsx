@@ -9,7 +9,7 @@ export const C = {
   line: 'var(--border)', line2: 'var(--border-soft)', lineStrong: 'var(--border-strong)',
   inverse: 'var(--text-inverse)', card: 'var(--bg-card)',
   bg: 'var(--bg-page)', zebra: 'var(--bg-stripe)', head: 'var(--bg-header)', hover: 'var(--bg-hover)',
-  danger: 'var(--red-text)', ok: 'var(--green-text)', warn: 'var(--orange-text)', accent: 'var(--text-link)',
+  danger: 'var(--red-text)', ok: 'var(--green-text)', warn: 'var(--orange-text)', violet: 'var(--purple-text)', accent: 'var(--text-link)',
   brand: 'var(--brand)', taupe: 'var(--text-sub)', taupeBg: 'var(--bg-card)', taupeLine: 'var(--border)',
 };
 export const R = 4; // = --radius (jpkerp5 표준 4px)
@@ -25,6 +25,7 @@ export const SH = {
 
 /* 지표 숫자 크기 SSOT — Metric 동일. */
 export const METRIC_FS = 18;
+export const METRIC_FS_M = 16;  // 모바일 지표 숫자 — Metric 모바일 하드코딩 SSOT 복귀용
 
 /* 스크림(오버레이 배경) SSOT — Modal·Drawer·시트·팔레트·로딩오버레이 전부 이것 하나.
  *   테마 토큰 금지: 스크림은 "뒤를 가리는 어둠"이라 라이트/다크 양쪽에서 어두워야 한다.

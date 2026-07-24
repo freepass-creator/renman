@@ -5,6 +5,7 @@
 export * from './tokens';
 export * from '../Spinner';
 export * from './misc';
+export * from './obj-row';
 export * from './layout';
 export * from './controls';
 export * from './table';

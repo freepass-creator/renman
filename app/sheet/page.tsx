@@ -10,7 +10,7 @@ import { useEffect, useMemo, useState, type CSSProperties } from 'react';
 import { Download } from 'lucide-react';
 import { TODAY, dday } from '@/lib/dashboard-consts';
 import { linkFleet } from '@/lib/domain/model';
-import { buildFleetRows, type FleetRow } from '@/lib/sheet-rows';
+import { buildFleetRows, statusRank, type FleetRow } from '@/lib/sheet-rows';
 import { FLEET_BASIC_COLS, FLEET_EXPANDED_COLS, FLEET_REVEAL_COLS } from '@/lib/sheet-cols';
 import type { SheetCol } from '@/components/ui';
 import { openCar } from '@/lib/ui-bus';
@@ -24,18 +24,6 @@ type View = '기본' | '상세';
 const VIEWS: View[] = ['기본', '상세'];
 // 기간(월) 구간 선택 입력 — 툴바 컨트롤 높이(32) 규격.
 const MONTH_INPUT: CSSProperties = { height: 32, boxSizing: 'border-box', border: '1px solid var(--border)', borderRadius: 7, padding: '0 6px', fontSize: 12, background: 'var(--bg-card)', color: 'inherit', fontFamily: 'inherit' };
-// 기본 정렬 우선순위(사장님 지정): 인도예정 > 만기경과 > 휴차 > 마감임박 > 운행중 > 정비 등 > 처분.
-function statusRank(r: FleetRow): number {
-  if (r.ownership === '처분완료') return 8;
-  if (r.ownership === '처분예정') return 7;
-  if (r.ownership === '구매예정' || r.ownership === '등록예정') return 0;  // 인도(입고)예정
-  if (r.dday != null && r.dday < 0) return 1;                             // 만기경과(반납지남)
-  if (r.util === '휴차') return 2;                                        // 휴차
-  if (r.dday != null && r.dday >= 0 && r.dday <= 30) return 3;            // 마감임박(만기임박)
-  if (r.util === '운행') return 4;                                        // 운행중
-  return 5;                                                                // 정비 등 기타
-}
-
 export default function SheetPage() {
   const { data: [vs = [], cs = [], ins = [], hs = []], loading } = useEntityLists(['vehicle', 'contract', 'insurance', 'history']);
   const [view, setView] = useState<View>('기본');
