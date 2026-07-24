@@ -6,7 +6,7 @@
  */
 import type { EntityRecord } from './intake/entities';
 import type { Contract, PaymentEntry, DiscountEntry } from './payments/types';
-import { generateSchedules, recalcContract, addPaymentEntry, addDiscountEntry, distributeUnpaid, applyPayment } from './payments/payment-schedule';
+import { generateSchedules, recalcContract, addPaymentEntry, addDiscountEntry, distributeUnpaid, applyPayment, computeCurrentSeq } from './payments/payment-schedule';
 import { applyReturnedProration } from './payments/returned-proration';
 import { ymd, ddayFrom, addMonthsIso } from './contracts/dates';
 import {
@@ -168,10 +168,11 @@ export function computeContractView(rec: EntityRecord, today: string): ContractV
   const count = seedNet != null && !hasPerSeq
     ? (seedNet > 0 ? Math.max(1, rent0 > 0 ? Math.ceil(seedNet / rent0) : 1) : 0)
     : (rc.unpaidSeqCount || 0);
-  // 회차 — 도래(dueDate≤기준일)/총. 스케줄 없으면(도래창 결손) 총=대여기간 폴백.
+  // 회차 — 현재 회차(computeCurrentSeq: 최고참 미납 or 다음 예정)/총. 선불=1회차 개시일 도래·후불=+1개월.
+  // 스케줄 없으면(도래창 결손) 총=대여기간 폴백.
   const scheds = rc.schedules || [];
   const roundTotal = scheds.length || Number(rec.rentalMonths) || 0;
-  const roundDue = scheds.length ? scheds.filter((s) => s.dueDate && String(s.dueDate) <= asOf).length : 0;
+  const roundDue = scheds.length ? computeCurrentSeq(scheds, asOf) : 0;
 
   return {
     rec, status, delivered, ended, startDate: start, endDate: end,

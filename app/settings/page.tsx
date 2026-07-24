@@ -150,7 +150,7 @@ export default function SettingsPage() {
   const landingLabel = landingItems.find((it) => it.href === landing)?.label || '홈';
 
   return (
-    <Page title="설정" meta={`${user.name} · ${roleLabel(user.role)}`} tools={<WorkbenchBar />}>
+    <Page title="설정" meta={`${user.name} · ${roleLabel(user.role)}`} tools={<WorkbenchBar />} noCompany>
       <Panel title="계정">
         <ListBox>
           <ListRow main="이름" right={<span style={{ fontSize: 12.5, color: C.mute }}>{user.name}</span>} />

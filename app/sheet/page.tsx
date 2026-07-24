@@ -9,13 +9,10 @@
 import { useEffect, useMemo, useState, type CSSProperties } from 'react';
 import { Download } from 'lucide-react';
 import { TODAY, dday } from '@/lib/dashboard-consts';
-import { companyLabel } from '@/lib/companies';
-import { useSession } from '@/lib/session';
 import { linkFleet } from '@/lib/domain/model';
 import { buildFleetRows, type FleetRow } from '@/lib/sheet-rows';
 import { FLEET_BASIC_COLS, FLEET_EXPANDED_COLS, FLEET_REVEAL_COLS } from '@/lib/sheet-cols';
 import type { SheetCol } from '@/components/ui';
-import { textMatch } from '@/lib/search-match';
 import { openCar } from '@/lib/ui-bus';
 import { downloadCsv } from '@/lib/export-csv';
 import { useEntityLists } from '@/lib/use-entity-lists';
@@ -27,11 +24,20 @@ type View = '기본' | '상세';
 const VIEWS: View[] = ['기본', '상세'];
 // 기간(월) 구간 선택 입력 — 툴바 컨트롤 높이(32) 규격.
 const MONTH_INPUT: CSSProperties = { height: 32, boxSizing: 'border-box', border: '1px solid var(--border)', borderRadius: 7, padding: '0 6px', fontSize: 12, background: 'var(--bg-card)', color: 'inherit', fontFamily: 'inherit' };
+// 기본 정렬 우선순위(사장님 지정): 인도예정 > 만기경과 > 휴차 > 마감임박 > 운행중 > 정비 등 > 처분.
+function statusRank(r: FleetRow): number {
+  if (r.ownership === '처분완료') return 8;
+  if (r.ownership === '처분예정') return 7;
+  if (r.ownership === '구매예정' || r.ownership === '등록예정') return 0;  // 인도(입고)예정
+  if (r.dday != null && r.dday < 0) return 1;                             // 만기경과(반납지남)
+  if (r.util === '휴차') return 2;                                        // 휴차
+  if (r.dday != null && r.dday >= 0 && r.dday <= 30) return 3;            // 마감임박(만기임박)
+  if (r.util === '운행') return 4;                                        // 운행중
+  return 5;                                                                // 정비 등 기타
+}
 
 export default function SheetPage() {
-  const { companyId, scopeAll } = useSession();
   const { data: [vs = [], cs = [], ins = [], hs = []], loading } = useEntityLists(['vehicle', 'contract', 'insurance', 'history']);
-  const [q, setQ] = useState('');
   const [view, setView] = useState<View>('기본');
   const [fromM, setFromM] = useState('');  // 기간뷰 시작월(YYYY-MM, 빈값=무제한)
   const [toM, setToM] = useState('');      // 기간뷰 종료월
@@ -82,10 +88,9 @@ export default function SheetPage() {
         if (toM && s > toM) return false;            // 계약 시작이 구간보다 뒤
         if (fromM && e && e < fromM) return false;   // 계약 만기가 구간보다 앞(만기 없으면 진행중 통과)
       }
-      if (q.trim() && !textMatch(q, r.plate, r.carName, r.customer, r.company, r.status, r.loanCompany, r.insurer, r.phone)) return false;
       return true;
-    });
-  }, [allRows, facets, q, fromM, toM]);
+    }).sort((a, b) => statusRank(a) - statusRank(b) || a.plate.localeCompare(b.plate, 'ko'));
+  }, [allRows, facets, fromM, toM]);
 
   // 칩별 매칭 건수(erp3식 '라벨(N)') — 전체 데이터 정적 집계(교차필터 아님). 필터 술어와 동일 기준.
   const counts = useMemo(() => {
@@ -122,6 +127,8 @@ export default function SheetPage() {
   const [shown, setShown] = useState<FleetRow[]>([]);
   useEffect(() => { setShown(rows); }, [rows]);
   const netTotal = shown.reduce((s, r) => s + Math.max(0, r.net), 0);
+  const heldCnt = shown.reduce((n, r) => n + (r.ownership !== '처분완료' ? 1 : 0), 0);   // 보유대수
+  const idleCnt = shown.reduce((n, r) => n + (r.util === '휴차' ? 1 : 0), 0);            // 휴차
 
   const exportCsv = () => {
     downloadCsv(`운영시트_${view}_${TODAY}`, cols.map((c) => c.label), shown.map((r) => cols.map((c) => (c.text ? c.text(r) : ''))));
@@ -136,9 +143,15 @@ export default function SheetPage() {
           tabs={VIEWS.map((v) => ({ key: v, label: v }))}
           tab={view}
           onTab={(k) => setView(k as View)}
-          /* 대수·미수는 탭이 바꾼 결과라 탭 바로 뒤(mid)에 붙여야 읽힌다. */
-          mid={<span style={{ fontSize: 12.5, color: C.faint, whiteSpace: 'nowrap' }}>{`${scopeAll ? '전체 회사' : companyLabel(companyId)} · ${shown.length}대${netTotal > 0 ? ` · 미수 ${won(netTotal)}` : ''}`}</span>}
-          search={{ value: q, onChange: setQ, placeholder: '차번·차명·계약자·할부사·보험사' }}
+          /* 요약 = 보유대수·휴차·미수만 딱. 탭이 바꾼 결과라 탭 바로 뒤(mid). */
+          mid={
+            <span style={{ fontSize: 12.5, whiteSpace: 'nowrap', display: 'inline-flex', gap: 12, alignItems: 'baseline' }}>
+              <span>보유 <b>{heldCnt}</b></span>
+              <span>휴차 <b>{idleCnt}</b></span>
+              {netTotal > 0 && <span>미수 <b style={{ color: C.danger }}>{won(netTotal)}</b></span>}
+            </span>
+          }
+          search={false}
           actions={
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
               <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }} title="계약기간이 이 구간과 겹치는 차량만 표시">
