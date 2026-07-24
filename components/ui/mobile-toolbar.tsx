@@ -15,9 +15,11 @@ export function MobileToolbar({ company, search, sort, view, filter, menu, tabs,
   const s0 = { flexShrink: 0 } as const;
   return (
     <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: SPACE_M }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: SPACE_M, width: '100%', minWidth: 0 }}>
+      {/* erp4식: 정보(회사) 좌 · 아이콘 툴(검색·정렬·보기·필터·메뉴) 우. 인라인 검색창 없음 → 검색은 아이콘 툴→시트. */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', minWidth: 0 }}>
         {company && <span style={s0}>{company}</span>}
-        {search ? <div style={{ flex: 1, minWidth: 0 }}>{search}</div> : <span style={{ flex: 1, minWidth: 0 }} />}
+        <span style={{ flex: 1, minWidth: 0 }} />
+        {search && <span style={s0}>{search}</span>}
         {sort && <span style={s0}>{sort}</span>}
         {view && <span style={s0}>{view}</span>}
         {filter && <span style={s0}>{filter}</span>}

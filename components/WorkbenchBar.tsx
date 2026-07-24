@@ -12,7 +12,7 @@
  *   false = 검색 슬롯 숨김(예외)
  */
 import React from 'react';
-import { Menu } from 'lucide-react';
+import { Menu, Search } from 'lucide-react';
 import { useIsMobile } from '@/lib/use-mobile';
 // ui 배럴(index)은 layout→이 파일을 간접 소비 — 배럴로 끌어오면 순환. tokens/controls만 직수입.
 import { SPACE_M, SPACE_GROUP_M } from '@/components/ui/tokens';
@@ -20,6 +20,7 @@ import { CompanyFilter, PillTabs } from '@/components/ui/controls';
 import { SearchBox, FilterBox } from '@/components/SearchBox';
 import { FacetFilterBtn } from '@/components/FacetRail';
 import { MobileToolbar } from '@/components/ui/mobile-toolbar';   // 직접경로 — ui 배럴은 layout→WorkbenchBar 순환
+import { BottomSheet } from '@/components/ui/bottom-sheet';       // 검색 시트(모바일 아이콘툴)
 import { useFacetFilterApi } from '@/lib/facet-filter-ctx';
 
 export type WorkbenchTab<T extends string = string> = { key: T; label: React.ReactNode; title?: string; badge?: number };
@@ -28,6 +29,17 @@ export type WorkbenchSearch = boolean | { value: string; onChange: (q: string) =
 function SearchSlot({ search }: { search: Exclude<WorkbenchSearch, false> }) {
   if (search === true) return <SearchBox />;
   return <FilterBox value={search.value} onChange={search.onChange} placeholder={search.placeholder} />;
+}
+
+/** 모바일 검색 아이콘 툴(erp4식) — 탭하면 검색 바텀시트. 값 있으면 점 표시, 시트 열림=brand 채움. */
+function SearchToolBtn({ open, active, onClick }: { open: boolean; active: boolean; onClick: () => void }) {
+  return (
+    <button type="button" aria-label="검색" aria-pressed={open} onClick={onClick}
+      style={{ position: 'relative', flexShrink: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 40, height: 40, boxSizing: 'border-box', padding: 0, borderRadius: 'var(--radius)', cursor: 'pointer', WebkitTapHighlightColor: 'transparent', border: `1px solid ${open ? 'var(--brand)' : 'var(--border)'}`, background: open ? 'var(--brand)' : 'var(--bg-card)', color: open ? '#fff' : (active ? 'var(--brand)' : 'var(--text-sub)') }}>
+      <Search size={18} strokeWidth={2.2} />
+      {active && !open && <span style={{ position: 'absolute', top: 5, right: 5, width: 6, height: 6, borderRadius: 999, background: 'var(--brand)' }} />}
+    </button>
+  );
 }
 
 export function WorkbenchBar<T extends string = string>({
@@ -63,6 +75,7 @@ export function WorkbenchBar<T extends string = string>({
   actions?: React.ReactNode;
 }) {
   const mobile = useIsMobile();
+  const [searchOpen, setSearchOpen] = React.useState(false);
   const resolved: Exclude<WorkbenchSearch, false> | null =
     search === false ? null : (search === true || search == null ? true : search);
   const hasSearch = resolved != null;
@@ -87,18 +100,26 @@ export function WorkbenchBar<T extends string = string>({
 
   if (mobile) {
     // 모바일 = MobileToolbar 원자로 조립(웹 WorkbenchBar 구조를 얹지 않음). 회사필터는 여기서 1개 렌더(Page는 shellOwnsCompany로 숨김).
+    const searchActive = !!(resolved && resolved !== true && resolved.value.trim());
     return (
-      <MobileToolbar
-        company={<CompanyFilter />}
-        search={hasSearch ? <SearchSlot search={resolved!} /> : undefined}
-        view={view}
-        filter={hasFacet ? <FacetFilterBtn /> : undefined}
-        menu={<button type="button" aria-label="메뉴" onClick={() => window.dispatchEvent(new Event('jpk:toggle-menu'))}
-          style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 40, height: 40, flexShrink: 0, border: 'none', background: 'none', cursor: 'pointer', color: 'var(--text-main)', WebkitTapHighlightColor: 'transparent' }}><Menu size={22} /></button>}
-        tabs={(tabs || subTabs || mid) ? tabRow : undefined}
-        stat={stat}
-        actions={actions}
-      />
+      <>
+        <MobileToolbar
+          company={<CompanyFilter />}
+          search={hasSearch ? <SearchToolBtn open={searchOpen} active={searchActive} onClick={() => setSearchOpen((o) => !o)} /> : undefined}
+          view={view}
+          filter={hasFacet ? <FacetFilterBtn /> : undefined}
+          menu={<button type="button" aria-label="메뉴" onClick={() => window.dispatchEvent(new Event('jpk:toggle-menu'))}
+            style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 40, height: 40, flexShrink: 0, border: 'none', background: 'none', cursor: 'pointer', color: 'var(--text-main)', WebkitTapHighlightColor: 'transparent' }}><Menu size={22} /></button>}
+          tabs={(tabs || subTabs || mid) ? tabRow : undefined}
+          stat={stat}
+          actions={actions}
+        />
+        {hasSearch && (
+          <BottomSheet open={searchOpen} onClose={() => setSearchOpen(false)} title="검색">
+            <SearchSlot search={resolved!} />
+          </BottomSheet>
+        )}
+      </>
     );
   }
 
