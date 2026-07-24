@@ -96,7 +96,7 @@ export function WorkbenchBar<T extends string = string>({
           {hasFacet && <FacetFilterBtn />}
         </div>
         {(tabs || subTabs || mid) && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: SPACE_M, flexWrap: 'wrap', overflowX: 'auto' }}>{tabRow}</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: SPACE_M, flexWrap: 'wrap', paddingTop: 8 }}>{tabRow}</div>
         )}
         {(view || stat || actions) && (
           <div style={{ display: 'flex', alignItems: 'center', gap: SPACE_M, flexWrap: 'wrap' }}>
