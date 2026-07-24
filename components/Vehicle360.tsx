@@ -11,7 +11,7 @@ import { Sec, Cards, Metric, ObjCard, Stepper, Btn, TextLink, Badge, FormGrid, K
 import { InfoDoc, type DocReplacePayload } from '@/components/InfoDoc';
 import { docHistory, pushDocVersion, latestDoc } from '@/lib/docs';
 import { deriveLocation, locationLabel } from '@/lib/vehicle-location';
-import { contractSchedules, computeContractView, effectiveEndDate, patchDeliver, patchReturn, patchTerminate, patchExtend, patchEngineLock, earlyTerminationFee, isReturnable, deriveStatus } from '@/lib/contract-ops';
+import { contractSchedules, computeContractView, effectiveEndDate, patchTerminate, patchExtend, patchEngineLock, earlyTerminationFee, isReturnable, deriveStatus } from '@/lib/contract-ops';
 import { canTransition } from '@/lib/domain/status';
 import { isCashPurchase } from '@/lib/domain/vehicle-finance';
 import { computeVehicleTax } from '@/lib/domain/vehicle-tax';
@@ -32,6 +32,7 @@ import { QuickLogForm } from '@/components/QuickLogForm';
 import { WorkForm } from '@/components/WorkForm';
 import { isWorkRecord, workSummary, workCategoryTone, workStatusTone } from '@/lib/work-ops';
 import { saveIntake } from '@/lib/intake';
+import { runTransition } from '@/lib/contracts/commit-transition';
 import { resolveWriteCompany, NEED_COMPANY } from '@/lib/scope';
 import { commitUpdate, commitSave, commitRemove } from '@/lib/commit';
 import { TODAY, dday } from '@/lib/dashboard-consts';
@@ -203,7 +204,13 @@ export function Vehicle360({ plate, focus }: { plate: string; focus?: string }) 
     if (!active?._key) return; const key = String(active._key);
     if (txMode && !canTransition(deriveStatus(active), txMode)) { toast(`${deriveStatus(active)} 상태에선 ${txMode === 'return' ? '반납' : txMode === 'extend' ? '연장' : '해지'}할 수 없습니다`, 'error'); return; }
     if (txMode === 'return') {
-      await doTransition(patchReturn(active, txForm.date, { returnMileage: txForm.mileage ? Number(txForm.mileage) : '', fuelIn: txForm.fuel, returnSettleNote: txForm.settleNote }), key, active);
+      // 반납 = 저장경로 SSOT 오케스트레이터에 위임(fresh-guard·histKey·활동기록 정본). doTransition은 활동기록·중복가드가 없어 반납이력이 유실됐음.
+      const t = requireTarget(); if (!t) return;
+      const extra: EntityRecord = { fuelIn: txForm.fuel };
+      if (txForm.mileage) extra.returnMileage = Number(txForm.mileage);
+      if (txForm.settleNote?.trim()) extra.returnSettleNote = txForm.settleNote.trim();
+      const res = await runTransition({ action: 'return', contract: active, date: txForm.date, extra, actor: user.name, sessionCompanyId: companyId, target: t });
+      if (!res.ok) { toast(res.reason === 'ALREADY' ? '이미 반납/종료 처리된 계약입니다' : res.reason === 'SAVE_FAIL' ? '반납 저장 실패 — 다시 시도' : NEED_COMPANY, 'error'); return; }
     } else if (txMode === 'extend') {
       const m = Number(txForm.months); if (!m || m <= 0) return;
       await doTransition(patchExtend(active, m), key, active);
@@ -215,11 +222,14 @@ export function Vehicle360({ plate, focus }: { plate: string; focus?: string }) 
   };
   // 인도(출고) 확정 — 반납과 대칭: 출고 시점 주행거리·연료(원점) 캡처 + 인도 활동 이벤트 기록 + 상태 운행 전이.
   const commitDeliver = async () => {
-    if (!waiting?._key) return; const key = String(waiting._key);
+    if (!waiting?._key) return;
     if (!canTransition(deriveStatus(waiting), 'deliver')) { toast('인도할 수 있는 상태가 아닙니다', 'error'); return; }
     const t = requireTarget(); if (!t) return;
-    await doTransition(patchDeliver(waiting, dlvForm.date, { mileageOut: dlvForm.mileage ? Number(dlvForm.mileage) : '', fuelOut: dlvForm.fuel }), key, waiting);
-    await saveIntake('history', t, [{ plate, category: '인도', title: `출고(인도)${dlvForm.mileage ? ' · ' + dlvForm.mileage + 'km' : ''} · 연료 ${dlvForm.fuel}`, date: dlvForm.date, author: user.name, customer: String(waiting.contractorName || ''), contractNo: String(waiting.contractNo || ''), companyId: t, _kind: 'activity' }], { notify: false });
+    // 인도 = 저장경로 SSOT 오케스트레이터에 위임(fresh-guard로 중복 인도 차단 + histKey로 활동기록 멱등). 기존은 histKey가 없어 재시도 시 이력 중복 가능했음.
+    const extra: EntityRecord = { fuelOut: dlvForm.fuel };
+    if (dlvForm.mileage) extra.mileageOut = Number(dlvForm.mileage);
+    const res = await runTransition({ action: 'deliver', contract: waiting, date: dlvForm.date, extra, actor: user.name, sessionCompanyId: companyId, target: t });
+    if (!res.ok) { toast(res.reason === 'ALREADY' ? '이미 인도 처리된 계약입니다' : res.reason === 'SAVE_FAIL' ? '인도 저장 실패 — 다시 시도' : NEED_COMPANY, 'error'); return; }
     setDlvOpen(false);
   };
   // 시동제어 — contract.engineDisabled 정본(SSOT). gpsControl=장비 능력(가능/불가)만.
