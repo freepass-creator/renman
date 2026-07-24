@@ -10,15 +10,18 @@ import { CompanyFilter, Btn } from './controls';
 
 /* 페이지 골격 · 패널 · 섹션 · 세부 진입 껍데기 — 레이아웃 원자. */
 
-export function Page({ title, meta, left, mid, right, tools, children, fill, back, noCompany }: {
+export function Page({ title, meta, left, mid, right, tools, children, fill, frame, back, noCompany }: {
   title?: React.ReactNode; meta?: React.ReactNode; left?: React.ReactNode; mid?: React.ReactNode; right?: React.ReactNode;
   /** 셸 툴바 SSOT — WorkbenchBar. title 옆(또는 모바일 전폭). mid/right 손롤 툴바 대신 이걸 쓴다. */
   tools?: React.ReactNode;
   /** 전체회사 셀렉터 숨김 — 회사 스코프가 무의미한 페이지(개발도구 등)용. */
   noCompany?: boolean;
+  /** 엑셀 시트 모드 — 본문(children)이 뷰포트를 꽉 채우고 자체 스크롤(헤더 틀고정). 페이지 스크롤 없음. */
+  frame?: boolean;
   children: React.ReactNode; fill?: boolean; back?: () => void;
 }) {
   const mobile = useIsMobile();
+  const frameMode = !!frame && !mobile;
   const hasTitle = title != null && title !== '';
   // 모바일: 제목을 상단바 헤더로. 웹: 제목은 본문 헤더행 h1(통상 ERP — 제목이 그 페이지 툴바와 한 덩어리).
   useAppBar(
@@ -30,11 +33,12 @@ export function Page({ title, meta, left, mid, right, tools, children, fill, bac
   const showMeta = meta != null && !mobile;
   return (
     <main style={{
-      // fill(업무=FacetPage 레일 모드)=폭 꽉 채움+좌우 대칭(캡·가운데정렬 제거→필터 숨기면 공간 회수). 비-fill=캡+가운데(가독).
-      padding: mobile ? PAGE_PAD_M : '16px 24px 60px',
+      // fill(업무=FacetPage 레일 모드)=폭 꽉 채움+좌우 대칭. frame(엑셀 시트)=뷰포트 꽉 채워 본문 자체 스크롤(헤더 틀고정)·페이지 스크롤 없음. 비-fill=캡+가운데(가독).
+      padding: mobile ? PAGE_PAD_M : (frameMode ? '16px 24px 20px' : '16px 24px 60px'),
       ...(fill ? { flex: 1, minWidth: 0 } : { maxWidth: 1680, margin: '0 auto' }),
+      ...(frameMode ? { height: 'calc(100vh - 49px)', overflow: 'hidden', display: 'flex', flexDirection: 'column' } : {}),
     }}>
-      <div style={{ display: 'flex', flexWrap: mobile ? 'nowrap' : 'wrap', alignItems: 'center', gap: mobile ? SPACE_M : 10, paddingBottom: mobile ? PAGE_HEAD_PB_M : 14, minHeight: mobile ? 0 : 36 }}>
+      <div style={{ display: 'flex', flexWrap: mobile ? 'nowrap' : 'wrap', alignItems: 'center', gap: mobile ? SPACE_M : 10, paddingBottom: mobile ? PAGE_HEAD_PB_M : 14, minHeight: mobile ? 0 : 36, flexShrink: 0 }}>
         {!mobile && hasTitle && <h1 style={{ fontSize: 18, fontWeight: 800, letterSpacing: '-0.02em', margin: 0, flexShrink: 0 }}>{title}</h1>}
         {!shellOwnsCompany && !noCompany && <CompanyFilter />}
         {left != null ? (
@@ -48,15 +52,15 @@ export function Page({ title, meta, left, mid, right, tools, children, fill, bac
         )}
         {right != null && <><span style={{ flex: tools != null ? 0 : 1, minWidth: tools != null ? 0 : 8 }} />{right}</>}
       </div>
-      {children}
+      {frameMode ? <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>{children}</div> : children}
     </main>
   );
 }
 
 /** FacetRail 워크벤치 셸 — 데스크톱=좌측 레일 · 모바일=섹션 스크롤(필터는 검색 옆 버튼). */
-export function FacetPage({ title, meta, left, mid, right, tools, rail, back, children }: {
+export function FacetPage({ title, meta, left, mid, right, tools, rail, frame, back, children }: {
   title?: React.ReactNode; meta?: React.ReactNode; left?: React.ReactNode; mid?: React.ReactNode; right?: React.ReactNode;
-  tools?: React.ReactNode; rail?: React.ReactNode | null; back?: () => void; children: React.ReactNode;
+  tools?: React.ReactNode; rail?: React.ReactNode | null; frame?: boolean; back?: () => void; children: React.ReactNode;
 }) {
   const mobile = useIsMobile();
   const hasRail = rail != null;
@@ -65,7 +69,7 @@ export function FacetPage({ title, meta, left, mid, right, tools, rail, back, ch
      undefined = 필터 안 씀(손익·부가세=maxWidth 가운데). */
   const usesRail = rail !== undefined;
   const page = (
-    <Page title={title} meta={meta} left={left} mid={mid} right={right} tools={tools} fill={usesRail && !mobile} back={back}>
+    <Page title={title} meta={meta} left={left} mid={mid} right={right} tools={tools} fill={usesRail && !mobile} frame={frame} back={back}>
       {mobile && hasRail ? rail : null}{/* 모바일: 인-플로우 블록(닫히면 null) */}
       {children}
     </Page>

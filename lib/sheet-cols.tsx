@@ -93,6 +93,7 @@ export const DEBT_COLS: SheetCol<ContractRow>[] = [
  *   전체 = 기본 + 자산상세(연식·VIN·취득·검사·GPS) + 할부(할부사·원금·이율·개월) + 보험(보험사·만기·보험료) + 연체.
  *   자리 고정 — 전체는 기본 열 사이에 «끼워넣지» 말고 뒤로 확장(눈이 같은 데를 본다). */
 const won0 = (n: number) => (n ? won(n) : '—');
+const n0 = (n: number) => (n ? n.toLocaleString('ko-KR') : '—');   // 콤마 숫자(₩ 없음) — 보증금·대여료용
 const ymd = (s: string) => s ? s.slice(0, 10) : '—';
 // 만기 셀 — «한 셀 한 값»: 날짜 하나만, 긴급도는 색으로(만료·D-7=빨강 / D-30=주황 / 그 외 기본). 검사·보험 공용.
 const ddayCell = (s: string) => {
@@ -102,6 +103,15 @@ const ddayCell = (s: string) => {
   if (d == null) return t;
   const color = d < 0 ? C.danger : d <= 7 ? C.danger : d <= 30 ? C.warn : undefined;
   return color ? <span style={{ color, fontWeight: 700 }}>{t}</span> : t;
+};
+// 남은 기간 — D-day(일수) → 년/월/일. 지나면 빨강 '만기지남'. (근사: 365일=년·30일=월)
+const remainSpan = (d: number | null) => {
+  if (d == null) return '—';
+  if (d < 0) return <span style={{ color: C.danger, fontWeight: 700 }}>만기지남</span>;
+  let rem = d;
+  const y = Math.floor(rem / 365); rem -= y * 365;
+  const m = Math.floor(rem / 30); rem -= m * 30;
+  return `${y}년 ${m}월 ${rem}일`;
 };
 const FL = {
   plate: { key: 'plate', label: '차량번호', render: (r) => r.plate || '—', text: (r) => r.plate },
@@ -119,14 +129,16 @@ const FL = {
   loanAmt: { key: 'loanAmt', label: '할부원금', align: 'r', render: (r) => won0(r.loanPrincipal), text: (r) => r.loanPrincipal },
   loanRate: { key: 'loanRate', label: '이율', align: 'r', render: (r) => r.loanRate ? `${(r.loanRate * 100).toFixed(1)}%` : '—', text: (r) => r.loanRate },
   loanMon: { key: 'loanMon', label: '할부개월', align: 'r', render: (r) => r.loanMonths || '—', text: (r) => r.loanMonths },
-  cust: { key: 'cust', label: '계약자', render: (r) => r.customer || '—', text: (r) => r.customer },
+  cust: { key: 'cust', label: '사용처', render: (r) => r.customer || '—', text: (r) => r.customer },
+  term: { key: 'term', label: '계약기간', align: 'r', render: (r) => r.termMonths ? `${r.termMonths}개월` : '—', text: (r) => r.termMonths },
   phone: { key: 'phone', label: '연락처', render: (r) => r.phone || '—', text: (r) => r.phone },
-  rent: { key: 'rent', label: '월렌트', align: 'r', render: (r) => r.rent ? won(r.rent) : '—', text: (r) => r.rent },
+  rent: { key: 'rent', label: '대여료', align: 'r', render: (r) => n0(r.rent), text: (r) => r.rent },
+  dep: { key: 'dep', label: '보증금', align: 'r', render: (r) => n0(r.deposit), text: (r) => r.deposit },
   start: { key: 'start', label: '시작', render: (r) => ymd(r.start), text: (r) => r.start },
   end: { key: 'end', label: '만기', render: (r) => ymd(r.end), text: (r) => r.end },
   dday: {
-    key: 'dday', label: 'D-day', align: 'r',
-    render: (r) => r.dday == null ? '—' : r.dday < 0 ? <span style={{ color: C.danger }}>{r.dday}</span> : `D-${r.dday}`,
+    key: 'dday', label: '남은기간', align: 'r',
+    render: (r) => remainSpan(r.dday),
     text: (r) => r.dday ?? '',
   },
   insurer: { key: 'insurer', label: '보험사', render: (r) => r.insurer || '—', text: (r) => r.insurer },
@@ -134,11 +146,11 @@ const FL = {
   insPrem: { key: 'insPrem', label: '보험료', align: 'r', render: (r) => won0(r.insPremium), text: (r) => r.insPremium },
   net: {
     key: 'net', label: '미수', align: 'r',
-    render: (r) => r.net > 0 ? <span style={{ color: C.danger, fontWeight: 700 }}>{won(r.net)}</span> : '—',
+    render: (r) => r.net > 0 ? <span style={{ color: C.danger, fontWeight: 700 }}>{n0(r.net)}</span> : '—',
     text: (r) => r.net,
   },
   od: {
-    key: 'od', label: '연체일', align: 'r',
+    key: 'od', label: '미수기간', align: 'r',
     render: (r) => r.overdueDays > 0 ? <span style={{ color: r.overdueDays >= 90 ? C.danger : C.warn, fontWeight: 700 }}>{r.overdueDays}일</span> : '—',
     text: (r) => r.overdueDays,
   },
@@ -157,7 +169,7 @@ const FL = {
   },
   // 인라인 경고 — 최고심각도 톤(위험 빨강·경고 주황) + 건수. hover(title)=사유 나열. 값=sheet-warnings.
   warn: {
-    key: 'warn', label: '⚠',
+    key: 'warn', label: '경고',
     render: (r) => {
       const ws = r.warnings;
       if (!ws.length) return <span style={{ color: C.faint }}>—</span>;
@@ -173,21 +185,23 @@ const FL = {
 } satisfies Record<string, SheetCol<FleetRow>>;
 
 /** 기본 = 자산식별 + 계약자·연락처 + 기간·D-day + 월렌트 + 미수 (운영현황 스캔 필수, erp5 운영현황 준거). */
+/** 기본 = 자산기본(차번·법인·상태·차명·연식) + 계약조건(계약자·기간·보증금·대여료·잔여D-day) + 수납/리스크(미수·회수단계·⚠).
+ *  한 셀 한 값 · 자리 고정. 세부(현위치·연락처·VIN·취득·GPS·할부상세·보험·검사만기)는 전체뷰로. */
 export const FLEET_BASIC_COLS: SheetCol<FleetRow>[] = [
-  FL.plate, FL.co, FL.status, FL.loc, FL.car,
-  FL.cust, FL.phone, FL.start, FL.end, FL.dday, FL.rent,
-  FL.net, FL.warn,
+  FL.plate, FL.co, FL.status, FL.car, FL.year,                 // 자산 기본
+  FL.cust, FL.term, FL.start, FL.end, FL.dday, FL.dep, FL.rent, // 계약 조건(사용처·계약기간·시작·만기·남은기간·보증금·대여료)
+  FL.net, FL.od, FL.stage, FL.warn,                             // 수납/리스크(미수·미수기간·회수단계·경고)
 ];
 
 /** 전체 = 기본 열 «그대로» + 부가 열이 우측에 쭉 붙음(연식·VIN·취득·검사·GPS·할부·보험·연체).
  *  기본 열 순서·자리는 고정(눈이 같은 데를 본다) — 확장은 앞에 끼워넣지 않고 뒤로만. */
+/** 전체 = 기본 열 그대로 + 나머지 정보 전부(현위치·연락처·소유·가동·자산스펙·할부·보험·검사·연체). 자리 고정 — 뒤로만 확장. */
 export const FLEET_EXPANDED_COLS: SheetCol<FleetRow>[] = [
   ...FLEET_BASIC_COLS,
-  FL.own, FL.util,
-  FL.year, FL.vin, FL.acqDate, FL.acqPrice, FL.inspect, FL.gps,
+  FL.loc, FL.phone, FL.own, FL.util,
+  FL.vin, FL.acqDate, FL.acqPrice, FL.gps,
   FL.loanCo, FL.loanAmt, FL.loanRate, FL.loanMon, FL.loanStart,
-  FL.insurer, FL.insEnd, FL.insPrem,
-  FL.od, FL.stage,
+  FL.insurer, FL.insEnd, FL.insPrem, FL.inspect,
 ];
 
 /** 사이드필터 칩 → 기본뷰에서 «필터 걸면 자동 노출»할 대응 컬럼. 값을 보며 거른다.

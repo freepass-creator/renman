@@ -108,7 +108,7 @@ export type FleetRow = {
   // 할부
   loanCompany: string; loanPrincipal: number; loanRate: number; loanMonths: number; loanStart: string;
   // 계약(활성)
-  customer: string; phone: string; rent: number; start: string; end: string; dday: number | null;
+  customer: string; phone: string; rent: number; deposit: number; termMonths: number; start: string; end: string; dday: number | null;
   // 보험
   insurer: string; insEnd: string; insPremium: number;
   // 미수
@@ -162,6 +162,8 @@ export function buildFleetRows(vehicles: VehicleNode[], insurance: EntityRecord[
       customer: active?.customer || '',
       phone: String(v?.rec.contractorPhone || ''),
       rent: Number(v?.rec.monthlyRent) || 0,
+      deposit: Number(v?.rec.deposit) || 0,
+      termMonths: Number(v?.rec.rentalMonths) || 0,
       start: String(v?.rec.startDate || v?.rec.deliveredDate || ''),
       end: String(v?.rec.endDate || ''),
       dday: v?.dday ?? null,

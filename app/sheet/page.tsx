@@ -45,6 +45,7 @@ export default function SheetPage() {
     const due = ['검사임박', '보험임박'].filter((x) => facets.has(x));
     const debt = ['할부있음', '보험없음'].filter((x) => facets.has(x));
     const warn = ['경고있음', '위험만'].filter((x) => facets.has(x));
+    const ct = ['만기임박', '반납지남', '계약없음'].filter((x) => facets.has(x));
     return allRows.filter((r) => {
       const held = r.ownership !== '처분완료';
       if (bo.length && !((bo.includes('보유') && held) || (bo.includes('매각') && !held))) return false;
@@ -56,6 +57,11 @@ export default function SheetPage() {
       }
       if (debt.length && !((debt.includes('할부있음') && r.loanCompany && r.loanCompany !== '현금') || (debt.includes('보험없음') && !r.insurer))) return false;
       if (warn.length && !((warn.includes('경고있음') && r.warnings.length > 0) || (warn.includes('위험만') && r.warnings.some((w) => w.sev === 'high')))) return false;
+      if (ct.length && !(
+        (ct.includes('만기임박') && r.dday != null && r.dday >= 0 && r.dday <= 30)
+        || (ct.includes('반납지남') && r.dday != null && r.dday < 0)
+        || (ct.includes('계약없음') && !r.customer)
+      )) return false;
       if (q.trim() && !textMatch(q, r.plate, r.carName, r.customer, r.company, r.status, r.loanCompany, r.insurer, r.phone)) return false;
       return true;
     });
@@ -63,10 +69,13 @@ export default function SheetPage() {
 
   // 칩별 매칭 건수(erp3식 '라벨(N)') — 전체 데이터 정적 집계(교차필터 아님). 필터 술어와 동일 기준.
   const counts = useMemo(() => {
-    const c: Record<string, number> = { 보유: 0, 매각: 0, 운행: 0, 휴차: 0, 정비: 0, 경고있음: 0, 위험만: 0, 미수있음: 0, '연체90일+': 0, 검사임박: 0, 보험임박: 0, 할부있음: 0, 보험없음: 0 };
+    const c: Record<string, number> = { 보유: 0, 매각: 0, 운행: 0, 휴차: 0, 정비: 0, 만기임박: 0, 반납지남: 0, 계약없음: 0, 경고있음: 0, 위험만: 0, 미수있음: 0, '연체90일+': 0, 검사임박: 0, 보험임박: 0, 할부있음: 0, 보험없음: 0 };
     for (const r of allRows) {
       if (r.ownership !== '처분완료') c['보유']++; else c['매각']++;
       if (c[r.util] != null) c[r.util]++;
+      if (r.dday != null && r.dday >= 0 && r.dday <= 30) c['만기임박']++;
+      if (r.dday != null && r.dday < 0) c['반납지남']++;
+      if (!r.customer && r.ownership !== '처분완료' && r.status !== '차량없음') c['계약없음']++;
       if (r.warnings.length > 0) c['경고있음']++;
       if (r.warnings.some((w) => w.sev === 'high')) c['위험만']++;
       if (r.net > 0) c['미수있음']++;
@@ -99,6 +108,7 @@ export default function SheetPage() {
 
   return (
     <FacetPage
+      frame
       title="운영시트"
       tools={
         <WorkbenchBar

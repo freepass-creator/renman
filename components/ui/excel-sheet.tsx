@@ -190,9 +190,10 @@ export function ExcelSheet<T>({ cols, rows, onRow, rowKey, onFiltered, mode = 'e
 
   return (
     <>
-      {/* 세로 캡 제거 — 세로는 페이지 스크롤 하나만(박스=내용 높이), 가로만 박스 내부 스크롤. 이중 스크롤·하단 갭 방지. */}
+      {/* frame(Page frame 모드)=부모 flex-column 채움 → 내부 스크롤 하나·헤더(thX sticky top:0) 틀고정.
+          비-frame=block(높이=내용)이라 flex:1 무시·페이지 스크롤. 어느 쪽이든 이중 스크롤·하단 갭 없음. */}
       <div style={{
-        overflowX: 'auto',
+        flex: '1 1 auto', minHeight: 0, overflow: 'auto',
         border: `1px solid ${C.line}`, borderRadius: 4, background: C.card,
       }}>
         <table style={{ borderCollapse: 'separate', borderSpacing: 0, fontSize: 12, width: 'max-content', minWidth: '100%' }}>

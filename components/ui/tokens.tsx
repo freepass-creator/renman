@@ -151,13 +151,14 @@ const EXCEL_PAD_X = 8;
 const EXCEL_ROW_H = 36;
 export const thX: CSSProperties = {
   padding: `${EXCEL_PAD_Y}px ${EXCEL_PAD_X}px`, textAlign: 'left', fontSize: 12, color: C.mute, fontWeight: 700,
-  background: C.head, borderBottom: `1px solid ${C.line}`, whiteSpace: 'nowrap',
+  background: C.head, borderBottom: `1px solid ${C.line}`, borderRight: `1px solid ${C.line}`, whiteSpace: 'nowrap',
   position: 'sticky', top: 0, zIndex: 2,
 };
 export const thXR: CSSProperties = { ...thX, textAlign: 'right', fontFamily: NUM, fontVariantNumeric: 'tabular-nums' };
 export const thXPin: CSSProperties = { ...thX, left: 0, zIndex: 5, boxShadow: `1px 0 0 ${C.line}` };
 export const tdX: CSSProperties = {
   padding: `${EXCEL_PAD_Y}px ${EXCEL_PAD_X}px`, fontSize: 12, whiteSpace: 'nowrap', color: C.ink,
+  borderRight: `1px solid ${C.line2}`,   // 세로 격자선 — 엑셀식. 좌/우 정렬 무관하게 칸 경계 균일.
   verticalAlign: 'middle', height: EXCEL_ROW_H, maxHeight: EXCEL_ROW_H, boxSizing: 'border-box', overflow: 'hidden',
 };
 export const tdXR: CSSProperties = { ...tdX, textAlign: 'right', fontVariantNumeric: 'tabular-nums', fontFamily: NUM, fontWeight: 600 };
