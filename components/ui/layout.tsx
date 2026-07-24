@@ -42,7 +42,15 @@ export function Page({ title, meta, left, mid, right, tools, children, fill, fra
           ? { flex: 1, minWidth: 0, maxWidth: 1680, margin: '0 auto', width: '100%' }
           : { maxWidth: 1680, margin: '0 auto' }),
     }}>
-      <div style={{ display: 'flex', flexWrap: mobile ? 'nowrap' : 'wrap', alignItems: 'center', gap: mobile ? SPACE_M : 10, paddingBottom: mobile ? PAGE_HEAD_PB_M : 14, minHeight: mobile ? 0 : 36, flexShrink: 0 }}>
+      {/* 모바일: 툴바(tools=WorkbenchBar)를 상단바 바로 아래 sticky 고정 — 스크롤에 안 사라짐(P0④).
+          main 패딩(12/14)을 음수마진으로 bleed해 전폭 배경, 콘텐츠는 그 아래로 스크롤. */}
+      <div style={{ display: 'flex', flexWrap: mobile ? 'nowrap' : 'wrap', alignItems: 'center', gap: mobile ? SPACE_M : 10, minHeight: mobile ? 0 : 36, flexShrink: 0,
+        ...(mobile
+          ? (tools != null
+              ? { position: 'sticky' as const, top: 'var(--fp-bar-h)', zIndex: 20, background: 'var(--bg-page)', margin: '-12px -14px 0', padding: '10px 14px 8px', borderBottom: `1px solid ${C.line}` }
+              : { paddingBottom: PAGE_HEAD_PB_M })
+          : { paddingBottom: 14 }),
+      }}>
         {!mobile && hasTitle && <h1 style={{ fontSize: 18, fontWeight: 800, letterSpacing: '-0.02em', margin: 0, flexShrink: 0 }}>{title}</h1>}
         {!shellOwnsCompany && !noCompany && <CompanyFilter />}
         {left != null ? (
