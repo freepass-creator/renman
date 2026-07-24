@@ -11,3 +11,6 @@ next-env.d.ts
 tmp/
 _lens*.cjs
 tmp_*.txt
+
+tsc-out.txt
+tsc-result.txt
