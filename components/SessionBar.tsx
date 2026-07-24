@@ -131,10 +131,9 @@ export default function TopBar() {
     // ERP4: 메뉴 열림 → 상태창이「☰ 메뉴」로 바뀌고 우측 X · 패널은 bar 아래 펼침.
     const status = slots.title ?? OPERATOR_BRAND;
     const mh = ctrlH(true);
+    // 열린 상태 좌측 라벨 = «메뉴» 텍스트만. 햄버거 아이콘 금지(우측 X가 닫기 담당 — 열렸는데 ☰ 있으면 헷갈림).
     const menuLabel = (
-      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 15, fontWeight: 800, color: ink, letterSpacing: '-0.01em' }}>
-        <Menu size={20} strokeWidth={2.4} /> 메뉴
-      </span>
+      <span style={{ fontSize: 15, fontWeight: 800, color: ink, letterSpacing: '-0.01em' }}>메뉴</span>
     );
     return (
       <>
