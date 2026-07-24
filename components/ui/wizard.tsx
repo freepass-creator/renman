@@ -44,13 +44,16 @@ export function WizPanel({ title, meta, onClose, footer, children }: {
   title: ReactNode; meta?: ReactNode; onClose: () => void; footer?: ReactNode; children: ReactNode;
 }) {
   return (
+    // overflow:hidden 제거 — sticky 푸터가 뷰포트(페이지 스크롤) 기준으로 붙게 하려면 조상에 overflow 없어야 함.
+    //   대신 헤더 상단·푸터 하단에 라운딩을 개별 부여해 모서리 둥근 룩 보존(children div는 배경 없어 하단 노출 무해).
     <div style={{
       border: `1px solid ${C.line}`, borderRadius: R, background: C.card,
-      boxShadow: SH.card, overflow: 'hidden',
+      boxShadow: SH.card,
     }}>
       <div style={{
         display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap',
         padding: '12px 16px', background: C.head,
+        borderTopLeftRadius: R, borderTopRightRadius: R,
       }}>
         <span style={{ fontSize: 15, fontWeight: 800, color: C.ink }}>{title}</span>
         {meta != null && <span style={{ fontSize: 12, color: C.mute }}>{meta}</span>}
@@ -59,9 +62,13 @@ export function WizPanel({ title, meta, onClose, footer, children }: {
       </div>
       <div style={{ padding: 16 }}>{children}</div>
       {footer != null && (
+        // 긴 현장 위저드(반납 5스텝) 스크롤 중 확정 CTA를 뷰포트 하단에 고정 — 오버레이 아님(문서 흐름 내 sticky).
         <div style={{
+          position: 'sticky', bottom: 0, zIndex: 1,
           display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap',
-          padding: '12px 16px', background: C.taupeBg,
+          padding: '12px 16px max(12px, env(safe-area-inset-bottom))', background: C.taupeBg,
+          borderTop: `1px solid ${C.line}`, boxShadow: '0 -2px 8px rgba(0,0,0,0.06)',
+          borderBottomLeftRadius: R, borderBottomRightRadius: R,
         }}>{footer}</div>
       )}
     </div>
