@@ -155,6 +155,7 @@ export const thX: CSSProperties = {
   position: 'sticky', top: 0, zIndex: 2,
 };
 export const thXR: CSSProperties = { ...thX, textAlign: 'right', fontFamily: NUM, fontVariantNumeric: 'tabular-nums' };
+export const thXC: CSSProperties = { ...thX, textAlign: 'center' };
 export const thXPin: CSSProperties = { ...thX, left: 0, zIndex: 5, boxShadow: `1px 0 0 ${C.line}` };
 export const tdX: CSSProperties = {
   padding: `${EXCEL_PAD_Y}px ${EXCEL_PAD_X}px`, fontSize: 12, whiteSpace: 'nowrap', color: C.ink,
@@ -162,4 +163,5 @@ export const tdX: CSSProperties = {
   verticalAlign: 'middle', height: EXCEL_ROW_H, maxHeight: EXCEL_ROW_H, boxSizing: 'border-box', overflow: 'hidden',
 };
 export const tdXR: CSSProperties = { ...tdX, textAlign: 'right', fontVariantNumeric: 'tabular-nums', fontFamily: NUM, fontWeight: 600 };
+export const tdXC: CSSProperties = { ...tdX, textAlign: 'center' };
 export const tdXPin: CSSProperties = { ...tdX, position: 'sticky', left: 0, zIndex: 1, boxShadow: `1px 0 0 ${C.line}`, fontFamily: NUM, fontWeight: 700 };

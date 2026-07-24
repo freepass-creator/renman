@@ -103,7 +103,7 @@ export function buildContractRows(contracts: ContractNode[]): ContractRow[] {
 export type FleetRow = {
   plate: string; companyId: string; company: string;
   // 자산
-  ownership: string; util: string; status: string; location: string; carName: string; year: string; vin: string;
+  ownership: string; util: string; status: string; location: string; carName: string; maker: string; subModel: string; year: string; vin: string;
   acqDate: string; acqPrice: number; inspectionTo: string; gps: string;
   // 할부
   loanCompany: string; loanPrincipal: number; loanRate: number; loanMonths: number; loanStart: string;
@@ -148,6 +148,8 @@ export function buildFleetRows(vehicles: VehicleNode[], insurance: EntityRecord[
       company: companyShort(asset.companyId),
       ownership: asset.ownership, util: asset.util, status: asset.status, location: asset.location,
       carName: String(veh?.carName || veh?.model || active?.view.rec.carName || ''),
+      maker: String(veh?.maker || ''),
+      subModel: String(veh?.subModel || veh?.modelLine || ''),
       year: String(veh?.firstReg || veh?.yearMonth || '').slice(0, 4),
       vin: String(veh?.vin || ''),
       acqDate: String(veh?.acquisitionDate || ''),

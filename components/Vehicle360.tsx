@@ -354,12 +354,15 @@ export function Vehicle360({ plate, focus }: { plate: string; focus?: string }) 
     <div>
       {/* 차량번호는 DetailShell title(모바일=상단바·웹=h1). 여기는 상태·법인·핵심수치만. */}
       {/* 헤더 = 상태 배지 + 법인만. 미수·반납지남은 아래 미결·리스크 칩(정본)·현황으로 위임(중복 제거). */}
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap', marginBottom: 14 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 14 }}>
         <Badge tone={statusTone}>{status}</Badge>
         {/* 차명·연식 = 상단 기본정보(차량번호는 DetailShell 타이틀). 모바일은 wrap. */}
         {v?.carName ? <span style={{ fontSize: 13.5, fontWeight: 800, color: C.ink }}>{String(v.carName)}</span> : null}
         {(() => { const yr = String(v?.modelYear || v?.yearMonth || (v?.firstReg ? String(v.firstReg).slice(0, 4) + '년식' : '')); return yr ? <span style={{ fontSize: 12.5, color: C.mute }}>{yr}</span> : null; })()}
         {v?.companyId ? <span style={{ fontSize: 12.5, color: C.faint }}>{companyLabel(String(v.companyId))}</span> : null}
+        <span style={{ flex: 1 }} />
+        {/* 손님 통화·상담 이력 = 활동·이력 섹션(하단)의 빠른기록. 헤더에서 바로 접근(스크롤+폼 열기). */}
+        <Btn variant="ghost" size="sm" onClick={() => { setLogOpen(true); goSec('v-history'); }}>통화·기록</Btn>
       </div>
 
       {/* 미결·리스크 — "지금 문제"만 맨 위(관리 by exception). 칩 클릭 = 해당 섹션/처리로 이동. 무박스(칩 흐름). */}

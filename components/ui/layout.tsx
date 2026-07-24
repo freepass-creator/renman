@@ -33,10 +33,14 @@ export function Page({ title, meta, left, mid, right, tools, children, fill, fra
   const showMeta = meta != null && !mobile;
   return (
     <main style={{
-      // fill(업무=FacetPage 레일 모드)=폭 꽉 채움+좌우 대칭. frame(엑셀 시트)=뷰포트 꽉 채워 본문 자체 스크롤(헤더 틀고정)·페이지 스크롤 없음. 비-fill=캡+가운데(가독).
+      // frame(엑셀 시트)=전폭·뷰포트 꽉 채워 자체 스크롤(헤더 틀고정)·페이지 스크롤 없음.
+      // 그 외(카드·문서)=1680 캡+가운데 — 가로형 카드가 뷰포트 전체로 늘어나 «표»처럼 보이지 않게.
       padding: mobile ? PAGE_PAD_M : (frameMode ? '16px 24px 20px' : '16px 24px 60px'),
-      ...(fill ? { flex: 1, minWidth: 0 } : { maxWidth: 1680, margin: '0 auto' }),
-      ...(frameMode ? { height: 'calc(100vh - 49px)', overflow: 'hidden', display: 'flex', flexDirection: 'column' } : {}),
+      ...(frameMode
+        ? { flex: 1, minWidth: 0, height: 'calc(100vh - 49px)', overflow: 'hidden', display: 'flex', flexDirection: 'column' }
+        : fill
+          ? { flex: 1, minWidth: 0, maxWidth: 1680, margin: '0 auto', width: '100%' }
+          : { maxWidth: 1680, margin: '0 auto' }),
     }}>
       <div style={{ display: 'flex', flexWrap: mobile ? 'nowrap' : 'wrap', alignItems: 'center', gap: mobile ? SPACE_M : 10, paddingBottom: mobile ? PAGE_HEAD_PB_M : 14, minHeight: mobile ? 0 : 36, flexShrink: 0 }}>
         {!mobile && hasTitle && <h1 style={{ fontSize: 18, fontWeight: 800, letterSpacing: '-0.02em', margin: 0, flexShrink: 0 }}>{title}</h1>}

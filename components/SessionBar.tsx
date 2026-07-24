@@ -15,6 +15,8 @@ import { TopSearch } from '@/components/TopSearch';
 
 // 상단 좌측 브랜드 = 이 ERP를 쓰는 운영사(테넌트) 이름. 임시 하드코딩 — 추후 로그인 유저의 소속회사로.
 const OPERATOR_BRAND = 'teamjpk';
+// 배포 표시버전 SSOT — 메뉴 하단 노출. 배포 때 SemVer로 올림: MAJOR(풀체인지)·MINOR(구조개편)·PATCH(소소). package.json과 별개(레포 내부값).
+const APP_VERSION = '6.0.0';
 
 // 메뉴 = lib/nav NAV_GROUPS SSOT (현황=보기 · 업무=손대기 · 경영=지표).
 //   hqOnly 항목(개발도구 등)은 본사(마스터)에게만 노출 — 직원 계정엔 숨김.
@@ -47,6 +49,10 @@ function NavMenu() {
               ))}
             </div>
           ))}
+          {/* 배포 버전 — 메뉴 하단(erp4식). 배포 확인용. APP_VERSION SSOT. */}
+          <div style={{ borderTop: `1px solid ${line}`, padding: '7px 14px', fontSize: 11, color: weak, fontFamily: 'var(--font-mono)', letterSpacing: '0.02em' }}>
+            {OPERATOR_BRAND} · v{APP_VERSION}
+          </div>
         </div>
       </>)}
     </div>
@@ -73,6 +79,10 @@ function MobileMenu({ open, onClose }: { open: boolean; onClose: () => void }) {
               ))}
             </div>
           ))}
+          {/* 배포 버전 — 메뉴 하단(erp4식). */}
+          <div style={{ borderTop: `1px solid ${line}`, margin: '4px 20px 0', padding: '12px 0 4px', fontSize: 12, color: weak, fontFamily: 'var(--font-mono)', letterSpacing: '0.02em' }}>
+            {OPERATOR_BRAND} · v{APP_VERSION}
+          </div>
         </div>
       </div>
     </>

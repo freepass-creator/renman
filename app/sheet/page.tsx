@@ -23,23 +23,29 @@ import { FacetPage, ExcelSheet, Btn, EmptyState, PageLoading, won, C } from '@/c
 import { FacetRail } from '@/components/FacetRail';
 import { WorkbenchBar } from '@/components/WorkbenchBar';
 
-type View = '기본' | '전체';
-const VIEWS: View[] = ['기본', '전체'];
+type View = '기본' | '상세';
+const VIEWS: View[] = ['기본', '상세'];
 
 export default function SheetPage() {
   const { companyId, scopeAll } = useSession();
   const { data: [vs = [], cs = [], ins = [], hs = []], loading } = useEntityLists(['vehicle', 'contract', 'insurance', 'history']);
   const [q, setQ] = useState('');
   const [view, setView] = useState<View>('기본');
-  const [facets, setFacets] = useState<Set<string>>(new Set(['보유'])); // 기본: 보유차량만
-  const toggleFacet = (label: string) => setFacets((s) => { const n = new Set(s); n.has(label) ? n.delete(label) : n.add(label); return n; });
-  const resetFacets = () => setFacets(new Set());
+  const [facets, setFacets] = useState<Set<string>>(new Set(['보유'])); // 기본: 보유차량만(단일선택 라디오의 기본 눌린 값)
+  // 보유/전체/매각 = 단일선택(라디오) — 하나만. 나머지 칩은 다중 토글.
+  const OWN = ['보유', '전체', '매각'];
+  const toggleFacet = (label: string) => setFacets((s) => {
+    const n = new Set(s);
+    if (OWN.includes(label)) { OWN.forEach((o) => n.delete(o)); n.add(label); }
+    else { n.has(label) ? n.delete(label) : n.add(label); }
+    return n;
+  });
+  const resetFacets = () => setFacets(new Set(['보유']));   // 초기화 = 기본(보유)
 
   const fleet = useMemo(() => linkFleet(vs, cs, TODAY), [vs, cs]);
   const allRows = useMemo(() => buildFleetRows(fleet.vehicles, ins, fleet.contracts, hs, TODAY), [fleet, ins, hs]);
 
   const rows = useMemo(() => {
-    const bo = ['보유', '매각'].filter((x) => facets.has(x));
     const util = ['운행', '휴차', '정비'].filter((x) => facets.has(x));
     const misu = ['미수있음', '연체90일+'].filter((x) => facets.has(x));
     const due = ['검사임박', '보험임박'].filter((x) => facets.has(x));
@@ -48,7 +54,10 @@ export default function SheetPage() {
     const ct = ['만기임박', '반납지남', '계약없음'].filter((x) => facets.has(x));
     return allRows.filter((r) => {
       const held = r.ownership !== '처분완료';
-      if (bo.length && !((bo.includes('보유') && held) || (bo.includes('매각') && !held))) return false;
+      // 보유(기본·미선택 포함)=처분완료 제외 · 전체=전부 · 매각=처분완료만.
+      if (facets.has('전체')) { /* 전부 표시 */ }
+      else if (facets.has('매각')) { if (held) return false; }
+      else if (!held) return false;
       if (util.length && !util.includes(r.util)) return false;
       if (misu.length && !((misu.includes('미수있음') && r.net > 0) || (misu.includes('연체90일+') && r.overdueDays >= 90))) return false;
       if (due.length) {
@@ -69,8 +78,9 @@ export default function SheetPage() {
 
   // 칩별 매칭 건수(erp3식 '라벨(N)') — 전체 데이터 정적 집계(교차필터 아님). 필터 술어와 동일 기준.
   const counts = useMemo(() => {
-    const c: Record<string, number> = { 보유: 0, 매각: 0, 운행: 0, 휴차: 0, 정비: 0, 만기임박: 0, 반납지남: 0, 계약없음: 0, 경고있음: 0, 위험만: 0, 미수있음: 0, '연체90일+': 0, 검사임박: 0, 보험임박: 0, 할부있음: 0, 보험없음: 0 };
+    const c: Record<string, number> = { 보유: 0, 전체: 0, 매각: 0, 운행: 0, 휴차: 0, 정비: 0, 만기임박: 0, 반납지남: 0, 계약없음: 0, 경고있음: 0, 위험만: 0, 미수있음: 0, '연체90일+': 0, 검사임박: 0, 보험임박: 0, 할부있음: 0, 보험없음: 0 };
     for (const r of allRows) {
+      c['전체']++;
       if (r.ownership !== '처분완료') c['보유']++; else c['매각']++;
       if (c[r.util] != null) c[r.util]++;
       if (r.dday != null && r.dday >= 0 && r.dday <= 30) c['만기임박']++;
@@ -90,7 +100,7 @@ export default function SheetPage() {
 
   // 기본뷰: 기본 컬럼 + «켜진 필터»에 대응하는 컬럼을 우측에 자동 노출(값 보며 거르기). 전체뷰: 전 컬럼.
   const cols = useMemo(() => {
-    if (view === '전체') return FLEET_EXPANDED_COLS;
+    if (view === '상세') return FLEET_EXPANDED_COLS;
     const seen = new Set(FLEET_BASIC_COLS.map((c) => c.key));
     const extra: SheetCol<FleetRow>[] = [];
     for (const label of facets) for (const c of (FLEET_REVEAL_COLS[label] || [])) if (!seen.has(c.key)) { seen.add(c.key); extra.push(c); }

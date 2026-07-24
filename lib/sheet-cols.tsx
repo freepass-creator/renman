@@ -16,8 +16,9 @@ const toneBadge = (t: SheetRow['tone']): 'green' | 'amber' | 'red' | 'gray' =>
 export const ASSET_COLS: SheetCol<SheetRow>[] = [
   { key: 'plate', label: '차량번호', render: (r) => r.plate || '—', text: (r) => r.plate },
   { key: 'co', label: '법인', render: (r) => r.company || '—', text: (r) => r.company },
-  { key: 'own', label: '소유', render: (r) => <Badge tone="gray">{r.ownership}</Badge>, text: (r) => r.ownership },
-  { key: 'util', label: '가동', render: (r) => <Badge tone={toneBadge(r.tone)}>{r.util}</Badge>, text: (r) => r.util },
+  // 생애단계 = 카드뷰 섹션(구매예정·등록예정·보유중·처분예정·처분완료)이 엑셀에선 이 분류 열로. align center.
+  { key: 'own', label: '생애단계', align: 'c', render: (r) => <Badge tone={r.ownership === '보유중' ? 'green' : r.ownership === '처분완료' ? 'gray' : 'amber'}>{r.ownership}</Badge>, text: (r) => r.ownership },
+  { key: 'util', label: '가동', align: 'c', render: (r) => <Badge tone={toneBadge(r.tone)}>{r.util}</Badge>, text: (r) => r.util },
   { key: 'car', label: '차명', render: (r) => r.carName || '—', text: (r) => r.carName },
   { key: 'year', label: '연식', render: (r) => r.year || '—', text: (r) => r.year },
   { key: 'cust', label: '계약자', render: (r) => r.customer || '—', text: (r) => r.customer },
@@ -119,6 +120,8 @@ const FL = {
   status: { key: 'status', label: '상태', render: (r) => <Badge tone={toneBadge(r.tone)}>{r.status}</Badge>, text: (r) => r.status },
   loc: { key: 'loc', label: '현위치', render: (r) => r.location || '—', text: (r) => r.location },
   car: { key: 'car', label: '차명', render: (r) => r.carName || '—', text: (r) => r.carName },
+  maker: { key: 'maker', label: '제조사', render: (r) => r.maker || '—', text: (r) => r.maker },
+  sub: { key: 'sub', label: '세부모델', render: (r) => r.subModel || '—', text: (r) => r.subModel },
   year: { key: 'year', label: '연식', render: (r) => r.year || '—', text: (r) => r.year },
   vin: { key: 'vin', label: '차대번호', render: (r) => r.vin || '—', text: (r) => r.vin },
   acqDate: { key: 'acqDate', label: '취득일', render: (r) => ymd(r.acqDate), text: (r) => r.acqDate },
@@ -187,29 +190,34 @@ const FL = {
 /** 기본 = 자산식별 + 계약자·연락처 + 기간·D-day + 월렌트 + 미수 (운영현황 스캔 필수, erp5 운영현황 준거). */
 /** 기본 = 자산기본(차번·법인·상태·차명·연식) + 계약조건(계약자·기간·보증금·대여료·잔여D-day) + 수납/리스크(미수·회수단계·⚠).
  *  한 셀 한 값 · 자리 고정. 세부(현위치·연락처·VIN·취득·GPS·할부상세·보험·검사만기)는 전체뷰로. */
-export const FLEET_BASIC_COLS: SheetCol<FleetRow>[] = [
-  FL.plate, FL.co, FL.status, FL.car, FL.year,                 // 자산 기본
-  FL.cust, FL.term, FL.start, FL.end, FL.dday, FL.dep, FL.rent, // 계약 조건(사용처·계약기간·시작·만기·남은기간·보증금·대여료)
-  FL.net, FL.od, FL.stage, FL.warn,                             // 수납/리스크(미수·미수기간·회수단계·경고)
-];
+// 정렬 배정 — 좌(식별자·이름·VIN)=기본 · 우(금액·율)=각 FL의 align'r' 유지 · 가운데(짧은값·날짜·배지·코드)=아래 집합으로 일괄.
+const CENTER_ALIGN = new Set(['co', 'status', 'year', 'term', 'start', 'end', 'dday', 'od', 'stage', 'warn', 'own', 'util', 'phone', 'gps', 'acqDate', 'loanMon', 'loanStart', 'insurer', 'insEnd', 'loanCo', 'inspect']);
+const alignCols = (cols: SheetCol<FleetRow>[]): SheetCol<FleetRow>[] =>
+  cols.map((c) => (CENTER_ALIGN.has(c.key) ? { ...c, align: 'c' as const } : c));
+
+export const FLEET_BASIC_COLS: SheetCol<FleetRow>[] = alignCols([
+  FL.plate, FL.co, FL.status, FL.maker, FL.sub, FL.year,       // 자산 기본(차번·제조사·세부모델=좌 · 법인·상태·연식=중)
+  FL.cust, FL.term, FL.start, FL.end, FL.dday, FL.dep, FL.rent, // 계약(사용처=좌 · 계약기간·시작·만기·남은기간=중 · 보증금·대여료=우)
+  FL.net, FL.od, FL.stage, FL.warn,                             // 수납/리스크(미수=우 · 미수기간·회수단계·경고=중)
+]);
 
 /** 전체 = 기본 열 «그대로» + 부가 열이 우측에 쭉 붙음(연식·VIN·취득·검사·GPS·할부·보험·연체).
  *  기본 열 순서·자리는 고정(눈이 같은 데를 본다) — 확장은 앞에 끼워넣지 않고 뒤로만. */
 /** 전체 = 기본 열 그대로 + 나머지 정보 전부(현위치·연락처·소유·가동·자산스펙·할부·보험·검사·연체). 자리 고정 — 뒤로만 확장. */
-export const FLEET_EXPANDED_COLS: SheetCol<FleetRow>[] = [
+export const FLEET_EXPANDED_COLS: SheetCol<FleetRow>[] = alignCols([
   ...FLEET_BASIC_COLS,
-  FL.loc, FL.phone, FL.own, FL.util,
+  FL.car, FL.loc, FL.phone, FL.own, FL.util,
   FL.vin, FL.acqDate, FL.acqPrice, FL.gps,
   FL.loanCo, FL.loanAmt, FL.loanRate, FL.loanMon, FL.loanStart,
   FL.insurer, FL.insEnd, FL.insPrem, FL.inspect,
-];
+]);
 
 /** 사이드필터 칩 → 기본뷰에서 «필터 걸면 자동 노출»할 대응 컬럼. 값을 보며 거른다.
  *  (상태·미수·가동은 이미 기본 컬럼이라 생략 — 없는 것만.) */
 export const FLEET_REVEAL_COLS: Record<string, SheetCol<FleetRow>[]> = {
-  '검사임박': [FL.inspect],
-  '보험임박': [FL.insEnd],
-  '할부있음': [FL.loanCo, FL.loanAmt, FL.loanStart],
-  '보험없음': [FL.insurer],
-  '연체90일+': [FL.od, FL.stage],
+  '검사임박': alignCols([FL.inspect]),
+  '보험임박': alignCols([FL.insEnd]),
+  '할부있음': alignCols([FL.loanCo, FL.loanAmt, FL.loanStart]),
+  '보험없음': alignCols([FL.insurer]),
+  '연체90일+': alignCols([FL.od, FL.stage]),
 };

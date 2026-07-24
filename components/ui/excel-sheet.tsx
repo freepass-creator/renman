@@ -2,7 +2,7 @@
 import React from 'react';
 import { useIsMobile } from '@/lib/use-mobile';
 import { haptic } from '@/lib/haptics';
-import { C, R, SH, thX, thXR, thXPin, tdX, tdXR, tdXPin, ctrlH, ctrlFs } from './tokens';
+import { C, R, SH, thX, thXR, thXC, thXPin, tdX, tdXR, tdXC, tdXPin, ctrlH, ctrlFs } from './tokens';
 import { ObjCard } from './misc';
 import { Search } from './controls';
 
@@ -20,7 +20,7 @@ import { Search } from './controls';
 export type SheetCol<T> = {
   key: string;
   label: string;
-  align?: 'l' | 'r';
+  align?: 'l' | 'c' | 'r';
   /** 좌측 틀고정 — 고정 칸은 자기 배경이 필요해 행 호버가 끊긴다. 꼭 필요할 때만. */
   pin?: boolean;
   render: (row: T) => React.ReactNode;
@@ -200,7 +200,7 @@ export function ExcelSheet<T>({ cols, rows, onRow, rowKey, onFiltered, mode = 'e
           <thead>
             <tr>
               {cols.map((c) => {
-                const base = c.pin ? thXPin : c.align === 'r' ? thXR : thX;
+                const base = c.pin ? thXPin : c.align === 'r' ? thXR : c.align === 'c' ? thXC : thX;
                 const canFilter = !!c.text;
                 const on = !!colFilter[c.key]?.size || (colSort?.key === c.key);
                 return (
@@ -236,7 +236,7 @@ export function ExcelSheet<T>({ cols, rows, onRow, rowKey, onFiltered, mode = 'e
                   onMouseLeave={() => setHover((h) => (h === i ? null : h))}
                 >
                   {cols.map((c) => {
-                    const base = c.pin ? { ...tdXPin, background: rowBg } : c.align === 'r' ? tdXR : tdX;
+                    const base = c.pin ? { ...tdXPin, background: rowBg } : c.align === 'r' ? tdXR : c.align === 'c' ? tdXC : tdX;
                     return <td key={c.key} style={base}>{c.render(r)}</td>;
                   })}
                 </tr>

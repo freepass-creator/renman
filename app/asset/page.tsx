@@ -186,6 +186,7 @@ export default function AssetPage() {
 
   return (
     <FacetPage
+      frame={view === 'excel'}
       title="자산현황"
       meta={`${scopeAll ? '전체 회사' : companyLabel(companyId)} · 현물 ${nodes.length}대`}
       tools={
@@ -200,33 +201,36 @@ export default function AssetPage() {
       }
       rail={!loading ? <FacetRail lensKey="자산현황" facets={facets} onToggle={toggleFacet} onReset={resetFacets} counts={counts} /> : null}
     >
-      <Sec title="생애" desc="현물자산 · 구매→등록→보유→처분" hideable={false}>
-        <Cards min={100} fit>
-          {(LIFE_SECS as readonly LifeSec[]).map((id) => (
-            <Metric key={id} label={SEC_META[id].title} value={`${cnt(SEC_OWN[id])}대`}
-              tone={cnt(SEC_OWN[id]) && (id === 'a-buy' || id === 'a-reg' || id === 'a-out-plan') ? 'warn' : 'ink'}
-              onClick={() => goSec(id)} />
-          ))}
-        </Cards>
-      </Sec>
-
-      {loading ? <PageLoading />
-        : view === 'excel'
-          ? (filtered.length === 0
-              ? <EmptyState>표시할 차량이 없습니다</EmptyState>
-              : <ExcelSheet cols={ASSET_COLS} rows={buildSheetRows(filtered)} rowKey={(r) => r.plate} onRow={(r) => openCar(r.plate)} />)
-          : order.map((id) => {
-          const sid = id as LifeSec;
-          const meta = SEC_META[sid];
-          const list = byOwn(SEC_OWN[sid]);
-          return (
-            <Sec key={sid} id={sid} title={meta.title} n={list.length} desc={meta.desc} onReorder={reorder}
-              right={SEC_PIPE[sid] ? <WorkPipe to={SEC_PIPE[sid]!} /> : undefined}>
-              {list.length === 0 ? <EmptyState variant="sec">해당 차량 없음</EmptyState>
-                : <div style={{ display: 'flex', flexDirection: 'column', gap: SPACE_M }}>{list.map(renderCard)}</div>}
-            </Sec>
-          );
-        })}
+      {/* 엑셀 뷰 = 운영시트처럼 엑셀만(섹션·생애요약 숨김)·헤더 틀고정(frame). 카드 뷰 = 생애요약 + 생애 섹션들. */}
+      {view === 'excel' ? (
+        loading ? <PageLoading />
+          : filtered.length === 0 ? <EmptyState>표시할 차량이 없습니다</EmptyState>
+            : <ExcelSheet cols={ASSET_COLS} rows={buildSheetRows(filtered)} rowKey={(r) => r.plate} onRow={(r) => openCar(r.plate)} />
+      ) : (
+        <>
+          <Sec title="생애" desc="현물자산 · 구매→등록→보유→처분" hideable={false}>
+            <Cards min={100} fit>
+              {(LIFE_SECS as readonly LifeSec[]).map((id) => (
+                <Metric key={id} label={SEC_META[id].title} value={`${cnt(SEC_OWN[id])}대`}
+                  tone={cnt(SEC_OWN[id]) && (id === 'a-buy' || id === 'a-reg' || id === 'a-out-plan') ? 'warn' : 'ink'}
+                  onClick={() => goSec(id)} />
+              ))}
+            </Cards>
+          </Sec>
+          {loading ? <PageLoading /> : order.map((id) => {
+            const sid = id as LifeSec;
+            const meta = SEC_META[sid];
+            const list = byOwn(SEC_OWN[sid]);
+            return (
+              <Sec key={sid} id={sid} title={meta.title} n={list.length} desc={meta.desc} onReorder={reorder}
+                right={SEC_PIPE[sid] ? <WorkPipe to={SEC_PIPE[sid]!} /> : undefined}>
+                {list.length === 0 ? <EmptyState variant="sec">해당 차량 없음</EmptyState>
+                  : <div style={{ display: 'flex', flexDirection: 'column', gap: SPACE_M }}>{list.map(renderCard)}</div>}
+              </Sec>
+            );
+          })}
+        </>
+      )}
     </FacetPage>
   );
 }

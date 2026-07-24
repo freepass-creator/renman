@@ -77,7 +77,7 @@ function FacetGroups({ groups, facets, onToggle, touch }: {
                   style={{ flexShrink: 0, transform: folded ? 'rotate(-90deg)' : 'none', transition: 'transform .12s' }}
                 />
                 <span style={{ fontSize: touch ? 15 : 13, color: C.ink, fontWeight: 700, letterSpacing: '-0.01em', lineHeight: 1.2 }}>{g.dim}</span>
-                <CountPill n={nOn} tone="accent" />{/* 섹션 선택수(accent) — 총합(brand)과 색 구분 */}
+                {g.dim !== '보유' && <CountPill n={nOn} tone="accent" />}{/* 섹션 선택수(accent). 보유(단일선택·기본뷰)는 필터 아님 → 카운트 안 함 */}
               </button>
               {nOn > 0 && (
                 <button
@@ -109,7 +109,9 @@ export function FacetFilterBtn() {
   const { open, setOpen } = useFacetFilterOpen();
 
   if (!api?.groups.length) return null;
-  const n = api.facets.size;
+  // 보유/전체/매각(보기 범위·단일선택)은 «필터»가 아니라 기본 뷰 → 카운트 제외.
+  const VIEW_SCOPE = ['보유', '전체', '매각'];
+  const n = [...api.facets].filter((f) => !VIEW_SCOPE.includes(f)).length;
   const h = ctrlH(mobile);
   // 아이콘만 정사각 토글 — 열림=꽉 찬 다크(brand). 선택 총합은 우상단 모서리 뱃지(accent · ring으로 버튼과 분리).
   return (
