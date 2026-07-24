@@ -3,7 +3,7 @@ import React from 'react';
 import { useIsMobile } from '@/lib/use-mobile';
 import { haptic } from '@/lib/haptics';
 import { C, R, SH, thX, thXR, thXC, thXPin, tdX, tdXR, tdXC, tdXPin, ctrlH, ctrlFs } from './tokens';
-import { ObjCard } from './misc';
+import { ObjCard, Cards } from './misc';
 import { Search } from './controls';
 
 /**
@@ -165,8 +165,9 @@ export function ExcelSheet<T>({ cols, rows, onRow, rowKey, onFiltered, mode = 'e
   React.useEffect(() => { onFiltered?.(view); }, [view, onFiltered]);
 
   if (mobile || mode === 'card') {
+    // 목록 = 그룹 카드 규격(Cards): 모바일=한 그룹 박스+구분선 행 / 데스크톱 카드뷰=그리드. 개별 박스 흩뿌림 금지.
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <Cards>
         {view.map((r, i) => (
           <ObjCard
             key={rowKey?.(r, i) ?? i}
@@ -175,7 +176,7 @@ export function ExcelSheet<T>({ cols, rows, onRow, rowKey, onFiltered, mode = 'e
             onClick={onRow ? () => { haptic.tap(); onRow(r); } : undefined}
           />
         ))}
-      </div>
+      </Cards>
     );
   }
 
