@@ -41,9 +41,9 @@ export default function MHome() {
               <Metric label="만기임박" value={soon.length} tone={soon.length ? 'warn' : undefined} />
               <Metric label="미수" value={net ? won(net) : '0'} tone={net ? 'danger' : undefined} />
             </div>
-            {overdue.length > 0 && <Rows title="만기 경과" tone="red" n={overdue.length}>{overdue.slice(0, 5).map(row)}</Rows>}
-            {soon.length > 0 && <Rows title="만기 임박" tone="amber" n={soon.length}>{soon.slice(0, 5).map(row)}</Rows>}
-            {misu.length > 0 && <Rows title="미수 발생" tone="red" n={misu.length}>{misu.slice(0, 6).map(row)}</Rows>}
+            {overdue.length > 0 && <Rows title="만기 경과" tone="red" n={overdue.length} collapsible id="home-overdue">{overdue.slice(0, 5).map(row)}</Rows>}
+            {soon.length > 0 && <Rows title="만기 임박" tone="amber" n={soon.length} collapsible id="home-soon">{soon.slice(0, 5).map(row)}</Rows>}
+            {misu.length > 0 && <Rows title="미수 발생" tone="red" n={misu.length} collapsible id="home-misu">{misu.slice(0, 6).map(row)}</Rows>}
             {!overdue.length && !soon.length && !misu.length && <EmptyState variant="ok">지금 챙길 급한 건이 없습니다</EmptyState>}
           </div>
         )}

@@ -50,7 +50,7 @@ function MGrid<R>({ def, tabColor }: { def: PageDef<R>; tabColor?: string }) {
               : groups.length ? groups.map((g) => {
                 const gr = rows.filter(g.match);
                 if (!gr.length) return null;
-                return <Rows key={g.key} title={g.label} tone={g.tone} n={gr.length}>{gr.map(renderRow)}</Rows>;
+                return <Rows key={g.key} title={g.label} tone={g.tone} n={gr.length} collapsible id={`ops-${g.key}`}>{gr.map(renderRow)}</Rows>;
               })
                 : <Rows>{rows.map(renderRow)}</Rows>}
           </div>

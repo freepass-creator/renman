@@ -7,7 +7,7 @@
  *   드릴인: ObjRow는 라우팅 무지. 호출부가 onClick={() => openCar(plate)} — 자산360.
  */
 import React from 'react';
-import { ChevronRight, Check } from 'lucide-react';
+import { ChevronRight, ChevronDown, Check } from 'lucide-react';
 import { C, NUM, R } from './tokens';
 import { Badge, CompanyBadge, type BadgeTone, type RailTone } from './misc';
 import { useIsMobile } from '@/lib/use-mobile';
@@ -101,32 +101,54 @@ export function ObjRow({
   );
 }
 
-export function Rows({ title, tone = 'gray', n, right, children }: {
+export function Rows({ title, tone = 'gray', n, right, collapsible, defaultOpen = true, id, children }: {
   title?: React.ReactNode;    // 그룹헤더 라벨 (생략 시 헤더 없는 민박스)
   tone?: BadgeTone;           // 헤더 톤
   n?: number;                 // 건수
   right?: React.ReactNode;    // 헤더 우측 = TextLink '더보기' 전용
+  collapsible?: boolean;      // 헤더 탭 → 접기/펴기 (제목 있을 때만)
+  defaultOpen?: boolean;      // 기본 펼침
+  id?: string;                // 접힘 상태 기억 키 (없으면 제목 문자열)
   children: React.ReactNode;  // ObjRow[]
 }) {
   const mobile = useIsMobile();
   const items = React.Children.toArray(children);
   const hasHead = title != null;
   const ht = HEAD_TONE[tone] || HEAD_TONE.gray;
+  const canCollapse = !!collapsible && hasHead;
+  const storeKey = canCollapse ? `jpk:mrows:${id ?? (typeof title === 'string' ? title : '')}` : '';
+  const [open, setOpen] = React.useState(defaultOpen);
+  React.useEffect(() => {
+    if (!storeKey) return;
+    try { const v = localStorage.getItem(storeKey); if (v != null) setOpen(v === '1'); } catch { /* noop */ }
+  }, [storeKey]);
+  const toggle = () => setOpen((o) => {
+    const nv = !o;
+    try { if (storeKey) localStorage.setItem(storeKey, nv ? '1' : '0'); } catch { /* noop */ }
+    return nv;
+  });
+
+  const head = hasHead && (
+    <div
+      {...(canCollapse ? { role: 'button', tabIndex: 0, 'aria-expanded': open, onClick: toggle, onKeyDown: (e: React.KeyboardEvent) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); } } } : {})}
+      style={{
+        display: 'flex', alignItems: 'center', gap: 6, minHeight: mobile ? 36 : 30,
+        padding: mobile ? '0 14px' : '0 12px', fontSize: mobile ? 12 : 11.5, fontWeight: 700,
+        borderBottom: open ? `1px solid ${C.line2}` : undefined,
+        background: tone === 'gray' ? C.head : ht[1], color: tone === 'gray' ? C.mute : ht[0],
+        cursor: canCollapse ? 'pointer' : 'default', WebkitTapHighlightColor: 'transparent', userSelect: 'none',
+      }}>
+      <span>{title}</span>
+      {n != null && <span style={{ fontFamily: NUM, marginLeft: 2 }}>{n}</span>}
+      {right != null && <span style={{ marginLeft: 'auto', fontWeight: 600 }}>{right}</span>}
+      {canCollapse && <ChevronDown size={15} style={{ marginLeft: right != null ? 6 : 'auto', flexShrink: 0, transform: open ? 'none' : 'rotate(-90deg)', transition: 'transform .15s ease' }} />}
+    </div>
+  );
+
   return (
     <div style={{ border: `1px solid ${C.line}`, borderRadius: R, background: C.card, overflow: 'hidden' }}>
-      {hasHead && (
-        <div style={{
-          display: 'flex', alignItems: 'center', gap: 6, minHeight: mobile ? 36 : 30,
-          padding: mobile ? '0 14px' : '0 12px', fontSize: mobile ? 12 : 11.5, fontWeight: 700,
-          borderBottom: `1px solid ${C.line2}`,
-          background: tone === 'gray' ? C.head : ht[1], color: tone === 'gray' ? C.mute : ht[0],
-        }}>
-          <span>{title}</span>
-          {n != null && <span style={{ fontFamily: NUM, marginLeft: 2 }}>{n}</span>}
-          {right != null && <span style={{ marginLeft: 'auto', fontWeight: 600 }}>{right}</span>}
-        </div>
-      )}
-      {items.map((child, i) => (
+      {head}
+      {(!canCollapse || open) && items.map((child, i) => (
         <div key={i} style={{ borderTop: i > 0 ? `1px solid ${C.line2}` : undefined }}>{child}</div>
       ))}
     </div>
