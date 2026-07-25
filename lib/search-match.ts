@@ -3,6 +3,7 @@
 import type { EntityRecord } from './intake/entities';
 import { ENTITIES } from './intake/entities';
 import { normPlate, vehicleMatchesPlate } from './plate';
+import { companyDisplay } from './companies';
 
 /** 통합 검색 핵심 — 차·계약·손님·보험·과태료·이력 (전 엔티티 fan-out 금지). */
 export const SEARCH_CORE_KEYS = ['vehicle', 'contract', 'customer', 'insurance', 'penalty', 'history'] as const;
@@ -16,7 +17,7 @@ export function searchEntityKeys(q: string): string[] {
   return keys.filter((k) => ENTITIES[k]);
 }
 
-export type VehicleSearchHit = { plate: string; label: string; sub: string; veh: EntityRecord };
+export type VehicleSearchHit = { plate: string; label: string; sub: string; veh: EntityRecord; companyId: string };
 
 /** 목록 인페이지 필터 — 공백·대소문자·plate(O/0·I/1) 관대 매칭. q 비면 true. */
 export function textMatch(q: string, ...parts: unknown[]): boolean {
@@ -53,13 +54,16 @@ export function matchVehicles(
     const np = normPlate(plate);
     const name = nameByPlate.get(np) || '';
     const car = String(v.carName || '');
+    const companyId = String(v.companyId || '');
+    const co = companyDisplay(companyId);
     const hitPlate = nq ? vehicleMatchesPlate(v, s) || np.includes(nq) : plate.includes(s);
     const hitText = car.includes(s) || name.includes(s);
     if (!hitPlate && !hitText) continue;
     out.push({
       plate,
+      companyId,
       label: `${plate}${car ? ` · ${car}` : ''}`,
-      sub: name || String(v.status || ''),
+      sub: [co, name || String(v.status || '')].filter(Boolean).join(' · '),
       veh: v,
     });
     if (out.length >= limit) break;

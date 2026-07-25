@@ -1,7 +1,6 @@
 /**
- * FLEET_DEF — 운영시트(/sheet) 정의. E-grid 원형. (설계서 §6 표)
- *   기존 app/sheet/page.tsx의 필터·카운트·요약·정렬을 그대로 이관 — WebPage 렌더러가 소비.
- *   도메인(linkFleet·buildFleetRows) 불변, 여기선 배열·필터만.
+ * FLEET_DEF — 운영원장(/sheet) 정의. E-grid 원형.
+ *   자산+계약 1행 마스터 → 행클릭 Vehicle360. 도메인(linkFleet·buildFleetRows) 불변.
  */
 import { useMemo } from 'react';
 import { TODAY, dday } from '@/lib/dashboard-consts';
@@ -20,7 +19,7 @@ const netTotal = (rows: FleetRow[]) => rows.reduce((s, r) => s + Math.max(0, r.n
 export const FLEET_DEF: PageDef<FleetRow> = {
   href: '/sheet',
   archetype: 'E-grid',
-  title: '운영시트',
+  title: '운영원장',
   rowKey: (r) => r.plate,
   drill: (r) => openCar(r.plate),
   mDrill: (r) => `/m/vehicle/${encodeURIComponent(r.plate)}`,
@@ -53,14 +52,14 @@ export const FLEET_DEF: PageDef<FleetRow> = {
 
   colSets: [
     { key: '기본', label: '기본', cols: FLEET_BASIC_COLS },
-    { key: '상세', label: '상세', cols: FLEET_EXPANDED_COLS },
+    { key: '전체', label: '전체', cols: FLEET_EXPANDED_COLS },
   ],
   revealCols: FLEET_REVEAL_COLS,
   lensKey: '운영시트',
   radioKeys: OWN,
   facetDefault: ['보유'],
   period: 'month',
-  csvName: (view) => `운영시트_${view}_${TODAY}`,
+  csvName: (view) => `운영원장_${view}_${TODAY}`,
   sort: (a, b) => statusRank(a) - statusRank(b) || a.plate.localeCompare(b.plate, 'ko'),
 
   // app/sheet/page.tsx rows useMemo 술어 그대로.

@@ -10,6 +10,11 @@ export const openPayments = () => {
   if (typeof window === 'undefined') return;
   window.dispatchEvent(new CustomEvent('jpk:navigate', { detail: { href: '/payments' } }));
 };
+/** 미수관리 — 회수 큐. */
+export const openReceivables = () => {
+  if (typeof window === 'undefined') return;
+  window.dispatchEvent(new CustomEvent('jpk:navigate', { detail: { href: '/receivables' } }));
+};
 /** 재무현황 — 출금·미분류 등. facet=미분류면 미분류 탭·칩. */
 export const openFinance = (opts?: { unclassified?: boolean }) => {
   if (typeof window === 'undefined') return;

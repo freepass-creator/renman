@@ -1,10 +1,10 @@
 'use client';
 import React from 'react';
-import { Search as SearchIcon, ChevronLeft, ChevronRight, Building2, ChevronDown, Check } from 'lucide-react';
+import { Search as SearchIcon, ChevronLeft, ChevronRight, Building2, ChevronDown, Check, X } from 'lucide-react';
 import { haptic } from '@/lib/haptics';
 import {
   C, R, SH, fieldStyle, selectStyle, toggleStyle, SPACE_M,
-  ctrlH, ctrlFs, ctrlInputFs, ctrlChipH, type CtrlSize,
+  ctrlH, ctrlFs, ctrlInputFs, type CtrlSize,
 } from './tokens';
 import { Drawer } from './overlays';
 import { type Period, PERIODS, periodRange, shiftPeriod, periodTitle } from '@/lib/finance/period';
@@ -133,19 +133,16 @@ export function IconSeg<T extends string>({ value, onChange, options, size = 'md
   );
 }
 
-/* 다중선택 필터칩 — FacetRail·ToggleChips SSOT (= ERP4). 웹28 · 모바일40. */
-export function ToggleChips<T extends string>({ selected, onToggle, options, size = 'md' }: { selected: Set<T>; onToggle: (v: T) => void; options: { key: T; label: string; count?: number }[]; size?: 'sm' | 'md' }) {
+/* 다중선택 필터칩 — FacetRail·ToggleChips SSOT (= ERP4). 높이=칩(sm). size는 API 호환용. */
+export function ToggleChips<T extends string>({ selected, onToggle, options, size: _size = 'md' }: { selected: Set<T>; onToggle: (v: T) => void; options: { key: T; label: string; count?: number }[]; size?: 'sm' | 'md' }) {
   const mobile = useIsMobile();
-  const h = ctrlChipH(mobile);
-  const fs = ctrlFs(mobile, size);
-  const pad = mobile ? '0 18px' : (size === 'sm' ? '0 11px' : '0 12px');
   return (
     <div style={{ display: 'flex', flexWrap: 'wrap', gap: mobile ? 8 : 6 }}>
       {options.map((o) => {
         const on = selected.has(o.key);
         return (
           <button key={o.key} type="button" data-ui="toggle" onClick={() => { haptic.select(); onToggle(o.key); }} aria-pressed={on}
-            style={{ display: 'inline-flex', alignItems: 'center', height: h, boxSizing: 'border-box', padding: pad, fontSize: fs, fontWeight: on ? 700 : 500, cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0, borderRadius: R, border: `1px solid ${on ? C.brand : C.taupeLine}`, background: on ? C.brand : C.taupeBg, color: on ? C.inverse : C.mute, lineHeight: 1, WebkitTapHighlightColor: 'transparent' }}>
+            style={toggleStyle(on, 'sm', mobile)}>
             {o.label}
           </button>
         );
@@ -306,10 +303,75 @@ export function Search({ size = 'md', style, wrapStyle, ...rest }: Omit<React.In
   const mobile = useIsMobile();
   const cs: CtrlSize = size === 'sm' ? 'sm' : 'md';
   const h = ctrlH(mobile, cs);
+  const hasValue = rest.value != null && String(rest.value).length > 0;
+  const clear = () => {
+    const ev = { target: { value: '' }, currentTarget: { value: '' } } as React.ChangeEvent<HTMLInputElement>;
+    rest.onChange?.(ev);
+  };
+  // width 등은 바깥 칸에 — X가 나와도 칸이 안 커짐. input style의 레이아웃만 wrap으로 올림.
+  const { width, minWidth, maxWidth, flex, ...inputStyle } = (style || {}) as React.CSSProperties;
+  const clearPad = mobile ? 28 : 22;
   return (
-    <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, height: h, boxSizing: 'border-box', padding: mobile ? '0 12px' : '0 10px', border: `1px solid ${C.line}`, borderRadius: R, background: C.card, ...wrapStyle }}>
+    <div style={{
+      position: 'relative',
+      display: 'inline-flex',
+      alignItems: 'center',
+      gap: 8,
+      height: h,
+      boxSizing: 'border-box',
+      padding: mobile ? '0 12px' : '0 10px',
+      paddingRight: hasValue ? (mobile ? 8 : 6) : (mobile ? 12 : 10),
+      border: `1px solid ${C.line}`,
+      borderRadius: R,
+      background: C.card,
+      width, minWidth, maxWidth, flex,
+      ...wrapStyle,
+    }}>
       <SearchIcon size={mobile ? 16 : 14} color={C.faint} style={{ flexShrink: 0 }} />
-      <input {...rest} style={{ flex: 1, border: 'none', outline: 'none', fontSize: ctrlInputFs(mobile, cs), background: 'transparent', color: C.ink, minWidth: 0, fontFamily: 'inherit', ...style }} />
+      <input
+        {...rest}
+        style={{
+          flex: 1,
+          border: 'none',
+          outline: 'none',
+          fontSize: ctrlInputFs(mobile, cs),
+          background: 'transparent',
+          color: C.ink,
+          minWidth: 0,
+          width: '100%',
+          fontFamily: 'inherit',
+          paddingRight: hasValue ? clearPad : 0,
+          boxSizing: 'border-box',
+          ...inputStyle,
+        }}
+      />
+      {hasValue && (
+        <button
+          type="button"
+          aria-label="검색어 지우기"
+          onClick={clear}
+          style={{
+            position: 'absolute',
+            right: mobile ? 4 : 2,
+            top: '50%',
+            transform: 'translateY(-50%)',
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            width: clearPad,
+            height: clearPad,
+            padding: 0,
+            margin: 0,
+            border: 'none',
+            borderRadius: R,
+            background: 'transparent',
+            color: C.mute,
+            cursor: 'pointer',
+          }}
+        >
+          <X size={mobile ? 16 : 14} />
+        </button>
+      )}
     </div>
   );
 }

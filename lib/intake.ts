@@ -14,6 +14,7 @@ import { notifySaved } from './ui-bus';
 import type { EntityRecord } from './intake/entities';
 import { workStatusPatch, canApplyWorkStatus } from './work-ops';
 import { normPlate, findVehicleByPlate, vehicleMatchesPlate, deriveVehicleStatusFromContract } from './plate';
+import { autoSettleAfterIntake } from './payments/auto-settle';
 
 // ── 앵커키 정규화 ──────────────────────────────────────────────────────────
 /** 차량번호 정규화 — plate SSOT(normPlate) 위임. 공백·OCR O/0·I/1 통일. */
@@ -114,6 +115,8 @@ const insuranceDenormSideEffect: SideEffectFn = async ({ companyId, records }) =
  * 엔티티별 부수효과. 새 후속처리는 여기에만 꽂으면 전 입력지점에 자동 적용된다.
  *   history   : 수선→차량상태 전이 (배선 완료)
  *   insurance : 보험→차량 만기 denorm 동기화(최신 증권) — 만기 오탐 제거
+ *   contract  : 계약→차량 자동생성
+ *   bank_tx · card_tx : CMS/카드집금 자동 정산(auto-settle)
  *   penalty   : 과태료→계약(임차인) 매칭 — 지금은 PenaltyUpload가 저장 전에 자체 수행(현행 유지: 리스크 회피).
  */
 /**
@@ -140,10 +143,20 @@ const contractVehicleSyncSideEffect: SideEffectFn = async ({ companyId, records 
   return applied;
 };
 
+/**
+ * 계좌·카드 담기 → CMS집금/카드자동집금 자동 묶음 정산.
+ *   계좌만 넣어도·CMS만 넣어도·카드만 넣어도, 상대편이 이미 있으면 high·medium 자동 붙음.
+ */
+const cashAutoSettleSideEffect: SideEffectFn = async ({ companyId }) => {
+  return autoSettleAfterIntake(companyId);
+};
+
 const SIDE_EFFECTS: Record<string, SideEffectFn[]> = {
   history: [workStatusSideEffect],
   insurance: [insuranceDenormSideEffect],
   contract: [contractVehicleSyncSideEffect],
+  bank_tx: [cashAutoSettleSideEffect],
+  card_tx: [cashAutoSettleSideEffect],
 };
 
 // ── 단일 통로 ──────────────────────────────────────────────────────────────

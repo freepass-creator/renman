@@ -8,7 +8,7 @@
  */
 import { useCallback, useMemo, useState } from 'react';
 import { useSession } from '@/lib/session';
-import { openCar, openCustomer } from '@/lib/ui-bus';
+import { openCar, openCustomer, openReceivables } from '@/lib/ui-bus';
 import { customerKey } from '@/lib/customers';
 import { companyLabel } from '@/lib/companies';
 import { type EntityRecord } from '@/lib/intake/entities';
@@ -86,8 +86,10 @@ export default function PaymentsPage() {
   };
 
   const allBank = useMemo(() => txs.map(toBankTx), [txs]);
+  // CMS 집금(deposit)=통장 묶음입금 → 대여료 매칭 제외.
+  // CMS 성공건(item)=손님별 출금 → 정산 여부와 무관하게 대여료 매칭 대상(미수↓).
   const deposits = useMemo(() => allBank.filter((t) => t.amount > 0 && !(t.withdraw && t.withdraw > 0) && t.settlementRole !== 'deposit'), [allBank]);
-  const pending = deposits.filter((t) => !t.matchedContractId && t.settlementRole !== 'item');
+  const pending = deposits.filter((t) => !t.matchedContractId);
   const matched = deposits.filter((t) => t.matchedContractId);
   const csByKey = useMemo(() => new Map(cs.map((r) => [String(r._key), r])), [cs]);
   const cmsSettled = useMemo(() => allBank.filter((t) => t.settlementRole === 'deposit').length, [allBank]);
@@ -247,6 +249,7 @@ export default function PaymentsPage() {
       meta={`${scopeAll ? '전체 회사' : companyLabel(companyId)} · 입금→계약 · 재무현황 공급`}
       tools={<WorkbenchBar mid={<WorkHubBack />} search actions={
         <>
+          <Btn variant="ghost" onClick={() => openReceivables()}>미수관리</Btn>
           <Btn variant="ghost" onClick={runCms} disabled={loading || busy || applying}>CMS 집금정산</Btn>
           <Btn onClick={run} disabled={loading || pending.length === 0 || busy || applying}>자동매칭 실행</Btn>
         </>

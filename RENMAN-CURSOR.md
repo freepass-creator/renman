@@ -79,6 +79,127 @@ curl -s -o /dev/null -w "%{http_code}" http://localhost:6006/<route>   # 200
 
 | 날짜 | 작업자 | 내용 | 상태 |
 |---|---|---|---|
+| 2026-07-25 | Cursor | 메뉴에 과태료·변경부과(`/penalty`) 복구 · 티어 라이트 | — |
+| 2026-07-25 | Cursor | 오늘마무리: 메뉴에 자금일보·미수 · 재무원장 CTA=계좌CMS→자금일보→미수 · CMS item도 대여료매칭(정산후 제외버그 제거) | tsc0 |
+| 2026-07-25 | Cursor | 계약·수납=자산과 동일 6×3 · 미수=`schUnpaid`(회차잔액) · 회차=좌열1×3 | tsc OK |
+| 2026-07-25 | Cursor | 계약·수납=시안규격(조건인라인수정·진행필드·한눈4칸·회차요약바·보증시동·손익회수율) · DeskPane 패널내조치 | tsc OK |
+| 2026-07-25 | Cursor | 수정=Glance 인라인(행구조 유지·패널만 편집) · EditKV 제거 · 레이아웃 고정 | tsc OK |
+| 2026-07-25 | Cursor | 수정→헤더에 저장·취소(닫기 제거) · 운영·GPS도 편집세션 | — |
+| 2026-07-25 | Cursor | 차량상세 CTA 라벨=「수정」통일(정정·갱신 제거) · 시안도 동일 | — |
+| 2026-07-25 | Cursor | 보험패널: 보험료=총/N회차 · 이전증권 · 차량폴백 · CTA=수정 | tsc OK |
+| 2026-07-25 | Cursor | `/vehicle` 패널 하단 첨부(AttFoot)=시안 이식 · `_docs` 슬롯(등록증·견적·할부·증권·GPS·과태료·정비·계약·영수증) | tsc OK |
+| 2026-07-25 | Cursor | 보험 대리점=대리점\|담당자 분리(제조사제원과 동일) · agencyContact 필드 | (셸불가) |
+| 2026-07-25 | Cursor | 차량상세 등록증 필드=시안 전항목(문서확인~출고가) · 엔티티 OCR 매핑 보강 · 취득원가·월상환·분납 | (셸불가) |
+| 2026-07-25 | Cursor | `/vehicle` 전폭 frame 셸 · 우측열 col5로 밀착(가운데 구멍 제거) · 크롬=번호판+탭 | (셸불가) |
+| 2026-07-25 | Cursor | `/vehicle/[plate]` 셸=Page frame+전폭(contentMax 10000) · DetailShell 1680캡 해제 · 본문 height 100% | (셸불가) |
+| 2026-07-25 | Cursor | `/vehicle/[plate]`=car-desk 시안 IA 이식(자산\|계약\|수납 탭·패널그리드) · `vehicle-detail/desk.tsx` · 엔티티+취급대리점·보험대리점 | (셸불가) |
+| 2026-07-25 | Cursor | `/dev/car-desk` 제조사제원+취급대리점·담당자 | (셸불가) |
+| 2026-07-25 | Cursor | `/dev/car-desk` 보험 계약자·피보험자 복구(렌터카 중복 vs 구독 필요 — 표시여부 보류) | (셸불가) |
+| 2026-07-25 | Cursor | `/dev/car-desk` 보험 계약자·피보험자 제거(렌터카 업무용에 불필요) | (셸불가) |
+| 2026-07-25 | Cursor | `/dev/car-desk` 보험 자동이체→대리점(상호·연락) 교체 | (셸불가) |
+| 2026-07-25 | Cursor | `/dev/car-desk` 보험 자동이체 행 제거 | (셸불가) |
+| 2026-07-25 | Cursor | `/dev/car-desk` 보험: 대인Ⅰ·Ⅱ 한줄 · 보험료=총/납부N회차 한줄 | (셸불가) |
+| 2026-07-25 | Cursor | `/dev/car-desk` #1등록=좌열1×3(행전체) · #8수선 col2–3로 한칸 우측 | (셸불가) |
+| 2026-07-25 | Cursor | `/dev/car-desk` Glance·이력·회차 행 hover=`C.hover` | (셸불가) |
+| 2026-07-25 | Cursor | `/dev/car-desk` 패널필드보강: 등록=등록증①~검사·제원 · 제원=5단+옵션·구동 · 취득·보험·운영도 누락채움 | (셸불가) |
+| 2026-07-25 | Cursor | `/dev/car-desk` 수선·사고표=일자\|구분\|내용\|금액 칸 분리(금액 본문 합침 해제) | (셸불가) |
+| 2026-07-25 | Cursor | `/dev/car-desk`=한 차량 조회전용 · `?new=1`·빈칸등록면 제거 · /asset「신규등록→시안」링크 회수 | (셸불가) |
+| 2026-07-25 | Cursor | `/dev/car-desk` #6 GPS=1×1 · #7 과태료=1×2(GPS아래) · #8 수선=5×1(하단) — 반반 억지분배 해제 | (셸불가) |
+| 2026-07-25 | Cursor | 신규등록=/asset 툴바(시안→/dev/car-desk?new=1) · 상세에는 없음 · 취소→목록 | (셸불가) |
+| 2026-07-25 | Cursor | `/dev/car-desk` Page 타이틀줄 제거 · 크롬=번호판+탭만 · 신규등록 버튼 자리 보류 · Page 빈헤더 미렌더 | (셸불가) |
+| 2026-07-25 | Cursor | 웹 TopBar=fixed+body paddingTop · Page frame=html/body overflow 잠금 · 상단바 고정·창스크롤 제거 | (셸불가) |
+| 2026-07-25 | Cursor | `/dev/car-desk` 우측열 운영\|GPS\|과태료만 세로 · 수선 2×1은 좌하단 · 빈칸 유지(억지배치 금지) | (셸불가) |
+| 2026-07-25 | Cursor | `/dev/car-desk` 우측열에 #4운영·#6GPS·#7과태료 1×1 세로나열 · #8수선 2×1(col4–5) | (셸불가) |
+| 2026-07-25 | Cursor | `/dev/car-desk` #5보험=1×2 · 필드=보험사·증권·대인ⅠⅡ·대물·자차·분납횟수·총보험료 등 | (셸불가) |
+| 2026-07-25 | Cursor | `/dev/car-desk` 조회/신규 탭 제거 · 기본=조회 · 우측「신규등록」버튼→등록면 · 취소로 복귀 | (셸불가) |
+| 2026-07-25 | Cursor | `/dev/car-desk` #4운영·#6GPS·#7과태료=1×1 · #8수선=2×1 · #5보험=1×2 · 하단 여백 유지 | (셸불가) |
+| 2026-07-25 | Cursor | `/dev/car-desk` 패널 본문 기본 overflow hidden(스크롤 제거) · 이력/회차표만 scroll | (셸불가) |
+| 2026-07-25 | Cursor | `/dev/car-desk` 패널 불변/가변/이력 뱃지 제거 | (셸불가) |
+| 2026-07-25 | Cursor | `/dev/car-desk` 자산 패널번호 #1~8 · #1~3 등록\|제원\|취득 각1×2 · #4~6 운영\|보험\|GPS 각1×2 · #7~8 과태료\|수선 각3×1 | (셸불가) |
+| 2026-07-25 | Cursor | `/dev/car-desk` 자산=패널6 가로배열(등록\|제원\|취득\|운영\|보험\|GPS) | (셸불가) |
+| 2026-07-25 | Cursor | `/dev/car-desk` 자산=가로1×6 · col1에 등록/제원/취득 세로 · col2~6 운영·보험·GPS·과태료·수선(세로3) | (셸불가) |
+| 2026-07-25 | Cursor | `/dev/car-desk` 자산=좌 세로스택 등록→제원→취득(각 가로2) · 중 운영\|보험\|GPS · 우 과태료\|수선 | (셸불가) |
+| 2026-07-25 | Cursor | `/dev/car-desk` 자산=6×3 칸좌표 고정(1행등록\|제원\|취득 · 2행운영\|보험\|GPS · 3행과태료\|수선) | (셸불가) |
+| 2026-07-25 | Cursor | `/dev/car-desk` 자산=6×3그리드(1fr×3) · 1행등록\|제원\|취득(각2) · 2행운영\|보험\|GPS(각2) · 3행과태료\|수선(각3) | (셸불가) |
+| 2026-07-25 | Cursor | `/dev/car-desk` 같은 행 패널 세로높이 맞춤(stretch+fill) · GPS는 2행 말단 | (셸불가) |
+| 2026-07-25 | Cursor | `/dev/car-desk` 자산=6슬롯 · 1행 메인3+운영(2)\|보험 · 2행 메인밑과태료 / 우밑수선+GPS | (셸불가) |
+| 2026-07-25 | Cursor | `/dev/car-desk` 자산=가로6슬롯 · 1행 내용높이(등록\|제원\|취득\|운영\|보험\|GPS) · 2행 과태료\|수선 | (셸불가) |
+| 2026-07-25 | Cursor | `/dev/car-desk` 자산=좌½ 메인3열(등록\|제원\|취득) + 우½ 운영\|보험\|GPS + 과태료\|수선 | (셸불가) |
+| 2026-07-25 | Cursor | `/dev/car-desk` 메인3=[등록\|제원\|취득] 좌측 가로50%만 · 우측비움 · 부가행 중요도폭 | (셸불가) |
+| 2026-07-25 | Cursor | `/dev/car-desk` 부가행=중요도별 폭(GPS 140px)·남은 가로 비움 | (셸불가) |
+| 2026-07-25 | Cursor | `/dev/car-desk` 자산=위 메인3(등록\|제원\|취득) + 아래 부가5 가로 | (셸불가) |
+| 2026-07-25 | Cursor | `/dev/car-desk` 자산=좌½에 [등록\|제원\|취득] 3열나란히 / 우½ 부가 | (셸불가) |
+| 2026-07-25 | Cursor | `/dev/car-desk` 자산=좌반 등록·제원·취득 세로스택 / 우반 운영·보험·GPS·이력 | (셸불가) |
+| 2026-07-25 | Cursor | `/dev/car-desk` 자산=등록|제원|취득 3열세로길게 + 하단 운영3·이력 | (셸불가) |
+| 2026-07-25 | Cursor | `/dev/car-desk` 자산=6열세로1행(등록·제원·취득할부·운영·보험·GPS)+하단과태료/수선 · 할부스케줄첨부·잔액표시 | (셸불가) |
+| 2026-07-25 | Cursor | `/dev/car-desk` 자산=불변(등록·제원·취득)/운영(상태·보험·GPS)/이력 · 상품손익 제외 | (셸불가) |
+| 2026-07-25 | Cursor | `/dev/car-desk` 자산=5열×2행(좁고 세로길게) · KV 짧게 · 계약조건 240px | (셸불가) |
+| 2026-07-25 | Cursor | `/dev/car-desk` ★차량등록정보·제조사제원=핵심불변(상단2칸·hero) · 제원증빙=견적/발주/계약사실확인 | (셸불가) |
+| 2026-07-25 | Cursor | `/dev/car-desk` 패널 가로압축(자산4열·계약300px×2+이력세로·KV max340) | (셸불가) |
+| 2026-07-25 | Cursor | `/dev/car-desk` 패널 하단 첨부(보기·다운로드 Modal) · InfoDoc/_docs 모델 시안 | (셸불가) |
+| 2026-07-25 | Cursor | Page frame 높이=`100vh−bar−dock` · `--fp-dock-h` SSOT(SessionBar) · car-desk 하단바 감안 꽉채움·페이지스크롤제거 | (셸불가) |
+| 2026-07-25 | Cursor | `/dev/car-desk` 자산탭=Vehicle360「이 차」맵(등록증·5단·GPS·취득/구매방법·보험·운영·상품손익·과태료·수선) 3×3 | (셸불가) |
+| 2026-07-25 | Cursor | `/dev/car-desk` 패널 타이틀·종류마크를 박스 안 헤더로(밖 텍스트 제거) | (셸불가) |
+| 2026-07-25 | Cursor | `/dev/car-desk` 탭별 불변·가변·이력 패널로 꽉 채움(자산3+2 / 계약2×2 / 수납2×2) | (셸불가) |
+| 2026-07-25 | Cursor | `/dev/car-desk` 탭=자산|계약|수납(굵직) · 헤더에 미수/D-day 한눈 | (셸불가) |
+| 2026-07-25 | Cursor | `/dev/car-desk` 도메인학습반영 — 한눈이슈·현재3원장·계약/차량이력분리·전문은첨부 | (셸불가) |
+| 2026-07-25 | Cursor | `/dev/car-desk` 계약이력 추가(현재②아래+이력렌즈=계약|차량분리) | (셸불가) |
+| 2026-07-25 | Cursor | `/dev/car-desk` 현재=①차량②계약③이행(수납) 3축 · 기본렌즈=현재 | (셸불가) |
+| 2026-07-25 | Cursor | `/dev/car-desk` 문서함버튼/오버레이 제거 — 첨부는 섹션 AttChip만(보관=백엔드) | (셸불가) |
+| 2026-07-25 | Cursor | `/dev/car-desk` 문서함=보관목록→전산화면으로꺼냄(등록증·증권·할부·과태료) | (셸불가) |
+| 2026-07-25 | Cursor | `/dev/car-desk` 수납·할부표·타임라인=섹션내 ScrollBody(자체스크롤) | (셸불가) |
+| 2026-07-25 | Cursor | `/dev/car-desk` 렌즈3 — 한눈(이슈)·현재(원장)·이력(타임라인) | (셸불가) |
+| 2026-07-25 | Cursor | `/dev/car-desk` 수납=360고정폭 · 현황전폭·계약이 가로여유 우선 | (셸불가) |
+| 2026-07-25 | Cursor | `/dev/car-desk` 시안 방향 OK(한눈+문서함+전폭) — 미세수정 대기 | — |
+| 2026-07-25 | Cursor | `/dev/car-desk` 이전(상·하단뎁스)·문서함전폭·grid fr로 뷰포트꽉 | (셸불가) |
+| 2026-07-25 | Cursor | `/dev/car-desk` 문서함(등록증·계약서·증권·할부표·과태료·수선) · 데스크=한눈만 | (셸불가) |
+| 2026-07-25 | Cursor | `/dev/car-desk` 한눈vs문서 — 원천(등록증·계약서·증권·할부표)은 버튼, 상시필드는 최소 | (셸불가) |
+| 2026-07-25 | Cursor | `/dev/car-desk` 섹션고유버튼+인라인기능(반납/입금/시동/정비/통화 등) | (셸불가) |
+| 2026-07-25 | Cursor | `/dev/car-desk` Page frame=원장시트 동일여백(16/24·전폭·뷰포트꽉) | (셸불가) |
+| 2026-07-25 | Cursor | `/dev/car-desk` 용도별 구역 — 좌원장스택·중계약/수납주표·우파생·하이력(활동넓게) | (셸불가) |
+| 2026-07-25 | Cursor | `/dev/car-desk` 버튼=섹션만(상단액션제거) · 수정/저장·입금·반납 각 박스 | (셸불가) |
+| 2026-07-25 | Cursor | `/dev/car-desk` 시안=박스수정/저장 · 조회↔신규(빈칸) 토글 · 같은페이지 채우기 | (셸불가) |
+| 2026-07-25 | Cursor | `/dev/car-desk` 시안 표통일 — Num칩/반납일자줄 제거 · 현황·계약·자산·수납·보험·취득·상품·보증 전부 KV/표 박스 | (셸불가·미검증) |
+| 2026-07-25 | Cursor | 자산상세 디자인시안 `/dev/car-desk` (한화면·타이틀+박스4칸·실연결X) | tsc0 |
+| 2026-07-25 | Cursor | 자산상세 원자분석후 완전신작: DetailGrid·플랫Num·표·Disclosure · Metric/옛패널0 | tsc0 |
+| 2026-07-25 | Cursor | 자산상세 완전재작성: Metric/Sec박스·옛패널스택 폐기 · 플랫Stat+KV+표 단일면 | tsc0 |
+| 2026-07-25 | Cursor | 자산상세 여백=원장Page동일(16/24·1680) · fill엣지블리드 해제 | tsc0 |
+| 2026-07-25 | Cursor | 자산상세 작업탭(한눈/이차/수납/이력) 제거 · 단일화면 스크롤+와이드다열 | tsc0 |
+| 2026-07-25 | Cursor | 자산상세「한눈」=필수지표+계약/자산/보험/수납피크 · 그자리 입금·수정 | tsc0 |
+| 2026-07-25 | Cursor | 자산상세 기본=와이드모니터(useDeskTier) · 좁으면 1열스크롤 · 지금지표\|계약 2열 | tsc0 |
+| 2026-07-25 | Cursor | 자산상세 웹=그리드짜임새·손롤박스제거(플랫행/표만) · ObjCard원자유지 | tsc0 |
+| 2026-07-25 | Cursor | 자산상세 fill ERP밀도(웹뷰포트채움·모바일 sticky크롬) · DetailShell fill | tsc0 |
+| 2026-07-25 | Cursor | 자산상세=ERP워크벤치(작업영역1개·좌컨텍스트/우처리) · 스크롤문서폐기 | tsc0 |
+| 2026-07-25 | Cursor | 자산상세 틀폐기→VehiclePage(웹좌레일+우작업·focus우선) · useVehicleDetail유지 | tsc0 |
+| 2026-07-25 | Cursor | Vehicle360 UI 완전교체→`VehicleDetail` 고정스크롤 4장 · `useVehicleDetail` · 배럴 · legacy→tools/archive | tsc0 |
+| 2026-07-25 | Cursor | Vehicle360 로직→`useVehicleDetail` 훅 추출(JSX없음) · types.ts · UI는 미작성 | tsc0 |
+| 2026-07-25 | Cursor | Vehicle360 세부스펙=지금/이차/수납정산/이력 원자배열 · SEC_DEFAULT·Sample360 동기 · 캔버스 detail-spec | tsc0 |
+| 2026-07-25 | Cursor | Vehicle360: 계약조건→현황 하위 · 할부스케줄→취득 Disclosure 인라인 · Disclosure원자 | tsc0 |
+| 2026-07-25 | Cursor | Vehicle360: 탭렌즈 철회 · SectionLabel(운영·자산·계약·이력)+Sec스크롤(freepass상세) · Input/출력▾ 유지 | tsc0 |
+| 2026-07-25 | Cursor | Vehicle360: sticky 렌즈(운영·자산·계약·이력)+Sec필터 · fInp→Input/Select · 출력▾ · 수납 현재/이전 | tsc0 |
+| 2026-07-25 | Cursor | toggleStyle 활성=색만(fontWeight 고정) · ToggleChips→toggleStyle · 선택시 폭 흔들림 제거 | tsc0 |
+| 2026-07-25 | Cursor | 빠른입력: 차 선택→입력옆 요약(회사·차번·차종·계약상태) · 아래 텍스트·파일 | tsc0 |
+| 2026-07-25 | Cursor | 빠른입력 차번후보=absolute팝업 말고 입력칸 아래 인라인 목록(회사 Badge) | tsc0 |
+| 2026-07-25 | Cursor | 빠른입력 차번후보에 회사 표시명 Badge · matchVehicles companyId/sub | tsc0 |
+| 2026-07-25 | Cursor | 빠른입력: 탭 제거·웹 좌텍스트/우파일 · 모바일 상하 · FileDrop 붙여넣기 | tsc0 |
+| 2026-07-25 | Cursor | 빠른입력 차번=matchVehicles 타이핑 후보(선택시 차번만 채움) | tsc0 |
+| 2026-07-25 | Cursor | 빠른입력=QuickInput(차번+텍스트\|파일) 인라인 · inbox plate/note · QuickLogForm은 360용 유지 | tsc0 |
+| 2026-07-25 | Cursor | 운영원장 빠른입력=인라인(Modal X)·차번 선택입력 · CTA순서 유지 | tsc0 |
+| 2026-07-25 | Cursor | 운영원장 CTA 순서: 빠른입력 · 자산등록 · 데이터센터 | tsc0 |
+| 2026-07-25 | Cursor | 운영원장 CTA 3개: 데이터센터 · 자산등록 · 빠른입력(openLog) | tsc0 |
+| 2026-07-25 | Cursor | 재무원장 CTA=데이터센터(openIngest) · ingest 하단 이전 | tsc0 |
+| 2026-07-25 | Cursor | 재무원장 CTA=거래 입력 1개→ingest · 데이터센터 하단 이전(Page back, WorkHubBack 제거) | tsc0 |
+| 2026-07-25 | Cursor | 재무원장 CTA: 담기→계좌·CMS 입력 / 법인카드 입력 | tsc0 |
+| 2026-07-25 | Cursor | 재무원장: 24·25 CMS미연결 수백건 DOM폭주→표 200건 상한(월간·검색으로 좁히기) | tsc0 |
+| 2026-07-25 | Cursor | 재무원장: 검색cms로 출금 숨기던 필터 원복(검색 가로채기 취소) | tsc0 |
+| 2026-07-25 | Cursor | CMS업로드=원장 CMS미연결 반영 · 계좌CMS집금과 수동/자동 매칭 · 입금합계는 계좌만 | tsc0 |
+| 2026-07-25 | Cursor | CMS: 매칭분 상시하위행(펼침X)·집금클릭=수동매칭·담기시 자동정산 유지 | tsc0 |
+| 2026-07-25 | Cursor | 담기 후 자동정산: bank_tx·card_tx→CMS/카드집금 high·medium 자동붙임 (`payments/auto-settle` · intake 부수효과) | tsc0 |
+| 2026-07-25 | Cursor | CMS매칭: 성공→집금 3~5일(창1~7) · 집금라벨만 deposit · 정산엑셀 672건 투입 · 정산 deposit13/item29 | tsc0 |
+| 2026-07-25 | Cursor | Search X=칸 안 absolute(width는 wrap) · 입력해도 검색칸 안 커짐 | tsc0 |
+| 2026-07-25 | Cursor | Search 입력값 있으면 X 지우기 · 재무원장 CMS정산 deposit 펼침→구성건(item) 나열 · deposit출처=CMS | tsc0 |
+| 2026-07-25 | Cursor | 재무원장 펼침=법인카드·CMS·카드매출·미분류만 · 카드→card_tx담기 · CMS→매칭/담기 CTA | tsc0 |
+| 2026-07-25 | Cursor | `/dev/sample` ERP 3축 시안: 원장(상단필터·기본/전체·행→360) · 고유 큐(ObjCard) · 안내. FacetRail/뷰토글 없음 | tsc0 |
 | 2026-07-24 | Cursor | 모바일 메뉴=ERP4: 열리면 TopBar 상태가「☰ 메뉴」+우측 X · 패널 bar 아래 펼침 | tsc0 |
 | 2026-07-24 | Cursor | 모바일 메뉴=ERP4: TopBar z80 유지·햄버거↔X · 패널/스크림은 bar 아래만 | tsc0 |
 | 2026-07-24 | Cursor | BottomSheet 푸터=ERP4 std/filter/commit: 검색[지우기·닫기] · 필터[해제·선택N·닫기] · 회사/보기[닫기] · SCRIM | tsc0 |

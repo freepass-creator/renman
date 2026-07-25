@@ -109,14 +109,21 @@ export default function TopBar() {
   const showActionBar = !!(slots.back || slots.actions || slots.depth);   // 모바일 하단 액션바(이전+주액션)
   useEffect(() => { setMenuOpen(false); }, [pathname]);
   useEffect(() => {
-    // 모바일: 상단 TopBar 항상(ERP4) · 하단 도크=탭/액션.
-    document.body.style.paddingTop = mobile ? 'var(--fp-bar-h)' : '';
+    // 상단바=fixed(웹·모바일) → body paddingTop으로 본문 시작 맞춤.
+    // 웹 뎁스: 하단 이전/홈 바 높이 → --fp-dock-h (Page frame이 빼서 페이지 스크롤 방지).
+    document.body.style.paddingTop = 'var(--fp-bar-h)';
+    const dock = showBottom ? 'calc(var(--fp-bar-h) + 8px)' : '0px';
+    document.documentElement.style.setProperty('--fp-dock-h', mobile ? '0px' : dock);
     document.body.style.paddingBottom = mobile
       ? (depth
           ? (showActionBar ? 'calc(var(--fp-bar-h) + env(safe-area-inset-bottom))' : 'env(safe-area-inset-bottom)')
           : (showActionBar ? 'calc(2 * var(--fp-bar-h) + env(safe-area-inset-bottom))' : 'calc(var(--fp-bar-h) + env(safe-area-inset-bottom))'))
-      : (showBottom ? 'calc(var(--fp-bar-h) + 8px)' : '');
-    return () => { document.body.style.paddingTop = ''; document.body.style.paddingBottom = ''; };
+      : (showBottom ? dock : '');
+    return () => {
+      document.body.style.paddingTop = '';
+      document.body.style.paddingBottom = '';
+      document.documentElement.style.setProperty('--fp-dock-h', '0px');
+    };
   }, [showBottom, showActionBar, mobile, depth]);
   const [todayLabel, setTodayLabel] = useState('');
   useEffect(() => { const n = new Date(); setTodayLabel(`${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}-${String(n.getDate()).padStart(2, '0')} (${['일', '월', '화', '수', '목', '금', '토'][n.getDay()]})`); }, []);
@@ -169,7 +176,12 @@ export default function TopBar() {
 
   return (
     <>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 16px', background: C.taupeBg, borderBottom: `1px solid ${line}`, position: 'sticky', top: 0, zIndex: 30, minHeight: 48, boxSizing: 'border-box', flexWrap: 'wrap' }}>
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 10,
+        padding: '0 16px', background: C.taupeBg, borderBottom: `1px solid ${line}`,
+        position: 'fixed', top: 0, left: 0, right: 0, zIndex: 80,
+        height: 'var(--fp-bar-h)', boxSizing: 'border-box',
+      }}>
         <NavMenu />
         <Link href="/" style={{ fontSize: 15, fontWeight: 800, letterSpacing: '-0.03em', color: ink, textDecoration: 'none' }}>{OPERATOR_BRAND}</Link>{/* SPA 이동 — 구 <a>는 전체 앱 재부팅(캐시 소실) */}
         {/* 가운데 = 전역 검색(검색 전용 인라인 타입어헤드 — 창 안 뜨고 밑에 결과 바로). */}

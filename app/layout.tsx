@@ -27,7 +27,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <AppBarProvider>
             <ConfirmProvider>
               <TopBar />
-              <div style={{ minHeight: 'calc(100vh - var(--fp-bar-h))' }}>{children}</div>
+              <div style={{ minHeight: 'calc(100vh - var(--fp-bar-h) - var(--fp-dock-h, 0px))' }}>{children}</div>
               <CommandPalette />
               <CarDrawer />
               <PrintHost />

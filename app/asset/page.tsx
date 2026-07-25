@@ -196,7 +196,7 @@ export default function AssetPage() {
             { key: 'card', label: '카드', icon: <LayoutGrid size={15} /> },
             { key: 'excel', label: '엑셀', icon: <Table size={15} /> },
           ]} />}
-          actions={<Btn size="sm" onClick={() => openIngest('vehicle')}>+ 차량 담기</Btn>}
+          actions={<Btn size="sm" variant="ghost" onClick={() => openIngest('vehicle')}>+ 차량 담기</Btn>}
         />
       }
       rail={!loading ? <FacetRail lensKey="자산현황" facets={facets} onToggle={toggleFacet} onReset={resetFacets} counts={counts} /> : null}

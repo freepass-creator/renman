@@ -80,7 +80,7 @@ function FilterPop<T>({ col, x, y, rows, sel, onSel, sort, onSort, onClose }: {
   const setDir = (dir: 'asc' | 'desc') => onSort(isS(dir) ? null : { key: col.key, dir });
 
   const btn = (active: boolean): React.CSSProperties => ({
-    flex: 1, height: ctrlH(false, 'sm'), fontSize: ctrlFs(false, 'sm'), fontWeight: active ? 700 : 500,
+    flex: 1, height: ctrlH(false, 'sm'), fontSize: ctrlFs(false, 'sm'), fontWeight: 600, boxSizing: 'border-box',
     border: `1px solid ${active ? C.brand : C.line}`, borderRadius: R,
     background: active ? C.brand : C.card, color: active ? C.inverse : C.mute, cursor: 'pointer',
   });
@@ -108,7 +108,7 @@ function FilterPop<T>({ col, x, y, rows, sel, onSel, sort, onSort, onClose }: {
                   style={{
                     display: 'flex', alignItems: 'center', gap: 6, width: '100%', textAlign: 'left',
                     padding: '5px 6px', border: 'none', borderRadius: R, cursor: 'pointer',
-                    background: on ? C.head : 'transparent', fontWeight: on ? 700 : 400,
+                    background: on ? C.head : 'transparent', fontWeight: 600,
                     fontSize: 12, color: C.ink,
                   }}>
                   <span style={{ width: 12, color: on ? C.brand : C.line2 }}>{on ? '✓' : ''}</span>
@@ -127,7 +127,7 @@ function FilterPop<T>({ col, x, y, rows, sel, onSel, sort, onSort, onClose }: {
   );
 }
 
-export function ExcelSheet<T>({ cols, rows, onRow, rowKey, onFiltered, mode = 'excel' }: {
+export function ExcelSheet<T>({ cols, rows, onRow, rowKey, onFiltered, mode = 'excel', rowStyle, rowClickable }: {
   cols: SheetCol<T>[];
   rows: T[];
   onRow?: (row: T) => void;
@@ -136,6 +136,10 @@ export function ExcelSheet<T>({ cols, rows, onRow, rowKey, onFiltered, mode = 'e
   onFiltered?: (rows: T[]) => void;
   /** 보기 모드 — 같은 cols로 표/카드를 그린다. 모바일은 항상 카드(표는 손가락으로 못 읽는다). */
   mode?: 'excel' | 'card';
+  /** 행 배경·장식 — CMS 상시 하위행 등. */
+  rowStyle?: (row: T) => React.CSSProperties | undefined;
+  /** false면 클릭 비활성(하위 장식행). 기본 true. */
+  rowClickable?: (row: T) => boolean;
 }) {
   const mobile = useIsMobile();
   // 훅은 조건부 return 앞에서 — 모바일 분기보다 위.
@@ -224,15 +228,19 @@ export function ExcelSheet<T>({ cols, rows, onRow, rowKey, onFiltered, mode = 'e
           </thead>
           <tbody>
             {view.map((r, i) => {
-              const bg = i % 2 ? C.zebra : C.card;
+              const custom = rowStyle?.(r);
+              const clickable = onRow ? (rowClickable ? rowClickable(r) : true) : false;
+              const bg = custom?.background
+                ? String(custom.background)
+                : (i % 2 ? C.zebra : C.card);
               // 고정(pin) 칸은 가로스크롤 시 뒤 내용을 가려야 해서 «자기 배경»이 필요하다.
               // 그래서 행 배경만 바꾸면 그 칸만 호버가 안 먹는다 → hover 행은 여기서 함께 계산한다.
-              const rowBg = hover === i && onRow ? C.hover : bg;
+              const rowBg = hover === i && clickable ? C.hover : bg;
               return (
                 <tr
                   key={rowKey?.(r, i) ?? i}
-                  onClick={onRow ? () => onRow(r) : undefined}
-                  style={{ cursor: onRow ? 'pointer' : 'default', background: rowBg }}
+                  onClick={clickable ? () => onRow!(r) : undefined}
+                  style={{ cursor: clickable ? 'pointer' : 'default', background: rowBg, ...custom, ...(hover === i && clickable ? { background: C.hover } : {}) }}
                   onMouseEnter={() => setHover(i)}
                   onMouseLeave={() => setHover((h) => (h === i ? null : h))}
                 >

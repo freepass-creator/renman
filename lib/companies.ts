@@ -1,6 +1,13 @@
 /** 법인 레지스트리 — session·store 공유. 한 회사가 법인 여러 개. 본사 합본 스코프(ALL)도 여기.
  *  기본 3사(스위치플랜·프라임구독·손오공렌터카) + ERP에서 추가/수정/삭제(회사관리). localStorage 보존.
- *  COMPANIES/COMPANY_DEFS 는 in-place 갱신되는 라이브 배열 — 소비처가 렌더마다 map 하므로 반영됨. */
+ *  COMPANIES/COMPANY_DEFS 는 in-place 갱신되는 라이브 배열 — 소비처가 렌더마다 map 하므로 반영됨.
+ *
+ *  이름 규약 (법인관리 UI와 동일):
+ *    label = 회사명(풀네임)  예: 스위치플랜 주식회사
+ *    short = 표시명          예: 스위치
+ *  원장·표·뱃지·ObjCard = **표시명** (`companyShort` / `companyDisplay`).
+ *  설정·공문·선택기 풀네임이 필요할 때만 `companyLabel`.
+ */
 export type CompanyDef = { id: string; label: string; short?: string };
 export const ALL_COMPANIES = '__ALL__';
 
@@ -37,7 +44,7 @@ function slug(name: string): string {
 
 export function companyDefs(): CompanyDef[] { return COMPANY_DEFS.map((c) => ({ ...c })); }
 
-/** 회사 추가 — 반환 id. 실패(빈 이름·id 중복) 시 null. */
+/** 회사 추가 — 반환 id. 실패(빈 이름·id 중복) 시 null. label=회사명, short=표시명. */
 export function addCompany(label: string, short?: string): string | null {
   const name = (label || '').trim(); if (!name) return null;
   let id = slug(name), n = 1;
@@ -58,16 +65,21 @@ export function removeCompany(id: string): void {
 }
 export function setCompanyShort(id: string, short: string): void { updateCompany(id, { short }); } // 호환
 
+/** 회사명(풀네임). 공문·설정·선택기용. */
 export function companyLabel(id: unknown): string {
   const s = String(id || '');
   if (s === ALL_COMPANIES) return '전체';
   return COMPANY_DEFS.find((c) => c.id === s)?.label || s || '—';
 }
+/** 표시명 — 원장 표식·뱃지·목록 SSOT. short 없으면 회사명으로 폴백. */
 export function companyShort(id: unknown): string {
   const s = String(id || '');
+  if (s === ALL_COMPANIES) return '전체';
   const c = COMPANY_DEFS.find((x) => x.id === s);
-  return c?.short || c?.label || s;
+  return c?.short || c?.label || s || '—';
 }
+/** @alias companyShort — 원장/표에서 쓸 때 의도 드러내는 이름. */
+export const companyDisplay = companyShort;
 
 // 회사별 구분 색(뱃지 톤). 기본 3사 고정 + 그 외는 해시로 안정 배정.
 export function companyTone(id: unknown): 'blue' | 'green' | 'purple' | 'teal' | 'orange' | 'amber' | 'gray' {

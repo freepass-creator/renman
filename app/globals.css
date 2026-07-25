@@ -99,6 +99,7 @@
   --fp-bar-h:      56px;
   --fp-bar-pad-x:  14px;  /* 모바일 바(상단·하단액션) 좌우 패딩 */
   --fp-tabbar-h:   0px;   /* 하단 탭바 표시 시 세팅 → 콘텐츠 도크 정렬 */
+  --fp-dock-h:     0px;   /* 웹 뎁스 하단 이전/홈 바 — SessionBar가 세팅, Page frame이 높이에서 뺌 */
   --fp-dock-safe:  env(safe-area-inset-bottom, 0px);
   /* 본문 기본 400 · 강조는 semibold/bold + brand 색 */
   --font-weight:        400;

@@ -141,7 +141,8 @@ export function parseCmsRow(row: Record<string, unknown>, _fileName: string): En
   if (amount <= 0) return null;
   const status = get(row, '수납상태', '결제상태', '납부상태');
   if (status && /미납|연체|미수|취소|정지|보류|실패/.test(status)) return null;
-  const txDate = normalizeKoreanDate(get(row, '청구완납일자', '결제일(납부기간)', '결제일', '정산일', '약정일'));
+  // 결제일 = CMS 성공일. 통장 집금은 보통 3~5일 후(cms-matching LAG). 정산일보다 결제일을 우선.
+  const txDate = normalizeKoreanDate(get(row, '결제일', '청구완납일자', '결제일(납부기간)', '정산일', '약정일'));
   if (!txDate) return null;
   const memo = [get(row, '상품', '상품명'), get(row, '청구월', '최초청구월'), get(row, '결제수단', '결제방식')].filter(Boolean).join(' / ');
   const rec: EntityRecord = {

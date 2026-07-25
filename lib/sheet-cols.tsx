@@ -1,6 +1,8 @@
 /**
- * 운영시트 컬럼 SSOT — 자산 열 문법 1벌. /sheet(엑셀 고정)와 /asset(카드↔엑셀 토글)이 같은 cols를 쓴다.
- * 컬럼을 페이지마다 손롤하지 말 것 — 여기서 따다 씀(운영시트·현황 표가 어긋나지 않게).
+ * 원장·현황 표 열 SSOT.
+ *   표식(선두·pin): 운영/자산/계약 = 표시명 → 차량번호 · 재무 = 표시명 → 계좌번호.
+ *   표시명 = companyShort(법인 short). 회사명(풀)=companyLabel 은 공문·설정용.
+ *   컬럼을 페이지마다 손롤하지 말 것 — 여기서 따다 씀.
  */
 import React from 'react';
 import { Badge, won, C, type SheetCol } from '@/components/ui';
@@ -12,10 +14,10 @@ import { AlertTriangle } from 'lucide-react';
 const toneBadge = (t: SheetRow['tone']): 'green' | 'amber' | 'red' | 'gray' =>
   t === 'ok' ? 'green' : t === 'warn' ? 'amber' : t === 'danger' ? 'red' : 'gray';
 
-/** 자산(차량 1행) 열 — 무엇(차번·법인·소유·가동·차명·연식) · 누구(계약자) · 돈(대여료·미수) · 시간(시작·만기·D-day) */
+/** 자산(차량 1행) 열 — 표식=회사명→차량번호 선두 고정 · 그 뒤 소유·가동·계약·미수 */
 export const ASSET_COLS: SheetCol<SheetRow>[] = [
-  { key: 'plate', label: '차량번호', render: (r) => r.plate || '—', text: (r) => r.plate },
-  { key: 'co', label: '법인', render: (r) => r.company || '—', text: (r) => r.company },
+  { key: 'co', label: '표시명', pin: true, render: (r) => r.company || '—', text: (r) => r.company },
+  { key: 'plate', label: '차량번호', pin: true, render: (r) => r.plate || '—', text: (r) => r.plate },
   // 생애단계 = 카드뷰 섹션(구매예정·등록예정·보유중·처분예정·처분완료)이 엑셀에선 이 분류 열로. align center.
   { key: 'own', label: '생애단계', align: 'c', render: (r) => <Badge tone={r.ownership === '보유중' ? 'green' : r.ownership === '처분완료' ? 'gray' : 'amber'}>{r.ownership}</Badge>, text: (r) => r.ownership },
   { key: 'util', label: '가동', align: 'c', render: (r) => <Badge tone={toneBadge(r.tone)}>{r.util}</Badge>, text: (r) => r.util },
@@ -38,14 +40,14 @@ export const ASSET_COLS: SheetCol<SheetRow>[] = [
 ];
 
 /* ── 계약 열 문법(계약·채권·반납·미수 공용) ──
- *   무엇(차번·법인·차명) · 누구(계약자) · 돈(대여료·보증금·미수) · 시간(시작·만기·D-day) · 상태 · 연락처(끝)
+ *   표식=회사명→차량번호 선두 · 누구(계약자) · 돈 · 시간 · 상태 · 연락처(끝)
  *   탭/화면마다 «빼기»만 · 자리 고정 — 눈이 같은 데를 본다. */
 const misu = (r: ContractRow) =>
   r.net > 0 ? <span style={{ color: C.danger, fontWeight: 700 }}>{won(r.net)}</span> : '—';
 
 const CT = {
-  plate: { key: 'plate', label: '차량번호', render: (r) => r.plate || '—', text: (r) => r.plate },
-  co: { key: 'co', label: '법인', render: (r) => r.company || '—', text: (r) => r.company },
+  co: { key: 'co', label: '표시명', pin: true, render: (r) => r.company || '—', text: (r) => r.company },
+  plate: { key: 'plate', label: '차량번호', pin: true, render: (r) => r.plate || '—', text: (r) => r.plate },
   car: { key: 'car', label: '차명', render: (r) => r.carName || '—', text: (r) => r.carName },
   cust: { key: 'cust', label: '계약자', render: (r) => r.customer || '—', text: (r) => r.customer },
   rent: { key: 'rent', label: '대여료', align: 'r', render: (r) => r.rent ? won(r.rent) : '—', text: (r) => r.rent },
@@ -73,7 +75,7 @@ const CT = {
 
 /** 계약 기준 열. */
 export const CONTRACT_COLS: SheetCol<ContractRow>[] = [
-  CT.plate, CT.co, CT.car, CT.cust,
+  CT.co, CT.plate, CT.car, CT.cust,
   CT.rent, CT.dep, CT.net,
   CT.start, CT.end, CT.dday,
   CT.st,
@@ -82,7 +84,7 @@ export const CONTRACT_COLS: SheetCol<ContractRow>[] = [
 
 /** 미수/채권 열 = 계약 열 + 회수 판단(연체일·미납회차)을 ⑤ 자리에 추가(앞으로 당기지 않음). */
 export const DEBT_COLS: SheetCol<ContractRow>[] = [
-  CT.plate, CT.co, CT.car, CT.cust,
+  CT.co, CT.plate, CT.car, CT.cust,
   CT.rent, CT.dep, CT.net,
   CT.start, CT.end, CT.dday,
   CT.st, CT.od, CT.cnt,
@@ -119,8 +121,8 @@ const remainSpan = (d: number | null) => {
   return parts.length ? parts.join(' ') : '0일';
 };
 const FL = {
-  plate: { key: 'plate', label: '차량번호', render: (r) => r.plate || '—', text: (r) => r.plate },
-  co: { key: 'co', label: '회사', render: (r) => r.company || '—', text: (r) => r.company },
+  plate: { key: 'plate', label: '차량번호', pin: true, render: (r) => r.plate || '—', text: (r) => r.plate },
+  co: { key: 'co', label: '표시명', pin: true, render: (r) => r.company || '—', text: (r) => r.company },
   status: { key: 'status', label: '차량상태', render: (r) => <Badge tone={toneBadge(r.tone)}>{r.status}</Badge>, text: (r) => r.status },
   loc: { key: 'loc', label: '현위치', render: (r) => r.location || '—', text: (r) => r.location },
   car: { key: 'car', label: '차명', render: (r) => r.carName || '—', text: (r) => r.carName },
@@ -216,9 +218,9 @@ const alignCols = (cols: SheetCol<FleetRow>[]): SheetCol<FleetRow>[] =>
   cols.map((c) => (CENTER_ALIGN.has(c.key) ? { ...c, align: 'c' as const } : c));
 
 export const FLEET_BASIC_COLS: SheetCol<FleetRow>[] = alignCols([
-  FL.co, FL.status, FL.plate, FL.maker, FL.sub, FL.year,                                    // 자산(회사·차량상태·차번·제조사·세부모델·연식) — erp5 운영현황 순서
-  FL.cust, FL.phone, FL.term, FL.start, FL.end, FL.dep, FL.rent, FL.pay, FL.round, FL.dday, // 계약(사용처·연락처·기간·시작·만기·보증금·대여료·결제일·회차·반납까지)
-  FL.net, FL.od, FL.stage, FL.warn, FL.note,                                                // 수납/리스크·비고
+  FL.co, FL.plate, FL.status, FL.maker, FL.sub, FL.year,                                   // 필수식별=회사명·차량번호 + 자산
+  FL.cust, FL.phone, FL.term, FL.start, FL.end, FL.dep, FL.rent, FL.pay, FL.round, FL.dday, // 계약
+  FL.net, FL.od, FL.stage, FL.warn, FL.note,
 ]);
 
 /** 전체 = 기본 열 «그대로» + 부가 열이 우측에 쭉 붙음(연식·VIN·취득·검사·GPS·할부·보험·연체).

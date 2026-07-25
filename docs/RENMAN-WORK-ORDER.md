@@ -174,7 +174,9 @@ const { data: [cs, hs], loading } = useEntityLists(['contract', 'history']);
 | `components/ui` `TextLink` | 표·카드 안 인라인 링크(번호판·임차인·EmptyState CTA) — 손롤 `<button style>` 금지 |
 | `components/WorkbenchBar` | 툴바 SSOT (검색·탭·뷰·액션) |
 | `components/ui` `WizPanel` | 현장 위저드 인라인 껍데기(Modal 풀스크린 대체) — Delivery/Return |
-| `components/ui` `PageToolBar` | 모바일 목록툴(=ERP4) — 아이콘+라벨 균등 행→시트. WorkbenchBar가 조립 |
+| `components/ui` `LedgerFrame` | **원장 틀 SSOT**(재무원장 시안) — Page frame+상단필터+기본/전체+ExcelSheet. FacetRail/뷰토글 금지 |
+| `components/ui` `SectionLabel` | 상세 그룹 소제목(무박스) — freepass ERP4 동기. 360 운영·자산·계약·이력 |
+| `components/ui` `Disclosure` | 접이식(할부스케줄 등) — Sec와 별개 · 제목 줄 눌러 표 인라인 펼침 |
 
 ---
 

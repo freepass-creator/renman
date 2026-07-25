@@ -87,13 +87,14 @@ export const PAGE_HEAD_PB_M = 0;
 
 /* 토글/탭/칩 활성 룩 SSOT — PillTabs·FilterChips·설정 선택 등.
  *   size sm|md = CTRL. lg = 현장 CTA(48)만.
- *   mobile=true 이면 ERP4 높이·16px 폰트. */
+ *   mobile=true 이면 ERP4 높이·16px 폰트.
+ *   활성은 색만 바꾼다. fontWeight·border 폭을 바꾸면 이웃이 1px씩 밀린다. */
 export function toggleStyle(active: boolean, size: 'sm' | 'md' | 'lg' = 'md', mobile = false): CSSProperties {
   if (size === 'lg') {
     return {
       display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 7,
       height: 48, boxSizing: 'border-box', padding: '0 18px',
-      fontSize: 15, fontWeight: active ? 700 : 500, lineHeight: 1,
+      fontSize: 15, fontWeight: 700, lineHeight: 1,
       cursor: 'pointer', borderRadius: R, whiteSpace: 'nowrap', flexShrink: 0,
       border: `1px solid ${active ? C.brand : C.taupeLine}`,
       background: active ? C.brand : C.taupeBg,
@@ -110,7 +111,8 @@ export function toggleStyle(active: boolean, size: 'sm' | 'md' | 'lg' = 'md', mo
   return {
     display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 7,
     height: h, boxSizing: 'border-box', padding: pad,
-    fontSize: fs, fontWeight: active ? 700 : 500, lineHeight: 1,
+    // 웹 600 · 모바일 700 — 활성/비활성 동일(굵기 전환 = 폭 흔들림)
+    fontSize: fs, fontWeight: mobile ? 700 : 600, lineHeight: 1,
     cursor: 'pointer', borderRadius: R, whiteSpace: 'nowrap', flexShrink: 0,
     border: `1px solid ${active ? C.brand : C.taupeLine}`,
     background: active ? C.brand : C.taupeBg,

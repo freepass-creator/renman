@@ -1,5 +1,5 @@
 'use client';
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useIsMobile } from '@/lib/use-mobile';
 import { useAppBar } from '@/lib/appbar';
 import { FacetFilterProvider } from '@/lib/facet-filter-ctx';
@@ -30,30 +30,50 @@ export function Page({ title, meta, left, mid, right, tools, children, fill, fra
       : (back ? { back } : null),
     [mobile, back, typeof title === 'string' ? title : 0],
   );
+  // frame: 창(html/body) 스크롤 잠금 — 상단바 고정 · 스크롤은 본문/패널 안만.
+  useEffect(() => {
+    if (!frameMode) return;
+    const html = document.documentElement;
+    const prevHtml = html.style.overflow;
+    const prevBody = document.body.style.overflow;
+    html.style.overflow = 'hidden';
+    document.body.style.overflow = 'hidden';
+    return () => {
+      html.style.overflow = prevHtml;
+      document.body.style.overflow = prevBody;
+    };
+  }, [frameMode]);
   // 모바일: 회사=PageToolBar «회사» 툴(시트). meta/회사칩을 본문 헤더에 붙이지 않음.
   const shellOwnsCompany = mobile && (tools != null || left != null);
   const showMeta = meta != null && !mobile;
   const mobileChrome = mobile && shellOwnsCompany; // TopBar + PageToolBar 2단
+  const showHead = !!(
+    mobileChrome
+    || (!mobile && hasTitle)
+    || (!shellOwnsCompany && !noCompany)
+    || left != null || mid != null || tools != null || right != null || showMeta
+  );
   return (
     <main style={{
       // frame(엑셀 시트)=전폭·뷰포트 꽉 채워 자체 스크롤(헤더 틀고정)·페이지 스크롤 없음.
       // 그 외(카드·문서)=1680 캡+가운데 — 가로형 카드가 뷰포트 전체로 늘어나 «표»처럼 보이지 않게.
       // 모바일 2단 크롬: body paddingTop=TopBar · 본문 padTop 0 → 툴바가 상단바 바로 아래(ERP4).
-      padding: mobileChrome ? '0 14px 48px' : (mobile ? PAGE_PAD_M : (frameMode ? '16px 24px 20px' : '16px 24px 60px')),
+      padding: mobileChrome ? '0 14px 48px' : (mobile ? PAGE_PAD_M : (frameMode ? '12px 20px 10px' : '16px 24px 60px')),
       ...(frameMode
-        ? { flex: 1, minWidth: 0, height: 'calc(100vh - var(--fp-bar-h))', overflow: 'hidden', display: 'flex', flexDirection: 'column' }
+        ? { flex: 1, minWidth: 0, height: 'calc(100vh - var(--fp-bar-h) - var(--fp-dock-h, 0px))', maxHeight: 'calc(100vh - var(--fp-bar-h) - var(--fp-dock-h, 0px))', overflow: 'hidden', display: 'flex', flexDirection: 'column' }
         : fill
           ? { flex: 1, minWidth: 0, maxWidth: 1680, margin: '0 auto', width: '100%' }
           : { maxWidth: 1680, margin: '0 auto' }),
     }}>
       {/* 모바일: TopBar(fixed) 바로 아래 PageToolBar sticky — 두 줄이 한 크롬(ERP4).
           좌우만 bleed. 상단 음수마진 금지(상단바와 겹침). */}
-      <div style={{ display: 'flex', flexWrap: mobile ? 'nowrap' : 'wrap', alignItems: mobileChrome ? 'stretch' : 'center', gap: mobile ? SPACE_M : 10, minHeight: mobile ? 0 : 36, flexShrink: 0,
+      {showHead && (
+      <div style={{ display: 'flex', flexWrap: mobile ? 'nowrap' : 'wrap', alignItems: mobileChrome ? 'stretch' : 'center', gap: mobile ? SPACE_M : 10, minHeight: mobile ? 0 : (frameMode ? 28 : 36), flexShrink: 0,
         ...(mobileChrome
           ? { position: 'sticky' as const, top: 'var(--fp-bar-h)', zIndex: 20, background: 'var(--bg-page)', margin: '0 -14px', padding: 0, borderBottom: 'none', width: 'calc(100% + 28px)', boxSizing: 'border-box' as const }
           : mobile
             ? { paddingBottom: PAGE_HEAD_PB_M }
-            : { paddingBottom: 14 }),
+            : { paddingBottom: frameMode ? 8 : 14 }),
       }}>
         {!mobile && hasTitle && <h1 style={{ fontSize: 18, fontWeight: 800, letterSpacing: '-0.02em', margin: 0, flexShrink: 0 }}>{title}</h1>}
         {!shellOwnsCompany && !noCompany && <CompanyFilter />}
@@ -68,6 +88,7 @@ export function Page({ title, meta, left, mid, right, tools, children, fill, fra
         )}
         {right != null && <><span style={{ flex: tools != null ? 0 : 1, minWidth: tools != null ? 0 : 8 }} />{right}</>}
       </div>
+      )}
       {frameMode ? <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>{children}</div> : children}
     </main>
   );
@@ -210,13 +231,35 @@ export function HiddenSecs() {
  *   라우트 뎁스(차량·손님): SessionBar 상단 제목 · 하단 이전+액션 / 탭 숨김. depth=true.
  *   fixed 오버레이: SessionBar 밖 → 모바일은 하단만 이전+액션(상단 이전 중복 X).
  */
-export function DetailShell({ title, meta, onBack, actions, fixed, maxWidth = 1000, children }: { title?: React.ReactNode; meta?: React.ReactNode; onBack?: () => void; actions?: React.ReactNode; fixed?: boolean; maxWidth?: number; children: React.ReactNode }) {
+export function DetailShell({ title, meta, onBack, actions, fixed, maxWidth = 1000, fill, children }: {
+  title?: React.ReactNode; meta?: React.ReactNode; onBack?: () => void; actions?: React.ReactNode;
+  fixed?: boolean; maxWidth?: number;
+  /** ERP 워크벤치 — 중복 h1 없음. 여백·폭은 원장 Page와 동일(16/24 · 1680). */
+  fill?: boolean;
+  children: React.ReactNode;
+}) {
   const mobile = useIsMobile();
-  useAppBar(fixed ? null : { back: onBack, depth: true, title, actions, contentMax: maxWidth, contentPad: mobile ? 12 : 16 }, [fixed, mobile, maxWidth, title]);
+  // 원장 Page SSOT: 웹 padding 16px 24px · maxWidth 1680 · contentPad 24
+  const deskPad = '16px 24px 60px';
+  const shellMax = fill ? 1680 : maxWidth;
+  useAppBar(fixed ? null : {
+    back: onBack, depth: true, title, actions,
+    contentMax: shellMax,
+    contentPad: fill ? (mobile ? 14 : 24) : (mobile ? 12 : 16),
+  }, [fixed, mobile, shellMax, title, fill]);
   if (!fixed) {
     return (
-      <div style={{ maxWidth, margin: '0 auto', padding: mobile ? '10px 14px 28px' : '14px 16px 48px' }}>
-        {title != null && !mobile && <h1 style={{ fontSize: 22, fontWeight: 800, letterSpacing: '-0.02em', margin: '2px 0 14px' }}>{title}</h1>}
+      <div style={{
+        maxWidth: shellMax,
+        width: '100%',
+        margin: '0 auto',
+        padding: fill
+          ? (mobile ? '10px 14px 48px' : deskPad)
+          : (mobile ? '10px 14px 28px' : '14px 16px 48px'),
+        minHeight: fill && !mobile ? 'calc(100vh - 52px)' : undefined,
+        boxSizing: 'border-box',
+      }}>
+        {title != null && !mobile && !fill && <h1 style={{ fontSize: 22, fontWeight: 800, letterSpacing: '-0.02em', margin: '2px 0 14px' }}>{title}</h1>}
         {children}
       </div>
     );

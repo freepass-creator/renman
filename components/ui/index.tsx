@@ -10,6 +10,7 @@ export * from './layout';
 export * from './controls';
 export * from './table';
 export * from './excel-sheet';
+export * from './ledger-frame';
 export * from './detail';
 export * from './overlays';
 export * from './bottom-sheet';

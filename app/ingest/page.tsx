@@ -1,6 +1,6 @@
 'use client';
 import { useState, useEffect } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { ENTITY_LIST, ENTITIES, mapOcrToEntity, type EntityRecord } from '@/lib/intake/entities';
 import { parseCsv } from '@/lib/intake/csv';
 import { downloadXlsxTemplate, parseSpreadsheet } from '@/lib/intake/xlsx';
@@ -16,7 +16,6 @@ import { toast } from '@/lib/toast';
 
 import { Page, Sec, Cards, Metric, Btn, FormGrid, Panel, PillTabs, Select, Input, th, td, C, Message, Loading } from '@/components/ui';
 import { WorkbenchBar } from '@/components/WorkbenchBar';
-import { WorkHubBack } from '@/components/WorkHubTabs';
 import { layerOfEntity } from '@/lib/domain/layers';
 
 // 담기가 URL(?type·plate)로 진입하므로 정적 프리렌더 대신 요청시 렌더(useSearchParams bailout 방지).
@@ -39,6 +38,7 @@ const ENTITY_GROUPS = (['ledger', 'event', 'system'] as const)
   .filter((g) => g.items.length > 0);
 
 export default function IngestPage() {
+  const router = useRouter();
   const { companyId, user, scopeAll } = useSession();
   const sp = useSearchParams();
   const [entityKey, setEntityKey] = useState(() => sp.get('type') || 'vehicle');   // ?type= 프리셀렉트
@@ -63,9 +63,10 @@ export default function IngestPage() {
       // 단일 통로 — 앵커 정규화·부수효과·jpk:saved 반영
       const r = await saveIntake(entityKey, target, toSave);
       const s = r.save;
-      const fx = r.sideEffects.length ? ` · 부수효과 ${r.sideEffects.length}` : '';
+      const settleNote = r.sideEffects.filter((x) => x.startsWith('cms-settle:') || x.startsWith('card-settle:')).join(' · ');
+      const fx = settleNote ? ` · ${settleNote}` : (r.sideEffects.length ? ` · 부수효과 ${r.sideEffects.length}` : '');
       setSaveMsg(`저장 ${s.saved}건 · 중복건너뜀 ${s.duplicates} · 백엔드 ${s.backend}${fx}`);
-      toast(`저장 ${s.saved}건${s.duplicates ? ` · 중복 ${s.duplicates}` : ''} — ${entity.label} (${companyLabel(target)})`, 'success');
+      toast(`저장 ${s.saved}건${s.duplicates ? ` · 중복 ${s.duplicates}` : ''}${settleNote ? ` · 자동정산 ${settleNote}` : ''} — ${entity.label} (${companyLabel(target)})`, 'success');
       setRecords([]);
       setPeekSaved(true);
       reloadSaved();
@@ -145,7 +146,8 @@ export default function IngestPage() {
 
   return (
     <Page title="데이터센터" meta="모든 데이터 투입구 · OCR·엑셀·직접입력"
-      tools={<WorkbenchBar mid={<WorkHubBack />} actions={<><Btn size="sm" variant="ghost" href="/ingest/freepass">프리패스 연동</Btn><Btn size="sm" variant="ghost" href="/ingest/classify">차종 분류</Btn><Btn size="sm" variant="ghost" href="/ingest/bulk">대량 자동매칭</Btn></>} />}
+      back={() => router.back()}
+      tools={<WorkbenchBar actions={<><Btn size="sm" variant="ghost" href="/ingest/freepass">프리패스 연동</Btn><Btn size="sm" variant="ghost" href="/ingest/classify">차종 분류</Btn><Btn size="sm" variant="ghost" href="/ingest/bulk">대량 자동매칭</Btn></>} />}
       right={<a href="/trash" style={{ fontSize: 13, color: C.mute, textDecoration: 'none', fontWeight: 600 }}>휴지통 →</a>}>
       <p style={{ color: C.mute, fontSize: 13, marginTop: 6, lineHeight: 1.6 }}>
         <b>모든 데이터</b>를 한곳에서 넣습니다 — 원장(차량·계약·고객·보험·계좌)뿐 아니라 <b>업무 기록(정비·통화·과태료)</b>까지.

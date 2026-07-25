@@ -5,6 +5,7 @@ import { useIsMobile } from '@/lib/use-mobile';
 import { C, R, SH, ctrlH, ctrlInputFs } from './tokens';
 import { Badge } from './misc';
 import { Input, Select } from './controls';
+import { ChevronDown } from 'lucide-react';
 
 /* 상세 라벨/값 표 · 인라인 편집 폼 · 링크형 리스트 — 상세(360) 원자. */
 
@@ -42,6 +43,45 @@ export function DetailRow({ main, sub, right, rightColor = C.mute }: { main: Rea
 }
 export function DetailEmpty({ children }: { children: React.ReactNode }) {
   return <div style={{ padding: 14, fontSize: 12.5, color: C.lineStrong }}>{children}</div>;
+}
+
+/* 섹션 소제목(테두리 없음) — freepass ERP4 동기. 상세 그룹 헤더. Section(박스)·Sec(접기)와 별개. */
+export function SectionLabel({ children, mt = 14, mb = 6 }: { children: React.ReactNode; mt?: number; mb?: number }) {
+  return <div style={{ fontSize: 13, fontWeight: 800, color: C.ink, letterSpacing: '-0.01em', margin: `${mt}px 0 ${mb}px` }}>{children}</div>;
+}
+
+/* 접이식 — 제목 줄만 보이고 눌러 펼침(할부스케줄·FAQ). Sec(페이지 섹션)과 별개. */
+export function Disclosure({ title, defaultOpen = false, open: openProp, onOpenChange, children }: {
+  title: React.ReactNode; defaultOpen?: boolean; open?: boolean; onOpenChange?: (o: boolean) => void; children: React.ReactNode;
+}) {
+  const mobile = useIsMobile();
+  const [inner, setInner] = React.useState(defaultOpen);
+  const controlled = openProp !== undefined;
+  const open = controlled ? !!openProp : inner;
+  const setOpen = (next: boolean) => { onOpenChange?.(next); if (!controlled) setInner(next); };
+  return (
+    <div style={{ borderTop: `1px solid ${C.line}` }}>
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        aria-expanded={open}
+        style={{
+          display: 'flex', alignItems: 'center', gap: 8, width: '100%',
+          minHeight: ctrlH(mobile), padding: mobile ? '10px 2px' : '8px 2px',
+          border: 'none', background: 'none', cursor: 'pointer', textAlign: 'left',
+          WebkitTapHighlightColor: 'transparent',
+        }}
+      >
+        <ChevronDown
+          size={mobile ? 16 : 14}
+          color={open ? C.ink : C.faint}
+          style={{ flex: '0 0 auto', transform: open ? 'none' : 'rotate(-90deg)', transition: 'transform .15s' }}
+        />
+        <span style={{ flex: 1, minWidth: 0, fontSize: mobile ? 14 : 12.5, fontWeight: 700, color: C.ink, lineHeight: 1.4 }}>{title}</span>
+      </button>
+      {open && <div style={{ padding: '0 0 10px 0' }}>{children}</div>}
+    </div>
+  );
 }
 
 /* 라벨|값 표(인라인 편집) — 세부(360)·InfoDoc 공용 SSOT.
