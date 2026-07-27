@@ -8,7 +8,7 @@ import { CONTRACT_MASTER_BASIC_COLS, CONTRACT_MASTER_EXPANDED_COLS } from '@/lib
 import { useEntityList } from '@/lib/use-entity-lists';
 import { textMatch } from '@/lib/search-match';
 import {
-  Btn, C, LedgerCreatePanel, LedgerFrame, LedgerRecordPanel, PillTabs, Search, won,
+  Btn, C, LedgerCreatePanel, LedgerFrame, LedgerRecordPanel, PeriodBar, Search, Select, toggleStyle, won,
   type LedgerColView, type LedgerFormSection,
 } from '@/components/ui';
 import { useIsMobile } from '@/lib/use-mobile';
@@ -26,6 +26,9 @@ export default function ContractLedgerPage() {
   const { rows: contracts, loading } = useEntityList('contract');
   const [q, setQ] = useState('');
   const [scope, setScope] = useState<'계약유지' | '계약종료' | '전체'>('계약유지');
+  const [dateBasis, setDateBasis] = useState<'계약일' | '종료일'>('계약일');
+  const [receivableOnly, setReceivableOnly] = useState(false);
+  const [range, setRange] = useState({ from: '', to: '' });
   const [colView, setColView] = useState<LedgerColView>('기본');
   const [selected, setSelected] = useState<ReturnType<typeof contractMasterRow> | null>(null);
   const [creating, setCreating] = useState(false);
@@ -35,9 +38,18 @@ export default function ContractLedgerPage() {
   const searchedRows = useMemo(() => allRows.filter((r) =>
     textMatch(q, r.company, r.contractNo, r.plate, r.carName, r.contractorName, r.contractorPhone, r.contractorLicenseNo, r.status, r.dataAlert),
   ), [allRows, q]);
-  const rows = useMemo(() => searchedRows.filter((r) =>
-    scope === '전체' || (scope === '계약유지' ? !r.ended : r.ended),
-  ), [searchedRows, scope]);
+  const latest = useMemo(() => allRows.reduce((latestDate, row) => {
+    const date = dateBasis === '종료일' ? (row.returnedDate || row.endDate) : (row.contractDate || row.startDate);
+    return date > latestDate ? date : latestDate;
+  }, TODAY), [allRows, dateBasis]);
+  const rows = useMemo(() => searchedRows.filter((r) => {
+    if (!(scope === '전체' || (scope === '계약유지' ? !r.ended : r.ended))) return false;
+    if (receivableOnly && r.net <= 0) return false;
+    const date = dateBasis === '종료일' ? (r.returnedDate || r.endDate) : (r.contractDate || r.startDate);
+    if (range.from && (!date || date < range.from)) return false;
+    if (range.to && (!date || date > range.to)) return false;
+    return true;
+  }), [searchedRows, scope, receivableOnly, dateBasis, range.from, range.to]);
   const active = searchedRows.filter((r) => !r.ended).length;
   // 실미수 = 현재 진행 계약 중 결제일이 도래한 미납만.
   // 종료 계약의 남은 채권은 회수대상 잔존채권으로 분리하고 실미수 KPI에 합치지 않는다.
@@ -56,16 +68,17 @@ export default function ContractLedgerPage() {
       }}><Plus size={14} /> {creating ? '생성 취소' : '계약 생성'}</Btn>}
       filters={<>
         <Search size="sm" placeholder="회사·계약번호·차량·계약자·상태·알람" value={q} onChange={(e) => setQ(e.target.value)} style={{ width: mobile ? '100%' : 300 }} />
-        <PillTabs
-          size="sm"
-          value={scope}
-          onChange={setScope}
-          tabs={[
-            { key: '계약유지', label: '계약유지' },
-            { key: '계약종료', label: '계약종료' },
-            { key: '전체', label: '전체' },
-          ]}
-        />
+        <Select size="sm" aria-label="계약 원장 선택" value={scope} onChange={(event) => setScope(event.target.value as typeof scope)}>
+          <option value="계약유지">유지계약 원장</option>
+          <option value="계약종료">종료계약 원장</option>
+          <option value="전체">전체계약 원장</option>
+        </Select>
+        <Select size="sm" aria-label="계약 날짜 기준" value={dateBasis} onChange={(event) => setDateBasis(event.target.value as typeof dateBasis)}>
+          <option value="계약일">계약일 기준</option>
+          <option value="종료일">종료일 기준</option>
+        </Select>
+        <button type="button" data-ui="toggle" aria-pressed={receivableOnly} onClick={() => setReceivableOnly((active) => !active)} style={toggleStyle(receivableOnly, 'sm', mobile)}>미수</button>
+        <PeriodBar latest={latest} initial="전체" onRange={setRange} />
       </>}
       stats={<span style={{ fontSize: 12.5, color: C.mute }}>유지 <b style={{ color: C.ok }}>{active}</b> · 실미수 <b style={{ color: C.danger }}>{debt.length}건 {won(debtSum)}</b> · 계약종료 미수 <b>{endedDebt.length}건 {won(endedDebtSum)}</b></span>}
       colView={colView}

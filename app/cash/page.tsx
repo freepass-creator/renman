@@ -36,6 +36,7 @@ import FileDrop from '@/components/FileDrop';
 type Flow = '전체' | '입금' | '출금';
 type CashLedgerKind = '입출금내역' | '계좌관리' | 'CMS 원천내역' | '법인카드 원천내역';
 type SourceQuickFilter = '정산완료' | '미정산' | '승인' | '취소' | null;
+type AccountStatusFilter = '전체' | '사용중' | '휴면';
 type CashInputKind = '계좌' | '계좌거래' | 'CMS' | '법인카드';
 type BulkInputSource = '파일' | '링크' | '텍스트';
 const amt = (n: number) => (n ? n.toLocaleString('ko-KR') : '—');
@@ -399,6 +400,7 @@ export default function CashLedgerPage() {
   const [flow, setFlow] = useState<Flow>('전체');
   const [unclassifiedOnly, setUnclassifiedOnly] = useState(false);
   const [sourceQuickFilter, setSourceQuickFilter] = useState<SourceQuickFilter>(null);
+  const [accountStatusFilter, setAccountStatusFilter] = useState<AccountStatusFilter>('사용중');
   const [q, setQ] = useState('');
   // PeriodBar의 effect를 기다리면 첫 프레임이 전체 기간으로 계산되어 행 제한 경고가 번쩍인다.
   // 화면에 표시할 기본 월간 범위를 같은 기준일로 첫 렌더부터 적용한다.
@@ -494,10 +496,12 @@ export default function CashLedgerPage() {
           lastTxDate: txs[0]?.date || '',
         };
       })
+      .filter((row) => accountStatusFilter === '전체'
+        || (accountStatusFilter === '사용중' ? row.status === '사용중' : row.status !== '사용중'))
       .filter((row) => textMatch(q, row.company, row.bankName, row.accountNumber, row.accountAlias, row.accountHolder, row.accountType, row.status, row.createdBy))
       .sort((a, b) => Number(a.status !== '사용중') - Number(b.status !== '사용중') || a.bankName.localeCompare(b.bankName, 'ko'));
     },
-    [accountRecords, bank, scopedCashRows, balanceCashRows, q],
+    [accountRecords, bank, scopedCashRows, balanceCashRows, accountStatusFilter, q],
   );
   const selectedAccountTransactions = useMemo(() => {
     if (!selectedAccount) return [];
@@ -625,6 +629,18 @@ export default function CashLedgerPage() {
       {ledgerKind === 'CMS 원천내역' && quickButton('미정산')}
       {ledgerKind === '법인카드 원천내역' && quickButton('승인')}
       {ledgerKind === '법인카드 원천내역' && quickButton('취소')}
+      {ledgerKind === '계좌관리' && (['전체', '사용중', '휴면'] as AccountStatusFilter[]).map((status) => (
+        <button
+          key={status}
+          type="button"
+          data-ui="toggle"
+          aria-pressed={accountStatusFilter === status}
+          onClick={() => setAccountStatusFilter((current) => current === status && status !== '전체' ? '전체' : status)}
+          style={toggleStyle(accountStatusFilter === status, 'sm', mobile)}
+        >
+          {status}
+        </button>
+      ))}
       {unclassifiedQuickFilter}
     </>
   );

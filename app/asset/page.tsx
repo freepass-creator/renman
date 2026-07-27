@@ -7,7 +7,7 @@ import { ASSET_MASTER_BASIC_COLS, ASSET_MASTER_EXPANDED_COLS } from '@/lib/maste
 import { useEntityList } from '@/lib/use-entity-lists';
 import { textMatch } from '@/lib/search-match';
 import {
-  Btn, C, LedgerCreatePanel, LedgerFrame, LedgerRecordPanel, Search, Select, toggleStyle,
+  Btn, C, LedgerCreatePanel, LedgerFrame, LedgerRecordPanel, PeriodBar, Search, Select, toggleStyle,
   type LedgerColView, type LedgerFormSection,
 } from '@/components/ui';
 import { useIsMobile } from '@/lib/use-mobile';
@@ -16,6 +16,7 @@ import { VEHICLE_DISPOSE_PLAN } from '@/lib/domain/status';
 
 type AssetOwnershipScope = '보유자산' | '처분자산' | '전체자산';
 type AssetQuickFilter = '계약중' | '휴차' | '매각대기';
+type AssetDateBasis = '취득일' | '처분일';
 const ASSET_QUICK_FILTERS: AssetQuickFilter[] = ['계약중', '휴차', '매각대기'];
 
 function matchesOwnership(row: AssetMasterRow, scope: AssetOwnershipScope): boolean {
@@ -46,6 +47,8 @@ export default function AssetLedgerPage() {
   const [q, setQ] = useState('');
   const [ownershipScope, setOwnershipScope] = useState<AssetOwnershipScope>('보유자산');
   const [quickFilter, setQuickFilter] = useState<AssetQuickFilter | null>(null);
+  const [dateBasis, setDateBasis] = useState<AssetDateBasis>('취득일');
+  const [range, setRange] = useState({ from: '', to: '' });
   const [colView, setColView] = useState<LedgerColView>('기본');
   const [selected, setSelected] = useState<ReturnType<typeof assetMasterRow> | null>(null);
   const [creating, setCreating] = useState(false);
@@ -56,9 +59,17 @@ export default function AssetLedgerPage() {
   const activeContractPlates = useMemo(() => new Set(
     contracts.map((contract) => contractMasterRow(contract, TODAY)).filter((contract) => !contract.ended).map((contract) => contract.plate),
   ), [contracts]);
-  const rows = useMemo(() => searchedRows.filter((r) =>
-    matchesOwnership(r, ownershipScope) && matchesQuickFilter(r, quickFilter, activeContractPlates),
-  ), [searchedRows, ownershipScope, quickFilter, activeContractPlates]);
+  const latest = useMemo(() => allRows.reduce((latestDate, row) => {
+    const date = dateBasis === '처분일' ? row.saleDate : (row.acquisitionDate || row.purchasedDate || row.firstReg);
+    return date > latestDate ? date : latestDate;
+  }, TODAY), [allRows, dateBasis]);
+  const rows = useMemo(() => searchedRows.filter((r) => {
+    if (!matchesOwnership(r, ownershipScope) || !matchesQuickFilter(r, quickFilter, activeContractPlates)) return false;
+    const date = dateBasis === '처분일' ? r.saleDate : (r.acquisitionDate || r.purchasedDate || r.firstReg);
+    if (range.from && (!date || date < range.from)) return false;
+    if (range.to && (!date || date > range.to)) return false;
+    return true;
+  }), [searchedRows, ownershipScope, quickFilter, activeContractPlates, dateBasis, range.from, range.to]);
   const held = searchedRows.filter((r) => !r.disposed).length;
   const disposed = searchedRows.filter((r) => r.disposed).length;
   const contracted = searchedRows.filter((r) => !r.disposed && activeContractPlates.has(r.plate)).length;
@@ -91,6 +102,10 @@ export default function AssetLedgerPage() {
           <option value="처분자산">처분자산</option>
           <option value="전체자산">전체자산</option>
         </Select>
+        <Select size="sm" aria-label="자산 날짜 기준" value={dateBasis} onChange={(event) => setDateBasis(event.target.value as AssetDateBasis)}>
+          <option value="취득일">취득일 기준</option>
+          <option value="처분일">처분일 기준</option>
+        </Select>
         <span style={{ display: 'inline-flex', gap: 6, flexWrap: 'wrap' }} aria-label="빠른 필터">
           {ASSET_QUICK_FILTERS.map((filter) => {
             const active = quickFilter === filter;
@@ -111,6 +126,7 @@ export default function AssetLedgerPage() {
             );
           })}
         </span>
+        <PeriodBar latest={latest} initial="전체" onRange={setRange} />
       </>}
       stats={<span style={{ fontSize: 12.5, color: C.mute }}>보유 <b>{held}</b> · 계약중 <b style={{ color: C.ok }}>{contracted}</b> · 휴차 <b style={{ color: C.warn }}>{idle}</b> · 매각대기 <b>{salePending}</b> · 처분 <b>{disposed}</b></span>}
       colView={colView}
