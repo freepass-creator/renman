@@ -62,6 +62,11 @@ type BankAccountRow = {
   createdAt: string;
   createdBy: string;
   updatedAt: string;
+  transactionCount: number;
+  totalIn: number;
+  totalOut: number;
+  currentBalance: number;
+  lastTxDate: string;
   raw: EntityRecord;
 };
 
@@ -83,6 +88,11 @@ const accountRow = (record: EntityRecord): BankAccountRow => ({
   createdAt: String(record.createdAt || ''),
   createdBy: String(record.createdBy || ''),
   updatedAt: String(record.updatedAt || ''),
+  transactionCount: 0,
+  totalIn: 0,
+  totalOut: 0,
+  currentBalance: Number(record.openingBalance) || 0,
+  lastTxDate: '',
   raw: record,
 });
 
@@ -94,6 +104,9 @@ const ACCOUNT_BASIC_COLS: SheetCol<BankAccountRow>[] = [
   { key: 'holder', label: '예금주', priority: 2, render: (r) => r.accountHolder || '—', text: (r) => r.accountHolder },
   { key: 'type', label: '계좌구분', priority: 2, render: (r) => r.accountType || '—', text: (r) => r.accountType },
   { key: 'status', label: '상태', priority: 1, align: 'c', render: (r) => <Badge tone={r.status === '사용중' ? 'green' : 'gray'}>{r.status}</Badge>, text: (r) => r.status },
+  { key: 'totalIn', label: '누적입금', priority: 1, align: 'r', render: (r) => r.totalIn ? <b style={{ color: C.ok }}>{won(r.totalIn)}</b> : '—', text: (r) => r.totalIn },
+  { key: 'totalOut', label: '누적출금', priority: 1, align: 'r', render: (r) => r.totalOut ? <b>{won(r.totalOut)}</b> : '—', text: (r) => r.totalOut },
+  { key: 'currentBalance', label: '최종잔액', priority: 1, align: 'r', render: (r) => won(r.currentBalance), text: (r) => r.currentBalance },
   { key: 'createdAt', label: '등록일', priority: 2, render: (r) => r.createdAt ? r.createdAt.slice(0, 10) : '—', text: (r) => r.createdAt },
   { key: 'createdBy', label: '등록자', priority: 2, render: (r) => r.createdBy || '—', text: (r) => r.createdBy },
 ];
@@ -433,14 +446,36 @@ export default function CashLedgerPage() {
           createdAt: '',
           createdBy: '원장',
           updatedAt: '',
+          transactionCount: 0,
+          totalIn: 0,
+          totalOut: 0,
+          currentBalance: 0,
+          lastTxDate: '',
           raw: record,
         });
       }
       return [...explicit, ...derived]
+      .map((row) => {
+        const accountNo = row.accountNumber.replace(/\D/g, '');
+        const txs = allRows.filter((tx) => {
+          if (tx.nest === 'cms-item' || tx.entity !== 'bank_tx' || tx.companyId !== row.companyId) return false;
+          const txNo = tx.account.replace(/\D/g, '');
+          return (accountNo && txNo === accountNo) || (!!row.accountAlias && tx.accountName === row.accountAlias);
+        });
+        const latestWithBalance = txs.find((tx) => tx.raw.balance !== '' && tx.raw.balance != null);
+        return {
+          ...row,
+          transactionCount: txs.length,
+          totalIn: txs.reduce((sum, tx) => sum + tx.inAmt, 0),
+          totalOut: txs.reduce((sum, tx) => sum + tx.outAmt, 0),
+          currentBalance: latestWithBalance ? Number(latestWithBalance.raw.balance) || 0 : row.openingBalance,
+          lastTxDate: txs[0]?.date || '',
+        };
+      })
       .filter((row) => textMatch(q, row.company, row.bankName, row.accountNumber, row.accountAlias, row.accountHolder, row.accountType, row.status, row.createdBy))
       .sort((a, b) => Number(a.status !== '사용중') - Number(b.status !== '사용중') || a.bankName.localeCompare(b.bankName, 'ko'));
     },
-    [accountRecords, bank, q],
+    [accountRecords, bank, allRows, q],
   );
   const selectedAccountTransactions = useMemo(() => {
     if (!selectedAccount) return [];
@@ -454,9 +489,6 @@ export default function CashLedgerPage() {
       })
       .slice(0, 20);
   }, [allRows, selectedAccount]);
-  const selectedAccountIn = selectedAccountTransactions.reduce((sum, row) => sum + row.inAmt, 0);
-  const selectedAccountOut = selectedAccountTransactions.reduce((sum, row) => sum + row.outAmt, 0);
-
   const rows = useMemo(() => {
     const isAll = !range.from && !range.to;
     const pass = (r: CashRow) => {
@@ -549,7 +581,7 @@ export default function CashLedgerPage() {
         setSelectedAccount(null);
         setSingleKind(ledgerKind === '계좌관리' ? '계좌' : '계좌거래');
         setCreating((open) => open === 'account' || open === 'transaction' ? null : (ledgerKind === '계좌관리' ? 'account' : 'transaction'));
-      }} aria-pressed={creating === 'account' || creating === 'transaction'} variant={creating === 'account' || creating === 'transaction' ? 'ghost' : 'solid'}><Plus size={14} /> {creating === 'account' || creating === 'transaction' ? '입력 취소' : '단건 입력'}</Btn>
+      }} aria-pressed={creating === 'account' || creating === 'transaction'} variant={creating === 'account' || creating === 'transaction' ? 'ghost' : 'solid'}><Plus size={14} /> {creating === 'account' || creating === 'transaction' ? '입력 취소' : ledgerKind === '계좌관리' ? '계좌 추가' : '단건 입력'}</Btn>
       <Btn size="sm" onClick={() => {
         setSelected(null);
         setSelectedAccount(null);
@@ -616,9 +648,10 @@ export default function CashLedgerPage() {
             <div style={{ borderTop: `1px solid ${C.line}`, padding: '10px 14px 14px' }}>
               <div style={{ fontSize: 12, fontWeight: 800, color: C.ink, marginBottom: 8 }}>거래·수납정보</div>
               <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', fontSize: 12.5, marginBottom: 8 }}>
-                <span>최근 거래 <b>{selectedAccountTransactions.length}</b>건</span>
-                <span>입금 <b style={{ color: C.ok }}>{won(selectedAccountIn)}</b></span>
-                <span>출금 <b>{won(selectedAccountOut)}</b></span>
+                <span>전체 거래 <b>{selectedAccount.transactionCount}</b>건</span>
+                <span>입금 <b style={{ color: C.ok }}>{won(selectedAccount.totalIn)}</b></span>
+                <span>출금 <b>{won(selectedAccount.totalOut)}</b></span>
+                <span>최종잔액 <b>{won(selectedAccount.currentBalance)}</b></span>
               </div>
               <ListBox>
                 {selectedAccountTransactions.length ? selectedAccountTransactions.slice(0, 8).map((tx) => (
