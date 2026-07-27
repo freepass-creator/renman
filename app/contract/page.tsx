@@ -1,14 +1,14 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { Plus } from 'lucide-react';
+import { Plus, SlidersHorizontal } from 'lucide-react';
 import { TODAY } from '@/lib/dashboard-consts';
 import { contractMasterRow } from '@/lib/master-ledgers';
 import { CONTRACT_MASTER_BASIC_COLS, CONTRACT_MASTER_EXPANDED_COLS } from '@/lib/master-ledger-cols';
 import { useEntityList } from '@/lib/use-entity-lists';
 import { textMatch } from '@/lib/search-match';
 import {
-  Btn, C, LedgerCreatePanel, LedgerFrame, LedgerRecordPanel, PeriodBar, Search, Select, toggleStyle, won,
+  Btn, C, LedgerCreatePanel, LedgerFilterPanel, LedgerFrame, LedgerRecordPanel, PeriodBar, Search, Select, toggleStyle, won,
   type LedgerColView, type LedgerFormSection,
 } from '@/components/ui';
 import { useIsMobile } from '@/lib/use-mobile';
@@ -29,6 +29,9 @@ export default function ContractLedgerPage() {
   const [dateBasis, setDateBasis] = useState<'계약일' | '종료일'>('계약일');
   const [receivableOnly, setReceivableOnly] = useState(false);
   const [range, setRange] = useState({ from: '', to: '' });
+  const [filterOpen, setFilterOpen] = useState(false);
+  const [detailStatus, setDetailStatus] = useState('');
+  const [detailEndReason, setDetailEndReason] = useState('');
   const [colView, setColView] = useState<LedgerColView>('기본');
   const [selected, setSelected] = useState<ReturnType<typeof contractMasterRow> | null>(null);
   const [creating, setCreating] = useState(false);
@@ -45,11 +48,16 @@ export default function ContractLedgerPage() {
   const rows = useMemo(() => searchedRows.filter((r) => {
     if (!(scope === '전체' || (scope === '계약유지' ? !r.ended : r.ended))) return false;
     if (receivableOnly && r.net <= 0) return false;
+    if (detailStatus && r.status !== detailStatus) return false;
+    if (detailEndReason && r.endReason !== detailEndReason) return false;
     const date = dateBasis === '종료일' ? (r.returnedDate || r.endDate) : (r.contractDate || r.startDate);
     if (range.from && (!date || date < range.from)) return false;
     if (range.to && (!date || date > range.to)) return false;
     return true;
-  }), [searchedRows, scope, receivableOnly, dateBasis, range.from, range.to]);
+  }), [searchedRows, scope, receivableOnly, detailStatus, detailEndReason, dateBasis, range.from, range.to]);
+  const contractStatuses = useMemo(() => [...new Set(allRows.map((r) => r.status).filter(Boolean))].sort(), [allRows]);
+  const endReasons = useMemo(() => [...new Set(allRows.map((r) => r.endReason).filter(Boolean))].sort(), [allRows]);
+  const detailFilterCount = Number(!!detailStatus) + Number(!!detailEndReason);
   const active = searchedRows.filter((r) => !r.ended).length;
   // 실미수 = 현재 진행 계약 중 결제일이 도래한 미납만.
   // 종료 계약의 남은 채권은 회수대상 잔존채권으로 분리하고 실미수 KPI에 합치지 않는다.
@@ -68,6 +76,9 @@ export default function ContractLedgerPage() {
       }}><Plus size={14} /> {creating ? '생성 취소' : '계약 생성'}</Btn>}
       filters={<>
         <Search size="sm" placeholder="회사·계약번호·차량·계약자·상태·알람" value={q} onChange={(e) => setQ(e.target.value)} style={{ width: mobile ? '100%' : 300 }} />
+        <Btn size="sm" variant={filterOpen ? 'solid' : 'ghost'} aria-pressed={filterOpen} onClick={() => setFilterOpen((open) => !open)}>
+          <SlidersHorizontal size={14} /> 필터{detailFilterCount ? ` ${detailFilterCount}` : ''}
+        </Btn>
         <Select size="sm" aria-label="계약 원장 선택" value={scope} onChange={(event) => setScope(event.target.value as typeof scope)}>
           <option value="계약유지">유지계약 원장</option>
           <option value="계약종료">종료계약 원장</option>
@@ -94,6 +105,12 @@ export default function ContractLedgerPage() {
         setSelected(row);
       }}
       onCloseDetail={() => setSelected(null)}
+      filterPanel={filterOpen ? (
+        <LedgerFilterPanel title="계약 세부 필터" onClose={() => setFilterOpen(false)} onReset={() => { setDetailStatus(''); setDetailEndReason(''); }}>
+          <label><span style={{ display: 'block', fontSize: 12, fontWeight: 800, marginBottom: 6 }}>계약상태</span><Select value={detailStatus} onChange={(e) => setDetailStatus(e.target.value)} style={{ width: '100%' }}><option value="">전체</option>{contractStatuses.map((value) => <option key={value} value={value}>{value}</option>)}</Select></label>
+          <label><span style={{ display: 'block', fontSize: 12, fontWeight: 800, marginBottom: 6 }}>종료사유</span><Select value={detailEndReason} onChange={(e) => setDetailEndReason(e.target.value)} style={{ width: '100%' }}><option value="">전체</option>{endReasons.map((value) => <option key={value} value={value}>{value}</option>)}</Select></label>
+        </LedgerFilterPanel>
+      ) : null}
       sidePanel={creating ? (
         <LedgerCreatePanel
           key="new-contract"

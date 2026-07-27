@@ -1,13 +1,13 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { Plus } from 'lucide-react';
+import { Plus, SlidersHorizontal } from 'lucide-react';
 import { assetMasterRow, contractMasterRow, type AssetMasterRow } from '@/lib/master-ledgers';
 import { ASSET_MASTER_BASIC_COLS, ASSET_MASTER_EXPANDED_COLS } from '@/lib/master-ledger-cols';
 import { useEntityList } from '@/lib/use-entity-lists';
 import { textMatch } from '@/lib/search-match';
 import {
-  Btn, C, LedgerCreatePanel, LedgerFrame, LedgerRecordPanel, PeriodBar, Search, Select, toggleStyle,
+  Btn, C, LedgerCreatePanel, LedgerFilterPanel, LedgerFrame, LedgerRecordPanel, PeriodBar, Search, Select, toggleStyle,
   type LedgerColView, type LedgerFormSection,
 } from '@/components/ui';
 import { useIsMobile } from '@/lib/use-mobile';
@@ -56,6 +56,9 @@ export default function AssetLedgerPage() {
   const [allAssetQuickFilter, setAllAssetQuickFilter] = useState<AllAssetQuickFilter | null>(null);
   const [dateBasis, setDateBasis] = useState<AssetDateBasis>('취득일');
   const [range, setRange] = useState({ from: '', to: '' });
+  const [filterOpen, setFilterOpen] = useState(false);
+  const [detailStatus, setDetailStatus] = useState('');
+  const [detailMaker, setDetailMaker] = useState('');
   const [colView, setColView] = useState<LedgerColView>('기본');
   const [selected, setSelected] = useState<ReturnType<typeof assetMasterRow> | null>(null);
   const [creating, setCreating] = useState(false);
@@ -72,13 +75,18 @@ export default function AssetLedgerPage() {
   }, TODAY), [allRows, dateBasis]);
   const rows = useMemo(() => searchedRows.filter((r) => {
     if (!matchesOwnership(r, ownershipScope) || !matchesQuickFilter(r, quickFilter, activeContractPlates)) return false;
+    if (detailStatus && r.status !== detailStatus) return false;
+    if (detailMaker && r.maker !== detailMaker) return false;
     if (ownershipScope === '전체자산' && allAssetQuickFilter === '보유' && r.disposed) return false;
     if (ownershipScope === '전체자산' && allAssetQuickFilter === '처분' && !r.disposed) return false;
     const date = dateBasis === '처분일' ? r.saleDate : (r.acquisitionDate || r.purchasedDate || r.firstReg);
     if (range.from && (!date || date < range.from)) return false;
     if (range.to && (!date || date > range.to)) return false;
     return true;
-  }), [searchedRows, ownershipScope, quickFilter, allAssetQuickFilter, activeContractPlates, dateBasis, range.from, range.to]);
+  }), [searchedRows, ownershipScope, quickFilter, allAssetQuickFilter, activeContractPlates, detailStatus, detailMaker, dateBasis, range.from, range.to]);
+  const assetStatuses = useMemo(() => [...new Set(allRows.map((r) => r.status).filter(Boolean))].sort(), [allRows]);
+  const assetMakers = useMemo(() => [...new Set(allRows.map((r) => r.maker).filter(Boolean))].sort(), [allRows]);
+  const detailFilterCount = Number(!!detailStatus) + Number(!!detailMaker);
   const held = searchedRows.filter((r) => !r.disposed).length;
   const disposed = searchedRows.filter((r) => r.disposed).length;
   const contracted = searchedRows.filter((r) => !r.disposed && activeContractPlates.has(r.plate)).length;
@@ -97,6 +105,9 @@ export default function AssetLedgerPage() {
       }}><Plus size={14} /> {creating ? '생성 취소' : '자산 생성'}</Btn>}
       filters={<>
         <Search size="sm" placeholder="차량번호·VIN·차명·소유자·상태" value={q} onChange={(e) => setQ(e.target.value)} style={{ width: mobile ? '100%' : 300 }} />
+        <Btn size="sm" variant={filterOpen ? 'solid' : 'ghost'} aria-pressed={filterOpen} onClick={() => setFilterOpen((open) => !open)}>
+          <SlidersHorizontal size={14} /> 필터{detailFilterCount ? ` ${detailFilterCount}` : ''}
+        </Btn>
         <Select
           size="sm"
           aria-label="자산 범위"
@@ -177,6 +188,12 @@ export default function AssetLedgerPage() {
         setSelected(row);
       }}
       onCloseDetail={() => setSelected(null)}
+      filterPanel={filterOpen ? (
+        <LedgerFilterPanel title="자산 세부 필터" onClose={() => setFilterOpen(false)} onReset={() => { setDetailStatus(''); setDetailMaker(''); }}>
+          <label><span style={{ display: 'block', fontSize: 12, fontWeight: 800, marginBottom: 6 }}>차량상태</span><Select value={detailStatus} onChange={(e) => setDetailStatus(e.target.value)} style={{ width: '100%' }}><option value="">전체</option>{assetStatuses.map((value) => <option key={value} value={value}>{value}</option>)}</Select></label>
+          <label><span style={{ display: 'block', fontSize: 12, fontWeight: 800, marginBottom: 6 }}>제조사</span><Select value={detailMaker} onChange={(e) => setDetailMaker(e.target.value)} style={{ width: '100%' }}><option value="">전체</option>{assetMakers.map((value) => <option key={value} value={value}>{value}</option>)}</Select></label>
+        </LedgerFilterPanel>
+      ) : null}
       sidePanel={creating ? (
         <LedgerCreatePanel
           key="new-asset"

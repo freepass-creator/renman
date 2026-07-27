@@ -22,7 +22,7 @@ export function LedgerFrame<R>({
   loading, empty,
   cols, rows, rowKey, onRow, onRowDoubleClick, onCloseDetail, selectedRowKey,
   rowStyle, rowClickable,
-  detail, sidePanel,
+  detail, sidePanel, filterPanel,
 }: {
   title: string;
   meta?: ReactNode;
@@ -46,6 +46,7 @@ export function LedgerFrame<R>({
   rowClickable?: (r: R) => boolean;
   detail?: ReactNode;
   sidePanel?: ReactNode;
+  filterPanel?: ReactNode;
 }) {
   const [pickedKey, setPickedKey] = React.useState<string | null>(null);
 
@@ -111,7 +112,13 @@ export function LedgerFrame<R>({
           <div
             className="ledger-workspace"
             data-panel={sidePanel != null ? 'open' : 'closed'}
+            data-filter={filterPanel != null ? 'open' : 'closed'}
           >
+            {filterPanel != null && (
+              <aside className="ledger-workspace__filter">
+                {filterPanel}
+              </aside>
+            )}
             <div className="ledger-workspace__sheet">
               {!rows.length ? (
                 <EmptyState>{empty ?? '표시할 항목이 없습니다'}</EmptyState>
