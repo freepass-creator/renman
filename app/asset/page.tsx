@@ -95,6 +95,7 @@ export default function AssetLedgerPage() {
           onChange={(event) => {
             const next = event.target.value as AssetOwnershipScope;
             setOwnershipScope(next);
+            setDateBasis(next === '처분자산' ? '처분일' : '취득일');
             if (next !== '보유자산') setQuickFilter(null);
           }}
         >
@@ -106,26 +107,25 @@ export default function AssetLedgerPage() {
           <option value="취득일">취득일 기준</option>
           <option value="처분일">처분일 기준</option>
         </Select>
-        <span style={{ display: 'inline-flex', gap: 6, flexWrap: 'wrap' }} aria-label="빠른 필터">
-          {ASSET_QUICK_FILTERS.map((filter) => {
-            const active = quickFilter === filter;
-            return (
-              <button
-                key={filter}
-                type="button"
-                data-ui="toggle"
-                aria-pressed={active}
-                onClick={() => {
-                  setOwnershipScope('보유자산');
-                  setQuickFilter((current) => current === filter ? null : filter);
-                }}
-                style={toggleStyle(active, 'sm', mobile)}
-              >
-                {filter}
-              </button>
-            );
-          })}
-        </span>
+        {ownershipScope === '보유자산' && (
+          <span style={{ display: 'inline-flex', gap: 6, flexWrap: 'wrap' }} aria-label="빠른 필터">
+            {ASSET_QUICK_FILTERS.map((filter) => {
+              const active = quickFilter === filter;
+              return (
+                <button
+                  key={filter}
+                  type="button"
+                  data-ui="toggle"
+                  aria-pressed={active}
+                  onClick={() => setQuickFilter((current) => current === filter ? null : filter)}
+                  style={toggleStyle(active, 'sm', mobile)}
+                >
+                  {filter}
+                </button>
+              );
+            })}
+          </span>
+        )}
         <PeriodBar latest={latest} initial="전체" onRange={setRange} />
       </>}
       stats={<span style={{ fontSize: 12.5, color: C.mute }}>보유 <b>{held}</b> · 계약중 <b style={{ color: C.ok }}>{contracted}</b> · 휴차 <b style={{ color: C.warn }}>{idle}</b> · 매각대기 <b>{salePending}</b> · 처분 <b>{disposed}</b></span>}
