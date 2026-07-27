@@ -19,6 +19,11 @@ type AssetQuickFilter = '계약중' | '휴차' | '매각대기';
 type AllAssetQuickFilter = '보유' | '처분';
 type AssetDateBasis = '취득일' | '처분일';
 const ASSET_QUICK_FILTERS: AssetQuickFilter[] = ['계약중', '휴차', '매각대기'];
+const ASSET_QUICK_FILTER_LABEL: Record<AssetQuickFilter, string> = {
+  계약중: '계약중',
+  휴차: '휴차중',
+  매각대기: '매각대기중',
+};
 
 function matchesOwnership(row: AssetMasterRow, scope: AssetOwnershipScope): boolean {
   return scope === '전체자산' || (scope === '보유자산' ? !row.disposed : row.disposed);
@@ -125,7 +130,7 @@ export default function AssetLedgerPage() {
                   onClick={() => setQuickFilter((current) => current === filter ? null : filter)}
                   style={toggleStyle(active, 'sm', mobile)}
                 >
-                  {filter}
+                  {ASSET_QUICK_FILTER_LABEL[filter]}
                 </button>
               );
             })}
