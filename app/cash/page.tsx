@@ -6,7 +6,7 @@
  *   · 집금 또는 미연결 클릭 → 수동 매칭 패널
  */
 import { useMemo, useState, useCallback } from 'react';
-import { Plus, X, Link2, Unlink } from 'lucide-react';
+import { Plus, X, Link2, Unlink, UploadCloud } from 'lucide-react';
 import { buildCashLedger, withCmsItemRows, type CashRow } from '@/lib/finance/cash-ledger';
 import { CASH_BASIC_COLS, CASH_EXPANDED_COLS } from '@/lib/finance/cash-cols';
 import { isUnclassified } from '@/lib/payments/ledger-subjects';
@@ -27,13 +27,16 @@ import { useSession } from '@/lib/session';
 import { resolveWriteCompany, NEED_COMPANY } from '@/lib/scope';
 import { toast } from '@/lib/toast';
 import {
-  LedgerCreatePanel, LedgerFrame, LedgerRecordPanel, Btn, Search, PillTabs, PeriodBar, Badge, Message, ListBox, ListRow,
+  LedgerCreatePanel, LedgerFrame, LedgerRecordPanel, Btn, Input, Search, PillTabs, PeriodBar, Badge, Message, ListBox, ListRow,
   C, toggleStyle, won, type LedgerColView, type LedgerFormSection, type SheetCol,
 } from '@/components/ui';
 import { useIsMobile } from '@/lib/use-mobile';
+import FileDrop from '@/components/FileDrop';
 
 type Flow = '전체' | '입금' | '출금' | '미분류';
 type CashLedgerKind = '거래원장' | '계좌원장';
+type CashInputKind = '계좌' | '계좌거래' | 'CMS' | '법인카드';
+type BulkInputSource = '파일' | '링크' | '텍스트';
 const amt = (n: number) => (n ? n.toLocaleString('ko-KR') : '—');
 /** 표 DOM 폭주 방지 — 24·25 CMS미연결 수백건이면 페이지가 죽음 */
 const ROW_DISPLAY_CAP = 200;
@@ -113,6 +116,9 @@ const CASH_TX_CREATE_SECTIONS: LedgerFormSection[] = [
   { title: '거래 기본정보', open: true, fields: ['account', 'txDate', 'amount', 'withdraw'] },
   { title: '분류·내용', fields: ['counterparty', 'memo', 'method', 'balance'] },
 ];
+const CARD_TX_CREATE_SECTIONS: LedgerFormSection[] = [
+  { title: '카드 승인정보', open: true, fields: ['txDate', 'amount', 'merchant', 'approvalNo', 'cardLast4', 'category'] },
+];
 
 const CASH_MATCH_DETAIL_COLS = CASH_EXPANDED_COLS.filter((col) =>
   ['match', 'flowNature', 'fundNature', 'matchedContract', 'matchedSchedule', 'alert'].includes(col.key),
@@ -141,6 +147,74 @@ const CARD_DETAIL_COLS: SheetCol<CashRow>[] = [
   { key: 'approvalNo', label: '승인번호', render: (r) => String(r.raw.approvalNo || '—') },
   { key: 'cardAmount', label: '승인금액', align: 'r', render: (r) => won(Number(r.raw.amount) || r.outAmt) },
 ];
+
+const CASH_INPUT_KINDS: CashInputKind[] = ['계좌', '계좌거래', 'CMS', '법인카드'];
+
+function CashBulkInputPanel({ onClose }: { onClose: () => void }) {
+  const [kind, setKind] = useState<CashInputKind>('계좌거래');
+  const [source, setSource] = useState<BulkInputSource>('파일');
+  const [files, setFiles] = useState<File[]>([]);
+  const [url, setUrl] = useState('');
+  const [text, setText] = useState('');
+  const ready = source === '파일' ? files.length > 0 : source === '링크' ? !!url.trim() : !!text.trim();
+  return (
+    <section className="ledger-record-panel" aria-label="자금 대량 입력">
+      <header className="ledger-record-panel__header">
+        <span className="ledger-record-panel__icon" aria-hidden="true"><UploadCloud size={16} /></span>
+        <div className="ledger-record-panel__heading">
+          <div className="ledger-record-panel__eyebrow">일괄 수집</div>
+          <div className="ledger-record-panel__title">대량 입력</div>
+        </div>
+        <button type="button" className="ledger-record-panel__close" onClick={onClose} aria-label="대량 입력 패널 닫기"><X size={16} /></button>
+      </header>
+      <div className="ledger-create-panel__body">
+        <div>
+          <div style={{ fontSize: 12, fontWeight: 800, color: C.ink, marginBottom: 7 }}>입력 대상</div>
+          <PillTabs size="sm" value={kind} onChange={setKind} tabs={CASH_INPUT_KINDS.map((key) => ({ key, label: key }))} />
+        </div>
+        <div style={{ marginTop: 14 }}>
+          <div style={{ fontSize: 12, fontWeight: 800, color: C.ink, marginBottom: 7 }}>입력 방식</div>
+          <PillTabs
+            size="sm"
+            value={source}
+            onChange={setSource}
+            tabs={(['파일', '링크', '텍스트'] as BulkInputSource[]).map((key) => ({ key, label: key }))}
+          />
+        </div>
+        <div style={{ marginTop: 12 }}>
+          {source === '파일' ? (
+            <FileDrop
+              multiple
+              accept=".xlsx,.xls,.csv,.pdf,image/*"
+              onFiles={(list) => setFiles(Array.from(list))}
+              hint={`${kind} 엑셀·CSV·PDF·이미지`}
+              note={files.length ? `${files.length}개 파일 선택됨` : undefined}
+            />
+          ) : source === '링크' ? (
+            <label className="ledger-create-panel__field">
+              <span>자료 링크</span>
+              <Input value={url} onChange={(event) => setUrl(event.target.value)} placeholder="https://..." />
+            </label>
+          ) : (
+            <label className="ledger-create-panel__field">
+              <span>원문 붙여넣기</span>
+              <textarea
+                value={text}
+                onChange={(event) => setText(event.target.value)}
+                placeholder="표·문자·거래내역을 그대로 붙여넣으세요"
+                style={{ minHeight: 180, resize: 'vertical', padding: 10, border: `1px solid ${C.line}`, borderRadius: 6, font: 'inherit' }}
+              />
+            </label>
+          )}
+        </div>
+      </div>
+      <footer className="ledger-create-panel__footer">
+        <span>{ready ? '입력원이 준비되었습니다. 분석·검토 단계는 데이터센터와 연결됩니다.' : '파일·링크·텍스트 중 하나를 입력하세요.'}</span>
+        <div><Btn size="sm" variant="ghost" onClick={onClose}>취소</Btn><Btn size="sm" disabled>분석 준비</Btn></div>
+      </footer>
+    </section>
+  );
+}
 
 function CmsMatchPanel({
   dep, bank, companyId, initialItemKeys, onClose, onDone,
@@ -318,7 +392,8 @@ export default function CashLedgerPage() {
   }, []);
   const [selected, setSelected] = useState<CashRow | null>(null);
   const [selectedAccount, setSelectedAccount] = useState<BankAccountRow | null>(null);
-  const [creating, setCreating] = useState<'account' | 'transaction' | null>(null);
+  const [creating, setCreating] = useState<'account' | 'transaction' | 'bulk' | null>(null);
+  const [singleKind, setSingleKind] = useState<CashInputKind>('계좌거래');
 
   const accountRows = useMemo(
     () => {
@@ -448,20 +523,36 @@ export default function CashLedgerPage() {
     />
   );
 
+  const singleKindTabs = (
+    <div style={{ marginBottom: 12 }}>
+      <div style={{ fontSize: 12, fontWeight: 800, color: C.ink, marginBottom: 7 }}>입력 대상</div>
+      <PillTabs
+        size="sm"
+        value={singleKind}
+        onChange={(next) => {
+          setSingleKind(next);
+          const account = next === '계좌';
+          setLedgerKind(account ? '계좌원장' : '거래원장');
+          setCreating(account ? 'account' : 'transaction');
+        }}
+        tabs={CASH_INPUT_KINDS.map((key) => ({ key, label: key }))}
+      />
+    </div>
+  );
+
   const createActions = (
     <span style={{ display: 'inline-flex', gap: 6, flexWrap: 'wrap' }}>
       <Btn size="sm" onClick={() => {
-        setLedgerKind('계좌원장');
         setSelected(null);
         setSelectedAccount(null);
-        setCreating((open) => open === 'account' ? null : 'account');
-      }} aria-pressed={creating === 'account'} variant={creating === 'account' ? 'ghost' : 'solid'}><Plus size={14} /> {creating === 'account' ? '등록 취소' : '신규 계좌'}</Btn>
+        setSingleKind(ledgerKind === '계좌원장' ? '계좌' : '계좌거래');
+        setCreating((open) => open === 'account' || open === 'transaction' ? null : (ledgerKind === '계좌원장' ? 'account' : 'transaction'));
+      }} aria-pressed={creating === 'account' || creating === 'transaction'} variant={creating === 'account' || creating === 'transaction' ? 'ghost' : 'solid'}><Plus size={14} /> {creating === 'account' || creating === 'transaction' ? '입력 취소' : '단건 입력'}</Btn>
       <Btn size="sm" onClick={() => {
-        setLedgerKind('거래원장');
         setSelected(null);
         setSelectedAccount(null);
-        setCreating((open) => open === 'transaction' ? null : 'transaction');
-      }} aria-pressed={creating === 'transaction'} variant={creating === 'transaction' ? 'ghost' : 'solid'}><Plus size={14} /> {creating === 'transaction' ? '등록 취소' : '거래 등록'}</Btn>
+        setCreating((open) => open === 'bulk' ? null : 'bulk');
+      }} aria-pressed={creating === 'bulk'} variant={creating === 'bulk' ? 'ghost' : 'solid'}><UploadCloud size={14} /> {creating === 'bulk' ? '입력 취소' : '대량 입력'}</Btn>
     </span>
   );
 
@@ -496,13 +587,16 @@ export default function CashLedgerPage() {
           setSelectedAccount(row);
         }}
         onCloseDetail={() => setSelectedAccount(null)}
-        sidePanel={creating === 'account' ? (
+        sidePanel={creating === 'bulk' ? (
+          <CashBulkInputPanel onClose={() => setCreating(null)} />
+        ) : creating === 'account' ? (
           <LedgerCreatePanel
             key="new-bank-account"
             entityKey="bank_account"
             title="신규 계좌 등록"
             sections={ACCOUNT_CREATE_SECTIONS}
             initial={{ status: '사용중', importMethod: '수기' }}
+            prefix={singleKindTabs}
             onClose={() => setCreating(null)}
           />
         ) : selectedAccount ? (
@@ -621,13 +715,16 @@ export default function CashLedgerPage() {
         setSelected(row);
       }}
       onCloseDetail={() => setSelected(null)}
-      sidePanel={creating === 'transaction' ? (
+      sidePanel={creating === 'bulk' ? (
+        <CashBulkInputPanel onClose={() => setCreating(null)} />
+      ) : creating === 'transaction' ? (
         <LedgerCreatePanel
-          key="new-cash-transaction"
-          entityKey="bank_tx"
-          title="거래 등록"
-          sections={CASH_TX_CREATE_SECTIONS}
-          initial={{ txDate: new Date().toISOString().slice(0, 10), method: '계좌' }}
+          key={`new-cash-${singleKind}`}
+          entityKey={singleKind === '법인카드' ? 'card_tx' : 'bank_tx'}
+          title={`${singleKind} 단건 입력`}
+          sections={singleKind === '법인카드' ? CARD_TX_CREATE_SECTIONS : CASH_TX_CREATE_SECTIONS}
+          initial={{ txDate: new Date().toISOString().slice(0, 10), method: singleKind === 'CMS' ? 'CMS' : '계좌' }}
+          prefix={singleKindTabs}
           onClose={() => setCreating(null)}
         />
       ) : selected?.nest === 'cms-dep' ? (

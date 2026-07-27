@@ -33,6 +33,7 @@ export function LedgerCreatePanel({
   sections,
   initial,
   quick,
+  prefix,
   onClose,
   onSaved,
 }: {
@@ -42,6 +43,7 @@ export function LedgerCreatePanel({
   initial?: EntityRecord;
   /** 회사만으로도 저장하되 아래 상세 입력은 선택적으로 유지한다. */
   quick?: boolean;
+  prefix?: React.ReactNode;
   onClose: () => void;
   onSaved?: (record: EntityRecord) => void;
 }) {
@@ -117,6 +119,7 @@ export function LedgerCreatePanel({
       </header>
 
       <div className="ledger-create-panel__body">
+        {prefix}
         {scopeAll && (
           <div className="ledger-create-panel__company">
             <label>
