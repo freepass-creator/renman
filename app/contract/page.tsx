@@ -61,9 +61,9 @@ export default function ContractLedgerPage() {
           value={scope}
           onChange={setScope}
           tabs={[
-            { key: '계약유지', label: '계약유지', badge: active },
-            { key: '계약종료', label: '계약종료', badge: searchedRows.length - active },
-            { key: '전체', label: '전체', badge: searchedRows.length },
+            { key: '계약유지', label: '계약유지' },
+            { key: '계약종료', label: '계약종료' },
+            { key: '전체', label: '전체' },
           ]}
         />
       </>}

@@ -55,9 +55,9 @@ export default function AssetLedgerPage() {
           value={scope}
           onChange={setScope}
           tabs={[
-            { key: '보유자산', label: '보유자산', badge: held },
-            { key: '처분자산', label: '처분자산', badge: disposed },
-            { key: '전체', label: '전체', badge: searchedRows.length },
+            { key: '보유자산', label: '보유자산' },
+            { key: '처분자산', label: '처분자산' },
+            { key: '전체', label: '전체' },
           ]}
         />
       </>}

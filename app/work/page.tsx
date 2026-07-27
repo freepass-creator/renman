@@ -162,9 +162,6 @@ export default function WorkLedgerPage() {
       .sort((a, b) => b.workAt.localeCompare(a.workAt) || a.kind.localeCompare(b.kind, 'ko'));
   }, [workItems, history, penalties, inbox]);
 
-  const counts = useMemo(() => Object.fromEntries(WORK_GROUPS.map((key) => [
-    key, key === '전체' ? allRows.length : allRows.filter((r) => r.group === key).length,
-  ])), [allRows]);
   const assignees = useMemo(() => [...new Set(allRows.map((r) => r.assignee).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'ko')), [allRows]);
   const latest = useMemo(() => allRows.reduce((value, r) => r.workDate > value ? r.workDate : value, new Date().toISOString().slice(0, 10)), [allRows]);
   const rows = useMemo(() => allRows.filter((r) =>
@@ -193,7 +190,7 @@ export default function WorkLedgerPage() {
           size="sm"
           value={group}
           onChange={setGroup}
-          tabs={WORK_GROUPS.map((key) => ({ key, label: key, badge: counts[key] || undefined }))}
+          tabs={WORK_GROUPS.map((key) => ({ key, label: key }))}
         />
         <PeriodBar latest={latest} initial="월간" onRange={setRange} />
         <Select size="sm" value={assignee} onChange={(e) => setAssignee(e.target.value)} aria-label="담당자 필터">

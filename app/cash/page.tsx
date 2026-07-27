@@ -388,8 +388,8 @@ export default function CashLedgerPage() {
         setCreating(null);
       }}
       tabs={[
-        { key: '거래원장', label: '거래원장', badge: allRows.filter((row) => row.nest !== 'cms-item').length },
-        { key: '계좌원장', label: '계좌원장', badge: accountRecords.length },
+        { key: '거래원장', label: '거래원장' },
+        { key: '계좌원장', label: '계좌원장' },
       ]}
     />
   );
