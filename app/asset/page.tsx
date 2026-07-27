@@ -16,6 +16,7 @@ import { VEHICLE_DISPOSE_PLAN } from '@/lib/domain/status';
 
 type AssetOwnershipScope = '보유자산' | '처분자산' | '전체자산';
 type AssetQuickFilter = '계약중' | '휴차' | '매각대기';
+type AllAssetQuickFilter = '보유' | '처분';
 type AssetDateBasis = '취득일' | '처분일';
 const ASSET_QUICK_FILTERS: AssetQuickFilter[] = ['계약중', '휴차', '매각대기'];
 
@@ -47,6 +48,7 @@ export default function AssetLedgerPage() {
   const [q, setQ] = useState('');
   const [ownershipScope, setOwnershipScope] = useState<AssetOwnershipScope>('보유자산');
   const [quickFilter, setQuickFilter] = useState<AssetQuickFilter | null>(null);
+  const [allAssetQuickFilter, setAllAssetQuickFilter] = useState<AllAssetQuickFilter | null>(null);
   const [dateBasis, setDateBasis] = useState<AssetDateBasis>('취득일');
   const [range, setRange] = useState({ from: '', to: '' });
   const [colView, setColView] = useState<LedgerColView>('기본');
@@ -65,11 +67,13 @@ export default function AssetLedgerPage() {
   }, TODAY), [allRows, dateBasis]);
   const rows = useMemo(() => searchedRows.filter((r) => {
     if (!matchesOwnership(r, ownershipScope) || !matchesQuickFilter(r, quickFilter, activeContractPlates)) return false;
+    if (ownershipScope === '전체자산' && allAssetQuickFilter === '보유' && r.disposed) return false;
+    if (ownershipScope === '전체자산' && allAssetQuickFilter === '처분' && !r.disposed) return false;
     const date = dateBasis === '처분일' ? r.saleDate : (r.acquisitionDate || r.purchasedDate || r.firstReg);
     if (range.from && (!date || date < range.from)) return false;
     if (range.to && (!date || date > range.to)) return false;
     return true;
-  }), [searchedRows, ownershipScope, quickFilter, activeContractPlates, dateBasis, range.from, range.to]);
+  }), [searchedRows, ownershipScope, quickFilter, allAssetQuickFilter, activeContractPlates, dateBasis, range.from, range.to]);
   const held = searchedRows.filter((r) => !r.disposed).length;
   const disposed = searchedRows.filter((r) => r.disposed).length;
   const contracted = searchedRows.filter((r) => !r.disposed && activeContractPlates.has(r.plate)).length;
@@ -97,6 +101,7 @@ export default function AssetLedgerPage() {
             setOwnershipScope(next);
             setDateBasis(next === '처분자산' ? '처분일' : '취득일');
             if (next !== '보유자산') setQuickFilter(null);
+            setAllAssetQuickFilter(null);
           }}
         >
           <option value="보유자산">보유자산</option>
@@ -118,6 +123,29 @@ export default function AssetLedgerPage() {
                   data-ui="toggle"
                   aria-pressed={active}
                   onClick={() => setQuickFilter((current) => current === filter ? null : filter)}
+                  style={toggleStyle(active, 'sm', mobile)}
+                >
+                  {filter}
+                </button>
+              );
+            })}
+          </span>
+        )}
+        {ownershipScope === '전체자산' && (
+          <span style={{ display: 'inline-flex', gap: 6, flexWrap: 'wrap' }} aria-label="전체자산 빠른 필터">
+            {(['보유', '처분'] as AllAssetQuickFilter[]).map((filter) => {
+              const active = allAssetQuickFilter === filter;
+              return (
+                <button
+                  key={filter}
+                  type="button"
+                  data-ui="toggle"
+                  aria-pressed={active}
+                  onClick={() => {
+                    const next = active ? null : filter;
+                    setAllAssetQuickFilter(next);
+                    setDateBasis(next === '처분' ? '처분일' : '취득일');
+                  }}
                   style={toggleStyle(active, 'sm', mobile)}
                 >
                   {filter}
