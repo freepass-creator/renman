@@ -27,7 +27,7 @@ import { useSession } from '@/lib/session';
 import { resolveWriteCompany, NEED_COMPANY } from '@/lib/scope';
 import { toast } from '@/lib/toast';
 import {
-  LedgerCreatePanel, LedgerFrame, LedgerRecordPanel, Btn, Input, Search, PillTabs, PeriodBar, Badge, Message, ListBox, ListRow,
+  LedgerCreatePanel, LedgerFrame, LedgerRecordPanel, Btn, Input, Select, Search, PillTabs, PeriodBar, Badge, Message, ListBox, ListRow,
   C, toggleStyle, won, type LedgerColView, type LedgerFormSection, type SheetCol,
 } from '@/components/ui';
 import { useIsMobile } from '@/lib/use-mobile';
@@ -408,6 +408,23 @@ export default function CashLedgerPage() {
   const [selectedAccount, setSelectedAccount] = useState<BankAccountRow | null>(null);
   const [creating, setCreating] = useState<'account' | 'transaction' | 'bulk' | null>(null);
   const [singleKind, setSingleKind] = useState<CashInputKind>('계좌거래');
+  const scopedCashRows = useMemo(() => allRows.filter((row) => {
+    if (row.nest === 'cms-item') return false;
+    if (range.from && row.date < range.from) return false;
+    if (range.to && row.date > range.to) return false;
+    if (flow === '입금' && row.inAmt <= 0) return false;
+    if (flow === '출금' && row.outAmt <= 0) return false;
+    if (flow === '미분류' && !isUnclassified(row.category)) return false;
+    if (srcSel.size && !srcSel.has(row.source)) return false;
+    return true;
+  }), [allRows, range.from, range.to, flow, srcSel]);
+  const balanceCashRows = useMemo(() => allRows.filter((row) => {
+    if (row.nest === 'cms-item' || row.entity !== 'bank_tx') return false;
+    if (range.from && row.date < range.from) return false;
+    if (range.to && row.date > range.to) return false;
+    if (srcSel.size && !srcSel.has(row.source)) return false;
+    return true;
+  }), [allRows, range.from, range.to, srcSel]);
 
   const accountRows = useMemo(
     () => {
@@ -457,12 +474,16 @@ export default function CashLedgerPage() {
       return [...explicit, ...derived]
       .map((row) => {
         const accountNo = row.accountNumber.replace(/\D/g, '');
-        const txs = allRows.filter((tx) => {
+        const txs = scopedCashRows.filter((tx) => {
           if (tx.nest === 'cms-item' || tx.entity !== 'bank_tx' || tx.companyId !== row.companyId) return false;
           const txNo = tx.account.replace(/\D/g, '');
           return (accountNo && txNo === accountNo) || (!!row.accountAlias && tx.accountName === row.accountAlias);
         });
-        const latestWithBalance = txs.find((tx) => tx.raw.balance !== '' && tx.raw.balance != null);
+        const latestWithBalance = balanceCashRows.find((tx) => {
+          if (tx.companyId !== row.companyId || tx.raw.balance === '' || tx.raw.balance == null) return false;
+          const txNo = tx.account.replace(/\D/g, '');
+          return (accountNo && txNo === accountNo) || (!!row.accountAlias && tx.accountName === row.accountAlias);
+        });
         return {
           ...row,
           transactionCount: txs.length,
@@ -475,20 +496,20 @@ export default function CashLedgerPage() {
       .filter((row) => textMatch(q, row.company, row.bankName, row.accountNumber, row.accountAlias, row.accountHolder, row.accountType, row.status, row.createdBy))
       .sort((a, b) => Number(a.status !== '사용중') - Number(b.status !== '사용중') || a.bankName.localeCompare(b.bankName, 'ko'));
     },
-    [accountRecords, bank, allRows, q],
+    [accountRecords, bank, scopedCashRows, balanceCashRows, q],
   );
   const selectedAccountTransactions = useMemo(() => {
     if (!selectedAccount) return [];
     const accountNo = selectedAccount.accountNumber.replace(/\D/g, '');
     const alias = selectedAccount.accountAlias.trim();
-    return allRows
-      .filter((row) => row.nest !== 'cms-item' && row.entity === 'bank_tx')
+    return scopedCashRows
+      .filter((row) => row.entity === 'bank_tx')
       .filter((row) => {
         const rowNo = row.account.replace(/\D/g, '');
         return (accountNo && rowNo === accountNo) || (alias && row.accountName === alias);
       })
       .slice(0, 20);
-  }, [allRows, selectedAccount]);
+  }, [scopedCashRows, selectedAccount]);
   const rows = useMemo(() => {
     const isAll = !range.from && !range.to;
     const pass = (r: CashRow) => {
@@ -534,6 +555,46 @@ export default function CashLedgerPage() {
     n.has(k) ? n.delete(k) : n.add(k);
     return n;
   });
+  const flowFilterControl = (
+    <span style={{ position: 'relative', display: 'inline-flex' }}>
+      <Select
+        size="sm"
+        aria-label="거래구분"
+        value={flow}
+        onChange={(event) => setFlow(event.target.value as Flow)}
+      >
+        <option value="전체">전체</option>
+        <option value="입금">입금</option>
+        <option value="출금">출금</option>
+        <option value="미분류">미분류</option>
+      </Select>
+      {unclN > 0 && (
+        <span style={{
+          position: 'absolute', top: -6, right: -6, minWidth: 16, height: 16, padding: '0 4px',
+          borderRadius: 999, background: C.danger, color: C.inverse, boxSizing: 'border-box',
+          fontSize: 10, fontWeight: 800, lineHeight: '15px', textAlign: 'center',
+          fontVariantNumeric: 'tabular-nums', boxShadow: `0 0 0 2px ${C.bg}`,
+        }}>{unclN > 99 ? '99+' : unclN}</span>
+      )}
+    </span>
+  );
+  const sourceFilterControls = (
+    <span style={{ display: 'inline-flex', flexWrap: 'wrap', gap: 4 }}>
+      {sources.map((source) => (
+        <button
+          key={source}
+          type="button"
+          data-ui="toggle"
+          aria-pressed={srcSel.has(source)}
+          onClick={() => toggleSrc(source)}
+          style={toggleStyle(srcSel.has(source), 'sm', mobile)}
+        >
+          {source}
+        </button>
+      ))}
+      {srcSel.size > 0 && <Btn variant="ghost" size="sm" onClick={() => setSrcSel(new Set())}>출처 해제</Btn>}
+    </span>
+  );
 
   const onDoneMatch = useCallback(() => {
     setSelected(null);
@@ -600,7 +661,6 @@ export default function CashLedgerPage() {
         colView={colView}
         onColView={setColView}
         filters={<>
-          {ledgerKindTabs}
           <Search
             size="sm"
             placeholder="회사·은행·계좌번호·계좌명·등록자"
@@ -608,6 +668,10 @@ export default function CashLedgerPage() {
             onChange={(event) => setQ(event.target.value)}
             style={{ width: mobile ? '100%' : CASH_SEARCH_WIDTH }}
           />
+          {flowFilterControl}
+          {ledgerKindTabs}
+          <PeriodBar latest={latest} initial="월간" onRange={onRange} />
+          {sourceFilterControls}
         </>}
         stats={<span style={{ fontSize: 12.5, color: C.mute }}>전체 <b>{accountRows.length}</b> · 사용중 <b style={{ color: C.ok }}>{activeAccounts}</b></span>}
         loading={accountLoading}
@@ -681,7 +745,6 @@ export default function CashLedgerPage() {
       onColView={setColView}
       filters={
         <>
-          {ledgerKindTabs}
           <Search
             size="sm"
             placeholder="회사·계좌·상대·과목·내용"
@@ -689,33 +752,10 @@ export default function CashLedgerPage() {
             onChange={(e) => setQ(e.target.value)}
             style={{ width: mobile ? '100%' : CASH_SEARCH_WIDTH }}
           />
-          <PillTabs
-            size="sm"
-            value={flow}
-            onChange={setFlow}
-            tabs={[
-              { key: '전체', label: '전체' },
-              { key: '입금', label: '입금' },
-              { key: '출금', label: '출금' },
-              { key: '미분류', label: '미분류', badge: unclN || undefined },
-            ]}
-          />
+          {flowFilterControl}
+          {ledgerKindTabs}
           <PeriodBar latest={latest} initial="월간" onRange={onRange} />
-          <span style={{ display: 'inline-flex', flexWrap: 'wrap', gap: 4 }}>
-            {sources.map((s) => (
-              <button
-                key={s}
-                type="button"
-                data-ui="toggle"
-                aria-pressed={srcSel.has(s)}
-                onClick={() => toggleSrc(s)}
-                style={toggleStyle(srcSel.has(s), 'sm', mobile)}
-              >
-                {s}
-              </button>
-            ))}
-            {srcSel.size > 0 && <Btn variant="ghost" size="sm" onClick={() => setSrcSel(new Set())}>출처 해제</Btn>}
-          </span>
+          {sourceFilterControls}
         </>
       }
       hint={rowMore > 0 ? (
