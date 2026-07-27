@@ -12,13 +12,11 @@ import {
 } from '@/components/ui';
 import { useIsMobile } from '@/lib/use-mobile';
 import { TODAY } from '@/lib/dashboard-consts';
-import { VEHICLE_DISPOSE_PLAN, VEHICLE_REPAIR } from '@/lib/domain/status';
+import { VEHICLE_DISPOSE_PLAN } from '@/lib/domain/status';
 
 type AssetOwnershipScope = '보유자산' | '처분자산' | '전체자산';
-type AssetQuickFilter = '계약중' | '휴차·정비' | '상품차' | '매각대기';
-const ASSET_QUICK_FILTERS: AssetQuickFilter[] = ['계약중', '휴차·정비', '상품차', '매각대기'];
-const PRODUCT_READY = new Set(['상품대기', '상품화']);
-const IDLE_REPAIR = new Set(['휴차', '유휴', ...VEHICLE_REPAIR]);
+type AssetQuickFilter = '계약중' | '휴차' | '매각대기';
+const ASSET_QUICK_FILTERS: AssetQuickFilter[] = ['계약중', '휴차', '매각대기'];
 
 function matchesOwnership(row: AssetMasterRow, scope: AssetOwnershipScope): boolean {
   return scope === '전체자산' || (scope === '보유자산' ? !row.disposed : row.disposed);
@@ -27,8 +25,9 @@ function matchesOwnership(row: AssetMasterRow, scope: AssetOwnershipScope): bool
 function matchesQuickFilter(row: AssetMasterRow, filter: AssetQuickFilter | null, activeContractPlates: Set<string>): boolean {
   if (!filter) return true;
   if (filter === '계약중') return !row.disposed && activeContractPlates.has(row.plate);
-  if (filter === '상품차') return !row.disposed && PRODUCT_READY.has(row.status);
-  if (filter === '휴차·정비') return !row.disposed && IDLE_REPAIR.has(row.status);
+  if (filter === '휴차') {
+    return !row.disposed && !activeContractPlates.has(row.plate) && !VEHICLE_DISPOSE_PLAN.has(row.status);
+  }
   return !row.disposed && VEHICLE_DISPOSE_PLAN.has(row.status);
 }
 
@@ -62,8 +61,11 @@ export default function AssetLedgerPage() {
   ), [searchedRows, ownershipScope, quickFilter, activeContractPlates]);
   const held = searchedRows.filter((r) => !r.disposed).length;
   const disposed = searchedRows.filter((r) => r.disposed).length;
-  const running = searchedRows.filter((r) => !r.disposed && r.status === '운행').length;
-  const attention = searchedRows.filter((r) => !r.disposed && ['휴차', '정비', '사고'].includes(r.status)).length;
+  const contracted = searchedRows.filter((r) => !r.disposed && activeContractPlates.has(r.plate)).length;
+  const idle = searchedRows.filter((r) =>
+    !r.disposed && !activeContractPlates.has(r.plate) && !VEHICLE_DISPOSE_PLAN.has(r.status),
+  ).length;
+  const salePending = searchedRows.filter((r) => !r.disposed && VEHICLE_DISPOSE_PLAN.has(r.status)).length;
 
   return (
     <LedgerFrame
@@ -110,7 +112,7 @@ export default function AssetLedgerPage() {
           })}
         </span>
       </>}
-      stats={<span style={{ fontSize: 12.5, color: C.mute }}>보유 <b>{held}</b> · 운행상태 <b style={{ color: C.ok }}>{running}</b> · 휴차/정비/사고 <b style={{ color: C.warn }}>{attention}</b> · 처분 <b>{disposed}</b></span>}
+      stats={<span style={{ fontSize: 12.5, color: C.mute }}>보유 <b>{held}</b> · 계약중 <b style={{ color: C.ok }}>{contracted}</b> · 휴차 <b style={{ color: C.warn }}>{idle}</b> · 매각대기 <b>{salePending}</b> · 처분 <b>{disposed}</b></span>}
       colView={colView}
       onColView={setColView}
       loading={loading || contractsLoading}
