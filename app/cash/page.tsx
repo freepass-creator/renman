@@ -33,7 +33,7 @@ import {
 import { useIsMobile } from '@/lib/use-mobile';
 import FileDrop from '@/components/FileDrop';
 
-type Flow = '전체' | '입금' | '출금' | '미분류';
+type Flow = '전체' | '입금' | '출금';
 type CashLedgerKind = '입출금내역' | '계좌관리';
 type CashInputKind = '계좌' | '계좌거래' | 'CMS' | '법인카드';
 type BulkInputSource = '파일' | '링크' | '텍스트';
@@ -396,8 +396,8 @@ export default function CashLedgerPage() {
   const [colView, setColView] = useState<LedgerColView>('기본');
   const [ledgerKind, setLedgerKind] = useState<CashLedgerKind>('입출금내역');
   const [flow, setFlow] = useState<Flow>('전체');
+  const [unclassifiedOnly, setUnclassifiedOnly] = useState(false);
   const [q, setQ] = useState('');
-  const [srcSel, setSrcSel] = useState<Set<string>>(new Set());
   // PeriodBar의 effect를 기다리면 첫 프레임이 전체 기간으로 계산되어 행 제한 경고가 번쩍인다.
   // 화면에 표시할 기본 월간 범위를 같은 기준일로 첫 렌더부터 적용한다.
   const [range, setRange] = useState<{ from: string; to: string }>(() => periodRange(latest, '월간'));
@@ -414,17 +414,15 @@ export default function CashLedgerPage() {
     if (range.to && row.date > range.to) return false;
     if (flow === '입금' && row.inAmt <= 0) return false;
     if (flow === '출금' && row.outAmt <= 0) return false;
-    if (flow === '미분류' && !isUnclassified(row.category)) return false;
-    if (srcSel.size && !srcSel.has(row.source)) return false;
+    if (unclassifiedOnly && !isUnclassified(row.category)) return false;
     return true;
-  }), [allRows, range.from, range.to, flow, srcSel]);
+  }), [allRows, range.from, range.to, flow, unclassifiedOnly]);
   const balanceCashRows = useMemo(() => allRows.filter((row) => {
     if (row.nest === 'cms-item' || row.entity !== 'bank_tx') return false;
     if (range.from && row.date < range.from) return false;
     if (range.to && row.date > range.to) return false;
-    if (srcSel.size && !srcSel.has(row.source)) return false;
     return true;
-  }), [allRows, range.from, range.to, srcSel]);
+  }), [allRows, range.from, range.to]);
 
   const accountRows = useMemo(
     () => {
@@ -519,8 +517,7 @@ export default function CashLedgerPage() {
       }
       if (flow === '입금' && !(r.inAmt > 0)) return false;
       if (flow === '출금' && !(r.outAmt > 0)) return false;
-      if (flow === '미분류' && !isUnclassified(r.category)) return false;
-      if (srcSel.size && !srcSel.has(r.source)) return false;
+      if (unclassifiedOnly && !isUnclassified(r.category)) return false;
       if (!textMatch(q, r.party, r.account, r.category, r.memo, r.date, r.raw.dataAlert, r.raw.reconciliationStatus, companyDisplay(r.companyId), r.companyId)) return false;
       return true;
     };
@@ -532,7 +529,7 @@ export default function CashLedgerPage() {
       out.push(r);
     }
     return out;
-  }, [allRows, flow, srcSel, q, range.from, range.to]);
+  }, [allRows, flow, unclassifiedOnly, q, range.from, range.to]);
 
   /** 통장 현금흐름만(입금·출금 합계). CMS미연결은 별도. */
   const bankRows = rows.filter((r) => r.nest !== 'cms-item' && r.nest !== 'cms-pending');
@@ -545,29 +542,27 @@ export default function CashLedgerPage() {
   const rowMore = Math.max(0, rows.length - ROW_DISPLAY_CAP);
   const displayRows = rowMore > 0 ? rows.slice(0, ROW_DISPLAY_CAP) : rows;
   const cols = colView === '기본' ? CASH_BASIC_COLS : CASH_EXPANDED_COLS;
-  const sources = useMemo(
-    () => [...new Set(allRows.filter((r) => r.nest !== 'cms-item').map((r) => r.source))],
-    [allRows],
-  );
-
-  const toggleSrc = (k: string) => setSrcSel((s) => {
-    const n = new Set(s);
-    n.has(k) ? n.delete(k) : n.add(k);
-    return n;
-  });
   const flowFilterControl = (
-    <span style={{ position: 'relative', display: 'inline-flex' }}>
-      <Select
-        size="sm"
-        aria-label="거래구분"
-        value={flow}
-        onChange={(event) => setFlow(event.target.value as Flow)}
-      >
-        <option value="전체">전체</option>
-        <option value="입금">입금</option>
-        <option value="출금">출금</option>
-        <option value="미분류">미분류</option>
-      </Select>
+    <Select
+      size="sm"
+      aria-label="거래구분"
+      value={flow}
+      onChange={(event) => setFlow(event.target.value as Flow)}
+    >
+      <option value="전체">전체</option>
+      <option value="입금">입금</option>
+      <option value="출금">출금</option>
+    </Select>
+  );
+  const unclassifiedQuickFilter = (
+    <button
+      type="button"
+      data-ui="toggle"
+      aria-pressed={unclassifiedOnly}
+      onClick={() => setUnclassifiedOnly((active) => !active)}
+      style={{ ...toggleStyle(unclassifiedOnly, 'sm', mobile), position: 'relative', overflow: 'visible' }}
+    >
+      미분류
       {unclN > 0 && (
         <span style={{
           position: 'absolute', top: -6, right: -6, minWidth: 16, height: 16, padding: '0 4px',
@@ -576,24 +571,7 @@ export default function CashLedgerPage() {
           fontVariantNumeric: 'tabular-nums', boxShadow: `0 0 0 2px ${C.bg}`,
         }}>{unclN > 99 ? '99+' : unclN}</span>
       )}
-    </span>
-  );
-  const sourceFilterControls = (
-    <span style={{ display: 'inline-flex', flexWrap: 'wrap', gap: 4 }}>
-      {sources.map((source) => (
-        <button
-          key={source}
-          type="button"
-          data-ui="toggle"
-          aria-pressed={srcSel.has(source)}
-          onClick={() => toggleSrc(source)}
-          style={toggleStyle(srcSel.has(source), 'sm', mobile)}
-        >
-          {source}
-        </button>
-      ))}
-      {srcSel.size > 0 && <Btn variant="ghost" size="sm" onClick={() => setSrcSel(new Set())}>출처 해제</Btn>}
-    </span>
+    </button>
   );
 
   const onDoneMatch = useCallback(() => {
@@ -670,8 +648,8 @@ export default function CashLedgerPage() {
           />
           {flowFilterControl}
           {ledgerKindTabs}
+          {unclassifiedQuickFilter}
           <PeriodBar latest={latest} initial="월간" onRange={onRange} />
-          {sourceFilterControls}
         </>}
         stats={<span style={{ fontSize: 12.5, color: C.mute }}>전체 <b>{accountRows.length}</b> · 사용중 <b style={{ color: C.ok }}>{activeAccounts}</b></span>}
         loading={accountLoading}
@@ -754,8 +732,8 @@ export default function CashLedgerPage() {
           />
           {flowFilterControl}
           {ledgerKindTabs}
+          {unclassifiedQuickFilter}
           <PeriodBar latest={latest} initial="월간" onRange={onRange} />
-          {sourceFilterControls}
         </>
       }
       hint={rowMore > 0 ? (
