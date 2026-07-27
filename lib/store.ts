@@ -357,13 +357,22 @@ class AuditingStore implements StoreAdapter {
 // 모듈 레벨 인메모리 캐시 — list 결과(Promise)를 재사용해 재조회·화면 전환을 즉시로.
 // 저장/수정/삭제 시 해당 엔티티 캐시만 무효화(다음 list에서 신선하게 재조회). 세션 한정(새로고침 시 초기화).
 const _listCache = new Map<string, Promise<EntityRecord[]>>();
-function _invalidate(entityKey: string) { for (const k of [..._listCache.keys()]) if (k.startsWith(entityKey + '::')) _listCache.delete(k); }
-export function clearStoreCache() { _listCache.clear(); }
+const _listValueCache = new Map<string, EntityRecord[]>();
+function _invalidate(entityKey: string) {
+  for (const k of [..._listCache.keys()]) if (k.startsWith(entityKey + '::')) _listCache.delete(k);
+  for (const k of [..._listValueCache.keys()]) if (k.startsWith(entityKey + '::')) _listValueCache.delete(k);
+}
+export function clearStoreCache() { _listCache.clear(); _listValueCache.clear(); }
 /** 엔티티 단위 무효화 — 감사 등 단건 최신이 필요할 때 전체 clear 금지. */
 export function invalidateEntityCache(entityKey: string) { _invalidate(entityKey); }
 /** 캐시 hit 판정 — soft-load(스피너 생략)용. */
 export function listsCached(entityKeys: readonly string[], companyId: string): boolean {
   return entityKeys.length > 0 && entityKeys.every((k) => _listCache.has(`${k}::${companyId}`));
+}
+export function cachedListValues(entityKeys: readonly string[], companyId: string): EntityRecord[][] | null {
+  if (!entityKeys.length) return [];
+  const values = entityKeys.map((key) => _listValueCache.get(`${key}::${companyId}`));
+  return values.every((value): value is EntityRecord[] => value != null) ? values : null;
 }
 
 class DispatchStore implements StoreAdapter {
@@ -384,6 +393,7 @@ class DispatchStore implements StoreAdapter {
         ? Promise.all(COMPANIES.map((c) => this.base.list(entityKey, c).catch(() => []))).then((a) => a.flat())   // 회사별 격리: 한 법인 오류가 합본 전체를 안 비움(정상분은 캐시)
         : this.base.list(entityKey, companyId);   // 단일 스코프는 throw→캐시제거→다음 재시도
       _listCache.set(ck, p);
+      void p.then((rows) => _listValueCache.set(ck, rows)).catch(() => {});
       p.catch(() => _listCache.delete(ck)); // 실패는 캐시 안 함(다음에 재시도)
     }
     return p.catch(() => []); // 호출자에겐 빈 배열(행 방지) — 캐시는 위 catch로 제거돼 다음 조회 때 재시도

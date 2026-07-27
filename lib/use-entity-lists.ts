@@ -11,7 +11,7 @@
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSession } from './session';
-import { getStore, listsCached } from './store';
+import { cachedListValues, getStore, listsCached } from './store';
 import { useReloadOnSaved } from './use-reload-on-saved';
 import { type EntityRecord } from './intake/entities';
 
@@ -24,11 +24,16 @@ export function useEntityLists(keys: readonly string[], opts?: { companyId?: str
   const companyId = opts?.companyId || sessionCo;
   const keyStr = keys.join(',');                                  // 배열 리터럴 identity 변동 방지(deps 안정화)
   const ks = useMemo(() => keyStr.split(',').filter(Boolean), [keyStr]);
-  const [data, setData] = useState<EntityRecord[][]>(() => ks.map(() => []));
-  const [loading, setLoading] = useState(true);
+  const [data, setData] = useState<EntityRecord[][]>(() => cachedListValues(ks, companyId) ?? ks.map(() => []));
+  const [loading, setLoading] = useState(() => cachedListValues(ks, companyId) == null);
 
   const load = useCallback((silent = false) => {
     if (!ks.length) { setData([]); setLoading(false); return; }
+    const warm = cachedListValues(ks, companyId);
+    if (warm) {
+      setData(warm);
+      setLoading(false);
+    }
     if (!silent && !listsCached(ks, companyId)) setLoading(true);  // 캐시 있으면 스피너 없이 즉시 렌더
     Promise.all(ks.map((k) => getStore().list(k, companyId)))
       .then((res) => { setData(res); setLoading(false); })         // 이전 데이터는 교체 시점까지 유지
