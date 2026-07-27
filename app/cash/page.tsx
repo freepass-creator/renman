@@ -39,7 +39,6 @@ const amt = (n: number) => (n ? n.toLocaleString('ko-KR') : '—');
 const ROW_DISPLAY_CAP = 200;
 
 const CMS_DEP_BG = 'color-mix(in srgb, var(--brand) 10%, var(--bg-card))';
-const CMS_ITEM_BG = 'color-mix(in srgb, var(--brand) 5%, var(--bg-stripe))';
 
 type BankAccountRow = {
   id: string;
@@ -289,8 +288,6 @@ export default function CashLedgerPage() {
   const onRange = useCallback((r: { from: string; to: string }) => {
     setRange((prev) => (prev.from === r.from && prev.to === r.to ? prev : r));
   }, []);
-  const [matchId, setMatchId] = useState<string | null>(null);
-  const [preSelItems, setPreSelItems] = useState<string[]>([]);
   const [selected, setSelected] = useState<CashRow | null>(null);
   const [selectedAccount, setSelectedAccount] = useState<BankAccountRow | null>(null);
   const [creating, setCreating] = useState<'account' | 'transaction' | null>(null);
@@ -323,16 +320,10 @@ export default function CashLedgerPage() {
       if (r.nest === 'cms-item') continue;
       if (!pass(r)) continue;
       out.push(r);
-      let j = i + 1;
-      while (j < allRows.length && allRows[j].nest === 'cms-item' && allRows[j].parentId === r.id) {
-        out.push(allRows[j]);
-        j++;
-      }
     }
     return out;
   }, [allRows, flow, srcSel, q, range.from, range.to]);
 
-  const matchRow = matchId ? rows.find((r) => r.id === matchId && r.nest === 'cms-dep') || null : null;
   /** 통장 현금흐름만(입금·출금 합계). CMS미연결은 별도. */
   const bankRows = rows.filter((r) => r.nest !== 'cms-item' && r.nest !== 'cms-pending');
   const pendingCms = rows.filter((r) => r.nest === 'cms-pending');
@@ -356,29 +347,9 @@ export default function CashLedgerPage() {
   });
 
   const onDoneMatch = useCallback(() => {
-    setMatchId(null);
-    setPreSelItems([]);
+    setSelected(null);
     reload();
   }, [reload]);
-
-  function openMatchForDeposit(depId: string, itemKeys: string[] = []) {
-    setPreSelItems(itemKeys);
-    setMatchId((id) => (id === depId && !itemKeys.length ? null : depId));
-  }
-
-  /** CMS미연결 클릭 → 날짜 가까운 CMS집금 행을 열어 이 건을 사전선택 */
-  function openMatchFromPending(pending: CashRow) {
-    const deps = rows.filter((r) => r.nest === 'cms-dep');
-    if (!deps.length) {
-      toast('연결할 CMS집금(계좌 입금)이 없습니다 — 「거래 등록」에서 계좌 입금을 먼저 넣으세요', 'info');
-      return;
-    }
-    const t = new Date(pending.date).getTime();
-    const nearest = [...deps].sort((a, b) =>
-      Math.abs(new Date(a.date).getTime() - t) - Math.abs(new Date(b.date).getTime() - t),
-    )[0];
-    openMatchForDeposit(nearest.id, [pending.recKey]);
-  }
 
   const ledgerKindTabs = (
     <PillTabs
@@ -537,15 +508,8 @@ export default function CashLedgerPage() {
       selectedRowKey={selected?.id}
       rowStyle={(r) => {
         if (r.nest === 'cms-dep') return { background: CMS_DEP_BG };
-        if (r.nest === 'cms-item') return { background: CMS_ITEM_BG };
         if (r.nest === 'cms-pending') return { background: 'color-mix(in srgb, var(--orange-text) 8%, var(--bg-card))' };
         return undefined;
-      }}
-      onRow={(r) => {
-        if (r.nest === 'cms-dep') { openMatchForDeposit(r.id); return; }
-        if (r.nest === 'cms-pending') { openMatchFromPending(r); return; }
-        setMatchId(null);
-        setPreSelItems([]);
       }}
       onRowDoubleClick={(row) => {
         setCreating(null);
@@ -561,6 +525,15 @@ export default function CashLedgerPage() {
           initial={{ txDate: new Date().toISOString().slice(0, 10), method: '계좌' }}
           onClose={() => setCreating(null)}
         />
+      ) : selected?.nest === 'cms-dep' ? (
+        <CmsMatchPanel
+          key={selected.id}
+          dep={selected}
+          bank={bank}
+          companyId={companyId}
+          onClose={() => setSelected(null)}
+          onDone={onDoneMatch}
+        />
       ) : selected ? (
         <LedgerRecordPanel
           title={`${selected.date || '일자 없음'} · ${selected.party || selected.category || '거래'}`}
@@ -568,17 +541,6 @@ export default function CashLedgerPage() {
           row={selected}
           cols={CASH_EXPANDED_COLS}
           onClose={() => setSelected(null)}
-        />
-      ) : null}
-      detail={matchRow ? (
-        <CmsMatchPanel
-          key={`${matchRow.id}:${preSelItems.join(',')}`}
-          dep={matchRow}
-          bank={bank}
-          companyId={companyId}
-          initialItemKeys={preSelItems}
-          onClose={() => { setMatchId(null); setPreSelItems([]); }}
-          onDone={onDoneMatch}
         />
       ) : null}
     />
