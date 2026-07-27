@@ -40,6 +40,7 @@ type BulkInputSource = '파일' | '링크' | '텍스트';
 const amt = (n: number) => (n ? n.toLocaleString('ko-KR') : '—');
 /** 표 DOM 폭주 방지 — 24·25 CMS미연결 수백건이면 페이지가 죽음 */
 const ROW_DISPLAY_CAP = 200;
+const CASH_SEARCH_WIDTH = 280;
 
 const CMS_DEP_BG = 'color-mix(in srgb, var(--brand) 10%, var(--bg-card))';
 
@@ -572,7 +573,7 @@ export default function CashLedgerPage() {
             placeholder="회사·은행·계좌번호·계좌명·등록자"
             value={q}
             onChange={(event) => setQ(event.target.value)}
-            style={{ width: mobile ? '100%' : 280 }}
+            style={{ width: mobile ? '100%' : CASH_SEARCH_WIDTH }}
           />
         </>}
         stats={<span style={{ fontSize: 12.5, color: C.mute }}>전체 <b>{accountRows.length}</b> · 사용중 <b style={{ color: C.ok }}>{activeAccounts}</b></span>}
@@ -652,7 +653,7 @@ export default function CashLedgerPage() {
             placeholder="회사·계좌·상대·과목·내용"
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            style={{ width: mobile ? '100%' : 180 }}
+            style={{ width: mobile ? '100%' : CASH_SEARCH_WIDTH }}
           />
           <PillTabs
             size="sm"
