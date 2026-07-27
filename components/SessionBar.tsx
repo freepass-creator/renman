@@ -109,6 +109,11 @@ export default function TopBar() {
   const showActionBar = !!(slots.back || slots.actions || slots.depth);   // 모바일 하단 액션바(이전+주액션)
   useEffect(() => { setMenuOpen(false); }, [pathname]);
   useEffect(() => {
+    // Menu links mount only after the popover opens, so their default prefetch starts too late.
+    // Warm the four primary ledgers up front to prevent the previous page lingering on navigation.
+    ['/asset', '/contract', '/cash', '/work'].forEach((href) => router.prefetch(href));
+  }, [router]);
+  useEffect(() => {
     // 상단바=fixed(웹·모바일) → body paddingTop으로 본문 시작 맞춤.
     // 웹 뎁스: 하단 이전/홈 바 높이 → --fp-dock-h (Page frame이 빼서 페이지 스크롤 방지).
     document.body.style.paddingTop = 'var(--fp-bar-h)';
