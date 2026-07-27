@@ -45,7 +45,7 @@ export function LedgerFilterPanel({
   return (
     <section className="ledger-record-panel" aria-label={title}>
       <header className="ledger-record-panel__header">
-        <strong style={{ flex: 1, fontSize: 13, color: C.ink }}>{title}</strong>
+        <strong style={{ flex: 1, fontSize: 12, lineHeight: '18px', fontWeight: 700, color: C.ink }}>{title}</strong>
         <button type="button" className="ledger-record-panel__close" onClick={onClose} aria-label={`${title} 닫기`}><X size={16} /></button>
       </header>
       <div style={{ padding: 12, display: 'grid', gap: 14, overflow: 'auto' }}>
