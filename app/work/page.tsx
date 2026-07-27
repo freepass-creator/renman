@@ -11,6 +11,7 @@ import {
   PeriodBar, Select, type LedgerColView, type LedgerFormSection, type SheetCol,
 } from '@/components/ui';
 import { useIsMobile } from '@/lib/use-mobile';
+import { todayKST } from '@/lib/contracts/dates';
 
 type WorkLedgerRow = {
   id: string;
@@ -220,7 +221,7 @@ export default function WorkLedgerPage() {
           sections={WORK_CREATE_SECTIONS}
           quick
           initial={{
-            date: new Date().toISOString().slice(0, 10),
+            date: todayKST(),
             status: '미분류',
             category: '미분류',
             workType: '미분류',

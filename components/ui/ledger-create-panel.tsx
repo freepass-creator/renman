@@ -58,6 +58,11 @@ export function LedgerCreatePanel({
   const fieldByKey = useMemo(() => new Map(selectedFields.map((field) => [field.key, field])), [selectedFields]);
 
   if (!entity) return null;
+  const companyReady = !scopeAll || !!String(form.companyId || '').trim();
+  const fieldsReady = quick
+    ? !!String(form.title || '').trim()
+    : selectedFields.every((field) => !field.required || !!String(form[field.key] ?? '').trim());
+  const canSave = companyReady && fieldsReady;
 
   const change = (key: string, value: string) => setForm((current) => ({ ...current, [key]: value }));
 
@@ -188,7 +193,7 @@ export function LedgerCreatePanel({
         <span>등록일·등록자는 저장 시 자동 기록됩니다.</span>
         <div>
           <Btn size="sm" variant="ghost" disabled={busy} onClick={onClose}>취소</Btn>
-          <Btn size="sm" disabled={busy} onClick={save}><Save size={14} /> {busy ? '저장 중…' : '생성'}</Btn>
+          <Btn size="sm" disabled={busy || !canSave} onClick={save}><Save size={14} /> {busy ? '저장 중…' : '생성'}</Btn>
         </div>
       </footer>
     </section>
