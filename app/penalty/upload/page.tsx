@@ -77,7 +77,9 @@ export default function PenaltyUploadPage() {
     setRows((prev) => prev.map((r) => r.id === id ? { ...r, rec: { ...r.rec, [key]: val } } : r));
   const removeRow = (id: string) => setRows((prev) => prev.filter((r) => r.id !== id));
 
-  const ready = rows.filter((r) => String(r.rec.plate || '').trim());
+  const isReady = (row: Row) =>
+    !!String(row.rec.plate || '').trim() && !!String(row.rec.violationDate || '').trim();
+  const ready = rows.filter(isReady);
   async function save() {
     if (!ready.length) return;
     const target = resolveWriteCompany(companyId, { companyId: co });
@@ -103,6 +105,7 @@ export default function PenaltyUploadPage() {
     <Page
       title="고지서 등록"
       meta="과태료·통행료 고지서를 올리면 위반일시로 임차인을 자동매칭합니다"
+      noCompany
       tools={
         <WorkbenchBar
           mid={<span style={{ fontSize: 12, color: C.faint, whiteSpace: 'nowrap' }}>{`${rows.length}건 · 분석완료 ${okCount} · 매칭 ${matchCount}${co ? ' · ' + companyLabel(co) : ''}`}</span>}
@@ -142,7 +145,13 @@ export default function PenaltyUploadPage() {
               <tbody>
                 {rows.map((r) => {
                   const d = derive(r.rec);
-                  const st = r.status === 'pending' ? { t: '분석중', tone: 'gray' as const } : r.status === 'failed' ? { t: '오류', tone: 'red' as const } : d.renter ? { t: '매칭', tone: 'green' as const } : { t: '미매칭', tone: 'amber' as const };
+                  const st = r.status === 'pending'
+                    ? { t: '분석중', tone: 'gray' as const }
+                    : !isReady(r)
+                      ? { t: r.status === 'failed' ? '보정필요' : '확인필요', tone: 'red' as const }
+                      : d.renter
+                        ? { t: '매칭', tone: 'green' as const }
+                        : { t: '미매칭', tone: 'amber' as const };
                   return (
                     <tr key={r.id} style={{ borderBottom: `1px solid ${C.line2}` }}>
                       <td style={{ padding: '5px 9px', whiteSpace: 'nowrap' }}>
@@ -167,7 +176,7 @@ export default function PenaltyUploadPage() {
           </div>
         )}
         {rows.some((r) => r.status === 'failed') && (
-          <div style={{ marginTop: 8, fontSize: 11.5, color: C.warn }}>일부 자동추출 실패(키 미설정 등) — 해당 행은 차량번호·위반일시를 직접 입력하면 저장됩니다.</div>
+          <div style={{ marginTop: 8, fontSize: 11.5, color: C.warn }}>일부 자동추출 실패(키 미설정 등) — 차량번호와 위반일시를 직접 입력하면 검증 후 등록할 수 있습니다.</div>
         )}
       </Panel>
     </Page>
