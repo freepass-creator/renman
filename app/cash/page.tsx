@@ -6,7 +6,7 @@
  *   · 집금 또는 미연결 클릭 → 수동 매칭 패널
  */
 import { useMemo, useState, useCallback } from 'react';
-import { Plus, X, Link2, Unlink, UploadCloud, SlidersHorizontal } from 'lucide-react';
+import { Plus, X, Link2, Unlink, UploadCloud } from 'lucide-react';
 import { buildCashLedger, withCmsItemRows, type CashRow } from '@/lib/finance/cash-ledger';
 import { CASH_BASIC_COLS, CASH_EXPANDED_COLS } from '@/lib/finance/cash-cols';
 import { isUnclassified } from '@/lib/payments/ledger-subjects';
@@ -27,7 +27,7 @@ import { useSession } from '@/lib/session';
 import { resolveWriteCompany, NEED_COMPANY } from '@/lib/scope';
 import { toast } from '@/lib/toast';
 import {
-  LedgerCreatePanel, LedgerFilterPanel, LedgerFrame, LedgerRecordPanel, Btn, Input, Select, Search, PillTabs, PeriodBar, Badge, Message, ListBox, ListRow,
+  LedgerCreatePanel, LedgerFilterButton, LedgerFilterPanel, LedgerFrame, LedgerRecordPanel, Btn, Input, Select, Search, PillTabs, PeriodBar, Badge, Message, ListBox, ListRow,
   C, toggleStyle, won, type LedgerColView, type LedgerFormSection, type SheetCol,
 } from '@/components/ui';
 import { useIsMobile } from '@/lib/use-mobile';
@@ -737,9 +737,7 @@ export default function CashLedgerPage() {
             onChange={(event) => setQ(event.target.value)}
             style={{ width: mobile ? '100%' : CASH_SEARCH_WIDTH }}
           />
-          <Btn size="sm" variant={filterOpen ? 'solid' : 'ghost'} aria-pressed={filterOpen} onClick={() => setFilterOpen((open) => !open)}>
-            <SlidersHorizontal size={14} /> 필터{detailFilterCount ? ` ${detailFilterCount}` : ''}
-          </Btn>
+          <LedgerFilterButton open={filterOpen} count={detailFilterCount} onClick={() => setFilterOpen((open) => !open)} />
           {ledgerKindControl}
           {ledgerQuickFilters}
           <PeriodBar latest={latest} initial="월간" onRange={onRange} />
@@ -835,9 +833,7 @@ export default function CashLedgerPage() {
             onChange={(e) => setQ(e.target.value)}
             style={{ width: mobile ? '100%' : CASH_SEARCH_WIDTH }}
           />
-          <Btn size="sm" variant={filterOpen ? 'solid' : 'ghost'} aria-pressed={filterOpen} onClick={() => setFilterOpen((open) => !open)}>
-            <SlidersHorizontal size={14} /> 필터{detailFilterCount ? ` ${detailFilterCount}` : ''}
-          </Btn>
+          <LedgerFilterButton open={filterOpen} count={detailFilterCount} onClick={() => setFilterOpen((open) => !open)} />
           {ledgerKindControl}
           {ledgerQuickFilters}
           <PeriodBar latest={latest} initial="월간" onRange={onRange} />

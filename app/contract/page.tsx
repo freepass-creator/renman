@@ -1,14 +1,14 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { Plus, SlidersHorizontal } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import { TODAY } from '@/lib/dashboard-consts';
 import { contractMasterRow } from '@/lib/master-ledgers';
 import { CONTRACT_MASTER_BASIC_COLS, CONTRACT_MASTER_EXPANDED_COLS } from '@/lib/master-ledger-cols';
 import { useEntityList } from '@/lib/use-entity-lists';
 import { textMatch } from '@/lib/search-match';
 import {
-  Btn, C, LedgerCreatePanel, LedgerFilterPanel, LedgerFrame, LedgerRecordPanel, PeriodBar, Search, Select, toggleStyle, won,
+  Btn, C, LedgerCreatePanel, LedgerFilterButton, LedgerFilterPanel, LedgerFrame, LedgerRecordPanel, PeriodBar, Search, Select, toggleStyle, won,
   type LedgerColView, type LedgerFormSection,
 } from '@/components/ui';
 import { useIsMobile } from '@/lib/use-mobile';
@@ -76,9 +76,7 @@ export default function ContractLedgerPage() {
       }}><Plus size={14} /> {creating ? '생성 취소' : '계약 생성'}</Btn>}
       filters={<>
         <Search size="sm" placeholder="회사·계약번호·차량·계약자·상태·알람" value={q} onChange={(e) => setQ(e.target.value)} style={{ width: mobile ? '100%' : 300 }} />
-        <Btn size="sm" variant={filterOpen ? 'solid' : 'ghost'} aria-pressed={filterOpen} onClick={() => setFilterOpen((open) => !open)}>
-          <SlidersHorizontal size={14} /> 필터{detailFilterCount ? ` ${detailFilterCount}` : ''}
-        </Btn>
+        <LedgerFilterButton open={filterOpen} count={detailFilterCount} onClick={() => setFilterOpen((open) => !open)} />
         <Select size="sm" aria-label="계약 원장 선택" value={scope} onChange={(event) => setScope(event.target.value as typeof scope)}>
           <option value="계약유지">유지계약 원장</option>
           <option value="계약종료">종료계약 원장</option>
