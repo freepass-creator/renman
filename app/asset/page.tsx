@@ -113,10 +113,12 @@ export default function AssetLedgerPage() {
           <option value="처분자산">처분자산</option>
           <option value="전체자산">전체자산</option>
         </Select>
-        <Select size="sm" aria-label="자산 날짜 기준" value={dateBasis} onChange={(event) => setDateBasis(event.target.value as AssetDateBasis)}>
-          <option value="취득일">취득일 기준</option>
-          <option value="처분일">처분일 기준</option>
-        </Select>
+        {ownershipScope === '처분자산' && (
+          <Select size="sm" aria-label="자산 날짜 기준" value={dateBasis} onChange={(event) => setDateBasis(event.target.value as AssetDateBasis)}>
+            <option value="취득일">취득일 기준</option>
+            <option value="처분일">처분일 기준</option>
+          </Select>
+        )}
         {ownershipScope === '보유자산' && (
           <span style={{ display: 'inline-flex', gap: 6, flexWrap: 'wrap' }} aria-label="빠른 필터">
             {ASSET_QUICK_FILTERS.map((filter) => {
