@@ -16,6 +16,7 @@ import { textMatch } from '@/lib/search-match';
 import { notifySaved } from '@/lib/ui-bus';
 import { companyDisplay } from '@/lib/companies';
 import { TODAY } from '@/lib/dashboard-consts';
+import { periodRange } from '@/lib/finance/period';
 import { type EntityRecord } from '@/lib/intake/entities';
 import {
   listUnmatchedCmsItems,
@@ -282,7 +283,9 @@ export default function CashLedgerPage() {
   const [flow, setFlow] = useState<Flow>('전체');
   const [q, setQ] = useState('');
   const [srcSel, setSrcSel] = useState<Set<string>>(new Set());
-  const [range, setRange] = useState<{ from: string; to: string }>({ from: '', to: '' });
+  // PeriodBar의 effect를 기다리면 첫 프레임이 전체 기간으로 계산되어 행 제한 경고가 번쩍인다.
+  // 화면에 표시할 기본 월간 범위를 같은 기준일로 첫 렌더부터 적용한다.
+  const [range, setRange] = useState<{ from: string; to: string }>(() => periodRange(latest, '월간'));
   const onRange = useCallback((r: { from: string; to: string }) => {
     setRange((prev) => (prev.from === r.from && prev.to === r.to ? prev : r));
   }, []);
