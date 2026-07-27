@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { Plus } from 'lucide-react';
-import { assetMasterRow } from '@/lib/master-ledgers';
+import { assetMasterRow, contractMasterRow, type AssetMasterRow } from '@/lib/master-ledgers';
 import { ASSET_MASTER_BASIC_COLS, ASSET_MASTER_EXPANDED_COLS } from '@/lib/master-ledger-cols';
 import { useEntityList } from '@/lib/use-entity-lists';
 import { textMatch } from '@/lib/search-match';
@@ -11,6 +11,24 @@ import {
   type LedgerColView, type LedgerFormSection,
 } from '@/components/ui';
 import { useIsMobile } from '@/lib/use-mobile';
+import { TODAY } from '@/lib/dashboard-consts';
+import { VEHICLE_DISPOSE_PLAN, VEHICLE_REPAIR } from '@/lib/domain/status';
+
+type AssetScope = '보유자산' | '계약중' | '상품대기' | '휴차·정비' | '매각대기' | '처분자산' | '전체';
+const ASSET_SCOPES: AssetScope[] = ['보유자산', '계약중', '상품대기', '휴차·정비', '매각대기', '처분자산', '전체'];
+const PRODUCT_READY = new Set(['상품대기', '상품화']);
+const IDLE_REPAIR = new Set(['휴차', '유휴', ...VEHICLE_REPAIR]);
+
+function matchesAssetScope(row: AssetMasterRow, scope: AssetScope, activeContractPlates: Set<string>): boolean {
+  if (scope === '전체') return true;
+  if (scope === '보유자산') return !row.disposed;
+  if (scope === '처분자산') return row.disposed;
+  if (scope === '계약중') return !row.disposed && activeContractPlates.has(row.plate);
+  if (scope === '상품대기') return !row.disposed && PRODUCT_READY.has(row.status);
+  if (scope === '휴차·정비') return !row.disposed && IDLE_REPAIR.has(row.status);
+  if (scope === '매각대기') return !row.disposed && VEHICLE_DISPOSE_PLAN.has(row.status);
+  return false;
+}
 
 const ASSET_CREATE_SECTIONS: LedgerFormSection[] = [
   { title: '기본·등록정보', open: true, fields: ['plate', 'status', 'carName', 'vin', 'ownerName', 'firstReg', 'inspectionTo'] },
@@ -23,8 +41,9 @@ const ASSET_CREATE_SECTIONS: LedgerFormSection[] = [
 export default function AssetLedgerPage() {
   const mobile = useIsMobile();
   const { rows: vehicles, loading } = useEntityList('vehicle');
+  const { rows: contracts, loading: contractsLoading } = useEntityList('contract');
   const [q, setQ] = useState('');
-  const [scope, setScope] = useState<'보유자산' | '처분자산' | '전체'>('보유자산');
+  const [scope, setScope] = useState<AssetScope>('보유자산');
   const [colView, setColView] = useState<LedgerColView>('기본');
   const [selected, setSelected] = useState<ReturnType<typeof assetMasterRow> | null>(null);
   const [creating, setCreating] = useState(false);
@@ -32,9 +51,12 @@ export default function AssetLedgerPage() {
   const searchedRows = useMemo(() => allRows.filter((r) =>
     textMatch(q, r.company, r.assetCode, r.plate, r.status, r.carName, r.maker, r.modelLine, r.subModel, r.trim, r.vin, r.ownerName),
   ), [allRows, q]);
+  const activeContractPlates = useMemo(() => new Set(
+    contracts.map((contract) => contractMasterRow(contract, TODAY)).filter((contract) => !contract.ended).map((contract) => contract.plate),
+  ), [contracts]);
   const rows = useMemo(() => searchedRows.filter((r) =>
-    scope === '전체' || (scope === '처분자산' ? r.disposed : !r.disposed),
-  ), [searchedRows, scope]);
+    matchesAssetScope(r, scope, activeContractPlates),
+  ), [searchedRows, scope, activeContractPlates]);
   const held = searchedRows.filter((r) => !r.disposed).length;
   const disposed = searchedRows.filter((r) => r.disposed).length;
   const running = searchedRows.filter((r) => !r.disposed && r.status === '운행').length;
@@ -54,17 +76,13 @@ export default function AssetLedgerPage() {
           size="sm"
           value={scope}
           onChange={setScope}
-          tabs={[
-            { key: '보유자산', label: '보유자산' },
-            { key: '처분자산', label: '처분자산' },
-            { key: '전체', label: '전체' },
-          ]}
+          tabs={ASSET_SCOPES.map((key) => ({ key, label: key }))}
         />
       </>}
       stats={<span style={{ fontSize: 12.5, color: C.mute }}>보유 <b>{held}</b> · 운행상태 <b style={{ color: C.ok }}>{running}</b> · 휴차/정비/사고 <b style={{ color: C.warn }}>{attention}</b> · 처분 <b>{disposed}</b></span>}
       colView={colView}
       onColView={setColView}
-      loading={loading}
+      loading={loading || contractsLoading}
       empty="등록된 자산이 없습니다."
       cols={colView === '기본' ? ASSET_MASTER_BASIC_COLS : ASSET_MASTER_EXPANDED_COLS}
       rows={rows}
