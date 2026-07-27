@@ -87,7 +87,7 @@ export async function pushToFreepass(products: ErpProduct[]): Promise<PushResult
   try {
     const res = await fetch('/api/freepass/push', {
       method: 'POST',
-      headers: apiAuthHeaders({ 'content-type': 'application/json' }),
+      headers: await apiAuthHeaders({ 'content-type': 'application/json' }),
       body: JSON.stringify({ products }),
     });
     const j = (await res.json().catch(() => ({}))) as PushResult;

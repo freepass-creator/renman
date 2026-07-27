@@ -15,6 +15,7 @@ import type { EntityRecord } from './intake/entities';
 import { workStatusPatch, canApplyWorkStatus } from './work-ops';
 import { normPlate, findVehicleByPlate, vehicleMatchesPlate, deriveVehicleStatusFromContract } from './plate';
 import { autoSettleAfterIntake } from './payments/auto-settle';
+import { buildAtomicEvent, type AtomicEventSource } from './domain/atomic-event';
 
 // ── 앵커키 정규화 ──────────────────────────────────────────────────────────
 /** 차량번호 정규화 — plate SSOT(normPlate) 위임. 공백·OCR O/0·I/1 통일. */
@@ -55,6 +56,7 @@ export function resolveAnchor(vehicles: EntityRecord[], query: string): EntityRe
 export type IntakeContext = {
   vehicle?: EntityRecord | null; // 앵커 차량(수선→상태전이용). _key·status 보유.
   idle?: boolean;                // 앵커 차량이 유휴(활성계약 없음)인가 → 상태전이 가드.
+  source?: AtomicEventSource;    // 직접입력·OCR·업로드 등 사건의 생성 경로.
   // 확장 여지: contracts?(과태료→계약 매칭), schedule 등.
 };
 
@@ -186,6 +188,17 @@ export async function saveIntake(
   const save = await getStore().save(entityKey, companyId, normalized);
 
   const sideEffects: string[] = [];
+  if (save.saved > 0 && entityKey !== 'atomic_event') {
+    try {
+      const events = normalized.map((record) => buildAtomicEvent({
+        entityType: entityKey, companyId, record, source: opts.context?.source || 'system',
+      }));
+      const eventSave = await getStore().save('atomic_event', companyId, events);
+      sideEffects.push(`atomic-events:${eventSave.saved}`);
+    } catch (e) {
+      console.warn(`원자 사건 기록(${entityKey}) 실패:`, (e as Error).message);
+    }
+  }
   for (const fn of SIDE_EFFECTS[entityKey] || []) {
     try {
       const applied = await fn({ entityKey, companyId, records: normalized, context: opts.context || {} });

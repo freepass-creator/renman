@@ -9,7 +9,8 @@
  * 입력 두 입구: 한곳(batch)=담기/데이터센터 · 그자리(context)=360·위저드·QuickLog.
  */
 import {
-  Table2, Wallet, Upload, Settings, Database, FlaskConical, Banknote, HandCoins, FileWarning, type LucideIcon,
+  Table2, Wallet, Settings, Database, FlaskConical, LayoutDashboard, ListTodo,
+  History, FolderOpen, CarFront, FileText, type LucideIcon,
 } from 'lucide-react';
 import type { Tier } from './tier';
 import type { AssetKind, DataLayer } from './domain/layers';
@@ -49,7 +50,7 @@ export const PAGE_IA: PageIA[] = [
   { href: '/contract', label: '계약현황', role: 'view', layer: 'ledger', tier: '라이트', assetKind: 'contract', view: '계약 생애', grab: 'both', grabHow: '담기 · 360' },
   { href: '/finance', label: '재무현황', role: 'view', layer: 'ledger', tier: '라이트', assetKind: 'cash', view: '구 재무현황(카드/Sec)', grab: 'batch', grabHow: '담기 · 분류' },
 
-  { href: '/work', label: '업무현황', role: 'work', layer: 'event', tier: '스탠다드', view: '업무 한눈', grab: 'none', grabHow: '—' },
+  { href: '/work', label: '업무원장', role: 'work', layer: 'event', tier: '라이트', view: '정비·일정·과태료 통합 엑셀', grab: 'context', grabHow: '행·생성 버튼' },
   { href: '/dispatch', label: '배차관리', role: 'work', layer: 'event', tier: '스탠다드', view: '출고·반납', grab: 'context', grabHow: '위저드' },
   { href: '/receivables', label: '미수관리', role: 'work', layer: 'event', tier: '라이트', view: '회수 큐', grab: 'context', grabHow: '연락·360' },
   { href: '/payments', label: '자금일보', role: 'work', layer: 'event', tier: '라이트', view: '입금매칭', grab: 'none', grabHow: '매칭·분류' },
@@ -65,6 +66,7 @@ export const PAGE_IA: PageIA[] = [
 
   { href: '/integrity', label: '리스크', role: 'system', layer: 'system', tier: '스탠다드', view: '정합성', grab: 'none', grabHow: '→360' },
   { href: '/settings', label: '설정', role: 'system', layer: 'system', tier: '라이트', view: '계정·초기화면', grab: 'none', grabHow: '—' },
+  { href: '/dev/data', label: '개발도구', role: 'system', layer: 'system', tier: '라이트', view: '데이터 마이그레이션·백엔드 점검', grab: 'none', grabHow: '본사 전용' },
   { href: '/dev/sample', label: '샘플', role: 'system', layer: 'system', tier: '라이트', view: 'ERP 3축 시안', grab: 'none', grabHow: '—' },
 ];
 
@@ -82,27 +84,98 @@ export type NavItem = { href: string; label: string; icon: LucideIcon; tier?: Ti
 export type NavGroup = { title: string; items: NavItem[] };
 
 /**
- * 햄버거 메뉴 — 원장 + 수납·미수 + 과태료(변경부과).
- *   360은 메뉴 항목 아님(원장 행·담기 진입).
+ * ERP 메뉴 정보구조 SSOT.
+ *
+ * 원장 = 확정된 현재 상태와 근거 데이터
+ * 업무 = 스케줄·지시·직접 생성·사건 발생에 따른 처리 과정
+ * 이력 = 완료 업무와 사건이 남긴 원자 기록
+ * 문서 = 원장·사건·이력을 증명하는 근거
+ *
+ * 상태·유형·기간은 별도 메뉴를 만들지 않고 views로 표현한다.
  */
+export type MenuView = {
+  id: string;
+  label: string;
+  /** 기존 페이지에서 필터로 구현할 때 사용할 안정적인 키 */
+  filter?: Record<string, string>;
+};
+
+export type ErpMenuNode = {
+  id: string;
+  label: string;
+  href?: string;
+  icon: LucideIcon;
+  tier?: Tier;
+  hqOnly?: boolean;
+  children?: ErpMenuNode[];
+  views?: MenuView[];
+};
+
+export const ERP_MENU_TREE: ErpMenuNode[] = [
+  {
+    id: 'ledger',
+    label: '원장',
+    href: '/asset',
+    icon: Table2,
+    children: [
+      {
+        id: 'asset-ledger',
+        label: '자산관리',
+        href: '/asset',
+        icon: CarFront,
+        views: [{ id: 'asset-status', label: '소유·가동 상태' }],
+      },
+      {
+        id: 'contract-ledger',
+        label: '계약관리',
+        href: '/contract',
+        icon: FileText,
+        views: [{ id: 'contract-status', label: '진행·만기·미수 상태' }],
+      },
+      {
+        id: 'money-ledger',
+        label: '자금관리',
+        href: '/cash',
+        icon: Wallet,
+        views: [
+          { id: 'accounts-daily', label: '계좌+일보' },
+        ],
+      },
+    ],
+  },
+  {
+    id: 'work',
+    label: '업무관리',
+    href: '/work',
+    icon: ListTodo,
+    children: [
+      { id: 'work-hub', label: '업무현황', href: '/work', icon: ListTodo },
+      { id: 'cash-journal', label: '자금일보', href: '/payments', icon: Wallet },
+    ],
+    views: [{ id: 'all-work', label: '정비·일정·과태료' }],
+  },
+  {
+    id: 'system',
+    label: '시스템',
+    href: '/dev/data',
+    icon: Settings,
+    children: [
+      { id: 'dev-tools', label: '데이터 마이그레이션', href: '/dev/data', icon: Database, hqOnly: true },
+      { id: 'settings', label: '설정', href: '/settings', icon: Settings },
+    ],
+  },
+];
+
+/** 기존 2단 메뉴 렌더러용 어댑터. 상세 views는 각 페이지의 필터로 렌더링한다. */
 export const NAV_GROUPS: NavGroup[] = [
-  { title: '원장', items: [
-    { href: '/sheet', label: '운영원장', icon: Table2, tier: '라이트', webOnly: true },
-    { href: '/cash', label: '재무원장', icon: Wallet, tier: '라이트', webOnly: true },
-  ] },
-  { title: '수납', items: [
-    { href: '/payments', label: '자금일보', icon: Banknote, tier: '라이트' },
-    { href: '/receivables', label: '미수관리', icon: HandCoins, tier: '라이트' },
-  ] },
-  { title: '업무', items: [
-    { href: '/penalty', label: '과태료·변경부과', icon: FileWarning, tier: '라이트' },
-  ] },
   { title: '', items: [
-    { href: '/ingest', label: '데이터센터', icon: Upload, tier: '라이트' },
-    { href: '/settings', label: '설정', icon: Settings, tier: '라이트' },
+    { href: '/asset', label: '자산관리', icon: CarFront, tier: '라이트' },
+    { href: '/contract', label: '계약관리', icon: FileText, tier: '라이트' },
+    { href: '/cash', label: '자금관리', icon: Wallet, tier: '라이트' },
+    { href: '/work', label: '업무관리', icon: ListTodo, tier: '라이트' },
   ] },
   { title: '시스템', items: [
-    { href: '/dev/sample', label: '샘플(시안)', icon: FlaskConical, tier: '라이트', hqOnly: true },
     { href: '/dev/data', label: '개발도구', icon: Database, tier: '라이트', hqOnly: true },
+    { href: '/settings', label: '설정', icon: Settings, tier: '라이트' },
   ] },
 ];

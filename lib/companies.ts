@@ -22,7 +22,16 @@ function hydrate(): CompanyDef[] {
   if (typeof window === 'undefined') return DEFAULTS.map((c) => ({ ...c }));
   try {
     const saved = JSON.parse(localStorage.getItem(LS) || 'null');
-    if (Array.isArray(saved) && saved.length) return saved.filter((c: CompanyDef) => c && c.id).map((c: CompanyDef) => ({ ...c }));
+    if (Array.isArray(saved) && saved.length) {
+      // 사용자가 회사를 편집했더라도 실제 원격 데이터의 기본 법인이 조회 목록에서 사라지면
+      // 합본 조회가 그 회사 컬렉션을 아예 읽지 못한다. 기본 ID는 항상 보존하고 저장값으로 표시명만 덮는다.
+      const valid = saved.filter((c: CompanyDef) => c && c.id).map((c: CompanyDef) => ({ ...c }));
+      const byId = new Map(valid.map((c: CompanyDef) => [c.id, c]));
+      return [
+        ...DEFAULTS.map((base) => ({ ...base, ...(byId.get(base.id) || {}) })),
+        ...valid.filter((c: CompanyDef) => !DEFAULTS.some((base) => base.id === c.id)),
+      ];
+    }
   } catch { /* ignore */ }
   return DEFAULTS.map((c) => ({ ...c }));
 }

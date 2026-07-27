@@ -1,32 +1,68 @@
 /**
- * 공용 API 인증.
- * · API_SHARED_SECRET 설정 시 Bearer 토큰 필수.
- * · production 에서는 시크릿 미설정 = 503 (OCR/문자 무단 호출 차단).
- * · 로컬(development)만 시크릿 없이 통과.
+ * Server API authentication.
+ *
+ * Production requests must carry a Firebase ID token. The token is verified
+ * with Firebase Admin; browser-visible shared secrets are deliberately not
+ * supported. Local development without Firebase remains available for the
+ * repository's preview mode.
  */
 import 'server-only';
-import { headers } from 'next/headers';
+import { getApps, initializeApp, cert, applicationDefault } from 'firebase-admin/app';
+import { getAuth } from 'firebase-admin/auth';
 import { NextResponse } from 'next/server';
+import { readFileSync } from 'node:fs';
 
-export type AuthedActor = { uid: string; email: string };
+export type AuthedActor = {
+  uid: string;
+  email: string;
+  systemRole: 'hq' | 'tenant' | 'local';
+  companyId: string | null;
+};
 
-export async function requireAuth(): Promise<AuthedActor | NextResponse> {
-  const h = await headers();
-  const auth = h.get('authorization') ?? '';
+export function getAdminApp() {
+  const current = getApps()[0];
+  if (current) return current;
+
+  const raw = (process.env.FIREBASE_ADMIN_KEY || '').trim();
+  if (raw) {
+    const serviceAccount = JSON.parse(raw);
+    return initializeApp({ credential: cert(serviceAccount) });
+  }
+  const keyFile = (process.env.FIREBASE_ADMIN_KEY_FILE || '').trim();
+  if (keyFile) {
+    const serviceAccount = JSON.parse(readFileSync(keyFile, 'utf8'));
+    return initializeApp({ credential: cert(serviceAccount) });
+  }
+
+  return initializeApp({
+    credential: applicationDefault(),
+    projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+  });
+}
+
+export async function requireAuth(req: Request): Promise<AuthedActor | NextResponse> {
+  if (process.env.NODE_ENV !== 'production' && !process.env.NEXT_PUBLIC_FIREBASE_API_KEY) {
+    return { uid: 'local-dev', email: 'local@dev', systemRole: 'local', companyId: null };
+  }
+
+  const auth = req.headers.get('authorization') ?? '';
   const token = auth.startsWith('Bearer ') ? auth.slice(7).trim() : '';
-  const secret = (process.env.API_SHARED_SECRET || '').trim();
+  if (!token) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
 
-  if (secret) {
-    if (token !== secret) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
-    return { uid: 'api', email: 'api@server' };
+  try {
+    const decoded = await getAuth(getAdminApp()).verifyIdToken(token, true);
+    const systemRole = decoded.systemRole;
+    const companyId = typeof decoded.companyId === 'string' ? decoded.companyId : null;
+    if (systemRole !== 'hq' && !(systemRole === 'tenant' && companyId)) {
+      return NextResponse.json({ error: 'forbidden' }, { status: 403 });
+    }
+    return {
+      uid: decoded.uid,
+      email: decoded.email || '',
+      systemRole,
+      companyId: systemRole === 'hq' ? null : companyId,
+    };
+  } catch {
+    return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
   }
-
-  if (process.env.NODE_ENV === 'production') {
-    return NextResponse.json(
-      { error: 'API_SHARED_SECRET required in production' },
-      { status: 503 },
-    );
-  }
-
-  return { uid: 'local-dev', email: 'local@dev' };
 }

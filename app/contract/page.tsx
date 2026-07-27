@@ -1,391 +1,104 @@
 'use client';
-/**
- * 계약현황 — 계약자산 원장 생애 Sec (탭 금지).
- *   계약예정(대기) · 계약중(운행) · 계약완료(종료) · 손님 + FacetRail 상시.
- *   채권·만기 = 레일. 가동률·미수율은 홈.
- */
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useSession } from '@/lib/session';
-import { type EntityRecord } from '@/lib/intake/entities';
-import { companyLabel } from '@/lib/companies';
-import {
-  computeContractView, contractSchedules, deriveStatus,
-  patchDeliver, patchReturn, patchTerminate, patchExtend,
-  type ContractView,
-} from '@/lib/contract-ops';
-import { canTransition } from '@/lib/domain/status';
-import { classifyContract, type ContractPhase, type ContractDebt } from '@/lib/domain/model';
-import { aggregateCustomers, customerKey, type CustomerAgg } from '@/lib/customers';
-import { dueMatcher, selectedInDim } from '@/lib/lens-filters';
-import { textMatch } from '@/lib/search-match';
-import { FacetPage, Sec, Cards, Metric, DataTable, ExcelSheet, IconSeg, Badge, StatusTag, Btn, DetailShell, Section, DetailGrid, EmptyState, Input, TextLink, won, th, thR, td, tdR, C, type Col, PageLoading, useConfirm } from '@/components/ui';
-import { LayoutGrid, Table } from 'lucide-react';
-import { CONTRACT_COLS } from '@/lib/sheet-cols';
-import { contractViewToRow } from '@/lib/sheet-rows';
-import { FacetRail } from '@/components/FacetRail';
-import { WorkbenchBar } from '@/components/WorkbenchBar';
-import { WorkPipe } from '@/components/WorkPipe';
-import { openIngest, openCar, openCustomer } from '@/lib/ui-bus';
-import { commitUpdate, commitRemove } from '@/lib/commit';
-import { toast } from '@/lib/toast';
+
+import { useMemo, useState } from 'react';
+import { Plus } from 'lucide-react';
 import { TODAY } from '@/lib/dashboard-consts';
-import { useSecOrder } from '@/lib/use-sec-order';
+import { contractMasterRow } from '@/lib/master-ledgers';
+import { CONTRACT_MASTER_BASIC_COLS, CONTRACT_MASTER_EXPANDED_COLS } from '@/lib/master-ledger-cols';
 import { useEntityList } from '@/lib/use-entity-lists';
+import { textMatch } from '@/lib/search-match';
+import {
+  Btn, C, LedgerCreatePanel, LedgerFrame, LedgerRecordPanel, PillTabs, Search, won,
+  type LedgerColView, type LedgerFormSection,
+} from '@/components/ui';
+import { useIsMobile } from '@/lib/use-mobile';
 
-const LIFE_SECS = ['c-wait', 'c-run', 'c-end', 'c-cust'] as const;
-type LifeSec = (typeof LIFE_SECS)[number];
-const SEC_PHASE: Partial<Record<LifeSec, ContractPhase>> = { 'c-wait': '대기', 'c-run': '운행', 'c-end': '종료' };
-const SEC_META: Record<LifeSec, { title: string; desc: string }> = {
-  'c-wait': { title: '계약예정', desc: '성립·인도 대기' },
-  'c-run': { title: '계약중', desc: '운행 중 계약' },
-  'c-end': { title: '계약완료', desc: '종료·해지 원장' },
-  'c-cust': { title: '손님', desc: '계약의 사람-뷰' },
-};
+const CONTRACT_CREATE_SECTIONS: LedgerFormSection[] = [
+  { title: '계약 기본정보', open: true, fields: ['contractNo', 'status', 'contractDate', 'plate', 'carName'] },
+  { title: '계약자정보', fields: ['contractorName', 'contractorPhone', 'contractorBirth', 'contractorLicenseNo', 'licenseType', 'contractorAddress'] },
+  { title: '기간·차량조건', fields: ['startDate', 'endDate', 'rentalMonths', 'annualMileageLimit', 'pickupPlace', 'returnPlace'] },
+  { title: '요금·납부조건', fields: ['monthlyRent', 'deposit', 'reservationFee', 'paymentDay', 'paymentTiming', 'lateFeeRate', 'earlyTerminationRate'] },
+  { title: '보험·운전자', fields: ['driverAgeMin', 'insuranceAge', 'cdw', 'deductible', 'superCover', 'additionalDrivers', 'withDriver'] },
+];
 
-const goSec = (id: string) => {
-  if (typeof document !== 'undefined') document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-};
-
-type ActKind = 'deliver' | 'return' | 'terminate' | 'extend' | 'pay';
-type Act = { kind: ActKind; value: string };
-
-export default function ContractWorkspace() {
-  const confirm = useConfirm();
-  const { companyId, scopeAll } = useSession();
-  const { rows: recs, loading, reload } = useEntityList('contract');
-  const views = useMemo(
-    () => recs.map((r) => computeContractView(r, TODAY)).sort((a, b) => b.net - a.net),
-    [recs],
-  );
-  const [facets, setFacets] = useState<Set<string>>(new Set());
+export default function ContractLedgerPage() {
+  const mobile = useIsMobile();
+  const { rows: contracts, loading } = useEntityList('contract');
   const [q, setQ] = useState('');
-  const [view, setView] = useState<'card' | 'excel'>('card'); // 카드=생애 그룹뷰 · 엑셀=평면 표(운영시트와 같은 CONTRACT_COLS SSOT)
-  const [openKey, setOpenKey] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [act, setAct] = useState<Act | null>(null);
-  const [editC, setEditC] = useState(false);            // 계약 정보 인라인 편집(정보수정 팝업 폐지)
-  const [cForm, setCForm] = useState<EntityRecord>({});
-  useEffect(() => { setEditC(false); }, [openKey]);     // 다른 계약 열면 편집 닫기
-  const saveContract = async () => {
-    if (!openKey) return;
-    const rec = recs.find((r) => String(r._key) === openKey);
-    if (!rec?._key) return;
-    try {
-      await commitUpdate({ entity: 'contract', sessionCompanyId: companyId, rec, key: String(rec._key), patch: cForm });
-      setEditC(false); reload(); toast('계약 정보 저장', 'success');
-    } catch (e) { toast('저장 실패: ' + (e as Error).message, 'error'); }
-  };
-  const [order, reorder] = useSecOrder('jpk:order:contract', [...LIFE_SECS]);
-  const toggleFacet = (label: string) => setFacets((s) => { const n = new Set(s); n.has(label) ? n.delete(label) : n.add(label); return n; });
-  const resetFacets = () => setFacets(new Set());
-  const setF = (labels: string[]) => setFacets(new Set(labels));
-
-  useEffect(() => {
-    if (loading) return;
-    const c = new URLSearchParams(window.location.search).get('c');
-    if (c) setOpenKey(c);
-  }, [loading]);
-  useEffect(() => {
-    if (new URLSearchParams(window.location.search).get('view') === 'customer') goSec('c-cust');
-  }, []);
-
-  async function applyPatch(v: ContractView, patch: EntityRecord, confirmMsg?: string) {
-    if (confirmMsg && !(await confirm({ message: confirmMsg, danger: true }))) return;
-    setBusy(true);
-    try {
-      await commitUpdate({ entity: 'contract', sessionCompanyId: companyId, rec: v.rec, key: String(v.rec._key || ''), patch });
-      setAct(null); setOpenKey(null); reload();
-    } catch (e) { toast('저장 실패: ' + (e as Error).message, 'error'); }
-    finally { setBusy(false); }
-  }
-  async function delContract(v: ContractView) {
-    if (!(await confirm({ message: `이 계약을 삭제할까요? (휴지통에서 복구 가능)\n${String(v.rec.contractorName || '')} · ${String(v.rec.plate || '')}`, danger: true }))) return;
-    setBusy(true);
-    try {
-      await commitRemove({ entity: 'contract', sessionCompanyId: companyId, rec: v.rec, key: String(v.rec._key || ''), reason: '수기 삭제' });
-      setOpenKey(null); reload();
-    } catch (e) { toast('삭제 실패: ' + (e as Error).message, 'error'); }
-    finally { setBusy(false); }
-  }
-  function startAct(kind: ActKind, v: ContractView) {
-    const defaults: Record<ActKind, string> = {
-      deliver: v.startDate || TODAY,
-      return: TODAY,
-      terminate: TODAY,
-      extend: '12',
-      pay: String(v.net || ''),
-    };
-    setAct({ kind, value: defaults[kind] });
-  }
-  async function commitAct(v: ContractView) {
-    if (!act) return;
-    const val = act.value.trim();
-    if (!val) return;
-    if (act.kind !== 'pay' && !canTransition(deriveStatus(v.rec), act.kind)) { toast(`${deriveStatus(v.rec)} 상태에선 처리할 수 없습니다`, 'error'); return; }
-    if (act.kind === 'deliver') return applyPatch(v, patchDeliver(v.rec, val));
-    if (act.kind === 'return') return applyPatch(v, patchReturn(v.rec, val));
-    if (act.kind === 'terminate') return applyPatch(v, patchTerminate(v.rec, val), '중도해지로 종료 처리할까요?');
-    if (act.kind === 'extend') {
-      const n = Number(val); if (!n) return;
-      return applyPatch(v, patchExtend(v.rec, n));
-    }
-    const amt = Number(val.replace(/[^0-9]/g, '')); if (!amt) return;
-    setBusy(true);
-    const scheds = contractSchedules(v.rec, TODAY);
-    const existing = Array.isArray(v.rec._payments) ? (v.rec._payments as Array<Record<string, unknown>>) : [];
-    const newPays: Array<Record<string, unknown>> = [];
-    let remain = amt;
-    for (const s of scheds) {
-      if (remain <= 0) break;
-      if (s.balance <= 0) continue;
-      const pay = Math.min(remain, s.balance);
-      newPays.push({ seq: s.seq, date: TODAY, amount: pay, source: '수동', manual: true });
-      remain -= pay;
-    }
-    if (remain > 0) newPays.push({ seq: scheds.length ? scheds[scheds.length - 1].seq : 1, date: TODAY, amount: remain, source: '수동', manual: true });
-    setBusy(true);
-    try {
-      await commitUpdate({
-        entity: 'contract', sessionCompanyId: companyId, rec: v.rec, key: String(v.rec._key || ''),
-        patch: { _payments: [...existing, ...newPays] },
-      });
-      setAct(null); reload();
-    } catch (e) { toast('수납 저장 실패: ' + (e as Error).message, 'error'); }
-    finally { setBusy(false); }
-  }
-  const actMeta: Record<ActKind, { title: string; label: string; type: 'date' | 'number'; confirm: string }> = {
-    deliver: { title: '인도 처리', label: '인도일', type: 'date', confirm: '인도 확정' },
-    return: { title: '반납 처리', label: '반납일', type: 'date', confirm: '반납 확정' },
-    terminate: { title: '중도해지', label: '해지일', type: 'date', confirm: '해지 확정' },
-    extend: { title: '계약 연장', label: '연장 개월', type: 'number', confirm: '연장 확정' },
-    pay: { title: '입금 기록', label: '입금액(원)', type: 'number', confirm: '입금 반영' },
-  };
-
-  const DEBT_LABELS: ContractDebt[] = ['채권잔존', '청산'];
-  const nodes = useMemo(() => views.map((v) => ({ v, c: classifyContract(v) })), [views]);
-  const debtSel = DEBT_LABELS.filter((x) => facets.has(x));
-  const dueMatch = dueMatcher('계약현황', facets);
-
-  const filteredNodes = nodes.filter((n) =>
-    (debtSel.length === 0 || debtSel.includes(n.c.debt))
-    && (!dueMatch || dueMatch(n.v.dday))
-    && textMatch(q, n.v.rec.contractNo, n.v.rec.contractorName, n.v.rec.plate, n.v.rec.contractorPhone));
-  const byPhase = (phase: ContractPhase) => filteredNodes.filter((n) => n.c.phase === phase).map((n) => n.v);
-  const allFiltered = filteredNodes.map((n) => n.v);
-
-  const nWait = nodes.filter((n) => n.c.phase === '대기').length;
-  const nRun = nodes.filter((n) => n.c.phase === '운행').length;
-  const nEnd = nodes.filter((n) => n.c.phase === '종료').length;
-  const nDebt = nodes.filter((n) => n.c.debt === '채권잔존').length;
-
-  const customersAll = useMemo(() => aggregateCustomers(recs, TODAY).sort((a, b) => b.totalUnpaid - a.totalUnpaid), [recs]);
-  // 칩별 매칭 건수(erp3식 '라벨(N)') — 채권·만기=계약뷰, 손님=고객집계. 전체 정적 집계.
-  const counts = useMemo(() => {
-    const c: Record<string, number> = { 채권잔존: 0, 청산: 0, 만기경과: 0, '30일이내': 0, '60일이내': 0, 운행중: 0, 미수있음: 0 };
-    for (const n of nodes) {
-      if (n.c.debt === '채권잔존') c['채권잔존']++; else if (n.c.debt === '청산') c['청산']++;
-      const dd = n.v.dday;
-      if (dd != null) { if (dd < 0) c['만기경과']++; if (dd >= 0 && dd <= 30) c['30일이내']++; if (dd >= 0 && dd <= 60) c['60일이내']++; }
-    }
-    for (const cust of customersAll) { if (cust.activeCount > 0) c['운행중']++; if (cust.totalUnpaid > 0) c['미수있음']++; }
-    return c;
-  }, [nodes, customersAll]);
-  const custStatus = selectedInDim('계약현황', '손님', facets);
-  const customers = customersAll.filter((c) => {
-    if (custStatus.length) {
-      const okActive = custStatus.includes('운행중') && c.activeCount > 0;
-      const okDebt = custStatus.includes('미수있음') && c.totalUnpaid > 0;
-      if (!(okActive || okDebt)) return false;
-    }
-    return textMatch(q, c.name, c.phone, ...c.vehicles);
-  });
-  const custDebt = customers.reduce((s, c) => s + Math.max(0, c.totalUnpaid), 0);
-
-  const cols: Col<ContractView>[] = [
-    ...(scopeAll ? [{ key: '_co', label: '회사', render: (v: ContractView) => <span style={{ color: C.mute }}>{companyLabel(v.rec.companyId)}</span> }] : []),
-    { key: 'no', label: '계약번호', render: (v) => String(v.rec.contractNo || '—') },
-    { key: 'renter', label: '임차인', render: (v) => (
-      <TextLink stop tone="ink" onClick={() => openCustomer(customerKey(v.rec.contractorName, v.rec.contractorPhone))}>
-        {String(v.rec.contractorName || '—')}
-      </TextLink>
-    ) },
-    { key: 'plate', label: '차량', render: (v) => (
-      <TextLink stop disabled={!v.rec.plate} onClick={() => { if (v.rec.plate) openCar(v.rec.plate); }}>
-        {String(v.rec.plate || '—')}
-      </TextLink>
-    ) },
-    { key: 'status', label: '상태', render: (v) => { const c = classifyContract(v); return <Badge tone={c.tone === 'danger' ? 'red' : c.tone === 'ok' ? 'green' : c.tone === 'warn' ? 'amber' : 'gray'}>{c.label}</Badge>; } },
-    { key: 'term', label: '기간', render: (v) => <span style={{ fontSize: 12 }}>{v.startDate || '—'}~{v.endDate || '—'}{v.dday != null && <span style={{ marginLeft: 6, color: v.dday < 0 ? C.danger : v.dday <= 30 ? C.warn : C.faint }}>{v.dday < 0 ? `만기경과 ${-v.dday}일` : `D-${v.dday}`}</span>}</span> },
-    { key: 'rent', label: '월대여료', align: 'r', render: (v) => won(v.monthlyRent) },
-    { key: 'net', label: '순미수', align: 'r', render: (v) => v.net > 0 ? <span style={{ color: C.danger, fontWeight: 700 }}>{won(v.net)}</span> : <span style={{ color: C.faint }}>—</span> },
-  ];
-  const custCols: Col<CustomerAgg>[] = [
-    ...(scopeAll ? [{ key: '_co', label: '회사', render: (c: CustomerAgg) => <span style={{ color: C.mute }}>{companyLabel(c.companyId)}</span> }] : []),
-    { key: 'name', label: '손님', render: (c) => <b>{c.name || '—'}</b> },
-    { key: 'phone', label: '연락처', render: (c) => <span style={{ color: C.mute }}>{c.phone || '—'}</span> },
-    { key: 'cnt', label: '계약', align: 'r', render: (c) => `${c.contracts.length}건` },
-    { key: 'active', label: '운행중', align: 'r', render: (c) => c.activeCount > 0 ? <b style={{ color: 'var(--green-text)' }}>{c.activeCount}</b> : <span style={{ color: C.faint }}>—</span> },
-    { key: 'veh', label: '차량', render: (c) => c.vehicles.length ? c.vehicles.slice(0, 2).join(', ') + (c.vehicles.length > 2 ? ` 외 ${c.vehicles.length - 2}` : '') : '—' },
-    { key: 'last', label: '최종종료', render: (c) => c.lastEnd || '—' },
-    { key: 'debt', label: '순미수', align: 'r', render: (c) => c.totalUnpaid > 0 ? <span style={{ color: C.danger, fontWeight: 700 }}>{won(c.totalUnpaid)}</span> : <span style={{ color: C.faint }}>—</span> },
-  ];
-
-  const openIdx = openKey ? allFiltered.findIndex((v) => String(v.rec._key) === openKey) : -1;
-  const open = openIdx >= 0 ? allFiltered[openIdx] : (openKey ? views.find((v) => String(v.rec._key) === openKey) ?? null : null);
-  const sched = open ? contractSchedules(open.rec, TODAY) : [];
+  const [scope, setScope] = useState<'계약유지' | '계약종료' | '전체'>('계약유지');
+  const [colView, setColView] = useState<LedgerColView>('기본');
+  const [selected, setSelected] = useState<ReturnType<typeof contractMasterRow> | null>(null);
+  const [creating, setCreating] = useState(false);
+  const allRows = useMemo(() => contracts
+    .map((record) => contractMasterRow(record, TODAY))
+    .sort((a, b) => Number(a.ended) - Number(b.ended) || a.endDate.localeCompare(b.endDate)), [contracts]);
+  const searchedRows = useMemo(() => allRows.filter((r) =>
+    textMatch(q, r.company, r.contractNo, r.plate, r.carName, r.contractorName, r.contractorPhone, r.contractorLicenseNo, r.status, r.dataAlert),
+  ), [allRows, q]);
+  const rows = useMemo(() => searchedRows.filter((r) =>
+    scope === '전체' || (scope === '계약유지' ? !r.ended : r.ended),
+  ), [searchedRows, scope]);
+  const active = searchedRows.filter((r) => !r.ended).length;
+  // 실미수 = 현재 진행 계약 중 결제일이 도래한 미납만.
+  // 종료 계약의 남은 채권은 회수대상 잔존채권으로 분리하고 실미수 KPI에 합치지 않는다.
+  const debt = searchedRows.filter((r) => !r.ended && r.net > 0);
+  const debtSum = debt.reduce((sum, r) => sum + r.net, 0);
+  const endedDebt = searchedRows.filter((r) => r.ended && r.net > 0);
+  const endedDebtSum = endedDebt.reduce((sum, r) => sum + r.net, 0);
 
   return (
-    <FacetPage
-      title="계약현황"
-      meta={`${companyLabel(companyId)} · ${views.length}건`}
-      tools={
-        <WorkbenchBar
-          search={{ value: q, onChange: setQ, placeholder: '계약·손님·차량' }}
-          view={<IconSeg value={view} onChange={setView} options={[
-            { key: 'card', label: '카드', icon: <LayoutGrid size={15} /> },
-            { key: 'excel', label: '엑셀', icon: <Table size={15} /> },
-          ]} />}
-          actions={<Btn size="sm" onClick={() => openIngest('contract')}>+ 신규 계약</Btn>}
+    <LedgerFrame
+      title="계약관리"
+      meta="계약 1건 1행 · 계약자·차량·기간·납부조건·반납·미수"
+      right={<Btn size="sm" variant={creating ? 'ghost' : 'solid'} aria-pressed={creating} onClick={() => {
+        setSelected(null);
+        setCreating((open) => !open);
+      }}><Plus size={14} /> {creating ? '생성 취소' : '계약 생성'}</Btn>}
+      filters={<>
+        <Search size="sm" placeholder="회사·계약번호·차량·계약자·상태·알람" value={q} onChange={(e) => setQ(e.target.value)} style={{ width: mobile ? '100%' : 300 }} />
+        <PillTabs
+          size="sm"
+          value={scope}
+          onChange={setScope}
+          tabs={[
+            { key: '계약유지', label: '계약유지', badge: active },
+            { key: '계약종료', label: '계약종료', badge: searchedRows.length - active },
+            { key: '전체', label: '전체', badge: searchedRows.length },
+          ]}
         />
-      }
-      rail={!loading ? <FacetRail lensKey="계약현황" facets={facets} onToggle={toggleFacet} onReset={resetFacets} counts={counts} /> : null}
-    >
-      <Sec title="생애" desc="계약자산 · 예정→중→완료" hideable={false}>
-        <Cards min={100} fit>
-          <Metric label="계약예정" value={loading ? '…' : nWait} tone={nWait ? 'warn' : 'ink'} onClick={() => goSec('c-wait')} />
-          <Metric label="계약중" value={loading ? '…' : nRun} tone="ok" onClick={() => goSec('c-run')} />
-          <Metric label="계약완료" value={loading ? '…' : nEnd} tone="ink" onClick={() => goSec('c-end')} />
-          <Metric label="채권잔존" value={loading ? '…' : nDebt} tone={nDebt ? 'danger' : 'ink'} onClick={() => setF(['채권잔존'])} />
-          <Metric label="손님" value={loading ? '…' : customersAll.length} tone="ink" onClick={() => goSec('c-cust')} />
-        </Cards>
-      </Sec>
-
-      {loading ? <PageLoading />
-        : view === 'excel'
-          ? (allFiltered.length === 0
-              ? <EmptyState>표시할 계약이 없습니다</EmptyState>
-              : <ExcelSheet
-                  cols={CONTRACT_COLS}
-                  rows={allFiltered.map((v) => contractViewToRow(v))}
-                  rowKey={(r) => r.contractNo || r.plate}
-                  onRow={(r) => { const v = allFiltered.find((x) => String(x.rec.contractNo || x.rec._key || '') === r.contractNo); if (v) setOpenKey(String(v.rec._key || '')); }}
-                />)
-        : order.map((id) => {
-          const sid = id as LifeSec;
-          const meta = SEC_META[sid];
-          if (sid === 'c-cust') {
-            return (
-              <Sec key={sid} id={sid} title={meta.title} n={customers.length} desc={meta.desc} onReorder={reorder}
-                right={<span style={{ display: 'inline-flex', gap: 10, alignItems: 'center' }}><span style={{ fontSize: 11.5, color: C.faint }}>채권 {won(custDebt)}</span><WorkPipe to="receivables" /></span>}>
-                {customers.length === 0 ? <EmptyState variant="sec">손님 없음</EmptyState>
-                  : <DataTable cols={custCols} rows={customers} onRow={(c) => openCustomer(c.key)} />}
-              </Sec>
-            );
-          }
-          const phase = SEC_PHASE[sid]!;
-          const list = byPhase(phase);
-          const pipe = sid === 'c-wait' || sid === 'c-run' ? 'dispatch' as const : sid === 'c-end' ? 'receivables' as const : null;
-          return (
-            <Sec key={sid} id={sid} title={meta.title} n={list.length} desc={meta.desc} onReorder={reorder}
-              right={pipe ? <WorkPipe to={pipe} /> : undefined}>
-              {list.length === 0 ? <EmptyState variant="sec">해당 계약 없음</EmptyState>
-                : <DataTable cols={cols} rows={list} onRow={(v) => setOpenKey(String(v.rec._key || ''))} />}
-            </Sec>
-          );
-        })}
-
-      {open && (
-        <DetailShell
-          fixed
-          title={`${open.rec.contractNo || '계약'} · ${open.rec.contractorName || ''}`}
-          meta={<StatusTag value={open.status} />}
-          onBack={() => { setOpenKey(null); setAct(null); }}
-          actions={<>
-            {!open.delivered && <Btn variant="solid" onClick={() => startAct('deliver', open)} disabled={busy}>인도 처리</Btn>}
-            {open.status === '운행' && <>
-              <Btn variant="ghost" onClick={() => startAct('extend', open)} disabled={busy}>연장</Btn>
-              <Btn variant="ghost" onClick={() => startAct('return', open)} disabled={busy}>반납</Btn>
-              <Btn variant="danger" onClick={() => startAct('terminate', open)} disabled={busy}>중도해지</Btn>
-            </>}
-            <Btn variant={editC ? 'solid' : 'ghost'} onClick={() => { if (editC) setEditC(false); else { setCForm({ ...open.rec }); setEditC(true); } }}>{editC ? '편집 닫기' : '정보 수정'}</Btn>
-            <Btn variant="danger" onClick={() => delContract(open)} disabled={busy}>삭제</Btn>
-            <Btn variant="ghost" onClick={() => openCar(String(open.rec.plate || ''))}>차량 360</Btn>
-            <Btn variant="ghost" onClick={() => openCustomer(customerKey(open.rec.contractorName, open.rec.contractorPhone))}>손님 360</Btn>
-            {open.net > 0 && <Btn variant="solid" onClick={() => startAct('pay', open)}>입금 기록</Btn>}
-          </>}
-        >
-          {openIdx > 0 || (openIdx >= 0 && openIdx < allFiltered.length - 1) ? (
-            <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
-              <Btn variant="ghost" size="sm" disabled={openIdx <= 0} onClick={() => { setOpenKey(String(allFiltered[openIdx - 1].rec._key)); setAct(null); }}>‹ 이전</Btn>
-              <Btn variant="ghost" size="sm" disabled={!(openIdx >= 0 && openIdx < allFiltered.length - 1)} onClick={() => { setOpenKey(String(allFiltered[openIdx + 1].rec._key)); setAct(null); }}>다음 ›</Btn>
-            </div>
-          ) : null}
-          {act && (() => {
-            const m = actMeta[act.kind];
-            return (
-              <div style={{ marginBottom: 14, padding: '12px 14px', border: `1px solid ${C.line}`, borderRadius: 'var(--radius)', background: 'var(--bg-stripe)' }}>
-                <div style={{ fontSize: 13, fontWeight: 700, color: C.ink, marginBottom: 10 }}>{m.title}</div>
-                <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: C.mute, marginBottom: 6 }}>{m.label}</label>
-                <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-                  <Input type={m.type} value={act.value} onChange={(e) => setAct({ ...act, value: e.target.value })} style={{ width: m.type === 'date' ? 160 : 140 }} />
-                  <Btn variant="solid" onClick={() => commitAct(open)} disabled={busy || !act.value.trim()}>{busy ? '처리 중…' : m.confirm}</Btn>
-                  <Btn variant="ghost" onClick={() => setAct(null)} disabled={busy}>취소</Btn>
-                </div>
-              </div>
-            );
-          })()}
-          <Cards min={128} fit>
-            <Metric label="순미수" value={won(open.net)} tone={open.net > 0 ? 'danger' : 'ink'} />
-            <Metric label="도래미수" value={won(open.gross)} />
-            <Metric label="입금누계" value={won(open.paid)} tone="ok" />
-            {open.refund > 0 && <Metric label="반납 일할환불" value={won(open.refund)} tone="warn" />}
-          </Cards>
-          <Section title="계약 정보">
-            {editC ? (
-              <div>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 10 }}>
-                  {(([['계약번호', 'contractNo'], ['계약자', 'contractorName'], ['연락처', 'contractorPhone'], ['월대여료', 'monthlyRent'], ['보증금', 'deposit'], ['시작일', 'startDate'], ['종료일', 'endDate'], ['납부일', 'paymentDay']]) as [string, string][]).map(([lab, key]) => (
-                    <label key={key} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                      <span style={{ fontSize: 11, color: C.mute }}>{lab}</span>
-                      <Input value={String(cForm[key] ?? '')} onChange={(e) => setCForm((f) => ({ ...f, [key]: e.target.value }))} style={{ width: '100%' }} />
-                    </label>
-                  ))}
-                </div>
-                <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
-                  <Btn onClick={saveContract} disabled={busy}>저장</Btn>
-                  <Btn variant="ghost" onClick={() => setEditC(false)}>취소</Btn>
-                </div>
-              </div>
-            ) : (
-              <DetailGrid rows={[
-                ['차량', `${open.rec.plate || ''} ${open.rec.carName || ''}`], ['기간', `${open.startDate} ~ ${open.endDate}`],
-                ['월대여료', won(open.monthlyRent)], ['보증금', won(open.rec.deposit)],
-                ['인도일', open.rec.deliveredDate], ['반납예정일', open.rec.returnScheduledDate],
-                ['반납/해지일', open.rec.returnedDate], ['종료사유', open.rec.endReason],
-              ]} />
-            )}
-          </Section>
-          <Section title={`수납 스케줄 (${sched.length}회차)`}>
-            {sched.length ? (
-              <div style={{ overflowX: 'auto', maxHeight: 260 }}>
-                <table style={{ borderCollapse: 'collapse', fontSize: 12.5, width: '100%' }}>
-                  <thead><tr><th style={th}>회차</th><th style={th}>납기일</th><th style={thR}>금액</th><th style={thR}>할인</th><th style={th}>상태</th></tr></thead>
-                  <tbody>
-                    {sched.map((s) => (
-                      <tr key={s.seq} style={{ borderTop: `1px solid ${C.line2}` }}>
-                        <td style={td}>{s.seq}</td><td style={td}>{s.dueDate}</td>
-                        <td style={tdR}>{won(s.amount)}</td>
-                        <td style={tdR}>{s.discount ? <span style={{ color: C.warn }}>-{won(s.discount)}</span> : '—'}</td>
-                        <td style={td}><Badge tone={s.status === '완료' ? 'green' : s.status === '연체' ? 'red' : s.status === '면제' ? 'gray' : 'amber'}>{s.status}</Badge></td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            ) : <div style={{ padding: 12, fontSize: 13, color: C.faint }}>월대여료·기간 입력 시 회차 생성</div>}
-          </Section>
-        </DetailShell>
-      )}
-    </FacetPage>
+      </>}
+      stats={<span style={{ fontSize: 12.5, color: C.mute }}>유지 <b style={{ color: C.ok }}>{active}</b> · 실미수 <b style={{ color: C.danger }}>{debt.length}건 {won(debtSum)}</b> · 계약종료 미수 <b>{endedDebt.length}건 {won(endedDebtSum)}</b></span>}
+      colView={colView}
+      onColView={setColView}
+      loading={loading}
+      empty="등록된 계약이 없습니다."
+      cols={colView === '기본' ? CONTRACT_MASTER_BASIC_COLS : CONTRACT_MASTER_EXPANDED_COLS}
+      rows={rows}
+      rowKey={(r) => r.contractNo || `${r.plate}:${r.startDate}`}
+      selectedRowKey={selected ? (selected.contractNo || `${selected.plate}:${selected.startDate}`) : null}
+      onRowDoubleClick={(row) => {
+        setCreating(false);
+        setSelected(row);
+      }}
+      onCloseDetail={() => setSelected(null)}
+      sidePanel={creating ? (
+        <LedgerCreatePanel
+          key="new-contract"
+          entityKey="contract"
+          title="계약 생성"
+          sections={CONTRACT_CREATE_SECTIONS}
+          initial={{ status: '대기', paymentTiming: '선불' }}
+          onClose={() => setCreating(false)}
+        />
+      ) : selected ? (
+        <LedgerRecordPanel
+          title={selected.contractNo || selected.contractorName}
+          subtitle={`${selected.contractorName || '계약자 미입력'} · ${selected.plate || '차량 미입력'}`}
+          row={selected}
+          cols={CONTRACT_MASTER_EXPANDED_COLS}
+          onClose={() => setSelected(null)}
+        />
+      ) : null}
+    />
   );
 }

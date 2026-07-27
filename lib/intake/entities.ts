@@ -142,6 +142,26 @@ export const ENTITIES: Record<string, Entity> = {
       { key: 'description', label: '상세', type: 'text', manual: true },
     ],
   },
+  // 통합 업무 원장 — 차량이력에 한정하지 않고 상담·일정·자금·문서 등 모든 업무를 1건 1행으로 저장.
+  work_item: {
+    key: 'work_item', label: '업무', layer: ENTITY_LAYER.work_item, source: '업무 직접입력', idFrom: 'workId',
+    fields: [
+      { key: 'date', label: '업무일', type: 'date', required: true },
+        { key: 'category', label: '업무구분', type: 'select', required: true, options: ['미분류', '일정', '고객상담', '정비·수선', '사고', '과태료', '자금', '문서', '일반', '기타'] },
+        { key: 'status', label: '상태', type: 'select', options: ['미분류', '접수', '예정', '진행중', '보류', '완료', '취소'] },
+      { key: 'priority', label: '우선순위', type: 'select', options: ['긴급', '높음', '보통', '낮음'] },
+      { key: 'title', label: '업무내용', type: 'text', required: true },
+      { key: 'targetType', label: '대상구분', type: 'select', options: ['자산', '계약', '고객', '자금', '회사', '기타'] },
+      { key: 'plate', label: '차량번호', type: 'text' },
+      { key: 'contractNo', label: '계약번호', type: 'text' },
+      { key: 'customerName', label: '고객명', type: 'text' },
+      { key: 'dueDate', label: '기한', type: 'date' },
+      { key: 'assigneeName', label: '담당자', type: 'text' },
+      { key: 'vendor', label: '업체/거래처', type: 'text' },
+      { key: 'amount', label: '금액(원)', type: 'number' },
+      { key: 'description', label: '상세내용', type: 'text' },
+    ],
+  },
   customer: {
     key: 'customer', label: '손님', layer: ENTITY_LAYER.customer, ocrType: 'license', source: '운전면허증', idFrom: 'licenseNo',
     fields: [
@@ -233,6 +253,22 @@ export const ENTITIES: Record<string, Entity> = {
       { key: 'returnedDate', label: '반납/해지일', type: 'date', manual: true, note: '반납 시 일할정산 자동' },
       { key: 'depositSettledDate', label: '보증금 정산일', type: 'date', manual: true, note: '반환/충당 완료 표시' },
       { key: 'endReason', label: '종료사유', type: 'select', options: ['정상종료', '중도해지', '채권보전'], manual: true },
+    ],
+  },
+  bank_account: {
+    key: 'bank_account', label: '계좌', layer: ENTITY_LAYER.bank_account, source: '원장 직접입력', idFrom: 'accountNumber',
+    fields: [
+      { key: 'bankName', label: '은행명', type: 'text', required: true },
+      { key: 'accountNumber', label: '계좌번호', type: 'text', required: true },
+      { key: 'accountAlias', label: '계좌명/별명', type: 'text' },
+      { key: 'accountHolder', label: '예금주', type: 'text' },
+      { key: 'accountType', label: '계좌구분', type: 'select', options: ['입출금', '집금', 'CMS', '대출', '적금', '기타'] },
+      { key: 'status', label: '상태', type: 'select', options: ['사용중', '사용정지', '해지'] },
+      { key: 'openedDate', label: '개설일', type: 'date' },
+      { key: 'closedDate', label: '해지일', type: 'date' },
+      { key: 'openingBalance', label: '등록시점 잔액(원)', type: 'number' },
+      { key: 'importMethod', label: '수집방법', type: 'select', options: ['엑셀', '자동연동', '수기'] },
+      { key: 'memo', label: '메모', type: 'text' },
     ],
   },
   bank_tx: {

@@ -1,31 +1,32 @@
 rules_version = '2';
 // jpkerp6 법인 격리 — companyId 기반. 진짜 보안 경계는 여기(서버).
-// users/{uid} = { role: '본사'|'법인'(|레거시 운영자|위탁사), companyId: string|null }
-// 본사(companyId=null) = 전 법인. 법인 소속 직원 = 배정 companyId 문서만.
-// MASTER 이메일은 NEXT_PUBLIC_MASTER_EMAIL 과 동일하게 유지할 것(기본 pyh@teamjpk.com).
+// 권한 SSOT = Firebase Custom Claims:
+//   { systemRole: 'hq' } 또는 { systemRole: 'tenant', companyId: string }
 service cloud.firestore {
   match /databases/{database}/documents {
-    function userDoc() {
-      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
-    }
-    function hasUserDoc() {
-      return exists(/databases/$(database)/documents/users/$(request.auth.uid));
-    }
     function isSignedIn() { return request.auth != null; }
-    function isMaster() {
-      return isSignedIn() && request.auth.token.email != null
-        && request.auth.token.email.lower() == 'pyh@teamjpk.com';
-    }
-    // 본사 = 전 법인. 레거시 '운영자' 호환.
     function isHQ() {
-      return isMaster() || (isSignedIn() && hasUserDoc()
-        && (userDoc().role == '본사' || userDoc().role == '운영자'));
+      return isSignedIn() && request.auth.token.systemRole == 'hq';
     }
-    function myCompany() { return hasUserDoc() ? userDoc().companyId : null; }
+    function myCompany() {
+      return isSignedIn() && request.auth.token.systemRole == 'tenant'
+        ? request.auth.token.companyId
+        : null;
+    }
     function tenantOK(companyId) { return isHQ() || (isSignedIn() && myCompany() == companyId); }
     // ★ 민감 컬렉션 — 범용 규칙에서 반드시 제외. 각자의 명시 match만 지배(범용 OR 우회로 권한승격 차단).
     //   users: role 자기승격 방지 · period_locks: 마감 우회 방지 · audit_logs: 위변조 방지.
-    function businessColl(coll) { return coll != 'users' && coll != 'period_locks' && coll != 'audit_logs'; }
+    function businessColl(coll) {
+      return coll != 'users'
+        && coll != 'period_locks'
+        && coll != 'audit_logs'
+        && coll != '_api_rate_limits';
+    }
+
+    // 서버 Admin 전용. 클라이언트는 조회·변조할 수 없다.
+    match /_api_rate_limits/{id} {
+      allow read, write: if false;
+    }
 
     match /users/{uid} {
       allow read: if isSignedIn() && (request.auth.uid == uid || isHQ());

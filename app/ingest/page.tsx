@@ -3,7 +3,6 @@ import { useState, useEffect } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { ENTITY_LIST, ENTITIES, mapOcrToEntity, type EntityRecord } from '@/lib/intake/entities';
 import { parseCsv } from '@/lib/intake/csv';
-import { downloadXlsxTemplate, parseSpreadsheet } from '@/lib/intake/xlsx';
 import { saveIntake } from '@/lib/intake';
 import { useEntityList } from '@/lib/use-entity-lists';
 import { callOcrExtract } from '@/lib/ocr-client';
@@ -14,7 +13,8 @@ import { Check, AlertTriangle } from 'lucide-react';
 import FileDrop from '@/components/FileDrop';
 import { toast } from '@/lib/toast';
 
-import { Page, Sec, Cards, Metric, Btn, FormGrid, Panel, PillTabs, Select, Input, th, td, C, Message, Loading } from '@/components/ui';
+import { Page, Sec, Cards, Metric, Btn, FormGrid, Panel, PillTabs, Select, Input, th, td, C, Message, Loading, OcrCrosscheck } from '@/components/ui';
+import type { CrosscheckResult } from '@/lib/ocr-crosscheck';
 import { WorkbenchBar } from '@/components/WorkbenchBar';
 import { layerOfEntity } from '@/lib/domain/layers';
 
@@ -61,7 +61,7 @@ export default function IngestPage() {
         ? [{ ...records[0], _ocrOriginal: { raw: ocrRaw, at: new Date().toISOString(), source: entity.source } }]
         : records;
       // 단일 통로 — 앵커 정규화·부수효과·jpk:saved 반영
-      const r = await saveIntake(entityKey, target, toSave);
+      const r = await saveIntake(entityKey, target, toSave, { context: { source: ocrRaw ? 'ocr' : tab === 'excel' ? 'upload' : 'manual' } });
       const s = r.save;
       const settleNote = r.sideEffects.filter((x) => x.startsWith('cms-settle:') || x.startsWith('card-settle:')).join(' · ');
       const fx = settleNote ? ` · ${settleNote}` : (r.sideEffects.length ? ` · 부수효과 ${r.sideEffects.length}` : '');
@@ -82,12 +82,13 @@ export default function IngestPage() {
   const [tab, setTab] = useState<Tab>(() => sp.get('plate') ? 'manual' : 'ocr');   // 차번 프리필로 오면 직접입력 탭
   const [records, setRecords] = useState<EntityRecord[]>([]);
   const [ocrRaw, setOcrRaw] = useState<Record<string, unknown> | null>(null);   // 원본 OCR 보존 (감사추적)
+  const [ocrCrosscheck, setOcrCrosscheck] = useState<CrosscheckResult | null>(null);
   const [error, setError] = useState('');
   const [info, setInfo] = useState('');
 
   const entity = ENTITIES[entityKey];
 
-  function reset() { setRecords([]); setError(''); setInfo(''); setOcrRaw(null); }
+  function reset() { setRecords([]); setError(''); setInfo(''); setOcrRaw(null); setOcrCrosscheck(null); }
 
   // ── OCR ──
   const [file, setFile] = useState<File | null>(null);
@@ -99,6 +100,7 @@ export default function IngestPage() {
       const r = await callOcrExtract(file, entity.ocrType || '');
       if (!r.ok) { setError(r.error || '추출 실패'); toast('OCR 추출 실패: ' + (r.error || ''), 'error'); return; }
       setOcrRaw(r.raw || {});   // 원본 보존
+      setOcrCrosscheck(r.crosscheck || null);
       setRecords([mapOcrToEntity(entityKey, r.raw || {})]);
       setInfo('OCR 추출 완료');
       toast('OCR 추출 완료 — 아래에서 검토 후 저장', 'success');
@@ -113,7 +115,9 @@ export default function IngestPage() {
     toast(`${f.name} 읽는 중…`, 'info');
     try {
       const isCsv = /\.csv$/i.test(f.name);
-      const recs = isCsv ? parseCsv(entityKey, await f.text()) : await parseSpreadsheet(entityKey, f);
+      const recs = isCsv
+        ? parseCsv(entityKey, await f.text())
+        : await (await import('@/lib/intake/xlsx')).parseSpreadsheet(entityKey, f);
       if (!recs.length) { setError(`인식된 행이 없습니다 — "${entity.label}" 형식이 맞는지 확인하세요 (계좌·CMS는 엔티티를 "계좌 거래"로)`); toast('인식된 행 0 — 엔티티/형식 확인', 'error'); return; }
       setRecords(recs);
       setInfo(`엑셀 ${recs.length}행 파싱 (${isCsv ? 'CSV' : 'XLSX'})`);
@@ -209,7 +213,10 @@ export default function IngestPage() {
           <div style={{ display: 'flex', gap: 14, alignItems: 'flex-start', flexWrap: 'wrap' }}>
             <FileDrop onFile={onExcelFile} accept=".xlsx,.xls,.csv" hint="채운 템플릿 또는 계좌·카드 내역 (.xlsx · .csv)" />
             <div style={{ marginTop: 28, display: 'flex', gap: 10, alignItems: 'center' }}>
-              <Btn variant="ghost" onClick={() => downloadXlsxTemplate(entityKey)}>＋ 빈 템플릿(.xlsx) 받기</Btn>
+              <Btn variant="ghost" onClick={async () => {
+                const { downloadXlsxTemplate } = await import('@/lib/intake/xlsx');
+                downloadXlsxTemplate(entityKey);
+              }}>＋ 빈 템플릿(.xlsx) 받기</Btn>
               {parsing && <Loading label="파일 읽는 중…" color={C.accent} />}
             </div>
           </div>
@@ -224,6 +231,7 @@ export default function IngestPage() {
 
       {error && <Message variant="danger"><div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><AlertTriangle size={16} />{error}</div></Message>}
       {info && <Message variant="success"><div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><Check size={16} />{info}</div></Message>}
+      {ocrCrosscheck && <OcrCrosscheck result={ocrCrosscheck} />}
 
       {records.length > 0 && (
         <Panel title="검토 및 저장">

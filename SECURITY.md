@@ -1,7 +1,7 @@
 # RENMAN 보안 상태 (서버 권한 경계)
 
 > 진짜 보안 경계는 **Firestore Rules + 서버 API**다. 화면 메뉴 숨김·클라이언트 검증은 UX일 뿐 경계가 아니다.
-> 테넌트 모델: `users/{uid} = { role, companyId }`. 본사(companyId=null)=전 법인, 법인 직원=배정 companyId 문서만.
+> 테넌트 권한 모델: Firebase Custom Claims `{ systemRole: 'hq' }` 또는 `{ systemRole: 'tenant', companyId }`.
 
 ## Firestore Rules 테스트
 
@@ -40,8 +40,8 @@ Java 없으면 로컬 실행 불가 → CI(`.github/workflows/ci.yml` `rules` �
 
 | # | 항목 | 요지 | 착수 조건 |
 |---|---|---|---|
-| P0-2 | 마스터=이메일 문자열 | `isMaster()`가 `pyh@teamjpk.com` 이메일 신뢰. 클라 가입폼 우회 가능 → **Firebase Custom Claims**(`systemRole:hq`, `companyIds[]`)로 이관. 마스터 2계정·MFA·재인증·권한변경 감사. | Firebase Admin/배포 |
-| P0-3 | API shared secret 공개 | 서버가 `API_SHARED_SECRET` 검사하나 클라가 `NEXT_PUBLIC_*`로 같은 값 전송 → 브라우저 번들에 노출(비밀 아님). **Firebase ID Token 검증**(`getIdToken()` → Admin `verifyIdToken()` → `users/{uid}` role/companyId)으로 교체. | Firebase Admin |
+| 완료 | 권한 SSOT | 이메일과 사용자 문서 role을 보안 경계에서 제거. Firebase Custom Claims(`systemRole`, `companyId`) 적용. | Rules/Auth |
+| 완료 | API 인증 | Firebase ID Token(`getIdToken()` → Admin `verifyIdToken()`)으로 교체. 브라우저 공개 shared secret 제거. | `lib/api-auth.ts` |
 | P0-4 | 법인 직원 = 전 컬렉션 수정 | 역할이 사실상 본사/법인 2단. 같은 회사면 컬렉션 무관 수정 가능. **컬렉션별 필드 화이트리스트 + 세분 역할**(contract/collections/finance/field/read_only). | 역할 모델 설계 |
 | P0-5 | `commitAll()` 비원자 | `for…await commitUpdate` 순차 — 계약+입금 중 하나 실패 시 부분반영(중복수납 위험). **`writeBatch`/`runTransaction`**으로 교체(계약+차량, 계약+입금, 은행+배분, 반납+보증금, 해지+위약금, 과태료+납부, 문서매칭). | Firebase(로컬 로직 일부 선작업 가능) |
 | P0-6 | 감사로그 비원자 | 본 데이터 저장 후 감사로그 async·실패삼킴 → 변경은 되고 로그는 유실 가능. 금액·권한·상태 변경은 **본 데이터와 같은 batch/transaction**. | P0-5와 함께 |

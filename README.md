@@ -10,7 +10,7 @@ v5/v4의 검증된 로직을 재사용하되, **한 회사가 법인 여러 개�
 ## 현재 (Phase 1 — OCR 인제스천 토대)
 - `app/api/ocr/extract/route.ts` — Gemini 2.5 구조화 추출 (v5에서 이식). 문서종류: vehicle_reg / license / business_reg / insurance_policy / penalty / rental_contract / contract_doc
 - `app/ingest/page.tsx` — 문서 업로드 → 추출 결과 plain 나열 (시험용)
-- `lib/api-auth.ts` — 인증 graceful skip (로컬). production은 Firebase Admin로 교체
+- `lib/api-auth.ts` — Firebase Admin ID Token 검증(로컬 Firebase 미설정 개발 모드만 우회)
 - `lib/firebase/client.ts` — Firebase 초기화 스텁 (다음: 추출 데이터 저장)
 
 ## 실행

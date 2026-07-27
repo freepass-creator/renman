@@ -151,11 +151,14 @@ export const tdR: CSSProperties = { ...td, textAlign: 'right', fontVariantNumeri
 /* 엑셀 시트(프리패스 ERP4 이식) — sticky 헤더·좌측 핀 · 행고 고정. DataTable과 별도(현황 한눈). */
 const EXCEL_PAD_Y = 5;
 const EXCEL_PAD_X = 8;
+/** 엑셀 thead·행 · 우측 상세패널 헤더 · Page frame 타이틀행 공통 높이. */
 const EXCEL_ROW_H = 36;
 export const thX: CSSProperties = {
   padding: `${EXCEL_PAD_Y}px ${EXCEL_PAD_X}px`, textAlign: 'left', fontSize: 12, color: C.mute, fontWeight: 700,
   background: C.head, borderBottom: `1px solid ${C.line}`, borderRight: `1px solid ${C.line}`, whiteSpace: 'nowrap',
   position: 'sticky', top: 0, zIndex: 2,
+  height: 'var(--ledger-head-h)', maxHeight: 'var(--ledger-head-h)', boxSizing: 'border-box',
+  verticalAlign: 'middle',
 };
 export const thXR: CSSProperties = { ...thX, textAlign: 'right', fontFamily: NUM, fontVariantNumeric: 'tabular-nums' };
 export const thXC: CSSProperties = { ...thX, textAlign: 'center' };

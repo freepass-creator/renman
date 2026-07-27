@@ -202,11 +202,26 @@ function LoginForm({ onSignup, onReset }: { onSignup: () => void; onReset: () =>
   );
 }
 
+function formatPhone(value: string): string {
+  const digits = value.replace(/\D/g, '').slice(0, 11);
+  if (digits.length <= 3) return digits;
+  if (digits.length <= 7) return `${digits.slice(0, 3)}-${digits.slice(3)}`;
+  return `${digits.slice(0, 3)}-${digits.slice(3, digits.length - 4)}-${digits.slice(-4)}`;
+}
+
+function formatBusinessNo(value: string): string {
+  const digits = value.replace(/\D/g, '').slice(0, 10);
+  if (digits.length <= 3) return digits;
+  if (digits.length <= 5) return `${digits.slice(0, 3)}-${digits.slice(3)}`;
+  return `${digits.slice(0, 3)}-${digits.slice(3, 5)}-${digits.slice(5)}`;
+}
+
 function SignupForm({ onBack }: { onBack: () => void }) {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
-  const [department, setDepartment] = useState('');
+  const [companyName, setCompanyName] = useState('');
+  const [businessNo, setBusinessNo] = useState('');
   const [password, setPassword] = useState('');
   const [password2, setPassword2] = useState('');
   const [err, setErr] = useState('');
@@ -224,9 +239,15 @@ function SignupForm({ onBack }: { onBack: () => void }) {
     const v = validate(); if (v) { setErr(v); return; }
     setBusy(true);
     try {
-      const displayName = [name.trim(), department.trim() ? `(${department.trim()})` : ''].filter(Boolean).join(' ');
-      await signup({ email, password, name: displayName, phone, department });
-      setInfo('가입 완료 — 본사에서 법인·권한을 배정하면 이용할 수 있습니다.');
+      await signup({
+        email,
+        password,
+        name: name.trim(),
+        phone,
+        companyName: companyName.trim(),
+        businessNo: businessNo.replace(/\D/g, ''),
+      });
+      setInfo('가입 신청 완료 — 관리자가 소속 회사와 권한을 승인하면 이용할 수 있습니다.');
     } catch (ex) {
       const m = String((ex as Error)?.message || '');
       setErr(m.includes('email-already-in-use') ? '이미 가입된 이메일입니다'
@@ -239,24 +260,12 @@ function SignupForm({ onBack }: { onBack: () => void }) {
     <form className={`login-card${busy ? ' is-loading' : ''}`} onSubmit={submit} noValidate aria-label="계정 만들기">
       <header className="login-head">
         <h2 className="login-title">계정 만들기</h2>
-        <p className="login-sub">직원 계정을 만듭니다. 가입 후 본사가 소속 법인을 배정해야 데이터가 보입니다.</p>
+        <p className="login-sub">사업자번호로 소속을 확인한 뒤 관리자 승인으로 이용합니다.</p>
       </header>
       <div className="login-form">
         <div className="login-field">
-          <label htmlFor="su-name">이름</label>
-          <input id="su-name" type="text" autoComplete="name" placeholder="홍길동" required value={name} onChange={(e) => setName(e.target.value)} />
-        </div>
-        <div className="login-field">
-          <label htmlFor="su-email">이메일</label>
+          <label htmlFor="su-email">이메일 (필수)</label>
           <input id="su-email" type="email" autoComplete="email" placeholder="name@company.com" required value={email} onChange={(e) => setEmail(e.target.value)} />
-        </div>
-        <div className="login-field">
-          <label htmlFor="su-phone">휴대폰 (선택)</label>
-          <input id="su-phone" type="tel" autoComplete="tel" placeholder="010-0000-0000" value={phone} onChange={(e) => setPhone(e.target.value)} />
-        </div>
-        <div className="login-field">
-          <label htmlFor="su-dept">부서 (선택)</label>
-          <input id="su-dept" type="text" placeholder="운영팀" value={department} onChange={(e) => setDepartment(e.target.value)} />
         </div>
         <div className="login-field">
           <label htmlFor="su-pw">비밀번호</label>
@@ -265,8 +274,28 @@ function SignupForm({ onBack }: { onBack: () => void }) {
         <div className="login-field">
           <label htmlFor="su-pw2">비밀번호 확인</label>
           <input id="su-pw2" type="password" autoComplete="new-password" placeholder="비밀번호 다시 입력" required value={password2} onChange={(e) => setPassword2(e.target.value)} />
+          {password2 && password !== password2 && <p className="biz-no-match is-miss">비밀번호가 일치하지 않습니다.</p>}
         </div>
-        <button type="submit" className="login-submit" disabled={busy || !!info}>가입하기</button>
+        <div className="login-field">
+          <label htmlFor="su-name">이름</label>
+          <input id="su-name" type="text" autoComplete="name" placeholder="홍길동" required value={name} onChange={(e) => setName(e.target.value)} />
+        </div>
+        <div className="login-field">
+          <label htmlFor="su-phone">연락처</label>
+          <input id="su-phone" type="tel" autoComplete="tel" inputMode="tel" placeholder="010-0000-0000"
+            value={phone} onChange={(e) => setPhone(formatPhone(e.target.value))} />
+        </div>
+        <div className="login-field">
+          <label htmlFor="su-company">소속 회사명 (참고)</label>
+          <input id="su-company" type="text" placeholder="회사명" value={companyName} onChange={(e) => setCompanyName(e.target.value)} />
+        </div>
+        <div className="login-field">
+          <label htmlFor="su-biz-no">소속 사업자번호</label>
+          <input id="su-biz-no" inputMode="numeric" autoComplete="off" placeholder="000-00-00000"
+            value={businessNo} onChange={(e) => setBusinessNo(formatBusinessNo(e.target.value))} />
+        </div>
+        <p className="login-msg signup-guide">가입 신청 후 관리자 승인이 필요합니다. 승인되면 사업자번호에 맞는 회사와 권한이 배정됩니다.</p>
+        <button type="submit" className="login-submit" disabled={busy || !!info}>계정 만들기</button>
       </div>
       <div className="login-links"><AuthLink onClick={onBack}>로그인으로 돌아가기</AuthLink></div>
       {err && <p className="login-msg is-err" role="alert" aria-live="polite">{err}</p>}

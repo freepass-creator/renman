@@ -16,11 +16,14 @@ import { uploadDoc, docPath } from '@/lib/storage';
 import { pushDocVersion } from '@/lib/docs';
 import { resolveWriteCompany, NEED_COMPANY } from '@/lib/scope';
 import { normPlate } from '@/lib/plate';
+import { matchDocumentToVehicle } from '@/lib/document-consistency';
 import { companyLabel } from '@/lib/companies';
 import { Page, Panel, Btn, Badge, EmptyState, DataTable, IconSeg, C, SPACE_M, won, type Col } from '@/components/ui';
 import FileDrop from '@/components/FileDrop';
 import { WorkbenchBar } from '@/components/WorkbenchBar';
 import { toast } from '@/lib/toast';
+import { getStore } from '@/lib/store';
+import { buildAtomicEvent } from '@/lib/domain/atomic-event';
 
 type DocKind = 'vehicle' | 'insurance';
 const KIND: Record<DocKind, { label: string; ocrType: string }> = {
@@ -33,7 +36,8 @@ type Row = {
   rec: EntityRecord;
   plate: string;
   match: EntityRecord | null;   // 매칭된 기존 차량
-  status: '매칭' | '신규' | '실패';
+  status: '매칭' | '검토' | '신규' | '실패';
+  matchScore: number;
 };
 
 export default function BulkMatchPage() {
@@ -60,8 +64,13 @@ export default function BulkMatchPage() {
       setRows(results.map((r, i): Row => {
         const rec = r.ok && r.raw ? mapOcrToEntity(kind, r.raw) : {};
         const plate = normPlate(rec.plate);
-        const match = plate ? byPlate.get(plate) ?? null : null;
-        return { file: files[i], rec, plate: String(rec.plate || ''), match, status: !r.ok ? '실패' : match ? '매칭' : '신규' };
+        const judged = matchDocumentToVehicle(rec, vs);
+        const match = judged.target || (plate ? byPlate.get(plate) ?? null : null);
+        const status: Row['status'] = !r.ok ? '실패'
+          : judged.decision === 'auto' ? '매칭'
+          : match ? '검토'
+          : '신규';
+        return { file: files[i], rec, plate: String(rec.plate || ''), match, status, matchScore: judged.score };
       }));
     } catch (e) {
       toast('OCR 실패: ' + (e as Error).message, 'error');
@@ -76,14 +85,33 @@ export default function BulkMatchPage() {
     setBusy(true);
     try {
       const recs: EntityRecord[] = [];
+      const updateEvents: EntityRecord[] = [];
+      let updated = 0;
       for (const r of okRows) {
         const key = String(r.rec.plate || r.rec.policyNo || 'new');
         // 원본 파일 저장(Firebase + 회사 Drive 미러) → 레코드에 첨부.
         const url = await uploadDoc(r.file, docPath(target, kind, key, r.file.name));
-        recs.push(url ? { ...r.rec, _docs: pushDocVersion(r.rec, { type: kind, url, reason: '대량 자동매칭', by: String(user?.name || '') }) } : r.rec);
+        const current = kind === 'vehicle'
+          ? r.match
+          : r.rec.policyNo ? await getStore().get('insurance', target, String(r.rec.policyNo)) : null;
+        const merged = url
+          ? { ...r.rec, _docs: pushDocVersion(current || r.rec, { type: kind, url, reason: '대량 자동매칭', by: String(user?.name || '') }) }
+          : r.rec;
+        if (current?._key) {
+          await getStore().update(kind, target, String(current._key), merged);
+          updateEvents.push(buildAtomicEvent({
+            entityType: kind, companyId: target, record: { ...current, ...merged }, source: 'ocr',
+          }));
+          updated++;
+        } else {
+          recs.push(merged);
+        }
       }
-      const res = await saveIntake(kind, target, recs);
-      toast(`${res.save.saved}건 반영 (${KIND[kind].label} · ${companyLabel(target)})${res.save.duplicates ? ` · 갱신 ${res.save.duplicates}` : ''}`, 'success');
+      const res = recs.length
+        ? await saveIntake(kind, target, recs, { context: { source: 'ocr' } })
+        : { save: { saved: 0, duplicates: 0, backend: getStore().backend } };
+      if (updateEvents.length) await getStore().save('atomic_event', target, updateEvents);
+      toast(`${res.save.saved + updated}건 반영 (${KIND[kind].label} · ${companyLabel(target)})${updated ? ` · 기존 갱신 ${updated}` : ''}`, 'success');
       reset();
     } catch (e) {
       toast('반영 실패: ' + (e as Error).message, 'error');
@@ -96,8 +124,10 @@ export default function BulkMatchPage() {
     { key: 'match', label: '매칭 차량', render: (r) => r.match ? `${String(r.match.plate || '')} · ${String(r.match.carName || '')}` : '—' },
     {
       key: 'status', label: '처리', render: (r) => {
-        const tone = r.status === '실패' ? 'red' : r.status === '신규' ? 'amber' : 'green';
-        const label = r.status === '매칭' ? '기존 갱신' : r.status === '신규' ? '신규 등록' : 'OCR 실패';
+        const tone = r.status === '실패' ? 'red' : r.status === '신규' || r.status === '검토' ? 'amber' : 'green';
+        const label = r.status === '매칭' ? `자동 매칭 ${r.matchScore}`
+          : r.status === '검토' ? `교차검토 ${r.matchScore}`
+          : r.status === '신규' ? '신규 등록' : 'OCR 실패';
         return <Badge tone={tone}>{label}</Badge>;
       },
     },

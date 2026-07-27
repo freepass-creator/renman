@@ -62,6 +62,13 @@ const CT = {
   },
   ret: { key: 'ret', label: '반납일', render: (r) => r.returned || '—', text: (r) => r.returned },
   st: { key: 'st', label: '상태', render: (r) => <Badge tone={r.ended ? 'gray' : 'green'}>{r.status}</Badge>, text: (r) => r.status },
+  alert: {
+    key: 'alert', label: '데이터알람',
+    render: (r) => r.dataAlert
+      ? <span title={`원본 미수 ${won(r.sourceCarryUnpaid)} · 차이 ${won(r.reconciliationDelta)}`}><Badge tone="amber">{r.dataAlert}</Badge></span>
+      : <Badge tone="green">원본 대사완료</Badge>,
+    text: (r) => r.dataAlert || '원본 대사완료',
+  },
   od: {
     key: 'od', label: '연체일', align: 'r',
     render: (r) => r.overdueDays > 0
@@ -78,7 +85,7 @@ export const CONTRACT_COLS: SheetCol<ContractRow>[] = [
   CT.co, CT.plate, CT.car, CT.cust,
   CT.rent, CT.dep, CT.net,
   CT.start, CT.end, CT.dday,
-  CT.st,
+  CT.st, CT.alert,
   CT.phone,
 ];
 
@@ -87,7 +94,7 @@ export const DEBT_COLS: SheetCol<ContractRow>[] = [
   CT.co, CT.plate, CT.car, CT.cust,
   CT.rent, CT.dep, CT.net,
   CT.start, CT.end, CT.dday,
-  CT.st, CT.od, CT.cnt,
+  CT.st, CT.od, CT.cnt, CT.alert,
   CT.phone,
 ];
 

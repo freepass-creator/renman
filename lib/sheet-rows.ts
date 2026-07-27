@@ -53,6 +53,9 @@ export type ContractRow = {
   dday: number | null;
   status: string;
   ended: boolean;
+  dataAlert: string;
+  sourceCarryUnpaid: number;
+  reconciliationDelta: number;
   tone: 'ok' | 'warn' | 'danger' | 'mute';
 };
 
@@ -86,6 +89,9 @@ export function contractViewToRow(v: ContractView, node?: { plate?: string; cust
     dday: v.dday,
     status: v.status,
     ended: v.ended,
+    dataAlert: String(r.dataAlert || ''),
+    sourceCarryUnpaid: Number(r.sourceCarryUnpaid) || 0,
+    reconciliationDelta: Number(r.reconciliationDelta) || 0,
     tone: debtTone(v.net, v.overdueDays),
   };
 }

@@ -1,236 +1,98 @@
 'use client';
-/**
- * 자산현황 — 현물자산 원장 생애 Sec (탭 금지).
- *   구매예정 · 등록예정 · 보유중 · 처분예정 · 처분완료 + FacetRail 상시.
- *   가동률·미수율은 홈(지표).
- */
-import { useMemo, useState, type ReactNode } from 'react';
-import { LayoutGrid, Table } from 'lucide-react';
-import { useSession } from '@/lib/session';
-import { type EntityRecord } from '@/lib/intake/entities';
-import { openCar, openIngest } from '@/lib/ui-bus';
-import { FacetPage, Sec, Cards, Metric, ObjCard, Btn, EmptyState, ExcelSheet, IconSeg, won, C, SPACE_M, PageLoading } from '@/components/ui';
-import { buildSheetRows } from '@/lib/sheet-rows';
-import { ASSET_COLS } from '@/lib/sheet-cols';
-import { FacetRail } from '@/components/FacetRail';
-import { WorkbenchBar } from '@/components/WorkbenchBar';
-import { WorkPipe } from '@/components/WorkPipe';
-import { QuickLogForm } from '@/components/QuickLogForm';
-import { companyLabel } from '@/lib/companies';
-import { TODAY, dday } from '@/lib/dashboard-consts';
-import { linkFleet, type Ownership, type VehicleNode } from '@/lib/domain/model';
+
+import { useMemo, useState } from 'react';
+import { Plus } from 'lucide-react';
+import { assetMasterRow } from '@/lib/master-ledgers';
+import { ASSET_MASTER_BASIC_COLS, ASSET_MASTER_EXPANDED_COLS } from '@/lib/master-ledger-cols';
+import { useEntityList } from '@/lib/use-entity-lists';
 import { textMatch } from '@/lib/search-match';
-import { vehicleLoanView } from '@/lib/vehicle-asset';
-import { useSecOrder } from '@/lib/use-sec-order';
-import { useEntityLists } from '@/lib/use-entity-lists';
+import {
+  Btn, C, LedgerCreatePanel, LedgerFrame, LedgerRecordPanel, PillTabs, Search,
+  type LedgerColView, type LedgerFormSection,
+} from '@/components/ui';
+import { useIsMobile } from '@/lib/use-mobile';
 
-const UTIL_LABELS = ['운행', '휴차', '정비'];
-const LIFE_SECS = ['a-buy', 'a-reg', 'a-hold', 'a-out-plan', 'a-out'] as const;
-type LifeSec = (typeof LIFE_SECS)[number];
-const SEC_OWN: Record<LifeSec, Ownership> = {
-  'a-buy': '구매예정',
-  'a-reg': '등록예정',
-  'a-hold': '보유중',
-  'a-out-plan': '처분예정',
-  'a-out': '처분완료',
-};
-const SEC_META: Record<LifeSec, { title: string; desc: string }> = {
-  'a-buy': { title: '구매예정', desc: '매입 검토·구매 대기' },
-  'a-reg': { title: '등록예정', desc: '매입 후 번호·등록 전' },
-  'a-hold': { title: '보유중', desc: '운행 가능 원장 · 가동률은 홈' },
-  'a-out-plan': { title: '처분예정', desc: '매각·말소 진행' },
-  'a-out': { title: '처분완료', desc: '매각·말소 원장' },
-};
+const ASSET_CREATE_SECTIONS: LedgerFormSection[] = [
+  { title: '기본·등록정보', open: true, fields: ['plate', 'status', 'carName', 'vin', 'ownerName', 'firstReg', 'inspectionTo'] },
+  { title: '제조·출고정보', fields: ['maker', 'modelLine', 'subModel', 'trim', 'modelYear', 'dealerAgency', 'dealerContact', 'dealerPhone'] },
+  { title: '취득정보', fields: ['supplier', 'purchasedDate', 'acquisitionDate', 'acquisitionPrice', 'consumerPrice', 'optionPrice', 'optionDiscount'] },
+  { title: '금융·할부정보', fields: ['loanCashOnly', 'loanCompany', 'loanMonths', 'loanPrincipal', 'loanRate', 'loanStartDate'] },
+  { title: '보험·GPS', fields: ['insuranceCompany', 'insurancePolicyNo', 'insuranceExpiryDate', 'gpsProvider', 'gpsDeviceId', 'gpsInstalledDate', 'gpsControl'] },
+];
 
-const SEC_PIPE: Partial<Record<LifeSec, 'ingest' | 'dispatch' | 'repair'>> = {
-  'a-buy': 'ingest',
-  'a-reg': 'ingest',
-  'a-hold': 'dispatch',
-  'a-out-plan': 'dispatch',
-};
-
-const goSec = (id: string) => {
-  if (typeof document !== 'undefined') document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-};
-
-const hasLoan = (n: VehicleNode) => {
-  const lv = vehicleLoanView(n.veh, TODAY);
-  if (lv?.cashOnly) return false;
-  return (Number(n.veh.loanRemainingPrincipal) || 0) > 0 || (lv != null && lv.remainPrincipal > 0);
-};
-const noInsurance = (n: VehicleNode) => !n.veh.insuranceExpiryDate;
-const badgeTone = (t: VehicleNode['tone']): 'green' | 'amber' | 'gray' | 'blue' =>
-  t === 'ok' ? 'green' : t === 'warn' ? 'amber' : t === 'mute' ? 'gray' : 'blue';
-
-export default function AssetPage() {
-  const { companyId, scopeAll } = useSession();
-  const { data: [vs = [], cs = [], hs = []], loading } = useEntityLists(['vehicle', 'contract', 'history']);
-  const [facets, setFacets] = useState<Set<string>>(new Set());
+export default function AssetLedgerPage() {
+  const mobile = useIsMobile();
+  const { rows: vehicles, loading } = useEntityList('vehicle');
   const [q, setQ] = useState('');
-  const [view, setView] = useState<'card' | 'excel'>('card'); // 카드=생애 그룹뷰 · 엑셀=평면 표(운영시트와 같은 ASSET_COLS SSOT)
-  const [logPlate, setLogPlate] = useState<string | null>(null);
-  const [order, reorder] = useSecOrder('jpk:order:asset', [...LIFE_SECS]);
-  const toggleFacet = (label: string) => setFacets((s) => { const n = new Set(s); n.has(label) ? n.delete(label) : n.add(label); return n; });
-  const resetFacets = () => setFacets(new Set());
-
-  const fleet = useMemo(() => linkFleet(vs, cs, TODAY), [vs, cs]);
-  const extra = useMemo(() => {
-    const loc = new Map<string, string>(), next = new Map<string, EntityRecord>();
-    for (const h of [...hs].sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')))) {
-      const p = String(h.plate || ''); if (!p) continue;
-      if (String(h.category) === '이동' && !loc.has(p)) loc.set(p, String(h.title || ''));
-      if (String(h.nextDate || '') >= TODAY && !next.has(p)) next.set(p, h);
-    }
-    const lastRet = new Map<string, string>();
-    for (const c of cs) { const p = String(c.plate); const r = String(c.returnedDate || ''); if (r && r > (lastRet.get(p) || '')) lastRet.set(p, r); }
-    return { loc, next, lastRet };
-  }, [hs, cs]);
-  const idleDaysOf = (n: VehicleNode) => {
-    const since = extra.lastRet.get(n.plate) || String(n.veh.acquisitionDate || n.veh.firstReg || '');
-    const dd = dday(since); return dd != null ? -dd : null;
-  };
-
-  const nodes = fleet.vehicles;
-  const utilSel = UTIL_LABELS.filter((x) => facets.has(x));
-  const dueSel = ['검사지남', '검사30일', '보험지남', '보험30일'].filter((x) => facets.has(x));
-  const debtSel = ['할부있음', '보험없음'].filter((x) => facets.has(x));
-
-  const filtered = nodes.filter((n) => {
-    if (utilSel.length && (n.utilization == null || !utilSel.includes(n.utilization))) return false;
-    if (dueSel.length) {
-      const insp = dday(n.veh.inspectionTo);
-      const ins = dday(n.veh.insuranceExpiryDate);
-      const hit = (dueSel.includes('검사지남') && insp != null && insp < 0)
-        || (dueSel.includes('검사30일') && insp != null && insp >= 0 && insp <= 30)
-        || (dueSel.includes('보험지남') && ins != null && ins < 0)
-        || (dueSel.includes('보험30일') && ins != null && ins >= 0 && ins <= 30);
-      if (!hit) return false;
-    }
-    if (debtSel.length) {
-      const hit = (debtSel.includes('할부있음') && hasLoan(n)) || (debtSel.includes('보험없음') && noInsurance(n));
-      if (!hit) return false;
-    }
-    if (!textMatch(q, n.plate, n.veh.carName, n.activeContract?.view.rec.contractorName, n.label)) return false;
-    return true;
-  }).sort((a, b) => String(a.plate).localeCompare(String(b.plate)));
-
-  const byOwn = (own: Ownership) => filtered.filter((n) => n.ownership === own);
-  const cnt = (own: Ownership) => nodes.filter((n) => n.ownership === own).length;
-
-  // 칩별 매칭 건수(erp3식 '라벨(N)') — 전체 함대 정적 집계(교차필터 아님). 필터 술어와 동일 기준.
-  const counts = useMemo(() => {
-    const c: Record<string, number> = { 운행: 0, 휴차: 0, 정비: 0, 검사지남: 0, 검사30일: 0, 보험지남: 0, 보험30일: 0, 할부있음: 0, 보험없음: 0 };
-    for (const n of nodes) {
-      if (n.utilization && c[n.utilization] != null) c[n.utilization]++;
-      const insp = dday(n.veh.inspectionTo), ins = dday(n.veh.insuranceExpiryDate);
-      if (insp != null && insp < 0) c['검사지남']++; else if (insp != null && insp <= 30) c['검사30일']++;
-      if (ins != null && ins < 0) c['보험지남']++; else if (ins != null && ins <= 30) c['보험30일']++;
-      if (hasLoan(n)) c['할부있음']++;
-      if (noInsurance(n)) c['보험없음']++;
-    }
-    return c;
-  }, [nodes]);
-
-  const renderCard = (n: VehicleNode) => {
-    const av = n.activeContract, idleD = n.utilization === '휴차' ? idleDaysOf(n) : null;
-    const fields: [string, ReactNode][] =
-      n.ownership === '처분완료' || n.ownership === '처분예정' ? [
-        ['매입', n.veh.acquisitionPrice ? won(n.veh.acquisitionPrice) : '—'],
-        ['매각', n.veh.salePrice ? won(n.veh.salePrice) : (n.veh.saleDate ? String(n.veh.saleDate) : '—')],
-        ['거쳐간 손님', `${n.contracts.length}명`],
-      ] : n.ownership === '구매예정' || n.ownership === '등록예정' ? [
-        ['상태', n.label],
-        ['매입처', String(n.veh.supplier || '—')],
-        ['매입가', n.veh.acquisitionPrice ? won(n.veh.acquisitionPrice) : '—'],
-      ] : n.utilization === '운행' && av ? [
-        ['계약자', String(av.view.rec.contractorName || '—')],
-        ['반납', av.view.endDate ? `${av.view.endDate}${av.view.dday != null ? (av.view.dday < 0 ? ` (${-av.view.dday}일 지남)` : ` (D-${av.view.dday})`) : ''}` : '—'],
-        ['월대여료', av.view.monthlyRent ? won(av.view.monthlyRent) : '—'],
-        ['검사만기', n.veh.inspectionTo ? String(n.veh.inspectionTo) : '—'],
-      ] : [
-        ['위치', extra.loc.get(n.plate) || '차고지'],
-        ['가동', n.utilization || '—'],
-        ['검사만기', n.veh.inspectionTo ? String(n.veh.inspectionTo) : '—'],
-        ['다음 계획', extra.next.get(n.plate) ? `${String(extra.next.get(n.plate)!.nextDate)} · ${String(extra.next.get(n.plate)!.title || '')}` : '—'],
-      ];
-    if (hasLoan(n)) {
-      const lv = vehicleLoanView(n.veh, TODAY);
-      fields.push(['할부잔여', won(Number(n.veh.loanRemainingPrincipal) || lv?.remainPrincipal || 0)]);
-    }
-    const deep = debtSel.includes('할부있음') ? 'loan' : debtSel.includes('보험없음') ? 'insurance' : undefined;
-    const right = idleD != null
-      ? <span style={{ color: idleD >= 180 ? C.danger : C.warn }}>{idleD}일 대기</span>
-      : undefined;
-    return (
-      <div key={n.plate} style={{ display: 'flex', flexDirection: 'column', gap: SPACE_M }}>
-        <ObjCard
-          badge={n.label}
-          badgeTone={badgeTone(n.tone)}
-          co={scopeAll ? String(n.veh.companyId || '') : undefined}
-          plate={n.plate}
-          carType={n.veh.carName ? String(n.veh.carName) : undefined}
-          fields={fields}
-          right={right}
-          onClick={() => openCar(n.plate, deep)}
-        />
-        {n.ownership === '보유중' && (n.utilization === '휴차' || n.utilization === '정비') ? (
-          <div style={{ display: 'flex', gap: SPACE_M, flexWrap: 'wrap' }}>
-            <Btn variant={logPlate === n.plate ? 'solid' : 'ghost'} onClick={() => setLogPlate((p) => p === n.plate ? null : n.plate)}>{logPlate === n.plate ? '닫기' : '+ 기록'}</Btn>
-            <Btn variant="ghost" onClick={() => openCar(n.plate, deep)}>360</Btn>
-          </div>
-        ) : null}
-        {logPlate === n.plate ? <QuickLogForm ctx={{ plate: n.plate, companyId: String(n.veh.companyId || '') }} onDone={() => setLogPlate(null)} onCancel={() => setLogPlate(null)} /> : null}
-      </div>
-    );
-  };
+  const [scope, setScope] = useState<'보유자산' | '처분자산' | '전체'>('보유자산');
+  const [colView, setColView] = useState<LedgerColView>('기본');
+  const [selected, setSelected] = useState<ReturnType<typeof assetMasterRow> | null>(null);
+  const [creating, setCreating] = useState(false);
+  const allRows = useMemo(() => vehicles.map(assetMasterRow).sort((a, b) => a.plate.localeCompare(b.plate, 'ko')), [vehicles]);
+  const searchedRows = useMemo(() => allRows.filter((r) =>
+    textMatch(q, r.company, r.assetCode, r.plate, r.status, r.carName, r.maker, r.modelLine, r.subModel, r.trim, r.vin, r.ownerName),
+  ), [allRows, q]);
+  const rows = useMemo(() => searchedRows.filter((r) =>
+    scope === '전체' || (scope === '처분자산' ? r.disposed : !r.disposed),
+  ), [searchedRows, scope]);
+  const held = searchedRows.filter((r) => !r.disposed).length;
+  const disposed = searchedRows.filter((r) => r.disposed).length;
+  const running = searchedRows.filter((r) => !r.disposed && r.status === '운행').length;
+  const attention = searchedRows.filter((r) => !r.disposed && ['휴차', '정비', '사고'].includes(r.status)).length;
 
   return (
-    <FacetPage
-      frame={view === 'excel'}
-      title="자산현황"
-      meta={`${scopeAll ? '전체 회사' : companyLabel(companyId)} · 현물 ${nodes.length}대`}
-      tools={
-        <WorkbenchBar
-          search={{ value: q, onChange: setQ, placeholder: '차량·차명·손님' }}
-          view={<IconSeg value={view} onChange={setView} options={[
-            { key: 'card', label: '카드', icon: <LayoutGrid size={15} /> },
-            { key: 'excel', label: '엑셀', icon: <Table size={15} /> },
-          ]} />}
-          actions={<Btn size="sm" variant="ghost" onClick={() => openIngest('vehicle')}>+ 차량 담기</Btn>}
+    <LedgerFrame
+      title="자산관리"
+      meta="차량 1대 1행 · 등록·소유·제원·취득·검사·금융·보험"
+      right={<Btn size="sm" variant={creating ? 'ghost' : 'solid'} aria-pressed={creating} onClick={() => {
+        setSelected(null);
+        setCreating((open) => !open);
+      }}><Plus size={14} /> {creating ? '생성 취소' : '자산 생성'}</Btn>}
+      filters={<>
+        <Search size="sm" placeholder="차량번호·VIN·차명·소유자·상태" value={q} onChange={(e) => setQ(e.target.value)} style={{ width: mobile ? '100%' : 300 }} />
+        <PillTabs
+          size="sm"
+          value={scope}
+          onChange={setScope}
+          tabs={[
+            { key: '보유자산', label: '보유자산', badge: held },
+            { key: '처분자산', label: '처분자산', badge: disposed },
+            { key: '전체', label: '전체', badge: searchedRows.length },
+          ]}
         />
-      }
-      rail={!loading ? <FacetRail lensKey="자산현황" facets={facets} onToggle={toggleFacet} onReset={resetFacets} counts={counts} /> : null}
-    >
-      {/* 엑셀 뷰 = 운영시트처럼 엑셀만(섹션·생애요약 숨김)·헤더 틀고정(frame). 카드 뷰 = 생애요약 + 생애 섹션들. */}
-      {view === 'excel' ? (
-        loading ? <PageLoading />
-          : filtered.length === 0 ? <EmptyState>표시할 차량이 없습니다</EmptyState>
-            : <ExcelSheet cols={ASSET_COLS} rows={buildSheetRows(filtered)} rowKey={(r) => r.plate} onRow={(r) => openCar(r.plate)} />
-      ) : (
-        <>
-          <Sec title="생애" desc="현물자산 · 구매→등록→보유→처분" hideable={false}>
-            <Cards min={100} fit>
-              {(LIFE_SECS as readonly LifeSec[]).map((id) => (
-                <Metric key={id} label={SEC_META[id].title} value={`${cnt(SEC_OWN[id])}대`}
-                  tone={cnt(SEC_OWN[id]) && (id === 'a-buy' || id === 'a-reg' || id === 'a-out-plan') ? 'warn' : 'ink'}
-                  onClick={() => goSec(id)} />
-              ))}
-            </Cards>
-          </Sec>
-          {loading ? <PageLoading /> : order.map((id) => {
-            const sid = id as LifeSec;
-            const meta = SEC_META[sid];
-            const list = byOwn(SEC_OWN[sid]);
-            return (
-              <Sec key={sid} id={sid} title={meta.title} n={list.length} desc={meta.desc} onReorder={reorder}
-                right={SEC_PIPE[sid] ? <WorkPipe to={SEC_PIPE[sid]!} /> : undefined}>
-                {list.length === 0 ? <EmptyState variant="sec">해당 차량 없음</EmptyState>
-                  : <div style={{ display: 'flex', flexDirection: 'column', gap: SPACE_M }}>{list.map(renderCard)}</div>}
-              </Sec>
-            );
-          })}
-        </>
-      )}
-    </FacetPage>
+      </>}
+      stats={<span style={{ fontSize: 12.5, color: C.mute }}>보유 <b>{held}</b> · 운행상태 <b style={{ color: C.ok }}>{running}</b> · 휴차/정비/사고 <b style={{ color: C.warn }}>{attention}</b> · 처분 <b>{disposed}</b></span>}
+      colView={colView}
+      onColView={setColView}
+      loading={loading}
+      empty="등록된 자산이 없습니다."
+      cols={colView === '기본' ? ASSET_MASTER_BASIC_COLS : ASSET_MASTER_EXPANDED_COLS}
+      rows={rows}
+      rowKey={(r) => r.plate}
+      selectedRowKey={selected?.plate}
+      onRowDoubleClick={(row) => {
+        setCreating(false);
+        setSelected(row);
+      }}
+      onCloseDetail={() => setSelected(null)}
+      sidePanel={creating ? (
+        <LedgerCreatePanel
+          key="new-asset"
+          entityKey="vehicle"
+          title="자산 생성"
+          sections={ASSET_CREATE_SECTIONS}
+          initial={{ status: '등록대기' }}
+          onClose={() => setCreating(false)}
+        />
+      ) : selected ? (
+        <LedgerRecordPanel
+          title={selected.plate}
+          subtitle={`${selected.carName || '차명 미입력'} · ${selected.status}`}
+          row={selected}
+          cols={ASSET_MASTER_EXPANDED_COLS}
+          onClose={() => setSelected(null)}
+        />
+      ) : null}
+    />
   );
 }

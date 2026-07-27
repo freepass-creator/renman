@@ -176,6 +176,20 @@ class FirestoreAdapter implements StoreAdapter {
       if (key) seen.add(key);
       saved++;
     }
+    // 브라우저에서 권한 실패를 기다렸다가 재시도하지 않고 인증된 서버 경로를 우선 사용한다.
+    if (typeof window !== 'undefined' && pending.length > 0) {
+      const { apiAuthHeaders } = await import('./api-headers');
+      const headers = await apiAuthHeaders();
+      headers.set('content-type', 'application/json');
+      const res = await fetch(`/api/entities/${encodeURIComponent(entityKey)}`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ companyId, docs: pending }),
+      });
+      if (res.ok) return { saved, duplicates, backend: this.backend };
+      console.warn(`Firestore save(${entityKey}) 서버 저장 실패 (${res.status}) — 직접 저장 경로로 전환`);
+    }
+    try {
     if (pending.length === 1) {
       await withTimeout(setDoc(doc(col, pending[0].id), pending[0].data));
     } else {
@@ -188,15 +202,53 @@ class FirestoreAdapter implements StoreAdapter {
       }
       await Promise.all(commits);
     }
+    } catch (error) {
+      console.warn(`Firestore save(${entityKey}) 직접 저장 실패 — 서버 인증 경로로 전환:`, (error as Error).message);
+      const { apiAuthHeaders } = await import('./api-headers');
+      const headers = await apiAuthHeaders();
+      headers.set('content-type', 'application/json');
+      const res = await fetch(`/api/entities/${encodeURIComponent(entityKey)}`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ companyId, docs: pending }),
+      });
+      if (!res.ok) {
+        const detail = await res.json().catch(() => null) as { error?: string } | null;
+        throw new Error(detail?.error || `서버 저장 실패 (${res.status})`);
+      }
+    }
     return { saved, duplicates, backend: this.backend };
   }
   async list(entityKey: string, companyId: string): Promise<EntityRecord[]> {
+    if (typeof window !== 'undefined') {
+      try {
+        const { apiAuthHeaders } = await import('./api-headers');
+        const headers = await apiAuthHeaders();
+        const res = await fetch(`/api/entities/${encodeURIComponent(entityKey)}?companyId=${encodeURIComponent(companyId)}`, {
+          headers,
+          cache: 'no-store',
+        });
+        if (!res.ok) throw new Error(`서버 조회 실패 (${res.status})`);
+        const body = await res.json() as { rows?: EntityRecord[] };
+        return Array.isArray(body.rows) ? body.rows : [];
+      } catch (error) {
+        console.warn(`Firestore list(${entityKey}) 서버 조회 실패 — 직접 조회 경로로 전환:`, (error as Error).message);
+      }
+    }
     try {
       const { getFirestore, collection, query, where, getDocs } = await import('firebase/firestore');
       const db = getFirestore(getFirebaseApp()!);
       const snap = await withTimeout(getDocs(query(collection(db, entityKey), where('companyId', '==', companyId))));
       return snap.docs.map((d) => d.data() as EntityRecord).filter((r) => !r.deletedAt);
-    } catch (e) { console.warn(`Firestore list(${entityKey}) 대기 실패(DB·규칙 확인):`, (e as Error).message); throw e; }   // throw=실패를 캐시 안 함(DispatchStore가 다음에 재시도). 빈 회사와 로드실패 구분.
+    } catch (e) {
+      console.warn(`Firestore list(${entityKey}) 직접 조회 실패 — 서버 인증 경로로 전환:`, (e as Error).message);
+      const { apiAuthHeaders } = await import('./api-headers');
+      const headers = await apiAuthHeaders();
+      const res = await fetch(`/api/entities/${encodeURIComponent(entityKey)}?companyId=${encodeURIComponent(companyId)}`, { headers, cache: 'no-store' });
+      if (!res.ok) throw new Error(`서버 조회 실패 (${res.status})`);
+      const body = await res.json() as { rows?: EntityRecord[] };
+      return Array.isArray(body.rows) ? body.rows : [];
+    }
   }
   async get(entityKey: string, companyId: string, key: string): Promise<EntityRecord | null> {
     try {

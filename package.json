@@ -9,7 +9,12 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:rules": "firebase emulators:exec --only firestore --project renman-rules-test \"vitest run --config vitest.rules.config.ts\""
+    "test:smoke": "node --experimental-strip-types scripts/smoke.mts",
+    "test:rules": "firebase emulators:exec --only firestore --project renman-rules-test \"vitest run --config vitest.rules.config.ts\"",
+    "admin:set-claims": "node --experimental-strip-types scripts/set-user-claims.mts",
+    "security:secrets": "node --experimental-strip-types scripts/check-secrets.mts",
+    "deploy:preflight": "node --experimental-strip-types scripts/deploy-preflight.mts",
+    "deploy:rules": "npm run deploy:preflight && firebase deploy --only firestore:rules,storage --project renman-dd0a2"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",
@@ -17,13 +22,14 @@
     "@radix-ui/react-tabs": "^1.1.17",
     "clsx": "^2.1.1",
     "firebase": "^12.12.1",
+    "firebase-admin": "^13.4.0",
     "googleapis": "^173.0.0",
     "lucide-react": "^1.21.0",
     "next": "^15.1.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "tailwind-merge": "^2.6.1",
-    "xlsx": "^0.18.5",
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz",
     "zod": "^4.4.3"
   },
   "devDependencies": {

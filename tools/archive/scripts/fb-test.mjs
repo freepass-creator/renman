@@ -1,13 +1,16 @@
 import { initializeApp } from 'firebase/app';
 import { getFirestore, doc, setDoc, getDoc } from 'firebase/firestore';
 const cfg = {
-  apiKey: 'AIzaSyAXU23aUSy-SCrtCNGjVxATWHPmQDGgxNg',
-  authDomain: 'renman-dd0a2.firebaseapp.com',
-  projectId: 'renman-dd0a2',
-  storageBucket: 'renman-dd0a2.firebasestorage.app',
-  messagingSenderId: '220476662395',
-  appId: '1:220476662395:web:7c2c14475e743ed04778de',
+  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
+  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
+  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
 };
+if (Object.values(cfg).some((value) => !value)) {
+  throw new Error('NEXT_PUBLIC_FIREBASE_* environment variables are required');
+}
 const app = initializeApp(cfg);
 const db = getFirestore(app);
 const t = setTimeout(() => { console.log('RESULT: TIMEOUT 10s — DB 미생성/미도달 가능성'); process.exit(0); }, 10000);

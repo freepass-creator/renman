@@ -10,7 +10,7 @@ export async function callOcrExtract(file: File, ocrType: string): Promise<OcrRe
   fd.append('file', file);
   fd.append('type', ocrType);
   try {
-    const res = await fetch('/api/ocr/extract', { method: 'POST', body: fd, headers: apiAuthHeaders() });
+    const res = await fetch('/api/ocr/extract', { method: 'POST', body: fd, headers: await apiAuthHeaders() });
     let json: Record<string, unknown> = {};
     try { json = await res.json(); } catch { /* non-json */ }
     if (!res.ok || !json.ok) return { ok: false, error: String(json.error || `OCR 실패 (${res.status})`) };

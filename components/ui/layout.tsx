@@ -68,14 +68,29 @@ export function Page({ title, meta, left, mid, right, tools, children, fill, fra
       {/* 모바일: TopBar(fixed) 바로 아래 PageToolBar sticky — 두 줄이 한 크롬(ERP4).
           좌우만 bleed. 상단 음수마진 금지(상단바와 겹침). */}
       {showHead && (
-      <div style={{ display: 'flex', flexWrap: mobile ? 'nowrap' : 'wrap', alignItems: mobileChrome ? 'stretch' : 'center', gap: mobile ? SPACE_M : 10, minHeight: mobile ? 0 : (frameMode ? 28 : 36), flexShrink: 0,
+      <div style={{ display: 'flex', flexWrap: mobile ? 'nowrap' : (frameMode ? 'nowrap' : 'wrap'), alignItems: mobileChrome ? 'stretch' : 'center', gap: mobile ? SPACE_M : 10,
+        minHeight: mobile ? 0 : (frameMode ? 'var(--ledger-head-h)' : 36),
+        height: !mobile && frameMode ? 'var(--ledger-head-h)' : undefined,
+        maxHeight: !mobile && frameMode ? 'var(--ledger-head-h)' : undefined,
+        overflow: !mobile && frameMode ? 'hidden' : undefined,
+        flexShrink: 0, boxSizing: 'border-box',
         ...(mobileChrome
-          ? { position: 'sticky' as const, top: 'var(--fp-bar-h)', zIndex: 20, background: 'var(--bg-page)', margin: '0 -14px', padding: 0, borderBottom: 'none', width: 'calc(100% + 28px)', boxSizing: 'border-box' as const }
+          ? { position: 'sticky' as const, top: 'var(--fp-bar-h)', zIndex: 20, background: 'var(--bg-page)', margin: '0 -14px', padding: 0, borderBottom: 'none', width: 'calc(100% + 28px)' }
           : mobile
             ? { paddingBottom: PAGE_HEAD_PB_M }
-            : { paddingBottom: frameMode ? 8 : 14 }),
+            : { paddingBottom: frameMode ? 0 : 14 }),
       }}>
-        {!mobile && hasTitle && <h1 style={{ fontSize: 18, fontWeight: 800, letterSpacing: '-0.02em', margin: 0, flexShrink: 0 }}>{title}</h1>}
+        {!mobile && hasTitle && (
+          <h1 style={{
+            fontSize: frameMode ? 12 : 18,
+            fontWeight: 800,
+            letterSpacing: '-0.02em',
+            margin: 0,
+            flexShrink: 0,
+            lineHeight: 1.2,
+            whiteSpace: frameMode ? 'nowrap' : undefined,
+          }}>{title}</h1>
+        )}
         {!shellOwnsCompany && !noCompany && <CompanyFilter />}
         {left != null ? (
           <div style={{ flex: 1, minWidth: 0, width: '100%' }}>{left}</div>
@@ -94,33 +109,17 @@ export function Page({ title, meta, left, mid, right, tools, children, fill, fra
   );
 }
 
-/** FacetRail 워크벤치 셸 — 데스크톱=좌측 레일 · 모바일=섹션 스크롤(필터는 검색 옆 버튼). */
+/** 전폭 워크벤치 셸. 좌측 FacetRail은 폐기하고 필터는 각 엑셀 뷰어의 상단 도구줄에서만 처리한다. */
 export function FacetPage({ title, meta, left, mid, right, tools, rail, frame, back, children }: {
   title?: React.ReactNode; meta?: React.ReactNode; left?: React.ReactNode; mid?: React.ReactNode; right?: React.ReactNode;
   tools?: React.ReactNode; rail?: React.ReactNode | null; frame?: boolean; back?: () => void; children: React.ReactNode;
 }) {
-  const mobile = useIsMobile();
-  const hasRail = rail != null;
-  /* 필터 = 인-플로우(오버레이 아님). 데스크톱=좌측 열이 콘텐츠를 민다(flex row) · 모바일=콘텐츠 위 블록.
-     열림은 FacetFilterBtn(검색창 옆) 토글 → 닫히면 FacetRail이 null 반환 → 콘텐츠 전폭(fill).
-     undefined = 필터 안 씀(손익·부가세=maxWidth 가운데). */
-  const usesRail = rail !== undefined;
-  const page = (
-    <Page title={title} meta={meta} left={left} mid={mid} right={right} tools={tools} fill={usesRail && !mobile} frame={frame} back={back}>
-      {mobile && hasRail ? rail : null}{/* 모바일: 인-플로우 블록(닫히면 null) */}
-      {children}
-    </Page>
-  );
+  void rail;
   return (
     <FacetFilterProvider>
-      {mobile || !usesRail ? page : (
-        <div style={{ display: 'flex', alignItems: 'stretch', minHeight: 'calc(100vh - var(--fp-bar-h))' }}>
-          {/* 데스크톱: 좌측 인-플로우 열(닫히면 null→전폭). 로딩중(rail=null)엔 200px 자리를 잡아 완료 시 흔들림 방지
-              — open은 마운트마다 true로 시작하므로 로딩 자리(200)와 완료 레일(200)이 일치 = shift 0. */}
-          {hasRail ? rail : <div aria-hidden style={{ flex: '0 0 200px', borderRight: '1px solid var(--border)', background: 'var(--bg-card)' }} />}
-          {page}
-        </div>
-      )}
+      <Page title={title} meta={meta} left={left} mid={mid} right={right} tools={tools} fill frame={frame} back={back}>
+        {children}
+      </Page>
     </FacetFilterProvider>
   );
 }

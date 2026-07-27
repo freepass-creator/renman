@@ -19,6 +19,7 @@ export type CashRow = {
   date: string;
   source: CashSource;
   account: string;
+  accountName?: string;
   party: string;
   memo: string;
   inAmt: number;
@@ -51,7 +52,9 @@ function rowFromBank(b: EntityRecord, nest?: CashNest, parentId?: string): CashR
   return {
     id: `bank:${String(b._key || b.txKey || '')}`, entity: 'bank_tx', recKey: String(b._key || ''),
     companyId: String(b.companyId || ''), date: String(b.txDate || ''), source: bankSource(b),
-    account: String(b.account || ''), party: String(b.counterparty || ''), memo: String(b.memo || ''),
+    account: String(b.account || b.accountNumber || ''),
+    accountName: String(b.accountAlias || b.accountName || b.bankName || ''),
+    party: String(b.counterparty || ''), memo: String(b.memo || ''),
     inAmt: Number(b.amount) || 0, outAmt: Number(b.withdraw) || 0, category: String(b.category || ''), raw: b,
     nest, parentId,
   };
@@ -79,7 +82,9 @@ export function buildCashLedger(bank: EntityRecord[], card: EntityRecord[]): Cas
     rows.push({
       id: `card:${String(c._key || c.txKey || '')}`, entity: 'card_tx', recKey: String(c._key || ''),
       companyId: String(c.companyId || ''), date: String(c.txDate || ''), source: '법인카드',
-      account: `법인카드${c.cardLast4 ? ' ' + String(c.cardLast4) : ''}`, party: String(c.merchant || ''), memo: String(c.approvalNo || ''),
+      account: `법인카드${c.cardLast4 ? ' ' + String(c.cardLast4) : ''}`,
+      accountName: String(c.cardName || c.accountAlias || '법인카드'),
+      party: String(c.merchant || ''), memo: String(c.approvalNo || ''),
       inAmt: 0, outAmt: Number(c.amount) || 0, category: String(c.category || ''), raw: c,
     });
   }

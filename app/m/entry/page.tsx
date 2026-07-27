@@ -1,7 +1,7 @@
 'use client';
-/** /m 입력 (D) — 2열 액션 타일. 전용 폼(memo·deliver·return·penalty·doc)은 P2 후반. 지금은 기존 흐름 연결. */
+/** Mobile entry hub: route each field task directly to its focused workflow. */
 import { useRouter } from 'next/navigation';
-import { Camera, Upload, PenLine } from 'lucide-react';
+import { Camera, Upload, PenLine, ReceiptText } from 'lucide-react';
 import { ActionGrid, ActionTile, C } from '@/components/ui';
 import { MHead } from '@/components/m/MHead';
 
@@ -10,14 +10,15 @@ export default function MEntry() {
   return (
     <>
       <MHead title="입력" color="var(--indigo-text)" />
-      <div style={{ padding: '14px' }}>
+      <div style={{ padding: 14 }}>
         <ActionGrid>
-          <ActionTile icon={<Camera size={24} />} label="촬영·증빙" desc="계약서·현장 사진 올리기" onClick={() => router.push('/inbox')} />
-          <ActionTile icon={<Upload size={24} />} label="데이터센터" desc="엑셀·OCR 대량 투입" onClick={() => router.push('/ingest')} />
-          <ActionTile icon={<PenLine size={24} />} label="직접 입력" desc="차량·계약 추가" onClick={() => router.push('/ingest')} />
+          <ActionTile icon={<Camera size={24} />} label="증빙 촬영·수집" desc="현장 사진과 계약 증빙 등록" onClick={() => router.push('/inbox')} />
+          <ActionTile icon={<Upload size={24} />} label="차량 등록" desc="등록증 OCR 또는 직접 입력" onClick={() => router.push('/ingest?type=vehicle')} />
+          <ActionTile icon={<PenLine size={24} />} label="계약 등록" desc="계약서 OCR 또는 직접 입력" onClick={() => router.push('/ingest?type=contract')} />
+          <ActionTile icon={<ReceiptText size={24} />} label="과태료 등록" desc="고지서 촬영 및 책임자 매칭" onClick={() => router.push('/ingest?type=penalty')} />
         </ActionGrid>
         <div style={{ marginTop: 12, fontSize: 11.5, color: C.faint, lineHeight: 1.5 }}>
-          ※ 임시로 데스크톱 입력 화면에 연결됩니다. 촬영·인도/반납 전용 폼은 다음 단계에서.
+          현장 업무별 입력 화면으로 바로 이동합니다. 인도·반납은 배차관리에서 차량과 계약을 확인한 뒤 처리하세요.
         </div>
       </div>
     </>

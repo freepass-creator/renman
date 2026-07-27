@@ -23,14 +23,17 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
+      - name: Secret scan
+        run: npm run security:secrets
+
       - name: Unit tests (미수·상태·스키마)
         run: npm test
 
       - name: Build
         run: npm run build
-        env:
-          # 빌드 시 필요한 공개 env — 실제 값은 배포에서 주입. CI는 존재만 있으면 통과.
-          NEXT_PUBLIC_MASTER_EMAIL: pyh@teamjpk.com
+
+      - name: Production route smoke test
+        run: npm run test:smoke
 
   rules:
     runs-on: ubuntu-latest

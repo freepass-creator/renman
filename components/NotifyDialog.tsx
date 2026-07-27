@@ -79,7 +79,7 @@ export function NotifyDialog({ recipients, onClose, onSent }: {
     for (const r of targets) {
       try {
         const res = await fetch('/api/notify', {
-          method: 'POST', headers: apiAuthHeaders({ 'Content-Type': 'application/json' }),
+          method: 'POST', headers: await apiAuthHeaders({ 'Content-Type': 'application/json' }),
           body: JSON.stringify({ tel: r.phone, message: fill(body, r), subject: label }),
         });
         const json = await res.json();

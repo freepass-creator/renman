@@ -1,13 +1,15 @@
 'use client';
 /**
  * LedgerFrame — 원장 페이지 공용 틀 (재무·운영 동일 규격).
- *   Page(frame) + 필터 1행 + ExcelSheet + (옵션) 행 아래 펼침 detail.
- *   좌측 FacetRail 없음. 재무 세부는 오버레이 말고 detail 슬롯(목록 밑).
+ *   Page(frame) + 필터 1행 + ExcelSheet + (옵션) 우측 고정 상세패널.
+ *   패널은 오버레이·슬라이드가 아니라 표와 나란히 공간을 나눠 쓴다.
+ *
+ *   클릭 = 행 선택 · 더블클릭 = 상세패널 열기 · 같은 행/패널 재더블클릭 = 닫기.
  */
 import React, { type ReactNode } from 'react';
 import { Page } from './layout';
 import { ExcelSheet, type SheetCol } from './excel-sheet';
-import { PillTabs } from './controls';
+import { CompanyFilter, PillTabs } from './controls';
 import { EmptyState, Message, PageLoading } from './misc';
 import { C } from './tokens';
 
@@ -18,9 +20,9 @@ export function LedgerFrame<R>({
   filters, stats,
   colView, onColView,
   loading, empty,
-  cols, rows, rowKey, onRow,
+  cols, rows, rowKey, onRow, onRowDoubleClick, onCloseDetail, selectedRowKey,
   rowStyle, rowClickable,
-  detail,
+  detail, sidePanel,
 }: {
   title: string;
   meta?: ReactNode;
@@ -36,11 +38,45 @@ export function LedgerFrame<R>({
   rows: R[];
   rowKey: (r: R) => string;
   onRow?: (r: R) => void;
+  /** 더블클릭 — 같은 행이면 닫고, 다른 행/미열림이면 연다(페이지에서 토글). */
+  onRowDoubleClick?: (r: R) => void;
+  onCloseDetail?: () => void;
+  selectedRowKey?: string | null;
   rowStyle?: (r: R) => React.CSSProperties | undefined;
   rowClickable?: (r: R) => boolean;
-  /** 행 클릭 후 표 바로 아래(수동매칭 등). CMS 구성건은 표에 상시 표시. */
   detail?: ReactNode;
+  sidePanel?: ReactNode;
 }) {
+  const [pickedKey, setPickedKey] = React.useState<string | null>(null);
+
+  React.useEffect(() => {
+    if (selectedRowKey != null) setPickedKey(selectedRowKey);
+    else if (sidePanel == null) {
+      setPickedKey(null);
+    }
+  }, [selectedRowKey, sidePanel]);
+
+  const openDetail = onRowDoubleClick
+    ? (row: R) => {
+      const key = rowKey(row);
+      if (pickedKey === key && sidePanel != null && onCloseDetail) {
+        setPickedKey(null);
+        onCloseDetail();
+        return;
+      }
+      setPickedKey(key);
+      onRowDoubleClick(row);
+    }
+    : undefined;
+
+  // 클릭은 선택만, 더블클릭은 모든 원장에서 동일하게 상세를 연다.
+  const selectRow = onRowDoubleClick
+    ? (row: R) => {
+      setPickedKey(rowKey(row));
+      onRow?.(row);
+    }
+    : onRow;
+
   return (
     <Page frame title={title} meta={meta} right={right}>
       {hint != null && (
@@ -53,6 +89,7 @@ export function LedgerFrame<R>({
         display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8, flexShrink: 0,
         padding: '8px 0 10px',
       }}>
+        <CompanyFilter />
         {filters}
         <span style={{ flex: 1, minWidth: 8 }} />
         {stats}
@@ -67,19 +104,43 @@ export function LedgerFrame<R>({
         />
       </div>
 
-      {loading ? <PageLoading /> : !rows.length ? (
+      {loading ? <PageLoading /> : !rows.length && sidePanel == null ? (
         <EmptyState>{empty ?? '표시할 항목이 없습니다'}</EmptyState>
       ) : (
         <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
-          <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
-            <ExcelSheet
-              cols={cols}
-              rows={rows}
-              rowKey={rowKey}
-              onRow={onRow}
-              rowStyle={rowStyle}
-              rowClickable={rowClickable}
-            />
+          <div
+            className="ledger-workspace"
+            data-panel={sidePanel != null ? 'open' : 'closed'}
+          >
+            <div className="ledger-workspace__sheet">
+              {!rows.length ? (
+                <EmptyState>{empty ?? '표시할 항목이 없습니다'}</EmptyState>
+              ) : (
+                <ExcelSheet
+                  cols={colView === '기본' ? cols.map((col) => ({ ...col, pin: false })) : cols}
+                  rows={rows}
+                  rowKey={rowKey}
+                  onRow={selectRow}
+                  onRowDoubleClick={openDetail}
+                  selectedRowKey={onRowDoubleClick ? (pickedKey ?? selectedRowKey) : selectedRowKey}
+                  fit={colView === '기본'}
+                  rowStyle={rowStyle}
+                  rowClickable={rowClickable}
+                />
+              )}
+            </div>
+            {sidePanel != null && (
+              <aside
+                className="ledger-workspace__panel"
+                onDoubleClick={(event) => {
+                  if ((event.target as HTMLElement).closest('button,a,input,select,textarea')) return;
+                  setPickedKey(null);
+                  onCloseDetail?.();
+                }}
+              >
+                {sidePanel}
+              </aside>
+            )}
           </div>
           {detail != null && (
             <div style={{

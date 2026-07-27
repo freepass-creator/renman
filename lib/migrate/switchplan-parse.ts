@@ -12,7 +12,9 @@
  *   - pastDue = 도래월별 max(0,청구−결제) 합. 묶음결제 시 과대 → 참고용.
  *
  * 차량 status·contract net미수 규칙(v5 migrate-switchplan commit 규칙):
- *   - 현보유(채권 활성 plate, 118) = '운행', 그 외 자산 = '매각'(비보유).
+ *   - 현보유 = 자산 시트의 첫 현보유 구간(최신본 113).
+ *   - 채권 시트 118에는 매각 후 잔존채권 차량도 포함되므로 보유대수로 사용하면 안 된다.
+ *   - 자산 시트의 "매각" 구간은 채권에 남아 있어도 status='매각'.
  *   - 계약 순미수(net) = carry → _paidTotal 역산(v6 수납엔진 정합).
  */
 
@@ -474,7 +476,7 @@ function parseLedgerSheet(
 
 /** 원장 시트(채권/반납)의 모든 차량번호 — 코드명·원장 유무 무관.
  *  parseLedgerSheet 는 코드명 없는 스필오버 행을 계약에서 제외하지만, 그 plate 도 유효 자산이므로
- *  활성 자산 판정엔 이 전량 집합을 쓴다. (사업현황 유효자산 = 채권시트 전체 plate = 현보유 118) */
+ *  이 목록은 채권·계약 대상이지 현보유 목록이 아니다. 매각 후 잔존채권 차량이 포함될 수 있다. */
 function collectLedgerPlates(wb: XLSX.WorkBook, sheetName: string, hasMonthRow: boolean): string[] {
   const sheet = wb.Sheets[sheetName];
   if (!sheet) return [];
@@ -642,7 +644,7 @@ export type SwitchplanParse = {
   vehicles: EntityRecord[];   // 자산 (163)
   contracts: EntityRecord[];  // 채권(운행중) + 반납(종료), _carry/_kind 포함
   loans: EntityRecord[];      // 상환합계 (할부, plate + 할부필드)
-  activePlates: string[];     // 채권 시트 전체 plate (미수 원장 대상)
+  activePlates: string[];     // 채권 시트 전체 plate (미수 원장 대상, 보유대수 아님)
   disposedPlates: string[];   // 자산 "매각" 섹션 차 — 채권에 남아도 처분(매각)이라 현보유 제외
   totals: SwitchplanTotals;
   asOf: string;               // 미수 기준일 (YYYY-MM-DD)
@@ -842,7 +844,7 @@ export type SwitchplanPackLive = {
 
 /**
  * 사업현황.xlsx 버퍼 → 라이브 팩(vehicle/contract/bank_tx).
- *  - vehicle(163): 할부 병합 + status(현보유 118='운행', 그 외='매각').
+ *  - vehicle(163): 할부 병합 + 자산 매각 구간 우선(status 현보유 113='운행', 매각='매각').
  *  - contract: 채권+반납, net미수=carry 역산.
  *  - bank_tx: [] (자금일보는 switchplan-jbo-parse 로 별도 파싱).
  */

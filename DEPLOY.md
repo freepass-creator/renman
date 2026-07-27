@@ -8,7 +8,7 @@
 2. **회사격리 Rules 배포** — `firebase deploy --only firestore:rules` (아래 2.3). **Firebase 콘솔 → Firestore → Rules에 test-mode(`allow read,write: if request.time < ...`) 블록이 없어야 함.** 이게 서버측 회사격리의 유일한 방어선.
 3. **Rules 검증(필수 테스트)** — 법인 A 계정으로 로그인 → 법인 B 문서 읽기 시도 → **PERMISSION_DENIED** 나와야 정상. 안 나오면 배포 안 된 것.
 4. **본사 마스터 계정 사전생성** — Firebase Auth 콘솔에서 `pyh@teamjpk.com` 미리 생성. (가입폼에서 이 이메일 선점은 코드로 차단됨 — auth.ts. 그래도 사전생성이 정석.)
-5. **API 라우트 잠금** — ALIGO/Gemini 실키를 붙이면 `/api/notify`·`/api/ocr`가 무단 호출 위험 → 배포 env에 **`API_SHARED_SECRET`** + 같은 값 **`NEXT_PUBLIC_API_SHARED_SECRET`**(클라이언트 Bearer) 설정. 설정 시 미일치 요청 401. 아직 안 붙였으면 **ALIGO_* 키를 prod에 넣지 말 것**(SMS는 mock 유지=악용 0).
+5. **API 라우트 잠금** — `FIREBASE_ADMIN_KEY`를 서버에 설정한다. `/api/*`는 클라이언트의 Firebase ID Token을 Admin SDK로 검증하며, 미인증 요청은 401이다.
 
 ## 0. 지금 상태
 - 코드 골격 완성 (OCR 수집 · v5 로직 · 멀티테넌트 · CRUD · 운영화면)
@@ -42,12 +42,12 @@ firebase use --add        # 프로젝트 선택
 firebase deploy --only firestore:rules
 ```
    → `firestore.rules`(companyId 기반 격리)가 서버에 발효. 법인 소속 직원은 자기 법인 문서만.
-4. **users/{uid} 프로필** 생성 — `{ role: '본사'|'법인', companyId }`. 본사=`companyId: null`(전 법인), 직원=`role: '법인'` + 배정 `companyId`. (레거시 `운영자`/`위탁사`도 앱·rules가 호환 인식)
+4. **Custom Claims 권한 부여** — 본사는 `npm run admin:set-claims -- --email ... --role hq`, 직원은 `--role tenant --company <companyId>`. `users/{uid}`는 표시 이름 등 프로필만 저장한다.
 
 ## 3. 실 인증 (Firebase Auth) — 대부분 반영됨
-- ✅ `lib/session.tsx`는 이미 Firebase Auth(`watchAuth`/`onAuthStateChanged`) 사용 — `firebaseReady()`면 자동. `loadProfile`이 `users/{uid}`로 role·companyId 세팅. 미프로비저닝 계정은 `no-profile`(잠금).
+- ✅ `lib/session.tsx`는 Firebase Auth를 사용하고 `loadProfile`이 서명된 Custom Claims에서 role·companyId를 세팅한다. Claims가 없는 계정은 `no-profile`로 잠긴다.
 - ✅ prod에서 env 미설정이면 `no-backend` 하드 차단(localStorage 폴백 방지).
-- ⚠️ `lib/api-auth.ts` — 현재 `API_SHARED_SECRET` opt-in 가드(설정 시 401). **완전 인증**은 Firebase Admin `verifyIdToken`으로 교체 + 클라이언트(`NotifyDialog`·OCR 호출)가 ID토큰을 Authorization 헤더로 전송하도록 배선(TODO).
+- ✅ `lib/api-auth.ts` — Firebase Admin `verifyIdToken` 적용. 클라이언트 API 호출은 로그인 사용자의 단기 ID Token을 전송.
 
 ## 4. Vercel 배포
 ```
@@ -75,4 +75,4 @@ firebase deploy --only firestore:rules
   - `GOOGLE_DRIVE_ROOT_FOLDER_ID` · `GOOGLE_DRIVE_SHARED_DRIVE_ID` — 루트 폴더·공유드라이브 ID.
   - `NEXT_PUBLIC_DRIVE_MIRROR=1` — 클라 미러 활성 스위치(끄면 Firebase만, 안전 폴백).
 - 활성 조건: 위 env 다 있고 `NEXT_PUBLIC_DRIVE_MIRROR=1` → 업로드가 회사 Drive에 자동 적재. creds 없으면 미러 skip(Firebase 원본 유효, 비파괴).
-- ⚠️ Drive route는 현재 `requireAuth`(API_SHARED_SECRET) 기준 — P0-3(ID Token 전환) 적용 시 함께 상향.
+- ✅ Drive route도 Firebase ID Token 기반 `requireAuth` 적용.

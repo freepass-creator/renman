@@ -16,6 +16,7 @@ import { COMPANIES, companyLabel, companyShort } from '@/lib/companies';
 import { Page, Panel, Btn, C, LoadingOverlay, th, td, useConfirm, usePrompt } from '@/components/ui';
 
 import { seedDemoData } from '@/lib/seed';
+import { MigrateDataButton } from '@/components/MigrateDataButton';
 
 const REAL = new Set(['switchplan']); // 실데이터 보유 회사
 
@@ -97,13 +98,35 @@ export default function DevDataPage() {
   }
   function checkBackend() { setMsg('저장 백엔드: ' + getStore().backend + ' (Firebase 설정 있으면 Firestore, 없으면 로컬)'); }
 
-  if (!isOperator) return <Page title="개발도구" noCompany><div style={{ padding: 20, color: C.mute }}>본사(마스터) 전용입니다.</div></Page>;
+  if (!isOperator) return <Page title="데이터 마이그레이션" noCompany><div style={{ padding: 20, color: C.mute }}>본사(마스터) 전용입니다.</div></Page>;
 
   const num = (n: number | undefined) => <span style={{ fontFamily: 'var(--font-mono)', fontVariantNumeric: 'tabular-nums' }}>{n ?? '—'}</span>;
+  const switchplan = counts.switchplan;
 
   return (
-    <Page title="개발도구" noCompany meta={`${user.name} · 본사 · 그때그때 필요한 관리 기능`}>
+    <Page title="데이터 마이그레이션" noCompany meta={`${user.name} · 본사 · Firestore/로컬 실데이터 적재`}>
       {busy && <LoadingOverlay label={busy === '__all__' ? '전체 초기화 중…' : busy === '__demo__' ? '데모 샘플 넣는 중…' : `${companyLabel(busy)} 처리 중…`} />}
+
+      <Panel title="스위치플랜 실데이터" action={
+        <MigrateDataButton
+          onDone={(r) => {
+            const p = r.loaded.perEntity;
+            setMsg(`스위치플랜 마이그레이션 ${r.loaded.total}건 (차량 ${p.vehicle || 0}·계약 ${p.contract || 0}·계좌 ${p.bank_tx || 0}·보험 ${p.insurance || 0})`);
+            setSnap({ companyId: 'switchplan', summary: r.summary });
+            void load();
+          }}
+        />
+      }>
+        <div style={{ padding: '12px 16px', fontSize: 12.5, color: C.mute, lineHeight: 1.7 }}>
+          Firebase 로그인 상태면 <b>Firestore</b>에 넣고, 없으면 로컬에 넣습니다.
+          현재 스위치플랜: 차량 <b style={{ color: C.ink }}>{switchplan?.vehicle ?? '—'}</b>
+          · 계약 <b style={{ color: C.ink }}>{switchplan?.contract ?? '—'}</b>
+          · 거래 <b style={{ color: C.ink }}>{switchplan?.bank_tx ?? '—'}</b>
+          · 보험 <b style={{ color: C.ink }}>{switchplan?.insurance ?? '—'}</b>
+          {msg && <div style={{ marginTop: 8, fontWeight: 600, color: msg.includes('실패') ? C.danger : C.ok }}>{msg}</div>}
+        </div>
+      </Panel>
+
       <Panel title="회사별 데이터 적재 / 초기화" action={
         <span style={{ display: 'inline-flex', gap: 8 }}>
           <Btn onClick={loadDemoAll} disabled={!!busy}>데모 샘플 넣기</Btn>
@@ -113,7 +136,7 @@ export default function DevDataPage() {
         <div style={{ padding: '4px 4px 10px' }}>
           <p style={{ fontSize: 12.5, color: C.mute, lineHeight: 1.7, margin: '8px 12px 12px' }}>
             <b>데모 샘플 넣기</b> = 전 법인에 소량 샘플(미수·반납·과태료·미분류입금). UI 확인용.
-            스위치플랜 <b>반영</b> = 실데이터(보유 많음). 프라임·손오공은 반영 시 데모 팩.
+            스위치플랜은 위 <b>데이터 마이그레이션</b> 또는 행의 <b>반영</b>을 쓰세요.
           </p>
           <div style={{ overflowX: 'auto', border: `1px solid ${C.line}`, borderRadius: 'var(--radius)', margin: '0 12px' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 640 }}>

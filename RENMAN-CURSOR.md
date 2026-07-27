@@ -79,6 +79,10 @@ curl -s -o /dev/null -w "%{http_code}" http://localhost:6006/<route>   # 200
 
 | 날짜 | 작업자 | 내용 | 상태 |
 |---|---|---|---|
+| 2026-07-27 | Cursor | 스위치플랜 마이그레이션 버튼(`MigrateDataButton`) · `/dev/data`·빈 원장 CTA · 메뉴명 변경 | tsc0 |
+| 2026-07-27 | Cursor | 원장 더블클릭 토글닫기(페이지 setSelected) · 클릭/더블클릭 타이머·user-select 보정 · thead/패널헤더 12px·36h 통일 | tsc0 |
+| 2026-07-27 | Cursor | 원장: 같은행 재더블클릭=패널닫기 · thead/패널헤더/Page타이틀 `--ledger-head-h:36` 통일 | tsc0 |
+| 2026-07-27 | Cursor | 원장: 클릭=행선택 · 더블클릭만 상세패널 진입(재더블/헤더더블=폭전환) · Page/패널 헤더 `--ledger-head-h` 정렬 | tsc0 |
 | 2026-07-25 | Cursor | 메뉴에 과태료·변경부과(`/penalty`) 복구 · 티어 라이트 | — |
 | 2026-07-25 | Cursor | 오늘마무리: 메뉴에 자금일보·미수 · 재무원장 CTA=계좌CMS→자금일보→미수 · CMS item도 대여료매칭(정산후 제외버그 제거) | tsc0 |
 | 2026-07-25 | Cursor | 계약·수납=자산과 동일 6×3 · 미수=`schUnpaid`(회차잔액) · 회차=좌열1×3 | tsc OK |

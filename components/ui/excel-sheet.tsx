@@ -21,6 +21,11 @@ export type SheetCol<T> = {
   key: string;
   label: string;
   align?: 'l' | 'c' | 'r';
+  /**
+   * 기본보기 반응형 중요도. 1은 항상 유지하고, 숫자가 클수록 표 영역이
+   * 좁아질 때 먼저 숨긴다. 전체보기에서는 이 값과 무관하게 모두 표시한다.
+   */
+  priority?: 1 | 2 | 3 | 4;
   /** 좌측 틀고정 — 고정 칸은 자기 배경이 필요해 행 호버가 끊긴다. 꼭 필요할 때만. */
   pin?: boolean;
   render: (row: T) => React.ReactNode;
@@ -127,15 +132,26 @@ function FilterPop<T>({ col, x, y, rows, sel, onSel, sort, onSort, onClose }: {
   );
 }
 
-export function ExcelSheet<T>({ cols, rows, onRow, rowKey, onFiltered, mode = 'excel', rowStyle, rowClickable }: {
+export function ExcelSheet<T>({
+  cols, rows, onRow, onRowDoubleClick, rowKey, selectedRowKey,
+  onFiltered, mode = 'excel', fit = false, rowStyle, rowClickable,
+}: {
   cols: SheetCol<T>[];
   rows: T[];
   onRow?: (row: T) => void;
+  /**
+   * 상세 진입. 데스크톱=더블클릭 · 모바일 카드=한 번 탭.
+   * onRow와 같이 쓰면 클릭은 선택(onRow), 더블클릭만 진입.
+   */
+  onRowDoubleClick?: (row: T) => void;
   rowKey?: (row: T, i: number) => string;
+  selectedRowKey?: string | null;
   /** 필터·정렬 적용 결과 — 페이지 건수·CSV가 이걸 쓴다. */
   onFiltered?: (rows: T[]) => void;
   /** 보기 모드 — 같은 cols로 표/카드를 그린다. 모바일은 항상 카드(표는 손가락으로 못 읽는다). */
   mode?: 'excel' | 'card';
+  /** 기본보기: 가로 스크롤 없이 현재 표 영역에 맞추고 낮은 중요도 열을 자동 숨김. */
+  fit?: boolean;
   /** 행 배경·장식 — CMS 상시 하위행 등. */
   rowStyle?: (row: T) => React.CSSProperties | undefined;
   /** false면 클릭 비활성(하위 장식행). 기본 true. */
@@ -147,7 +163,12 @@ export function ExcelSheet<T>({ cols, rows, onRow, rowKey, onFiltered, mode = 'e
   const [colFilter, setColFilter] = React.useState<Record<string, Set<string>>>({});
   const [colSort, setColSort] = React.useState<ColSort>(null);
   const [openCol, setOpenCol] = React.useState<{ key: string; x: number; y: number } | null>(null);
+  const clickTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
   const byKey = React.useMemo(() => new Map(cols.map((c) => [c.key, c])), [cols]);
+
+  React.useEffect(() => () => {
+    if (clickTimer.current) clearTimeout(clickTimer.current);
+  }, []);
 
   const view = React.useMemo(() => {
     const active = Object.entries(colFilter).filter(([, s]) => s.size);
@@ -177,7 +198,10 @@ export function ExcelSheet<T>({ cols, rows, onRow, rowKey, onFiltered, mode = 'e
             key={rowKey?.(r, i) ?? i}
             title={cols[0]?.render(r)}
             fields={cols.slice(1, 5).map((c) => [c.label, c.render(r)] as [React.ReactNode, React.ReactNode])}
-            onClick={onRow ? () => { haptic.tap(); onRow(r); } : undefined}
+            onClick={(onRowDoubleClick || onRow) ? () => {
+              haptic.tap();
+              (onRowDoubleClick || onRow)?.(r);
+            } : undefined}
           />
         ))}
       </Cards>
@@ -197,19 +221,29 @@ export function ExcelSheet<T>({ cols, rows, onRow, rowKey, onFiltered, mode = 'e
     <>
       {/* frame(Page frame 모드)=부모 flex-column 채움 → 내부 스크롤 하나·헤더(thX sticky top:0) 틀고정.
           비-frame=block(높이=내용)이라 flex:1 무시·페이지 스크롤. 어느 쪽이든 이중 스크롤·하단 갭 없음. */}
-      <div style={{
-        flex: '1 1 auto', minHeight: 0, overflow: 'auto',
-        border: `1px solid ${C.line}`, borderRadius: 4, background: C.card,
-      }}>
-        <table style={{ borderCollapse: 'separate', borderSpacing: 0, fontSize: 12, width: 'max-content', minWidth: '100%' }}>
+      <div
+        className={`excel-sheet${fit ? ' excel-sheet--fit' : ' excel-sheet--full'}`}
+        style={{
+          flex: '1 1 auto', minHeight: 0,
+          border: `1px solid ${C.line}`, borderRadius: 4, background: C.card,
+        }}
+      >
+        <table style={{
+          borderCollapse: 'separate', borderSpacing: 0, fontSize: 12,
+          width: fit ? '100%' : 'max-content',
+          minWidth: '100%',
+          tableLayout: fit ? 'fixed' : 'auto',
+        }}>
           <thead>
             <tr>
-              {cols.map((c) => {
+              {cols.map((c, colIndex) => {
                 const base = c.pin ? thXPin : c.align === 'r' ? thXR : c.align === 'c' ? thXC : thX;
                 const canFilter = !!c.text;
                 const on = !!colFilter[c.key]?.size || (colSort?.key === c.key);
                 return (
-                  <th key={c.key}
+                  <th
+                    key={c.key}
+                    className={`excel-sheet__col excel-sheet__col--p${c.priority ?? Math.min(4, Math.floor(colIndex / 3) + 1)}`}
                     style={{ ...base, cursor: canFilter ? 'pointer' : 'default', color: on ? C.brand : base.color, userSelect: 'none' }}
                     title={canFilter ? `${c.label} 필터` : undefined}
                     onClick={canFilter ? (e) => {
@@ -229,24 +263,72 @@ export function ExcelSheet<T>({ cols, rows, onRow, rowKey, onFiltered, mode = 'e
           <tbody>
             {view.map((r, i) => {
               const custom = rowStyle?.(r);
-              const clickable = onRow ? (rowClickable ? rowClickable(r) : true) : false;
+              const rowId = rowKey?.(r, i) ?? String(i);
+              const clickable = (onRow || onRowDoubleClick) ? (rowClickable ? rowClickable(r) : true) : false;
+              const selected = selectedRowKey != null && rowId === selectedRowKey;
               const bg = custom?.background
                 ? String(custom.background)
                 : (i % 2 ? C.zebra : C.card);
               // 고정(pin) 칸은 가로스크롤 시 뒤 내용을 가려야 해서 «자기 배경»이 필요하다.
               // 그래서 행 배경만 바꾸면 그 칸만 호버가 안 먹는다 → hover 행은 여기서 함께 계산한다.
-              const rowBg = hover === i && clickable ? C.hover : bg;
+              const rowBg = selected
+                ? 'color-mix(in srgb, var(--brand) 9%, var(--bg-card))'
+                : (hover === i && clickable ? C.hover : bg);
               return (
                 <tr
-                  key={rowKey?.(r, i) ?? i}
-                  onClick={clickable ? () => onRow!(r) : undefined}
-                  style={{ cursor: clickable ? 'pointer' : 'default', background: rowBg, ...custom, ...(hover === i && clickable ? { background: C.hover } : {}) }}
+                  key={rowId}
+                  aria-selected={selected || undefined}
+                  tabIndex={clickable ? 0 : undefined}
+                  title={onRowDoubleClick ? (onRow ? '클릭=선택 · 더블클릭=상세 · 다시 더블클릭=닫기' : '더블클릭=상세 · 다시 더블클릭=닫기') : undefined}
+                  onClick={clickable && onRow ? () => {
+                    if (!onRowDoubleClick) {
+                      onRow(r);
+                      return;
+                    }
+                    // 더블클릭과 충돌 없이: 매 click마다 선택 예약 갱신, dblclick이 예약을 취소한다.
+                    if (clickTimer.current) clearTimeout(clickTimer.current);
+                    clickTimer.current = setTimeout(() => {
+                      onRow(r);
+                      clickTimer.current = null;
+                    }, 280);
+                  } : undefined}
+                  onDoubleClick={clickable && onRowDoubleClick ? (event) => {
+                    event.preventDefault();
+                    if (clickTimer.current) {
+                      clearTimeout(clickTimer.current);
+                      clickTimer.current = null;
+                    }
+                    window.getSelection()?.removeAllRanges();
+                    haptic.tap();
+                    onRowDoubleClick(r);
+                  } : undefined}
+                  onKeyDown={clickable && onRowDoubleClick ? (event) => {
+                    if (event.key === 'Enter') {
+                      event.preventDefault();
+                      onRowDoubleClick(r);
+                    }
+                  } : undefined}
+                  style={{
+                    cursor: clickable ? 'pointer' : 'default',
+                    background: rowBg,
+                    userSelect: onRowDoubleClick ? 'none' : undefined,
+                    ...custom,
+                    ...(hover === i && clickable ? { background: C.hover } : {}),
+                  }}
                   onMouseEnter={() => setHover(i)}
                   onMouseLeave={() => setHover((h) => (h === i ? null : h))}
                 >
-                  {cols.map((c) => {
+                  {cols.map((c, colIndex) => {
                     const base = c.pin ? { ...tdXPin, background: rowBg } : c.align === 'r' ? tdXR : c.align === 'c' ? tdXC : tdX;
-                    return <td key={c.key} style={base}>{c.render(r)}</td>;
+                    return (
+                      <td
+                        key={c.key}
+                        className={`excel-sheet__col excel-sheet__col--p${c.priority ?? Math.min(4, Math.floor(colIndex / 3) + 1)}`}
+                        style={{ ...base, textOverflow: fit ? 'ellipsis' : undefined }}
+                      >
+                        {c.render(r)}
+                      </td>
+                    );
                   })}
                 </tr>
               );

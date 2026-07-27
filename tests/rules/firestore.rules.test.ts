@@ -19,7 +19,6 @@ import { beforeAll, afterAll, beforeEach, describe, test } from 'vitest';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const RULES = readFileSync(resolve(HERE, '../../firestore.rules'), 'utf8');
-const MASTER_EMAIL = 'pyh@teamjpk.com'; // firestore.rules isMaster()와 동일 유지
 
 let env: RulesTestEnvironment;
 
@@ -48,10 +47,11 @@ beforeEach(async () => {
 });
 
 // ctx 헬퍼
-const staffA = () => env.authenticatedContext('staffA').firestore();
-const staffB = () => env.authenticatedContext('staffB').firestore();
-const hq = () => env.authenticatedContext('hq').firestore();
-const master = () => env.authenticatedContext('master', { email: MASTER_EMAIL }).firestore();
+const staffA = () => env.authenticatedContext('staffA', { systemRole: 'tenant', companyId: 'C1' }).firestore();
+const staffB = () => env.authenticatedContext('staffB', { systemRole: 'tenant', companyId: 'C2' }).firestore();
+const hq = () => env.authenticatedContext('hq', { systemRole: 'hq' }).firestore();
+const emailOnly = () => env.authenticatedContext('master', { email: 'pyh@teamjpk.com' }).firestore();
+const claimsOnlyHq = () => env.authenticatedContext('claims-hq', { systemRole: 'hq' }).firestore();
 
 describe('P0-1 권한상승 차단 — 법인은 자기 role을 본사로 못 바꾼다', () => {
   test('법인 staffA: role만 본사로 승격 시도 → 거부 (범용 match OR 우회 봉쇄)', async () => {
@@ -113,6 +113,15 @@ describe('감사로그(audit_logs) — append-only, 위변조 불가', () => {
   });
 });
 
+describe('서버 전용 rate-limit 컬렉션', () => {
+  test('본사 Claim이어도 클라이언트 조회·쓰기는 거부한다', async () => {
+    await assertFails(getDoc(doc(hq(), '_api_rate_limits', 'ocr_x')));
+    await assertFails(setDoc(doc(hq(), '_api_rate_limits', 'ocr_x'), {
+      companyId: 'C1', count: 1, resetAt: Date.now(),
+    }));
+  });
+});
+
 describe('가입(users create) — 셀프가입은 role/companyId 못 심는다', () => {
   test('신규 uid 셀프가입: role/companyId 없이 생성 → 허용', async () => {
     const u = env.authenticatedContext('newbie').firestore();
@@ -128,9 +137,12 @@ describe('가입(users create) — 셀프가입은 role/companyId 못 심는다'
   });
 });
 
-describe('마스터 이메일 — 현행 동작 문서화(⚠ P0-2: 추후 Custom Claims로 이관 예정)', () => {
-  test('master 이메일 계정: users 문서 없이도 본사 권한(타사 계약 읽기) → 허용', async () => {
-    await assertSucceeds(getDoc(doc(master(), 'contracts', 'c1')));
-    await assertSucceeds(getDoc(doc(master(), 'contracts', 'c2')));
+describe('Custom Claims 권한 경계', () => {
+  test('이메일만 일치하고 Claims가 없으면 본사 권한을 얻지 못한다', async () => {
+    await assertFails(getDoc(doc(emailOnly(), 'contracts', 'c1')));
+  });
+  test('HQ Claim은 users 문서 없이도 전 법인 조회가 가능하다', async () => {
+    await assertSucceeds(getDoc(doc(claimsOnlyHq(), 'contracts', 'c1')));
+    await assertSucceeds(getDoc(doc(claimsOnlyHq(), 'contracts', 'c2')));
   });
 });

@@ -17,7 +17,7 @@ async function mirrorToDrive(file: File, storagePath: string): Promise<void> {
     form.append('file', file);
     form.append('path', drivePath);
     form.append('fileName', fileName);
-    await fetch('/api/google/drive/upload', { method: 'POST', headers: apiAuthHeaders(), body: form });
+    await fetch('/api/google/drive/upload', { method: 'POST', headers: await apiAuthHeaders(), body: form });
   } catch { /* 미러 실패는 무시 */ }
 }
 
