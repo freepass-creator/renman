@@ -114,6 +114,34 @@ const CASH_TX_CREATE_SECTIONS: LedgerFormSection[] = [
   { title: '분류·내용', fields: ['counterparty', 'memo', 'method', 'balance'] },
 ];
 
+const CASH_MATCH_DETAIL_COLS = CASH_EXPANDED_COLS.filter((col) =>
+  ['match', 'flowNature', 'fundNature', 'matchedContract', 'matchedSchedule', 'alert'].includes(col.key),
+);
+
+const CASH_TRANSACTION_DETAIL_COLS: SheetCol<CashRow>[] = [
+  { key: 'detailCompany', label: '회사명', render: (r) => companyDisplay(r.companyId) },
+  { key: 'detailAccountName', label: '계좌명', render: (r) => r.accountName || '—' },
+  { key: 'detailAccount', label: '계좌번호', render: (r) => r.account || '—' },
+  { key: 'detailDate', label: '거래일자', render: (r) => r.date || '—' },
+  {
+    key: 'detailFlow', label: '거래구분',
+    render: (r) => <Badge tone={r.inAmt > 0 ? 'green' : 'amber'}>{r.inAmt > 0 ? '입금' : '출금'}</Badge>,
+  },
+  {
+    key: 'detailAmount', label: '금액', align: 'r',
+    render: (r) => <span style={{ fontWeight: 800 }}>{won(r.inAmt || r.outAmt)}</span>,
+  },
+  { key: 'detailParty', label: '거래처·내용', render: (r) => [r.party, r.memo].filter(Boolean).join(' · ') || '—' },
+];
+
+const CARD_DETAIL_COLS: SheetCol<CashRow>[] = [
+  { key: 'cardName', label: '카드명', render: (r) => String(r.raw.cardName || r.accountName || '—') },
+  { key: 'cardLast4', label: '카드번호', render: (r) => r.raw.cardLast4 ? `•••• ${String(r.raw.cardLast4)}` : '—' },
+  { key: 'merchant', label: '가맹점', render: (r) => String(r.raw.merchant || r.party || '—') },
+  { key: 'approvalNo', label: '승인번호', render: (r) => String(r.raw.approvalNo || '—') },
+  { key: 'cardAmount', label: '승인금액', align: 'r', render: (r) => won(Number(r.raw.amount) || r.outAmt) },
+];
+
 function CmsMatchPanel({
   dep, bank, companyId, initialItemKeys, onClose, onDone,
 }: {
@@ -293,12 +321,64 @@ export default function CashLedgerPage() {
   const [creating, setCreating] = useState<'account' | 'transaction' | null>(null);
 
   const accountRows = useMemo(
-    () => accountRecords
-      .map(accountRow)
+    () => {
+      const explicit = accountRecords.map(accountRow);
+      const seen = new Set(explicit.map((row) => `${row.companyId}:${row.accountNumber.replace(/\D/g, '') || row.accountNumber}`));
+      const derived: BankAccountRow[] = [];
+      for (const record of bank) {
+        if (String(record.settlementRole || '') === 'item') continue;
+        const rawAccount = String(record.accountNumber || record.account || '').trim();
+        const explicitLabel = String(record.accountAlias || record.accountName || record.bankName || '').trim();
+        const labeledAccount = /계좌|법인카드|\([^)]*\d{4}\)/.test(rawAccount);
+        if (!rawAccount || (!explicitLabel && !labeledAccount)) continue;
+        const accountNumber = rawAccount;
+        const companyId = String(record.companyId || '');
+        const identity = `${companyId}:${accountNumber.replace(/\D/g, '') || accountNumber}`;
+        if (seen.has(identity)) continue;
+        seen.add(identity);
+        const accountAlias = explicitLabel || accountNumber;
+        const bankName = String(record.bankName || accountAlias.match(/\(([^0-9)]+)/)?.[1] || '');
+        derived.push({
+          id: `derived:${identity}`,
+          companyId,
+          company: companyDisplay(companyId),
+          bankName,
+          accountNumber,
+          accountAlias,
+          accountHolder: String(record.accountHolder || ''),
+          accountType: String(record.accountType || '입출금'),
+          status: '사용중',
+          openedDate: '',
+          closedDate: '',
+          openingBalance: 0,
+          importMethod: '거래원장 자동구성',
+          memo: '',
+          createdAt: '',
+          createdBy: '원장',
+          updatedAt: '',
+          raw: record,
+        });
+      }
+      return [...explicit, ...derived]
       .filter((row) => textMatch(q, row.company, row.bankName, row.accountNumber, row.accountAlias, row.accountHolder, row.accountType, row.status, row.createdBy))
-      .sort((a, b) => Number(a.status !== '사용중') - Number(b.status !== '사용중') || a.bankName.localeCompare(b.bankName, 'ko')),
-    [accountRecords, q],
+      .sort((a, b) => Number(a.status !== '사용중') - Number(b.status !== '사용중') || a.bankName.localeCompare(b.bankName, 'ko'));
+    },
+    [accountRecords, bank, q],
   );
+  const selectedAccountTransactions = useMemo(() => {
+    if (!selectedAccount) return [];
+    const accountNo = selectedAccount.accountNumber.replace(/\D/g, '');
+    const alias = selectedAccount.accountAlias.trim();
+    return allRows
+      .filter((row) => row.nest !== 'cms-item' && row.entity === 'bank_tx')
+      .filter((row) => {
+        const rowNo = row.account.replace(/\D/g, '');
+        return (accountNo && rowNo === accountNo) || (alias && row.accountName === alias);
+      })
+      .slice(0, 20);
+  }, [allRows, selectedAccount]);
+  const selectedAccountIn = selectedAccountTransactions.reduce((sum, row) => sum + row.inAmt, 0);
+  const selectedAccountOut = selectedAccountTransactions.reduce((sum, row) => sum + row.outAmt, 0);
 
   const rows = useMemo(() => {
     const isAll = !range.from && !range.to;
@@ -431,8 +511,33 @@ export default function CashLedgerPage() {
             subtitle={`${selectedAccount.company} · ${selectedAccount.status}`}
             row={selectedAccount}
             cols={ACCOUNT_ALL_COLS}
+            sections={[
+              { title: '기본정보', cols: ACCOUNT_BASIC_COLS },
+              { title: '개설·수집정보', cols: ACCOUNT_ALL_COLS.slice(ACCOUNT_BASIC_COLS.length) },
+            ]}
             onClose={() => setSelectedAccount(null)}
-          />
+          >
+            <div style={{ borderTop: `1px solid ${C.line}`, padding: '10px 14px 14px' }}>
+              <div style={{ fontSize: 12, fontWeight: 800, color: C.ink, marginBottom: 8 }}>거래·수납정보</div>
+              <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', fontSize: 12.5, marginBottom: 8 }}>
+                <span>최근 거래 <b>{selectedAccountTransactions.length}</b>건</span>
+                <span>입금 <b style={{ color: C.ok }}>{won(selectedAccountIn)}</b></span>
+                <span>출금 <b>{won(selectedAccountOut)}</b></span>
+              </div>
+              <ListBox>
+                {selectedAccountTransactions.length ? selectedAccountTransactions.slice(0, 8).map((tx) => (
+                  <ListRow
+                    key={tx.id}
+                    badge={tx.inAmt > 0 ? '입금' : '출금'}
+                    badgeTone={tx.inAmt > 0 ? 'green' : 'gray'}
+                    main={`${tx.date || '일자 없음'} · ${tx.party || tx.category || '거래'}`}
+                    sub={tx.memo || tx.category || undefined}
+                    right={<b style={{ color: tx.inAmt > 0 ? C.ok : C.ink }}>{won(tx.inAmt || tx.outAmt)}</b>}
+                  />
+                )) : <div style={{ padding: 12, color: C.mute, fontSize: 12.5 }}>연결된 계좌 거래가 없습니다.</div>}
+              </ListBox>
+            </div>
+          </LedgerRecordPanel>
         ) : null}
       />
     );
@@ -539,7 +644,14 @@ export default function CashLedgerPage() {
           title={`${selected.date || '일자 없음'} · ${selected.party || selected.category || '거래'}`}
           subtitle={`${companyDisplay(selected.companyId)} · ${selected.account || '계좌 미입력'}`}
           row={selected}
-          cols={CASH_EXPANDED_COLS}
+          cols={CASH_TRANSACTION_DETAIL_COLS}
+          sections={[
+            { title: '기본정보', cols: CASH_TRANSACTION_DETAIL_COLS },
+            {
+              title: selected.entity === 'card_tx' ? '카드 승인정보' : '분류·수납정보',
+              cols: selected.entity === 'card_tx' ? CARD_DETAIL_COLS : CASH_MATCH_DETAIL_COLS,
+            },
+          ]}
           onClose={() => setSelected(null)}
         />
       ) : null}
