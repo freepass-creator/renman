@@ -49,11 +49,15 @@ function bankSource(b: EntityRecord): CashSource {
 }
 
 function rowFromBank(b: EntityRecord, nest?: CashNest, parentId?: string): CashRow {
+  const fullAccountNumber = String(b.accountNumber || '');
+  const sourceAccountLabel = String(b.account || '');
   return {
     id: `bank:${String(b._key || b.txKey || '')}`, entity: 'bank_tx', recKey: String(b._key || ''),
     companyId: String(b.companyId || ''), date: String(b.txDate || ''), source: bankSource(b),
-    account: String(b.account || b.accountNumber || ''),
-    accountName: String(b.accountAlias || b.accountName || b.bankName || ''),
+    // 원본 시트명이 account에 들어온 과거 자료는 계좌명으로 취급한다.
+    // 전체 계좌번호는 accountNumber가 명시된 경우에만 표시(끝 4자리로 전체 번호를 추정하지 않음).
+    account: fullAccountNumber,
+    accountName: String(b.accountAlias || b.accountName || b.bankName || sourceAccountLabel),
     party: String(b.counterparty || ''), memo: String(b.memo || ''),
     inAmt: Number(b.amount) || 0, outAmt: Number(b.withdraw) || 0, category: String(b.category || ''), raw: b,
     nest, parentId,

@@ -112,6 +112,8 @@ export function parseSwitchplanJbo(buf: ArrayBuffer, fallbackYear = 2026): JboPa
 
       const rec: EntityRecord = {
         account: sn,
+        accountName: sn,
+        accountLast4: sn.match(/(\d{4})\)?$/)?.[1] || '',
         txDate: date,
         amount: inAmt,
         withdraw: outAmt,

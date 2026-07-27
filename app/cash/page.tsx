@@ -34,7 +34,7 @@ import { useIsMobile } from '@/lib/use-mobile';
 import FileDrop from '@/components/FileDrop';
 
 type Flow = '전체' | '입금' | '출금' | '미분류';
-type CashLedgerKind = '거래원장' | '계좌원장';
+type CashLedgerKind = '입출금내역' | '계좌관리';
 type CashInputKind = '계좌' | '계좌거래' | 'CMS' | '법인카드';
 type BulkInputSource = '파일' | '링크' | '텍스트';
 const amt = (n: number) => (n ? n.toLocaleString('ko-KR') : '—');
@@ -381,7 +381,7 @@ export default function CashLedgerPage() {
   );
 
   const [colView, setColView] = useState<LedgerColView>('기본');
-  const [ledgerKind, setLedgerKind] = useState<CashLedgerKind>('거래원장');
+  const [ledgerKind, setLedgerKind] = useState<CashLedgerKind>('입출금내역');
   const [flow, setFlow] = useState<Flow>('전체');
   const [q, setQ] = useState('');
   const [srcSel, setSrcSel] = useState<Set<string>>(new Set());
@@ -403,16 +403,17 @@ export default function CashLedgerPage() {
       const derived: BankAccountRow[] = [];
       for (const record of bank) {
         if (String(record.settlementRole || '') === 'item') continue;
-        const rawAccount = String(record.accountNumber || record.account || '').trim();
+        const rawAccount = String(record.accountNumber || '').trim();
+        const sourceLabel = String(record.account || '').trim();
         const explicitLabel = String(record.accountAlias || record.accountName || record.bankName || '').trim();
-        const labeledAccount = /계좌|법인카드|\([^)]*\d{4}\)/.test(rawAccount);
-        if (!rawAccount || (!explicitLabel && !labeledAccount)) continue;
+        const labeledAccount = /계좌|법인카드|\([^)]*\d{4}\)/.test(sourceLabel);
+        if (!rawAccount && !explicitLabel && !labeledAccount) continue;
         const accountNumber = rawAccount;
         const companyId = String(record.companyId || '');
-        const identity = `${companyId}:${accountNumber.replace(/\D/g, '') || accountNumber}`;
+        const accountAlias = explicitLabel || sourceLabel;
+        const identity = `${companyId}:${accountNumber.replace(/\D/g, '') || accountAlias}`;
         if (seen.has(identity)) continue;
         seen.add(identity);
-        const accountAlias = explicitLabel || accountNumber;
         const bankName = String(record.bankName || accountAlias.match(/\(([^0-9)]+)/)?.[1] || '');
         derived.push({
           id: `derived:${identity}`,
@@ -427,7 +428,7 @@ export default function CashLedgerPage() {
           openedDate: '',
           closedDate: '',
           openingBalance: 0,
-          importMethod: '거래원장 자동구성',
+          importMethod: '입출금내역 자동구성',
           memo: '',
           createdAt: '',
           createdBy: '원장',
@@ -518,8 +519,8 @@ export default function CashLedgerPage() {
         setCreating(null);
       }}
       tabs={[
-        { key: '거래원장', label: '거래원장' },
-        { key: '계좌원장', label: '계좌원장' },
+        { key: '입출금내역', label: '입출금내역' },
+        { key: '계좌관리', label: '계좌관리' },
       ]}
     />
   );
@@ -533,7 +534,7 @@ export default function CashLedgerPage() {
         onChange={(next) => {
           setSingleKind(next);
           const account = next === '계좌';
-          setLedgerKind(account ? '계좌원장' : '거래원장');
+          setLedgerKind(account ? '계좌관리' : '입출금내역');
           setCreating(account ? 'account' : 'transaction');
         }}
         tabs={CASH_INPUT_KINDS.map((key) => ({ key, label: key }))}
@@ -546,8 +547,8 @@ export default function CashLedgerPage() {
       <Btn size="sm" onClick={() => {
         setSelected(null);
         setSelectedAccount(null);
-        setSingleKind(ledgerKind === '계좌원장' ? '계좌' : '계좌거래');
-        setCreating((open) => open === 'account' || open === 'transaction' ? null : (ledgerKind === '계좌원장' ? 'account' : 'transaction'));
+        setSingleKind(ledgerKind === '계좌관리' ? '계좌' : '계좌거래');
+        setCreating((open) => open === 'account' || open === 'transaction' ? null : (ledgerKind === '계좌관리' ? 'account' : 'transaction'));
       }} aria-pressed={creating === 'account' || creating === 'transaction'} variant={creating === 'account' || creating === 'transaction' ? 'ghost' : 'solid'}><Plus size={14} /> {creating === 'account' || creating === 'transaction' ? '입력 취소' : '단건 입력'}</Btn>
       <Btn size="sm" onClick={() => {
         setSelected(null);
@@ -557,7 +558,7 @@ export default function CashLedgerPage() {
     </span>
   );
 
-  if (ledgerKind === '계좌원장') {
+  if (ledgerKind === '계좌관리') {
     const activeAccounts = accountRows.filter((row) => row.status === '사용중').length;
     return (
       <LedgerFrame
