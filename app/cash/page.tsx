@@ -34,7 +34,8 @@ import { useIsMobile } from '@/lib/use-mobile';
 import FileDrop from '@/components/FileDrop';
 
 type Flow = '전체' | '입금' | '출금';
-type CashLedgerKind = '입출금내역' | '계좌관리';
+type CashLedgerKind = '입출금내역' | '계좌관리' | 'CMS 원천내역' | '법인카드 원천내역';
+type SourceQuickFilter = '정산완료' | '미정산' | '승인' | '취소' | null;
 type CashInputKind = '계좌' | '계좌거래' | 'CMS' | '법인카드';
 type BulkInputSource = '파일' | '링크' | '텍스트';
 const amt = (n: number) => (n ? n.toLocaleString('ko-KR') : '—');
@@ -397,6 +398,7 @@ export default function CashLedgerPage() {
   const [ledgerKind, setLedgerKind] = useState<CashLedgerKind>('입출금내역');
   const [flow, setFlow] = useState<Flow>('전체');
   const [unclassifiedOnly, setUnclassifiedOnly] = useState(false);
+  const [sourceQuickFilter, setSourceQuickFilter] = useState<SourceQuickFilter>(null);
   const [q, setQ] = useState('');
   // PeriodBar의 effect를 기다리면 첫 프레임이 전체 기간으로 계산되어 행 제한 경고가 번쩍인다.
   // 화면에 표시할 기본 월간 범위를 같은 기준일로 첫 렌더부터 적용한다.
@@ -410,6 +412,7 @@ export default function CashLedgerPage() {
   const [singleKind, setSingleKind] = useState<CashInputKind>('계좌거래');
   const scopedCashRows = useMemo(() => allRows.filter((row) => {
     if (row.nest === 'cms-item') return false;
+    if (row.entity !== 'bank_tx' || row.nest === 'cms-pending') return false;
     if (range.from && row.date < range.from) return false;
     if (range.to && row.date > range.to) return false;
     if (flow === '입금' && row.inAmt <= 0) return false;
@@ -511,12 +514,20 @@ export default function CashLedgerPage() {
   const rows = useMemo(() => {
     const isAll = !range.from && !range.to;
     const pass = (r: CashRow) => {
+      if (ledgerKind === '입출금내역' && (r.entity !== 'bank_tx' || r.nest === 'cms-item' || r.nest === 'cms-pending')) return false;
+      if (ledgerKind === 'CMS 원천내역' && !((r.nest === 'cms-item') || (r.nest === 'cms-pending'))) return false;
+      if (ledgerKind === '법인카드 원천내역' && r.entity !== 'card_tx') return false;
       if (!isAll) {
         if (range.from && r.date < range.from) return false;
         if (range.to && r.date > range.to) return false;
       }
       if (flow === '입금' && !(r.inAmt > 0)) return false;
       if (flow === '출금' && !(r.outAmt > 0)) return false;
+      if (sourceQuickFilter === '정산완료' && r.nest !== 'cms-item') return false;
+      if (sourceQuickFilter === '미정산' && r.nest !== 'cms-pending') return false;
+      const cardCancelled = r.outAmt < 0 || /취소/.test(`${r.raw.status || ''} ${r.raw.approvalStatus || ''} ${r.memo}`);
+      if (sourceQuickFilter === '승인' && cardCancelled) return false;
+      if (sourceQuickFilter === '취소' && !cardCancelled) return false;
       if (unclassifiedOnly && !isUnclassified(r.category)) return false;
       if (!textMatch(q, r.party, r.account, r.category, r.memo, r.date, r.raw.dataAlert, r.raw.reconciliationStatus, companyDisplay(r.companyId), r.companyId)) return false;
       return true;
@@ -524,12 +535,11 @@ export default function CashLedgerPage() {
     const out: CashRow[] = [];
     for (let i = 0; i < allRows.length; i++) {
       const r = allRows[i];
-      if (r.nest === 'cms-item') continue;
       if (!pass(r)) continue;
       out.push(r);
     }
     return out;
-  }, [allRows, flow, unclassifiedOnly, q, range.from, range.to]);
+  }, [allRows, ledgerKind, flow, sourceQuickFilter, unclassifiedOnly, q, range.from, range.to]);
 
   /** 통장 현금흐름만(입금·출금 합계). CMS미연결은 별도. */
   const bankRows = rows.filter((r) => r.nest !== 'cms-item' && r.nest !== 'cms-pending');
@@ -542,18 +552,24 @@ export default function CashLedgerPage() {
   const rowMore = Math.max(0, rows.length - ROW_DISPLAY_CAP);
   const displayRows = rowMore > 0 ? rows.slice(0, ROW_DISPLAY_CAP) : rows;
   const cols = colView === '기본' ? CASH_BASIC_COLS : CASH_EXPANDED_COLS;
-  const flowFilterControl = (
-    <Select
-      size="sm"
-      aria-label="거래구분"
-      value={flow}
-      onChange={(event) => setFlow(event.target.value as Flow)}
-    >
-      <option value="전체">전체</option>
-      <option value="입금">입금</option>
-      <option value="출금">출금</option>
-    </Select>
-  );
+  const quickButton = (label: Exclude<Flow, '전체'> | Exclude<SourceQuickFilter, null>) => {
+    const active = label === '입금' || label === '출금' ? flow === label : sourceQuickFilter === label;
+    return (
+      <button
+        key={label}
+        type="button"
+        data-ui="toggle"
+        aria-pressed={active}
+        onClick={() => {
+          if (label === '입금' || label === '출금') setFlow((current) => current === label ? '전체' : label);
+          else setSourceQuickFilter((current) => current === label ? null : label);
+        }}
+        style={toggleStyle(active, 'sm', mobile)}
+      >
+        {label}
+      </button>
+    );
+  };
   const unclassifiedQuickFilter = (
     <button
       type="button"
@@ -579,21 +595,38 @@ export default function CashLedgerPage() {
     reload();
   }, [reload]);
 
-  const ledgerKindTabs = (
-    <PillTabs
+  const ledgerKindControl = (
+    <Select
       size="sm"
+      aria-label="원장 선택"
       value={ledgerKind}
-      onChange={(next) => {
+      onChange={(event) => {
+        const next = event.target.value as CashLedgerKind;
         setLedgerKind(next);
+        setFlow('전체');
+        setSourceQuickFilter(null);
+        setUnclassifiedOnly(false);
         setSelected(null);
         setSelectedAccount(null);
         setCreating(null);
       }}
-      tabs={[
-        { key: '입출금내역', label: '입출금내역' },
-        { key: '계좌관리', label: '계좌관리' },
-      ]}
-    />
+    >
+      <option value="입출금내역">입출금내역</option>
+      <option value="계좌관리">계좌관리</option>
+      <option value="CMS 원천내역">CMS 원천내역</option>
+      <option value="법인카드 원천내역">법인카드 원천내역</option>
+    </Select>
+  );
+  const ledgerQuickFilters = (
+    <>
+      {(ledgerKind === '입출금내역' || ledgerKind === '계좌관리') && quickButton('입금')}
+      {(ledgerKind === '입출금내역' || ledgerKind === '계좌관리') && quickButton('출금')}
+      {ledgerKind === 'CMS 원천내역' && quickButton('정산완료')}
+      {ledgerKind === 'CMS 원천내역' && quickButton('미정산')}
+      {ledgerKind === '법인카드 원천내역' && quickButton('승인')}
+      {ledgerKind === '법인카드 원천내역' && quickButton('취소')}
+      {unclassifiedQuickFilter}
+    </>
   );
 
   const singleKindTabs = (
@@ -604,9 +637,13 @@ export default function CashLedgerPage() {
         value={singleKind}
         onChange={(next) => {
           setSingleKind(next);
-          const account = next === '계좌';
-          setLedgerKind(account ? '계좌관리' : '입출금내역');
-          setCreating(account ? 'account' : 'transaction');
+          setLedgerKind(
+            next === '계좌' ? '계좌관리'
+              : next === 'CMS' ? 'CMS 원천내역'
+                : next === '법인카드' ? '법인카드 원천내역'
+                  : '입출금내역',
+          );
+          setCreating(next === '계좌' ? 'account' : 'transaction');
         }}
         tabs={CASH_INPUT_KINDS.map((key) => ({ key, label: key }))}
       />
@@ -618,7 +655,12 @@ export default function CashLedgerPage() {
       <Btn size="sm" onClick={() => {
         setSelected(null);
         setSelectedAccount(null);
-        setSingleKind(ledgerKind === '계좌관리' ? '계좌' : '계좌거래');
+        setSingleKind(
+          ledgerKind === '계좌관리' ? '계좌'
+            : ledgerKind === 'CMS 원천내역' ? 'CMS'
+              : ledgerKind === '법인카드 원천내역' ? '법인카드'
+                : '계좌거래',
+        );
         setCreating((open) => open === 'account' || open === 'transaction' ? null : (ledgerKind === '계좌관리' ? 'account' : 'transaction'));
       }} aria-pressed={creating === 'account' || creating === 'transaction'} variant={creating === 'account' || creating === 'transaction' ? 'ghost' : 'solid'}><Plus size={14} /> {creating === 'account' || creating === 'transaction' ? '입력 취소' : ledgerKind === '계좌관리' ? '계좌 추가' : '단건 입력'}</Btn>
       <Btn size="sm" onClick={() => {
@@ -646,9 +688,8 @@ export default function CashLedgerPage() {
             onChange={(event) => setQ(event.target.value)}
             style={{ width: mobile ? '100%' : CASH_SEARCH_WIDTH }}
           />
-          {flowFilterControl}
-          {ledgerKindTabs}
-          {unclassifiedQuickFilter}
+          {ledgerKindControl}
+          {ledgerQuickFilters}
           <PeriodBar latest={latest} initial="월간" onRange={onRange} />
         </>}
         stats={<span style={{ fontSize: 12.5, color: C.mute }}>전체 <b>{accountRows.length}</b> · 사용중 <b style={{ color: C.ok }}>{activeAccounts}</b></span>}
@@ -714,10 +755,21 @@ export default function CashLedgerPage() {
     );
   }
 
+  const ledgerMeta = ledgerKind === 'CMS 원천내역'
+    ? 'CMS 청구·출금 결과와 계좌 정산 연결'
+    : ledgerKind === '법인카드 원천내역'
+      ? '법인카드 승인·취소 내역과 계좌 결제 연결'
+      : '실제 계좌 입출금 1건 1행';
+  const ledgerEmpty = ledgerKind === 'CMS 원천내역'
+    ? '표시할 CMS 원천내역이 없습니다. 기간을 바꾸거나 대량 입력에서 CMS 자료를 등록하세요.'
+    : ledgerKind === '법인카드 원천내역'
+      ? '표시할 법인카드 원천내역이 없습니다. 기간을 바꾸거나 대량 입력에서 법인카드 자료를 등록하세요.'
+      : '표시할 계좌 입출금이 없습니다. 기간을 바꾸거나 단건·대량 입력에서 등록하세요.';
+
   return (
     <LedgerFrame
       title="자금관리"
-      meta="거래 1건 1행 · 계좌·CMS·카드 입출금과 계약 매칭"
+      meta={ledgerMeta}
       right={createActions}
       colView={colView}
       onColView={setColView}
@@ -730,9 +782,8 @@ export default function CashLedgerPage() {
             onChange={(e) => setQ(e.target.value)}
             style={{ width: mobile ? '100%' : CASH_SEARCH_WIDTH }}
           />
-          {flowFilterControl}
-          {ledgerKindTabs}
-          {unclassifiedQuickFilter}
+          {ledgerKindControl}
+          {ledgerQuickFilters}
           <PeriodBar latest={latest} initial="월간" onRange={onRange} />
         </>
       }
@@ -743,17 +794,17 @@ export default function CashLedgerPage() {
           ) : null}
       stats={
         <span style={{ fontSize: 12.5, whiteSpace: 'nowrap', display: 'inline-flex', gap: 12, flexWrap: 'wrap' }}>
-          <span>계좌 <b>{bankRows.length}</b></span>
-          <span>입금 <b style={{ color: C.ok }}>{amt(inSum)}</b></span>
-          <span>출금 <b>{amt(outSum)}</b></span>
-          {pendingCms.length > 0 && (
+          <span>{ledgerKind === 'CMS 원천내역' ? 'CMS' : ledgerKind === '법인카드 원천내역' ? '카드' : '계좌'} <b>{rows.length}</b></span>
+          {ledgerKind === '입출금내역' && <span>입금 <b style={{ color: C.ok }}>{amt(inSum)}</b></span>}
+          {ledgerKind === '입출금내역' && <span>출금 <b>{amt(outSum)}</b></span>}
+          {ledgerKind === 'CMS 원천내역' && pendingCms.length > 0 && (
             <span>CMS미연결 <b style={{ color: C.brand }}>{pendingCms.length}</b>·<b style={{ color: C.brand }}>{amt(cmsPendingSum)}</b></span>
           )}
           {alertN > 0 && <span>데이터알람 <b style={{ color: C.warn }}>{alertN}</b></span>}
         </span>
       }
       loading={loading}
-      empty="표시할 거래가 없습니다. 기간을 바꾸거나 「거래 등록」에서 입력하세요."
+      empty={ledgerEmpty}
       cols={cols}
       rows={displayRows}
       rowKey={(r) => r.id}
