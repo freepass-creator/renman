@@ -79,7 +79,7 @@ export function LedgerFrame<R>({
     : onRow;
 
   return (
-    <Page frame title={title} meta={meta} right={right}>
+    <Page frame title={title} meta={meta} right={right} noCompany>
       {hint != null && (
         typeof hint === 'string' || typeof hint === 'number'
           ? <Message variant="info">{hint}</Message>
