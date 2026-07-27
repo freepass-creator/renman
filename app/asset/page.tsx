@@ -7,27 +7,29 @@ import { ASSET_MASTER_BASIC_COLS, ASSET_MASTER_EXPANDED_COLS } from '@/lib/maste
 import { useEntityList } from '@/lib/use-entity-lists';
 import { textMatch } from '@/lib/search-match';
 import {
-  Btn, C, LedgerCreatePanel, LedgerFrame, LedgerRecordPanel, PillTabs, Search,
+  Btn, C, LedgerCreatePanel, LedgerFrame, LedgerRecordPanel, Search, Select, toggleStyle,
   type LedgerColView, type LedgerFormSection,
 } from '@/components/ui';
 import { useIsMobile } from '@/lib/use-mobile';
 import { TODAY } from '@/lib/dashboard-consts';
 import { VEHICLE_DISPOSE_PLAN, VEHICLE_REPAIR } from '@/lib/domain/status';
 
-type AssetScope = '보유자산' | '계약중' | '상품대기' | '휴차·정비' | '매각대기' | '처분자산' | '전체';
-const ASSET_SCOPES: AssetScope[] = ['보유자산', '계약중', '상품대기', '휴차·정비', '매각대기', '처분자산', '전체'];
+type AssetOwnershipScope = '보유자산' | '처분자산' | '전체자산';
+type AssetQuickFilter = '계약중' | '휴차·정비' | '상품차' | '매각대기';
+const ASSET_QUICK_FILTERS: AssetQuickFilter[] = ['계약중', '휴차·정비', '상품차', '매각대기'];
 const PRODUCT_READY = new Set(['상품대기', '상품화']);
 const IDLE_REPAIR = new Set(['휴차', '유휴', ...VEHICLE_REPAIR]);
 
-function matchesAssetScope(row: AssetMasterRow, scope: AssetScope, activeContractPlates: Set<string>): boolean {
-  if (scope === '전체') return true;
-  if (scope === '보유자산') return !row.disposed;
-  if (scope === '처분자산') return row.disposed;
-  if (scope === '계약중') return !row.disposed && activeContractPlates.has(row.plate);
-  if (scope === '상품대기') return !row.disposed && PRODUCT_READY.has(row.status);
-  if (scope === '휴차·정비') return !row.disposed && IDLE_REPAIR.has(row.status);
-  if (scope === '매각대기') return !row.disposed && VEHICLE_DISPOSE_PLAN.has(row.status);
-  return false;
+function matchesOwnership(row: AssetMasterRow, scope: AssetOwnershipScope): boolean {
+  return scope === '전체자산' || (scope === '보유자산' ? !row.disposed : row.disposed);
+}
+
+function matchesQuickFilter(row: AssetMasterRow, filter: AssetQuickFilter | null, activeContractPlates: Set<string>): boolean {
+  if (!filter) return true;
+  if (filter === '계약중') return !row.disposed && activeContractPlates.has(row.plate);
+  if (filter === '상품차') return !row.disposed && PRODUCT_READY.has(row.status);
+  if (filter === '휴차·정비') return !row.disposed && IDLE_REPAIR.has(row.status);
+  return !row.disposed && VEHICLE_DISPOSE_PLAN.has(row.status);
 }
 
 const ASSET_CREATE_SECTIONS: LedgerFormSection[] = [
@@ -43,7 +45,8 @@ export default function AssetLedgerPage() {
   const { rows: vehicles, loading } = useEntityList('vehicle');
   const { rows: contracts, loading: contractsLoading } = useEntityList('contract');
   const [q, setQ] = useState('');
-  const [scope, setScope] = useState<AssetScope>('보유자산');
+  const [ownershipScope, setOwnershipScope] = useState<AssetOwnershipScope>('보유자산');
+  const [quickFilter, setQuickFilter] = useState<AssetQuickFilter | null>(null);
   const [colView, setColView] = useState<LedgerColView>('기본');
   const [selected, setSelected] = useState<ReturnType<typeof assetMasterRow> | null>(null);
   const [creating, setCreating] = useState(false);
@@ -55,8 +58,8 @@ export default function AssetLedgerPage() {
     contracts.map((contract) => contractMasterRow(contract, TODAY)).filter((contract) => !contract.ended).map((contract) => contract.plate),
   ), [contracts]);
   const rows = useMemo(() => searchedRows.filter((r) =>
-    matchesAssetScope(r, scope, activeContractPlates),
-  ), [searchedRows, scope, activeContractPlates]);
+    matchesOwnership(r, ownershipScope) && matchesQuickFilter(r, quickFilter, activeContractPlates),
+  ), [searchedRows, ownershipScope, quickFilter, activeContractPlates]);
   const held = searchedRows.filter((r) => !r.disposed).length;
   const disposed = searchedRows.filter((r) => r.disposed).length;
   const running = searchedRows.filter((r) => !r.disposed && r.status === '운행').length;
@@ -72,12 +75,40 @@ export default function AssetLedgerPage() {
       }}><Plus size={14} /> {creating ? '생성 취소' : '자산 생성'}</Btn>}
       filters={<>
         <Search size="sm" placeholder="차량번호·VIN·차명·소유자·상태" value={q} onChange={(e) => setQ(e.target.value)} style={{ width: mobile ? '100%' : 300 }} />
-        <PillTabs
+        <Select
           size="sm"
-          value={scope}
-          onChange={setScope}
-          tabs={ASSET_SCOPES.map((key) => ({ key, label: key }))}
-        />
+          aria-label="자산 범위"
+          value={ownershipScope}
+          onChange={(event) => {
+            const next = event.target.value as AssetOwnershipScope;
+            setOwnershipScope(next);
+            if (next !== '보유자산') setQuickFilter(null);
+          }}
+        >
+          <option value="보유자산">보유자산</option>
+          <option value="처분자산">처분자산</option>
+          <option value="전체자산">전체자산</option>
+        </Select>
+        <span style={{ display: 'inline-flex', gap: 6, flexWrap: 'wrap' }} aria-label="빠른 필터">
+          {ASSET_QUICK_FILTERS.map((filter) => {
+            const active = quickFilter === filter;
+            return (
+              <button
+                key={filter}
+                type="button"
+                data-ui="toggle"
+                aria-pressed={active}
+                onClick={() => {
+                  setOwnershipScope('보유자산');
+                  setQuickFilter((current) => current === filter ? null : filter);
+                }}
+                style={toggleStyle(active, 'sm', mobile)}
+              >
+                {filter}
+              </button>
+            );
+          })}
+        </span>
       </>}
       stats={<span style={{ fontSize: 12.5, color: C.mute }}>보유 <b>{held}</b> · 운행상태 <b style={{ color: C.ok }}>{running}</b> · 휴차/정비/사고 <b style={{ color: C.warn }}>{attention}</b> · 처분 <b>{disposed}</b></span>}
       colView={colView}
