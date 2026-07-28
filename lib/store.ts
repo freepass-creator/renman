@@ -397,14 +397,21 @@ class DispatchStore implements StoreAdapter {
     const ck = `${entityKey}::${companyId}`;
     let p = _listCache.get(ck);
     if (!p) {
-      p = this.all(companyId)
-        ? Promise.all(COMPANIES.map((c) => this.base.list(entityKey, c).catch(() => []))).then((a) => a.flat())   // 회사별 격리: 한 법인 오류가 합본 전체를 안 비움(정상분은 캐시)
-        : this.base.list(entityKey, companyId);   // 단일 스코프는 throw→캐시제거→다음 재시도
+      const raw = this.all(companyId)
+        ? Promise.all(COMPANIES.map((c) => this.base.list(entityKey, c).catch(() => []))).then((a) => a.flat())
+        : this.base.list(entityKey, companyId);
+      // hang 방지 — 미결 Promise가 캐시에 남으면 PageLoading 영구. 실패·타임아웃은 캐시 제거→재시도.
+      p = withTimeout(raw, 15_000, `store.list ${entityKey}`)
+        .then((rows) => { _listValueCache.set(ck, rows); return rows; })
+        .catch((e) => {
+          console.error(e);
+          _listCache.delete(ck);
+          _listValueCache.delete(ck);
+          return [] as EntityRecord[];
+        });
       _listCache.set(ck, p);
-      void p.then((rows) => _listValueCache.set(ck, rows)).catch(() => {});
-      p.catch(() => _listCache.delete(ck)); // 실패는 캐시 안 함(다음에 재시도)
     }
-    return p.catch(() => []); // 호출자에겐 빈 배열(행 방지) — 캐시는 위 catch로 제거돼 다음 조회 때 재시도
+    return p;
   }
   async listDeleted(entityKey: string, companyId: string) {
     if (!this.all(companyId)) return this.base.listDeleted(entityKey, companyId);

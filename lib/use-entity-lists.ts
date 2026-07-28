@@ -13,6 +13,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSession } from './session';
 import { cachedListValues, getStore, listsCached } from './store';
 import { useReloadOnSaved } from './use-reload-on-saved';
+import { withTimeout } from './async';
 import { type EntityRecord } from './intake/entities';
 
 export function useEntityLists(keys: readonly string[], opts?: { companyId?: string }): {
@@ -35,9 +36,10 @@ export function useEntityLists(keys: readonly string[], opts?: { companyId?: str
       setLoading(false);
     }
     if (!silent && !listsCached(ks, companyId)) setLoading(true);  // 캐시 있으면 스피너 없이 즉시 렌더
-    Promise.all(ks.map((k) => getStore().list(k, companyId)))
+    // Firestore hang → PageLoading 영구 방지 (session withTimeout과 동일 원자)
+    withTimeout(Promise.all(ks.map((k) => getStore().list(k, companyId))), 15_000, '엔티티 목록')
       .then((res) => { setData(res); setLoading(false); })         // 이전 데이터는 교체 시점까지 유지
-      .catch(() => setLoading(false));
+      .catch((e) => { console.error(e); setLoading(false); });
   }, [ks, companyId]);
 
   useEffect(() => { load(); }, [load]);

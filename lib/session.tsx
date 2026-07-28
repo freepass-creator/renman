@@ -65,12 +65,13 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     if (firebaseReady()) {
       let alive = true;
       // Auth 콜백이 안 오면 boot 스피너 영구 → 로그인 화면으로.
+      // ※ 죽은(StrictMode cleanup) 콜백이 clearTimeout 하면 안 됨 — 새 mount의 boot 탈출을 가로챔.
       const bootTo = setTimeout(() => {
-        if (alive) { console.error('Auth 부트 시간초과'); setPhase('signed-out'); }
+        if (alive) { console.error('Auth 부트 시간초과'); setPhase((p) => (p === 'boot' ? 'signed-out' : p)); }
       }, 10_000);
       const unsub = watchAuth(async (fb) => {
-        clearTimeout(bootTo);
         if (!alive) return;
+        clearTimeout(bootTo);
         if (!fb) { setPhase('signed-out'); return; }
         try {
           const prof = await withTimeout(loadProfile(fb.uid, fb.email), 8_000, '프로필 로드');

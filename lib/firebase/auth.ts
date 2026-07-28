@@ -22,9 +22,17 @@ export function watchAuth(cb: (u: FbUser) => void): () => void {
   let unsub = () => {};
   let dead = false;
   (async () => {
-    const { getAuth, onAuthStateChanged } = await import('firebase/auth');
-    if (dead) return;
-    unsub = onAuthStateChanged(getAuth(getFirebaseApp()!), (u) => cb(u ? { uid: u.uid, email: u.email } : null));
+    try {
+      const { getAuth, onAuthStateChanged } = await import('firebase/auth');
+      if (dead) return;
+      unsub = onAuthStateChanged(getAuth(getFirebaseApp()!), (u) => {
+        if (dead) return;
+        cb(u ? { uid: u.uid, email: u.email } : null);
+      });
+    } catch (e) {
+      console.error('Auth 구독 실패', e);
+      if (!dead) cb(null);
+    }
   })();
   return () => { dead = true; unsub(); };
 }
