@@ -4,14 +4,13 @@
  * 데이터 = linkFleet → buildFleetRows · 열 = FLEET_*_COLS. 옛 FacetPage/OpsLens 금지.
  */
 import { useMemo, useState } from 'react';
-import { Car, CalendarClock, ExternalLink, FileText } from 'lucide-react';
+import { Car, CalendarClock, FileText } from 'lucide-react';
 import { TODAY, dday } from '@/lib/dashboard-consts';
 import { linkFleet } from '@/lib/domain/model';
 import { buildFleetRows, statusRank, type FleetRow } from '@/lib/sheet-rows';
 import { FLEET_BASIC_COLS, FLEET_DETAIL_SECTIONS, FLEET_EXPANDED_COLS } from '@/lib/sheet-cols';
 import { useEntityLists } from '@/lib/use-entity-lists';
 import { textMatch } from '@/lib/search-match';
-import { openCar } from '@/lib/ui-bus';
 import {
   Btn, C, FilterChips, LedgerActions, LedgerFilterButton, LedgerFilterFields, LedgerFilterPanel, LedgerFrame, LedgerRecordPanel,
   PeriodBar, Search, Select, won,
@@ -22,6 +21,7 @@ import {
   FLEET_FILTER_DEFS, countActiveFilters, emptyFilterValues, matchLedgerFilters,
 } from '@/lib/ledger-filter-defs';
 import { RENTAL_TYPES } from '@/lib/schema/contract';
+import { VehicleSideEmbed } from '@/components/ledger/VehicleSideEmbed';
 
 const RENTAL_CHIP_OPTS = [
   { key: '전체' as const, label: '전체' },
@@ -190,14 +190,9 @@ export default function StatusPage() {
           cols={FLEET_EXPANDED_COLS}
           sections={FLEET_DETAIL_SECTIONS}
           onClose={() => setSelected(null)}
-          actions={
-            selected.plate ? (
-              <Btn size="sm" variant="ghost" iconOnly tip="차량 상세" onClick={() => openCar(selected.plate)}>
-                <ExternalLink size={14} />
-              </Btn>
-            ) : null
-          }
-        />
+        >
+          {selected.plate ? <VehicleSideEmbed plate={selected.plate} /> : null}
+        </LedgerRecordPanel>
       ) : null}
     />
   );

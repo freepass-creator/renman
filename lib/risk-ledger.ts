@@ -33,6 +33,8 @@ export type RiskSheetRow = {
   dueDate: string;
   amount: number;
   status: string;
+  /** 미납 행 — 내용증명·시동 등 조치용. */
+  contractKey?: string;
   tone: RiskTone;
   badgeTone: BadgeTone;
 };
@@ -172,6 +174,7 @@ export function buildRiskSheetRows(
       dueDate: String(v.rec.endDate || '').slice(0, 10),
       amount: v.net,
       status: v.ended ? '반환미수' : '미납',
+      contractKey: String(v.rec._key || ''),
     }));
   }
 

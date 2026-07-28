@@ -57,8 +57,8 @@ const Add = ({ type, plate, label }: { type: string; plate: string; label: strin
   <Btn variant="ghost" onClick={() => openIngest(type, plate)}>{label}</Btn>
 );
 
-/** freepass-style 차량 상세 — 고정 스크롤 레이아웃(DnD/순서 없음). */
-export function VehicleDetail({ plate, focus }: { plate: string; focus?: string }) {
+/** freepass-style 차량 상세 — 고정 스크롤 레이아웃(DnD/순서 없음). embed=원장 우측 패널. */
+export function VehicleDetail({ plate, focus, embed }: { plate: string; focus?: string; embed?: boolean }) {
   const {
     loading, companyId, v, contracts, penalties, history, active, waiting, totalUnpaid, d, schedule,
     master, status, statusTone, loan, loanSum, lastReturn, idleDays, loc, locStr, target, workList,
@@ -74,7 +74,7 @@ export function VehicleDetail({ plate, focus }: { plate: string; focus?: string 
   if (loading) return <PageLoading />;
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: SPACE_GROUP_M }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: embed ? 12 : SPACE_GROUP_M }}>
       {/* 신분 행 */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
         <Badge tone={statusTone}>{status}</Badge>

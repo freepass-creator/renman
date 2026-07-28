@@ -15,10 +15,12 @@ import {
 import { useIsMobile } from '@/lib/use-mobile';
 import { MigrateDataButton } from '@/components/MigrateDataButton';
 import { openIngest, openReceivables } from '@/lib/ui-bus';
+import { sendNoticeCert } from '@/lib/docs/send-notice';
 import {
   CONTRACT_FILTER_DEFS, countActiveFilters, emptyFilterValues, eqFilter, matchLedgerFilters,
 } from '@/lib/ledger-filter-defs';
 import { RENTAL_TYPES } from '@/lib/schema/contract';
+import { ContractScheduleEmbed } from '@/components/ledger/ContractScheduleEmbed';
 
 const RENTAL_CHIP_OPTS = [
   { key: '전체' as const, label: '전체' },
@@ -195,12 +197,25 @@ export default function ContractLedgerPage() {
           actions={<>
             <Btn size="sm" onClick={() => setEditing(true)}><Pencil size={14} /> 수정</Btn>
             {selected.net > 0 && (
-              <Btn size="sm" variant="ghost" iconOnly tip="미수 회수" onClick={() => openReceivables()}>
-                <CircleDollarSign size={14} />
-              </Btn>
+              <>
+                <Btn size="sm" variant="ghost" iconOnly tip="미수 회수" onClick={() => openReceivables()}>
+                  <CircleDollarSign size={14} />
+                </Btn>
+                <Btn
+                  size="sm"
+                  variant="danger"
+                  onClick={() => {
+                    void sendNoticeCert({ rec: selected.raw, companyId: String(selected.raw.companyId || '') });
+                  }}
+                >
+                  내용증명
+                </Btn>
+              </>
             )}
           </>}
-        />
+        >
+          {selected.plate ? <ContractScheduleEmbed plate={selected.plate} /> : null}
+        </LedgerRecordPanel>
       ) : null}
     />
   );

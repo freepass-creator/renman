@@ -6,6 +6,7 @@
  *   · 집금 또는 미연결 클릭 → 수동 매칭 패널
  */
 import { useMemo, useState, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import { Plus, X, Link2, Unlink, UploadCloud, Landmark, GitMerge, CircleDollarSign } from 'lucide-react';
 import { buildCashLedger, withCmsItemRows, buildBankAccountLedger, type CashRow, type BankAccountRow } from '@/lib/finance/cash-ledger';
 import { CASH_BASIC_COLS, CASH_EXPANDED_COLS } from '@/lib/finance/cash-cols';
@@ -13,7 +14,7 @@ import { isUnclassified } from '@/lib/payments/ledger-subjects';
 import { useCashLedgerLists } from '@/lib/use-cash-ledger-lists';
 import { useEntityList } from '@/lib/use-entity-lists';
 import { textMatch } from '@/lib/search-match';
-import { notifySaved, openIngest, openPayments, openReceivables } from '@/lib/ui-bus';
+import { notifySaved, openIngest, openPayments, openReceivables, openCar } from '@/lib/ui-bus';
 import { MigrateDataButton } from '@/components/MigrateDataButton';
 import { companyDisplay } from '@/lib/companies';
 import { TODAY } from '@/lib/dashboard-consts';
@@ -340,6 +341,7 @@ function CmsMatchPanel({
 
 export default function CashLedgerPage() {
   const mobile = useIsMobile();
+  const router = useRouter();
   const { companyId } = useSession();
   const { bank, card, loading, reload } = useCashLedgerLists();
   const { rows: accountRecords, loading: accountLoading } = useEntityList('bank_account');
@@ -842,6 +844,19 @@ export default function CashLedgerPage() {
             },
           ]}
           onClose={() => setSelected(null)}
+          actions={String(selected.raw.matchedContractId || selected.raw.plate || '') ? (
+            <Btn
+              size="sm"
+              variant="ghost"
+              onClick={() => {
+                const plate = String(selected.raw.plate || '');
+                if (plate) openCar(plate);
+                else router.push('/contract');
+              }}
+            >
+              연결 계약
+            </Btn>
+          ) : undefined}
         />
       ) : null}
     />

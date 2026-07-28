@@ -1,11 +1,13 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { Plus, UploadCloud } from 'lucide-react';
+import { Plus, UploadCloud, CarFront, FileText } from 'lucide-react';
 import { useEntityLists } from '@/lib/use-entity-lists';
 import { textMatch } from '@/lib/search-match';
 import { companyDisplay } from '@/lib/companies';
 import type { EntityRecord } from '@/lib/intake/entities';
+import { openCar } from '@/lib/ui-bus';
+import { useRouter } from 'next/navigation';
 import {
   Badge, Btn, C, LedgerActions, LedgerCreatePanel, LedgerFilterButton, LedgerFilterFields, LedgerFilterPanel, LedgerFrame, LedgerRecordPanel, Search, won,
   PeriodBar, Select, type LedgerColView, type LedgerFormSection, type SheetCol,
@@ -106,6 +108,7 @@ const WORK_DETAIL_SECTIONS = buildDetailSections(ALL_COLS, WORK_DETAIL_DEFS);
 
 export default function WorkLedgerPage() {
   const mobile = useIsMobile();
+  const router = useRouter();
   const { data: [workItems = [], history = [], penalties = [], inbox = []], loading, reload } = useEntityLists(['work_item', 'history', 'penalty', 'inbox']);
   const [q, setQ] = useState('');
   const [colView, setColView] = useState<LedgerColView>('기본');
@@ -297,6 +300,20 @@ export default function WorkLedgerPage() {
           cols={ALL_COLS}
           sections={WORK_DETAIL_SECTIONS}
           onClose={() => setSelected(null)}
+          actions={(
+            <>
+              {String(selected.raw.plate || '') ? (
+                <Btn size="sm" variant="ghost" onClick={() => openCar(String(selected.raw.plate))}>
+                  <CarFront size={14} /> 차량
+                </Btn>
+              ) : null}
+              {String(selected.raw.contractNo || '') ? (
+                <Btn size="sm" variant="ghost" onClick={() => router.push('/contract')}>
+                  <FileText size={14} /> 계약
+                </Btn>
+              ) : null}
+            </>
+          )}
         />
       ) : null}
     />

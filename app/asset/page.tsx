@@ -1,8 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { ExternalLink, Pencil, Plus, UploadCloud } from 'lucide-react';
-import { useRouter } from 'next/navigation';
+import { Pencil, Plus, UploadCloud } from 'lucide-react';
 import { assetMasterRow, type AssetMasterRow } from '@/lib/master-ledgers';
 import { ASSET_DETAIL_SECTIONS, ASSET_MASTER_BASIC_COLS, ASSET_MASTER_EXPANDED_COLS } from '@/lib/master-ledger-cols';
 import { useEntityList } from '@/lib/use-entity-lists';
@@ -21,6 +20,7 @@ import { openIngest } from '@/lib/ui-bus';
 import {
   ASSET_FILTER_DEFS, countActiveFilters, emptyFilterValues, eqFilter, matchLedgerFilters,
 } from '@/lib/ledger-filter-defs';
+import { VehicleSideEmbed } from '@/components/ledger/VehicleSideEmbed';
 type AssetOwnershipScope = '보유자산' | '처분자산' | '전체자산';
 type AssetQuickFilter = '계약중' | '휴차' | '매각대기';
 type AllAssetQuickFilter = '보유' | '처분';
@@ -70,7 +70,6 @@ export default function AssetLedgerPage() {
   const [selected, setSelected] = useState<ReturnType<typeof assetMasterRow> | null>(null);
   const [creating, setCreating] = useState(false);
   const [editing, setEditing] = useState(false);
-  const router = useRouter();
   const allRows = useMemo(() => vehicles.map(assetMasterRow).sort((a, b) => a.plate.localeCompare(b.plate, 'ko')), [vehicles]);
   const fleet = useMemo(() => linkFleet(vehicles, contracts, TODAY), [vehicles, contracts]);
   const searchedRows = useMemo(() => allRows.filter((r) =>
@@ -236,15 +235,10 @@ export default function AssetLedgerPage() {
           onClose={() => { setSelected(null); setEditing(false); }}
           actions={<>
             <Btn size="sm" onClick={() => setEditing(true)}><Pencil size={14} /> 수정</Btn>
-            <Btn
-              size="sm"
-              variant="ghost"
-              iconOnly
-              tip="차량 상세"
-              onClick={() => router.push(`/vehicle/${encodeURIComponent(selected.plate)}`)}
-            ><ExternalLink size={14} /></Btn>
           </>}
-        />
+        >
+          {selected.plate ? <VehicleSideEmbed plate={selected.plate} /> : null}
+        </LedgerRecordPanel>
       ) : null}
     />
   );
