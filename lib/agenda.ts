@@ -1,7 +1,7 @@
 /**
  * 일정 어젠다 SSOT — 기한 있는 일 1건=1행.
  *   반납·만기 · 검사 · 보험 · 과태료 → 날짜순.
- *   status: 어김(지남) | 임박(D≤7) | 예정 — 엑셀 원장·홈 대시보드 공용.
+ *   status: 어김(지남) | 임박(D≤7) | 예정 — 리스크관리·대시보드 공용(SSOT).
  */
 import { type EntityRecord } from './intake/entities';
 import { dday } from './dashboard-consts';

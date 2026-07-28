@@ -3,7 +3,7 @@
  * 대시보드(/) — `/dev/erp-design` HomeView 시안 1:1 이식.
  *   KPI 4칸(가동률·휴차·미수율·오늘업무) + 오늘 집중 업무 + 데이터 교차검증.
  *   셸 = LedgerFrame(회사 스코프). Sec 접기 없음. 색=C.* 토큰만.
- *   데이터 = computeKPI · computeDashboard · buildAgenda · selectPendingWork.
+ *   데이터 = computeKPI · computeDashboard · riskAgendaFocus · selectPendingWork.
  */
 import { useMemo, type CSSProperties, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
@@ -14,7 +14,7 @@ import {
 import { TODAY } from '@/lib/dashboard-consts';
 import { computeKPI } from '@/lib/kpi';
 import { computeDashboard } from '@/lib/operating-snapshot';
-import { buildAgenda } from '@/lib/agenda';
+import { riskAgendaFocus } from '@/lib/risk-ledger';
 import { selectPendingWork } from '@/lib/snapshot/selectors';
 import { useEntityLists } from '@/lib/use-entity-lists';
 import { openCar, openIngest } from '@/lib/ui-bus';
@@ -127,20 +127,12 @@ export default function DashboardPage() {
     [contracts, vehicles, insurances, penalties, bankTx],
   );
   const pending = useMemo(() => selectPendingWork(D), [D]);
-  const agenda = useMemo(
-    () => buildAgenda(contracts, vehicles, insurances, penalties),
+  const focusAll = useMemo(
+    () => riskAgendaFocus(contracts, vehicles, insurances, penalties),
     [contracts, vehicles, insurances, penalties],
   );
-
-  const focus = useMemo(() => {
-    const rank = (s: string) => (s === '어김' ? 0 : s === '임박' ? 1 : 2);
-    return agenda
-      .filter((a) => a.status === '어김' || a.status === '임박')
-      .sort((a, b) => rank(a.status) - rank(b.status) || a.dday - b.dday)
-      .slice(0, 5);
-  }, [agenda]);
-
-  const delayedN = useMemo(() => agenda.filter((a) => a.status === '어김').length, [agenda]);
+  const focus = useMemo(() => focusAll.slice(0, 5), [focusAll]);
+  const delayedN = useMemo(() => focusAll.filter((a) => a.status === '어김').length, [focusAll]);
   const misuRate = kpi.monthlyBilled > 0
     ? Math.round((kpi.misuActive / kpi.monthlyBilled) * 1000) / 10
     : 0;
@@ -213,7 +205,7 @@ export default function DashboardPage() {
               <div style={{ fontSize: 12, color: C.sub, marginTop: 6 }}>가동과 회수에 집중해야 할 항목을 먼저 보여드립니다.</div>
             </div>
             <div style={{ display: 'inline-flex', gap: 7 }}>
-              <Btn size="sm" variant="ghost" onClick={() => go('/desk')}>일정</Btn>
+              <Btn size="sm" variant="ghost" onClick={() => go('/risk')}>리스크</Btn>
               <Btn size="sm" variant="solid" onClick={() => go('/work')}>업무</Btn>
             </div>
           </div>
@@ -267,7 +259,7 @@ export default function DashboardPage() {
                   ))}
                 </div>
               )}
-              onClick={() => go('/desk')}
+              onClick={() => go('/risk')}
             />
           </div>
 
@@ -279,7 +271,7 @@ export default function DashboardPage() {
             <Panel
               title="오늘 집중할 업무"
               desc="위험도와 기한을 기준으로 정렬했습니다."
-              action={<Btn size="sm" variant="ghost" onClick={() => go('/desk')}>전체 업무 보기</Btn>}
+              action={<Btn size="sm" variant="ghost" onClick={() => go('/risk')}>리스크 전체</Btn>}
             >
               {loading ? (
                 <EmptyState variant="sec">…</EmptyState>
@@ -302,7 +294,7 @@ export default function DashboardPage() {
                           {a.dday < 0 ? `${-a.dday}일 지남` : a.dday === 0 ? '오늘' : `D-${a.dday}`}
                         </span>
                       )}
-                      onClick={() => { if (a.plate) openCar(a.plate); else go('/desk'); }}
+                      onClick={() => { if (a.plate) openCar(a.plate); else go('/risk'); }}
                     />
                   ))}
                 </ListBox>

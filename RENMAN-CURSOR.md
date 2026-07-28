@@ -21,9 +21,9 @@
 
 ## 2. 지금 할 일 (요약 — 상세는 WORK-ORDER)
 
-**IA (2026-07):** 허브=홈(대시보드)·운영현황(통합시트)·일정관리(기한엑셀)·데이터센터.  
-원장=자산·계약·자금·업무. 일정=`buildAgenda` 어김/임박/예정 · LedgerFrame.  
-홈=지표 한눈(함대·일정어김·미수) — 엑셀 표는 각 메뉴.
+**IA (2026-07):** 허브=대시보드·운영현황·리스크관리·데이터센터.  
+원장=자산·계약·자금·업무. 리스크=`risk-ledger`(미완료·미납·만기·휴차 + `buildAgenda` 어김·임박). `/desk`→`/risk`.  
+대시보드=KPI + `riskAgendaFocus` 오늘집중 — 엑셀 표는 각 메뉴.
 
 **Claude 검증 포인트:** `PAGE_IA`/`NAV_GROUPS` · 리다이렉트 · 패널 수정 · `/cash` tools CTA · 버튼 zone · `tsc --noEmit`.
 
@@ -70,6 +70,7 @@ curl -s -o /dev/null -w "%{http_code}" http://localhost:6006/<route>   # 200
 
 | 날짜 | 작업자 | 내용 | 상태 |
 |---|---|---|---|
+| 2026-07-29 | Cursor | /desk메뉴제거→/risk redirect · risk-ledger에 agenda어김·임박합류 · 대시보드 riskAgendaFocus | tsc0 |
 | 2026-07-28 | Cursor | 대시보드=/dev/erp-design HomeView 이식(KPI4+오늘업무+교차검증) · aging/법인별표 제거 | tsc0 |
 | 2026-07-28 | Cursor | Sec collapsible={false} 추가 · 대시보드 3구획 접기/셰브론 제거 | tsc0 |
 | 2026-07-28 | Cursor | 홈 삭제·대시보드 신규(LedgerFrame·KPI+aging+법인별) · home-kpi 폐기 · computeKPI/kpiByCompany SSOT | tsc0 |

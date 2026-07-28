@@ -6,12 +6,12 @@
  * 2026-07 IA:
  *   허브 = 대시보드 · 운영현황 · 리스크관리 · 데이터센터
  *   원장 = 자산 · 계약 · 자금 · 업무
- *   대시보드(/) = 관제 콕핏(KPI 타일 + 법인별). 예외 엑셀=/risk · 일정=/desk.
+ *   대시보드(/) = 관제 콕핏(KPI 타일 + 법인별). 예외 엑셀=/risk (일정 어김·임박 흡수).
  *   원장 = 마스터 표 + 더블클릭 우측 상세패널 (별도 상세페이지 축소 수순)
  */
 import {
   Table2, Wallet, Settings, Database, ListTodo,
-  CarFront, FileText, LayoutDashboard, Upload, CalendarCheck, TriangleAlert, type LucideIcon,
+  CarFront, FileText, LayoutDashboard, Upload, TriangleAlert, type LucideIcon,
 } from 'lucide-react';
 import type { Tier } from './tier';
 import type { AssetKind, DataLayer } from './domain/layers';
@@ -44,8 +44,7 @@ export const PAGE_IA: PageIA[] = [
   // ── 허브 ──
   { href: '/', label: '대시보드', role: 'hub', layer: 'mixed', tier: '라이트', view: '관제 콕핏 · KPI 타일 + 법인별', grab: 'none', grabHow: '—' },
   { href: '/status', label: '운영현황', role: 'view', layer: 'mixed', tier: '라이트', view: '차량 1대=1행 통합원장 · LedgerFrame', grab: 'none', grabHow: '—' },
-  { href: '/desk', label: '일정관리', role: 'view', layer: 'event', tier: '라이트', view: 'buildAgenda · LedgerFrame', grab: 'none', grabHow: '—' },
-  { href: '/risk', label: '리스크관리', role: 'hub', layer: 'mixed', tier: '라이트', view: 'risk-ledger · LedgerFrame · 미완료·미납·만기·휴차', grab: 'none', grabHow: '—' },
+  { href: '/risk', label: '리스크관리', role: 'hub', layer: 'mixed', tier: '라이트', view: 'risk-ledger · LedgerFrame · 미완료·미납·만기·휴차(+일정 어김·임박)', grab: 'none', grabHow: '—' },
   { href: '/ingest', label: '데이터센터', role: 'input', layer: 'mixed', tier: '라이트', view: 'OCR·엑셀·직접 투입', grab: 'batch', grabHow: '담기' },
 
   // ── 원장 ──
@@ -70,6 +69,7 @@ export const PAGE_IA: PageIA[] = [
   { href: '/sheet', label: '운영원장→자산', role: 'view', layer: 'ledger', tier: '라이트', view: 'redirect /asset', grab: 'none', grabHow: '—' },
   { href: '/finance', label: '재무현황→자금', role: 'view', layer: 'ledger', tier: '라이트', view: 'redirect /cash', grab: 'none', grabHow: '—' },
   { href: '/ops', label: '마이페이지→대시보드', role: 'hub', layer: 'mixed', tier: '라이트', view: 'redirect /', grab: 'none', grabHow: '—' },
+  { href: '/desk', label: '일정관리→리스크', role: 'view', layer: 'event', tier: '라이트', view: 'redirect /risk', grab: 'none', grabHow: '—' },
 ];
 
 export const PAGE_BY_HREF: Record<string, PageIA> = Object.fromEntries(PAGE_IA.map((p) => [p.href, p]));
@@ -148,7 +148,6 @@ export const NAV_GROUPS: NavGroup[] = [
   { title: '', items: [
     { href: '/', label: '대시보드', icon: LayoutDashboard, tier: '라이트' },
     { href: '/status', label: '운영현황', icon: LayoutDashboard, tier: '라이트' },
-    { href: '/desk', label: '일정관리', icon: CalendarCheck, tier: '라이트' },
     { href: '/risk', label: '리스크관리', icon: TriangleAlert, tier: '라이트' },
     { href: '/ingest', label: '데이터센터', icon: Upload, tier: '라이트' },
   ] },

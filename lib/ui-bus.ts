@@ -7,10 +7,10 @@ export const openLens = (lens: string) => {
   if (typeof window === 'undefined') return;
   const map: Record<string, string> = {
     운영: '/status',
-    일정: '/desk',
+    일정: '/risk',
     콕핏: '/',
     미결: '/receivables',
-    리스크: '/receivables',
+    리스크: '/risk',
     휴차: '/status',
     요약: '/',
     돈: '/cash',

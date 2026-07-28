@@ -99,7 +99,7 @@ export default function StatusPage() {
       tools={<LedgerActions aria-label="워크플로">
         <Btn size="sm" variant="ghost" iconOnly tip="자산 원장" href="/asset"><Car size={14} /></Btn>
         <Btn size="sm" variant="ghost" iconOnly tip="계약 원장" href="/contract"><FileText size={14} /></Btn>
-        <Btn size="sm" variant="ghost" iconOnly tip="일정/미결" href="/desk"><CalendarClock size={14} /></Btn>
+        <Btn size="sm" variant="ghost" iconOnly tip="리스크관리" href="/risk"><CalendarClock size={14} /></Btn>
       </LedgerActions>}
       filters={<>
         <Search

@@ -8,7 +8,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   LayoutDashboard, Upload, CarFront, ListTodo,
-  Wallet, FileText, CalendarCheck,
+  Wallet, FileText, TriangleAlert,
   type LucideIcon,
 } from 'lucide-react';
 import { useSession } from '@/lib/session';
@@ -20,7 +20,7 @@ import { Btn, C, SPACE_M, toggleStyle } from '@/components/ui';
 
 export type MobileTabId =
   | 'operations' | 'money' | 'work'
-  | 'home' | 'status' | 'desk' | 'mydesk' | 'search' | 'upload' | 'settings'
+  | 'home' | 'status' | 'risk' | 'desk' | 'mydesk' | 'search' | 'upload' | 'settings'
   | 'dispatch' | 'asset' | 'receivables' | 'finance' | 'contract'
   | 'inbox' | 'penalty' | 'payments' | 'pnl' | 'integrity';
 
@@ -37,7 +37,7 @@ export type MobileTabDef = {
 export const MOBILE_TAB_DEFS: MobileTabDef[] = [
   { id: 'home', label: '대시보드', href: '/', icon: LayoutDashboard, match: (p) => p === '/', group: '허브', tier: pageTier('/') },
   { id: 'status', label: '운영', href: '/status', icon: LayoutDashboard, match: (p) => p.startsWith('/status'), group: '허브', tier: pageTier('/status') },
-  { id: 'desk', label: '일정', href: '/desk', icon: CalendarCheck, match: (p) => p.startsWith('/desk'), group: '허브', tier: pageTier('/desk') },
+  { id: 'risk', label: '리스크', href: '/risk', icon: TriangleAlert, match: (p) => p.startsWith('/risk') || p.startsWith('/desk'), group: '허브', tier: pageTier('/risk') },
   { id: 'upload', label: '업로드', href: '/ingest', icon: Upload, match: (p) => p.startsWith('/ingest'), group: '허브', tier: pageTier('/ingest') },
   { id: 'asset', label: '자산', href: '/asset', icon: CarFront, match: (p) => p.startsWith('/asset'), group: '원장', tier: pageTier('/asset') },
   { id: 'contract', label: '계약', href: '/contract', icon: FileText, match: (p) => p.startsWith('/contract'), group: '원장', tier: pageTier('/contract') },
@@ -47,8 +47,8 @@ export const MOBILE_TAB_DEFS: MobileTabDef[] = [
 
 export const MOBILE_TAB_MAP: Record<string, MobileTabDef> = Object.fromEntries(MOBILE_TAB_DEFS.map((t) => [t.id, t]));
 
-/** 라이트 코어 — 홈·미결·원장. */
-const PREFERRED_LIGHT: MobileTabId[] = ['home', 'desk', 'asset', 'contract', 'work'];
+/** 라이트 코어 — 홈·리스크·원장. */
+const PREFERRED_LIGHT: MobileTabId[] = ['home', 'risk', 'asset', 'contract', 'work'];
 const PREFERRED_STANDARD: MobileTabId[] = PREFERRED_LIGHT;
 
 export const MAX_MOBILE_TABS = 5;
@@ -71,7 +71,11 @@ const STORE_PREFIX = 'jpk:mobile-tabs:';
 
 function normalizeIds(raw: unknown): MobileTabId[] {
   if (!Array.isArray(raw)) return defaultMobileTabs();
-  const mapped = (raw as string[]).map((id) => (id === 'field' ? 'dispatch' : id));
+  const mapped = (raw as string[]).map((id) => (
+    id === 'field' ? 'dispatch'
+      : id === 'desk' || id === 'mydesk' ? 'risk'
+        : id
+  ));
   const ids = mapped.filter(allowedTab);
   const uniq = [...new Set(ids)];
   return uniq.length ? uniq.slice(0, MAX_MOBILE_TABS) : defaultMobileTabs();

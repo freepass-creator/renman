@@ -1,20 +1,20 @@
 /**
  * 리스크관리 원장 SSOT — 웹(/risk) · 모바일(/m/risk) 단일.
- * linkFleet/buildFleetRows · selectReceivables(동일 net) · buildAgenda 병합.
+ * linkFleet/buildFleetRows · selectReceivables(동일 net) · buildAgenda(어김→미완료 · 임박→만기).
  * 구분: 미완료 · 미납 · 만기 · 휴차. 페이지 손롤 집계 금지.
- * 홈(/)은 랜딩만 — 예외 그리드는 여기만.
+ * 일정관리(/desk)는 /risk로 흡수.
  */
 import { type EntityRecord } from '@/lib/intake/entities';
 import { TODAY } from '@/lib/dashboard-consts';
 import { linkFleet } from '@/lib/domain/model';
 import { buildFleetRows, type FleetRow } from '@/lib/sheet-rows';
-import { buildAgenda } from '@/lib/agenda';
+import { buildAgenda, type AgendaItem } from '@/lib/agenda';
 import { computeContractView } from '@/lib/contract-ops';
 import { selectReceivables } from '@/lib/snapshot/selectors';
 import type { BadgeTone } from '@/components/ui/misc';
 import { NAV_GROUPS, type NavItem } from '@/lib/nav';
 
-/** 만기 칩 경계 — D≤이 값(경과 포함은 미완료, 임박만 만기). */
+/** 만기 칩 경계 — D≤이 값(경과 포함은 미완료, 임박만 만기). buildAgenda 임박과 동일. */
 export const RISK_DDAY_BOUND = 7;
 
 export type RiskSheetGroup = '미완료' | '미납' | '만기' | '휴차';
@@ -68,6 +68,21 @@ function rowOf(
   return { ...partial, group, tone: t.tone, badgeTone: t.badgeTone };
 }
 
+/** 대시보드「오늘 집중」·리스크 일정 합류 공용 — buildAgenda 어김·임박만. cap 없으면 전체. */
+export function riskAgendaFocus(
+  contracts: EntityRecord[],
+  vehicles: EntityRecord[],
+  insurances: EntityRecord[],
+  penalties: EntityRecord[],
+  cap?: number,
+): AgendaItem[] {
+  const rank = (s: AgendaItem['status']) => (s === '어김' ? 0 : s === '임박' ? 1 : 2);
+  const items = buildAgenda(contracts, vehicles, insurances, penalties)
+    .filter((a) => a.status === '어김' || a.status === '임박')
+    .sort((a, b) => rank(a.status) - rank(b.status) || a.dday - b.dday || a.date.localeCompare(b.date));
+  return cap != null ? items.slice(0, cap) : items;
+}
+
 /** 미완료·미납·만기·휴차 주의 행 (엑셀·리스트 공용). */
 export function buildRiskSheetRows(
   vehicles: EntityRecord[],
@@ -89,6 +104,9 @@ export function buildRiskSheetRows(
     seen.add(r.id);
     out.push(r);
   };
+
+  // 일정 SSOT 1회 — 어김→미완료 · 임박→만기 (검사·보험·과태료·반납)
+  const agenda = buildAgenda(contracts, vehicles, insurances, penalties);
 
   // ── 미완료: 만기경과 · 인도예정 · 일정 어김 ──
   for (const r of held.filter((x) => x.dday != null && x.dday < 0).sort((a, b) => (a.dday ?? 0) - (b.dday ?? 0))) {
@@ -118,7 +136,7 @@ export function buildRiskSheetRows(
     }));
   }
   const overduePlates = new Set(held.filter((x) => x.dday != null && x.dday < 0).map((x) => x.plate));
-  for (const a of buildAgenda(contracts, vehicles, insurances, penalties).filter((x) => x.status === '어김')) {
+  for (const a of agenda.filter((x) => x.status === '어김')) {
     if (a.kind === '반납·만기' && a.plate && overduePlates.has(a.plate)) continue;
     const fr = a.plate ? byPlate.get(a.plate) : undefined;
     push(rowOf('미완료', {
@@ -154,7 +172,7 @@ export function buildRiskSheetRows(
     }));
   }
 
-  // ── 만기: 0 ≤ dday ≤ RISK_DDAY_BOUND (경과분은 미완료) ──
+  // ── 만기: 계약 임박 + 일정 임박(검사·보험·과태료·반납) ──
   for (const r of held
     .filter((x) => x.dday != null && x.dday >= 0 && x.dday <= RISK_DDAY_BOUND)
     .sort((a, b) => (a.dday ?? 0) - (b.dday ?? 0))) {
@@ -168,6 +186,24 @@ export function buildRiskSheetRows(
       dueDate: (r.end || '').slice(0, 10),
       amount: Math.max(0, r.net),
       status: '만기임박',
+    }));
+  }
+  const soonPlates = new Set(
+    held.filter((x) => x.dday != null && x.dday >= 0 && x.dday <= RISK_DDAY_BOUND).map((x) => x.plate),
+  );
+  for (const a of agenda.filter((x) => x.status === '임박')) {
+    if (a.kind === '반납·만기' && a.plate && soonPlates.has(a.plate)) continue;
+    const fr = a.plate ? byPlate.get(a.plate) : undefined;
+    push(rowOf('만기', {
+      id: `만기:일정:${a.key}`,
+      kind: a.kind,
+      plate: a.plate,
+      customer: a.title || '—',
+      carName: fr ? carNameOf(fr) : '—',
+      due: `${ddayLabel(a.dday)} · ${a.date}`,
+      dueDate: a.date,
+      amount: 0,
+      status: '임박',
     }));
   }
 

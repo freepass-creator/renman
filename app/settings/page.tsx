@@ -108,8 +108,9 @@ export default function SettingsPage() {
   useEffect(() => {
     try {
       const v = localStorage.getItem('jpk:landing') || '';
-      if (v === 'mydesk') setLanding('/desk');            // 레거시 → 일정관리
+      if (v === 'mydesk') setLanding('/risk');            // 레거시 → 리스크관리
       else if (v === 'field') setLanding('/dispatch');
+      else if (v === '/desk') setLanding('/risk');
       else if (!v || v === 'home') setLanding('/');
       else setLanding(v);
     } catch { /* 무시 */ }
