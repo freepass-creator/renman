@@ -234,7 +234,7 @@ export const ENTITIES: Record<string, Entity> = {
       { key: 'pickupPlace', label: '인수장소', type: 'text', manual: true },
       { key: 'returnPlace', label: '반환장소', type: 'text', manual: true },
       { key: 'paymentDay', label: '결제일', type: 'number', manual: true, note: '매월 N일 (미입력=25일)' },
-      { key: 'paymentTiming', label: '납부시기', type: 'select', options: ['선납', '후납'], manual: true, note: '선납=계약일 기준 · 후납=익월 (레거시 선불/후불 호환)' },
+      { key: 'paymentTiming', label: '선후납', type: 'select', options: ['선납', '후납'], manual: true, note: '선납=계약일 기준 · 후납=익월 (레거시 선불/후불 호환)' },
       { key: 'reservationFee', label: '예약금(원)', type: 'number', manual: true, note: '대여예정요금 10% 범위' },
       { key: 'lateFeeRate', label: '지연손해금율(%)', type: 'number', manual: true },
       { key: 'earlyTerminationRate', label: '중도해지 위약금율(%)', type: 'number', manual: true, note: '표준 10%' },

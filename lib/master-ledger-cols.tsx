@@ -164,7 +164,7 @@ const C0 = {
     text: (r) => r.paymentDay || '',
   },
   paymentTiming: {
-    key: 'paymentTiming', label: '납부시기', align: 'c', priority: 3,
+    key: 'paymentTiming', label: '선후납', align: 'c', priority: 3,
     render: (r) => {
       const t = paymentTimingOf(r.paymentTiming);
       return t === '후납' ? <Badge tone="amber">후납</Badge> : <Badge tone="gray">선납</Badge>;
