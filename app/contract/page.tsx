@@ -1,17 +1,23 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { Plus } from 'lucide-react';
+import { CircleDollarSign, Pencil, Plus, UploadCloud } from 'lucide-react';
 import { TODAY } from '@/lib/dashboard-consts';
 import { contractMasterRow } from '@/lib/master-ledgers';
-import { CONTRACT_MASTER_BASIC_COLS, CONTRACT_MASTER_EXPANDED_COLS } from '@/lib/master-ledger-cols';
+import { CONTRACT_DETAIL_SECTIONS, CONTRACT_MASTER_BASIC_COLS, CONTRACT_MASTER_EXPANDED_COLS } from '@/lib/master-ledger-cols';
+import { summarizeContractLedgerStats } from '@/lib/ledger-stats';
 import { useEntityList } from '@/lib/use-entity-lists';
 import { textMatch } from '@/lib/search-match';
 import {
-  Btn, C, LedgerCreatePanel, LedgerFilterButton, LedgerFilterPanel, LedgerFrame, LedgerRecordPanel, PeriodBar, Search, Select, toggleStyle, won,
+  Btn, C, FilterChips, LedgerActions, LedgerCreatePanel, LedgerEditPanel, LedgerFilterButton, LedgerFilterFields, LedgerFilterPanel, LedgerFrame, LedgerRecordPanel, PeriodBar, Search, Select, won,
   type LedgerColView, type LedgerFormSection,
 } from '@/components/ui';
 import { useIsMobile } from '@/lib/use-mobile';
+import { MigrateDataButton } from '@/components/MigrateDataButton';
+import { openIngest, openReceivables } from '@/lib/ui-bus';
+import {
+  CONTRACT_FILTER_DEFS, countActiveFilters, emptyFilterValues, eqFilter, matchLedgerFilters,
+} from '@/lib/ledger-filter-defs';
 
 const CONTRACT_CREATE_SECTIONS: LedgerFormSection[] = [
   { title: '계약 기본정보', open: true, fields: ['contractNo', 'status', 'contractDate', 'plate', 'carName'] },
@@ -27,55 +33,71 @@ export default function ContractLedgerPage() {
   const [q, setQ] = useState('');
   const [scope, setScope] = useState<'계약유지' | '계약종료' | '전체'>('계약유지');
   const [dateBasis, setDateBasis] = useState<'계약일' | '종료일'>('계약일');
-  const [receivableOnly, setReceivableOnly] = useState(false);
+  const [riskOnly, setRiskOnly] = useState(false);
   const [range, setRange] = useState({ from: '', to: '' });
   const [filterOpen, setFilterOpen] = useState(false);
-  const [detailStatus, setDetailStatus] = useState('');
-  const [detailEndReason, setDetailEndReason] = useState('');
+  const [detailFilters, setDetailFilters] = useState(() => emptyFilterValues(CONTRACT_FILTER_DEFS));
   const [colView, setColView] = useState<LedgerColView>('기본');
   const [selected, setSelected] = useState<ReturnType<typeof contractMasterRow> | null>(null);
   const [creating, setCreating] = useState(false);
+  const [editing, setEditing] = useState(false);
   const allRows = useMemo(() => contracts
     .map((record) => contractMasterRow(record, TODAY))
     .sort((a, b) => Number(a.ended) - Number(b.ended) || a.endDate.localeCompare(b.endDate)), [contracts]);
   const searchedRows = useMemo(() => allRows.filter((r) =>
-    textMatch(q, r.company, r.contractNo, r.plate, r.carName, r.contractorName, r.contractorPhone, r.contractorLicenseNo, r.status, r.dataAlert),
+    textMatch(q, r.company, r.contractNo, r.plate, r.carName, r.contractorName, r.contractorPhone, r.contractorLicenseNo, r.status, r.dataAlert, r.riskLabel),
   ), [allRows, q]);
   const latest = useMemo(() => allRows.reduce((latestDate, row) => {
     const date = dateBasis === '종료일' ? (row.returnedDate || row.endDate) : (row.contractDate || row.startDate);
     return date > latestDate ? date : latestDate;
   }, TODAY), [allRows, dateBasis]);
+  const contractFilterMatchers = useMemo(() => ({
+    status: eqFilter<ReturnType<typeof contractMasterRow>>((r) => r.status),
+    endReason: eqFilter<ReturnType<typeof contractMasterRow>>((r) => r.endReason),
+  }), []);
   const rows = useMemo(() => searchedRows.filter((r) => {
     if (!(scope === '전체' || (scope === '계약유지' ? !r.ended : r.ended))) return false;
-    if (receivableOnly && r.net <= 0) return false;
-    if (detailStatus && r.status !== detailStatus) return false;
-    if (detailEndReason && r.endReason !== detailEndReason) return false;
+    if (riskOnly && !r.atRisk) return false;
+    if (!matchLedgerFilters(r, detailFilters, contractFilterMatchers)) return false;
     const date = dateBasis === '종료일' ? (r.returnedDate || r.endDate) : (r.contractDate || r.startDate);
     if (range.from && (!date || date < range.from)) return false;
     if (range.to && (!date || date > range.to)) return false;
     return true;
-  }), [searchedRows, scope, receivableOnly, detailStatus, detailEndReason, dateBasis, range.from, range.to]);
+  }), [searchedRows, scope, riskOnly, detailFilters, contractFilterMatchers, dateBasis, range.from, range.to]);
   const contractStatuses = useMemo(() => [...new Set(allRows.map((r) => r.status).filter(Boolean))].sort(), [allRows]);
   const endReasons = useMemo(() => [...new Set(allRows.map((r) => r.endReason).filter(Boolean))].sort(), [allRows]);
-  const detailFilterCount = Number(!!detailStatus) + Number(!!detailEndReason);
-  const active = searchedRows.filter((r) => !r.ended).length;
-  // 실미수 = 현재 진행 계약 중 결제일이 도래한 미납만.
-  // 종료 계약의 남은 채권은 회수대상 잔존채권으로 분리하고 실미수 KPI에 합치지 않는다.
-  const debt = searchedRows.filter((r) => !r.ended && r.net > 0);
-  const debtSum = debt.reduce((sum, r) => sum + r.net, 0);
-  const endedDebt = searchedRows.filter((r) => r.ended && r.net > 0);
-  const endedDebtSum = endedDebt.reduce((sum, r) => sum + r.net, 0);
+  const detailFilterCount = countActiveFilters(detailFilters, CONTRACT_FILTER_DEFS);
+  const { active, riskCount, riskDebtSum, endedRiskCount, endedRiskDebtSum } = useMemo(
+    () => summarizeContractLedgerStats(searchedRows, TODAY),
+    [searchedRows],
+  );
 
   return (
     <LedgerFrame
       title="계약관리"
-      meta="계약 1건 1행 · 계약자·차량·기간·납부조건·반납·미수"
-      right={<Btn size="sm" variant={creating ? 'ghost' : 'solid'} aria-pressed={creating} onClick={() => {
-        setSelected(null);
-        setCreating((open) => !open);
-      }}><Plus size={14} /> {creating ? '생성 취소' : '계약 생성'}</Btn>}
+      meta="계약 1건 1행 · 계약자·차량·기간·납부 · 리스크(불이행)"
+      right={<LedgerActions aria-label="쓰기">
+        <Btn
+          size="sm"
+          variant="solid"
+          aria-pressed={creating}
+          onClick={() => {
+            setSelected(null);
+            setEditing(false);
+            setCreating((open) => !open);
+          }}
+        ><Plus size={14} /> {creating ? '생성 취소' : '계약 생성'}</Btn>
+      </LedgerActions>}
+      tools={<LedgerActions aria-label="워크플로">
+        <Btn size="sm" variant="ghost" iconOnly tip="계약서·자료 투입 — 데이터센터" onClick={() => openIngest('contract')}>
+          <UploadCloud size={14} />
+        </Btn>
+        <Btn size="sm" variant="ghost" iconOnly tip="미수 회수" onClick={() => openReceivables()}>
+          <CircleDollarSign size={14} />
+        </Btn>
+      </LedgerActions>}
       filters={<>
-        <Search size="sm" placeholder="회사·계약번호·차량·계약자·상태·알람" value={q} onChange={(e) => setQ(e.target.value)} style={{ width: mobile ? '100%' : 300 }} />
+        <Search size="sm" placeholder="회사·계약번호·차량·계약자·상태·리스크·알람" value={q} onChange={(e) => setQ(e.target.value)} style={{ width: mobile ? '100%' : 300 }} />
         <LedgerFilterButton open={filterOpen} count={detailFilterCount} onClick={() => setFilterOpen((open) => !open)} />
         <Select size="sm" aria-label="계약 원장 선택" value={scope} onChange={(event) => setScope(event.target.value as typeof scope)}>
           <option value="계약유지">유지계약 원장</option>
@@ -86,27 +108,47 @@ export default function ContractLedgerPage() {
           <option value="계약일">계약일 기준</option>
           <option value="종료일">종료일 기준</option>
         </Select>
-        <button type="button" data-ui="toggle" aria-pressed={receivableOnly} onClick={() => setReceivableOnly((active) => !active)} style={toggleStyle(receivableOnly, 'sm', mobile)}>미수</button>
-        <PeriodBar latest={latest} initial="전체" onRange={setRange} />
+        <FilterChips
+          allowOff
+          value={riskOnly ? '리스크' : null}
+          onChange={(v) => setRiskOnly(v === '리스크')}
+          options={[{ key: '리스크', label: '리스크' }]}
+        />
+        <PeriodBar latest={latest} initial="전체" size="sm" onRange={setRange} />
       </>}
-      stats={<span style={{ fontSize: 12.5, color: C.mute }}>유지 <b style={{ color: C.ok }}>{active}</b> · 실미수 <b style={{ color: C.danger }}>{debt.length}건 {won(debtSum)}</b> · 계약종료 미수 <b>{endedDebt.length}건 {won(endedDebtSum)}</b></span>}
+      stats={<span style={{ fontSize: 12.5, color: C.mute }}>유지 <b style={{ color: C.ok }}>{active}</b> · 리스크 <b style={{ color: C.danger }}>{riskCount}건</b>{riskDebtSum > 0 ? <> · 미수 {won(riskDebtSum)}</> : null} · 종료 리스크 <b>{endedRiskCount}건</b>{endedRiskDebtSum > 0 ? <> · 미수 {won(endedRiskDebtSum)}</> : null}</span>}
       colView={colView}
       onColView={setColView}
       loading={loading}
-      empty="등록된 계약이 없습니다."
+      empty={<>
+        등록된 계약이 없습니다. 계약서는 데이터센터에서 담으세요.
+        <div style={{ marginTop: 14, display: 'flex', justifyContent: 'center', gap: 8 }}>
+          <Btn size="sm" variant="ghost" onClick={() => openIngest('contract')}><UploadCloud size={14} /> 데이터센터</Btn>
+          <MigrateDataButton size="sm" />
+        </div>
+      </>}
       cols={colView === '기본' ? CONTRACT_MASTER_BASIC_COLS : CONTRACT_MASTER_EXPANDED_COLS}
       rows={rows}
       rowKey={(r) => r.contractNo || `${r.plate}:${r.startDate}`}
       selectedRowKey={selected ? (selected.contractNo || `${selected.plate}:${selected.startDate}`) : null}
       onRowDoubleClick={(row) => {
         setCreating(false);
+        setEditing(false);
         setSelected(row);
       }}
-      onCloseDetail={() => setSelected(null)}
+      onCloseDetail={() => { setSelected(null); setEditing(false); }}
       filterPanel={filterOpen ? (
-        <LedgerFilterPanel title="계약 세부 필터" onClose={() => setFilterOpen(false)} onReset={() => { setDetailStatus(''); setDetailEndReason(''); }}>
-          <label><span style={{ display: 'block', fontSize: 12, fontWeight: 800, marginBottom: 6 }}>계약상태</span><Select value={detailStatus} onChange={(e) => setDetailStatus(e.target.value)} style={{ width: '100%' }}><option value="">전체</option>{contractStatuses.map((value) => <option key={value} value={value}>{value}</option>)}</Select></label>
-          <label><span style={{ display: 'block', fontSize: 12, fontWeight: 800, marginBottom: 6 }}>종료사유</span><Select value={detailEndReason} onChange={(e) => setDetailEndReason(e.target.value)} style={{ width: '100%' }}><option value="">전체</option>{endReasons.map((value) => <option key={value} value={value}>{value}</option>)}</Select></label>
+        <LedgerFilterPanel
+          title="계약 세부 필터"
+          onClose={() => setFilterOpen(false)}
+          onReset={() => setDetailFilters(emptyFilterValues(CONTRACT_FILTER_DEFS))}
+        >
+          <LedgerFilterFields
+            defs={CONTRACT_FILTER_DEFS}
+            values={detailFilters}
+            onChange={(key, value) => setDetailFilters((prev) => ({ ...prev, [key]: value }))}
+            options={{ status: contractStatuses, endReason: endReasons }}
+          />
         </LedgerFilterPanel>
       ) : null}
       sidePanel={creating ? (
@@ -118,13 +160,32 @@ export default function ContractLedgerPage() {
           initial={{ status: '대기', paymentTiming: '선불' }}
           onClose={() => setCreating(false)}
         />
+      ) : selected && editing ? (
+        <LedgerEditPanel
+          key={`edit-contract:${selected.contractNo || selected.plate}`}
+          entityKey="contract"
+          title={`${selected.contractNo || selected.contractorName || '계약'} 수정`}
+          sections={CONTRACT_CREATE_SECTIONS}
+          record={selected.raw}
+          onClose={() => setEditing(false)}
+          onSaved={(record) => setSelected(contractMasterRow(record, TODAY))}
+        />
       ) : selected ? (
         <LedgerRecordPanel
           title={selected.contractNo || selected.contractorName}
           subtitle={`${selected.contractorName || '계약자 미입력'} · ${selected.plate || '차량 미입력'}`}
           row={selected}
           cols={CONTRACT_MASTER_EXPANDED_COLS}
-          onClose={() => setSelected(null)}
+          sections={CONTRACT_DETAIL_SECTIONS}
+          onClose={() => { setSelected(null); setEditing(false); }}
+          actions={<>
+            <Btn size="sm" onClick={() => setEditing(true)}><Pencil size={14} /> 수정</Btn>
+            {selected.net > 0 && (
+              <Btn size="sm" variant="ghost" iconOnly tip="미수 회수" onClick={() => openReceivables()}>
+                <CircleDollarSign size={14} />
+              </Btn>
+            )}
+          </>}
         />
       ) : null}
     />

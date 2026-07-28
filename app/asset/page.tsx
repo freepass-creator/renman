@@ -15,6 +15,7 @@ import { useIsMobile } from '@/lib/use-mobile';
 import { TODAY } from '@/lib/dashboard-consts';
 import { linkFleet, type Fleet } from '@/lib/domain/model';
 import { normPlate } from '@/lib/plate';
+import { summarizeAssetLedgerStats } from '@/lib/ledger-stats';
 import { MigrateDataButton } from '@/components/MigrateDataButton';
 import { openIngest } from '@/lib/ui-bus';
 import {
@@ -96,17 +97,10 @@ export default function AssetLedgerPage() {
   const assetStatuses = useMemo(() => [...new Set(allRows.map((r) => r.status).filter(Boolean))].sort(), [allRows]);
   const assetMakers = useMemo(() => [...new Set(allRows.map((r) => r.maker).filter(Boolean))].sort(), [allRows]);
   const detailFilterCount = countActiveFilters(detailFilters, ASSET_FILTER_DEFS);
-  const held = searchedRows.filter((r) => !r.disposed).length;
-  const disposed = searchedRows.filter((r) => r.disposed).length;
-  const contracted = searchedRows.filter((r) => {
-    const n = fleet.byPlate.get(normPlate(r.plate));
-    return n?.ownership === '보유중' && n.utilization === '운행';
-  }).length;
-  const idle = searchedRows.filter((r) => {
-    const n = fleet.byPlate.get(normPlate(r.plate));
-    return n?.ownership === '보유중' && n.utilization === '휴차';
-  }).length;
-  const salePending = searchedRows.filter((r) => fleet.byPlate.get(normPlate(r.plate))?.ownership === '처분예정').length;
+  const { held, disposed, contracted, idle, salePending } = useMemo(
+    () => summarizeAssetLedgerStats(searchedRows, fleet),
+    [searchedRows, fleet],
+  );
 
   return (
     <LedgerFrame
@@ -115,16 +109,14 @@ export default function AssetLedgerPage() {
       right={<LedgerActions aria-label="쓰기">
         <Btn
           size="sm"
-          variant="ghost"
-          iconOnly
-          tip={creating ? '수기 생성 취소' : '수기 생성(예외)'}
+          variant="solid"
           aria-pressed={creating}
           onClick={() => {
             setSelected(null);
             setEditing(false);
             setCreating((open) => !open);
           }}
-        ><Plus size={14} /></Btn>
+        ><Plus size={14} /> {creating ? '생성 취소' : '자산 생성'}</Btn>
       </LedgerActions>}
       tools={<LedgerActions aria-label="워크플로">
         <Btn size="sm" variant="ghost" iconOnly tip="등록증·자료 투입 — 데이터센터" onClick={() => openIngest('vehicle')}>
