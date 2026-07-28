@@ -70,6 +70,9 @@ curl -s -o /dev/null -w "%{http_code}" http://localhost:6006/<route>   # 200
 
 | 날짜 | 작업자 | 내용 | 상태 |
 |---|---|---|---|
+| 2026-07-29 | Cursor | ①영업손익 operatingProfit/ByCompany/Trend SSOT · 대시보드·pnl 소비 |
+| 2026-07-29 | Cursor | ②열라벨 선후납→납부시기(값 선납/후납 유지) |
+| 2026-07-29 | Cursor | ③업무관리 과태료 CMS집금식(버킷1줄·전용뷰·/penalty redirect) |
 | 2026-07-29 | Cursor | ②대시보드 / 백지재작성(KPI5·법인요약·6개월손익막대·Sec접기0)·①③기충족스킵 |
 | 2026-07-29 | Cursor | ④납부시기(선납/후납) 라벨통일·반납까지=dday숫자+remainSpan tooltip |
 | 2026-07-29 | Cursor | ⑤허브·원장 meta 한줄 통일(비자명·중점구분) |
