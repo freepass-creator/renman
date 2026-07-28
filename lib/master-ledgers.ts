@@ -3,6 +3,7 @@ import { computeContractView } from './contract-ops';
 import type { EntityRecord } from './intake/entities';
 import { OUT } from './domain/status';
 import { contractRisks } from './risk-ops';
+import { rentalTypeOf } from './schema/contract';
 
 const str = (v: unknown) => String(v ?? '').trim();
 const num = (v: unknown) => Number(v) || 0;
@@ -68,7 +69,7 @@ export function assetMasterRow(raw: EntityRecord): AssetMasterRow {
 
 export type ContractMasterRow = {
   raw: EntityRecord;
-  companyId: string; company: string; contractNo: string; status: string; ended: boolean;
+  companyId: string; company: string; contractNo: string; status: string; rentalType: string; ended: boolean;
   contractDate: string; contractorName: string; contractorPhone: string; contractorBirth: string;
   contractorLicenseNo: string; contractorAddress: string; licenseType: string;
   plate: string; carName: string; rentalMonths: number; startDate: string; endDate: string;
@@ -94,7 +95,7 @@ export function contractMasterRow(raw: EntityRecord, today: string): ContractMas
   const companyId = str(raw.companyId);
   return {
     raw, companyId, company: companyShort(companyId), contractNo: str(raw.contractNo || raw._key),
-    status: view.status, ended: view.ended, contractDate: str(raw.contractDate),
+    status: view.status, rentalType: rentalTypeOf(raw), ended: view.ended, contractDate: str(raw.contractDate),
     contractorName: str(raw.contractorName), contractorPhone: str(raw.contractorPhone),
     contractorBirth: str(raw.contractorBirth), contractorLicenseNo: str(raw.contractorLicenseNo),
     contractorAddress: str(raw.contractorAddress), licenseType: str(raw.licenseType),

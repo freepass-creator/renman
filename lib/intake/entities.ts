@@ -9,6 +9,7 @@
  */
 import type { DataLayer } from '@/lib/domain/layers';
 import { ENTITY_LAYER } from '@/lib/domain/layers';
+import { RENTAL_TYPES } from '@/lib/schema/contract';
 
 export type FieldType = 'text' | 'number' | 'date' | 'select';
 
@@ -220,6 +221,7 @@ export const ENTITIES: Record<string, Entity> = {
       { key: 'contractorAddress', label: '주소', type: 'text', ocrFrom: 'contractor_address' },
       { key: 'plate', label: '차량번호', type: 'text', ocrFrom: 'car_number' },
       { key: 'carName', label: '차종', type: 'text', ocrFrom: 'car_name' },
+      { key: 'rentalType', label: '대여형태', type: 'select', options: [...RENTAL_TYPES], manual: true, note: '상품 분류. 미지정 허용' },
       { key: 'rentalMonths', label: '대여기간(개월)', type: 'number', ocrFrom: 'rental_period_months' },
       { key: 'startDate', label: '시작일', type: 'date', ocrFrom: 'start_date' },
       { key: 'endDate', label: '종료일', type: 'date', ocrFrom: 'end_date' },

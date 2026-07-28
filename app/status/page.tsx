@@ -21,6 +21,13 @@ import { useIsMobile } from '@/lib/use-mobile';
 import {
   FLEET_FILTER_DEFS, countActiveFilters, emptyFilterValues, matchLedgerFilters,
 } from '@/lib/ledger-filter-defs';
+import { RENTAL_TYPES } from '@/lib/schema/contract';
+
+const RENTAL_CHIP_OPTS = [
+  { key: '전체' as const, label: '전체' },
+  ...RENTAL_TYPES.map((t) => ({ key: t, label: t })),
+];
+type RentalChip = (typeof RENTAL_CHIP_OPTS)[number]['key'];
 
 type OwnScope = '보유' | '전체' | '매각';
 type UtilChip = '운행' | '휴차' | '정비';
@@ -32,6 +39,7 @@ export default function StatusPage() {
   const [own, setOwn] = useState<OwnScope>('보유');
   const [utilChip, setUtilChip] = useState<UtilChip | null>(null);
   const [riskOnly, setRiskOnly] = useState(false);
+  const [rentalChip, setRentalChip] = useState<RentalChip>('전체');
   const [range, setRange] = useState({ from: '', to: '' });
   const [filterOpen, setFilterOpen] = useState(false);
   const [detailFilters, setDetailFilters] = useState(() => emptyFilterValues(FLEET_FILTER_DEFS));
@@ -45,7 +53,7 @@ export default function StatusPage() {
   }, [vs, cs, ins, hs]);
 
   const searched = useMemo(() => allRows.filter((r) =>
-    textMatch(q, r.company, r.plate, r.carName, r.maker, r.customer, r.phone, r.status, r.util, r.location),
+    textMatch(q, r.company, r.plate, r.carName, r.maker, r.customer, r.phone, r.status, r.util, r.location, r.rentalType),
   ), [allRows, q]);
 
   const latest = useMemo(() => allRows.reduce((acc, r) => {
@@ -74,6 +82,7 @@ export default function StatusPage() {
     if (own === '매각' && held) return false;
     if (utilChip && r.util !== utilChip) return false;
     if (riskOnly && !(r.net > 0 || r.warnings.length > 0 || (r.dday != null && r.dday < 0))) return false;
+    if (rentalChip !== '전체' && r.rentalType !== rentalChip) return false;
     if (!matchLedgerFilters(r, detailFilters, fleetFilterMatchers)) return false;
     if (range.from || range.to) {
       const s = (r.start || '').slice(0, 10);
@@ -83,7 +92,7 @@ export default function StatusPage() {
       if (range.to && s && s > range.to) return false;
     }
     return true;
-  }), [searched, own, utilChip, riskOnly, detailFilters, fleetFilterMatchers, range.from, range.to]);
+  }), [searched, own, utilChip, riskOnly, rentalChip, detailFilters, fleetFilterMatchers, range.from, range.to]);
 
   const detailFilterCount = countActiveFilters(detailFilters, FLEET_FILTER_DEFS);
   const heldN = searched.filter((r) => r.ownership !== '처분완료').length;
@@ -130,6 +139,11 @@ export default function StatusPage() {
           value={riskOnly ? '리스크' : null}
           onChange={(v) => setRiskOnly(v === '리스크')}
           options={[{ key: '리스크', label: '리스크' }]}
+        />
+        <FilterChips
+          value={rentalChip}
+          onChange={(v) => setRentalChip(v ?? '전체')}
+          options={RENTAL_CHIP_OPTS}
         />
         <PeriodBar latest={latest} initial="전체" size="sm" onRange={setRange} />
       </>}

@@ -14,6 +14,7 @@ import { normPlate } from './plate';
 import { deriveLocation } from './vehicle-location';
 import { companyShort } from './companies';
 import { rowWarnings, type SheetWarning } from './sheet-warnings';
+import { rentalTypeOf } from './schema/contract';
 import type { RailTone as RowRail } from '@/components/ui';   // 타입 전용 — 런타임 커플링 없음
 
 export type SheetRow = {
@@ -52,6 +53,7 @@ export type ContractRow = {
   returned: string;     // 반납일(있으면)
   dday: number | null;
   status: string;
+  rentalType: string;   // 대여형태(상품) — 미지정=''
   ended: boolean;
   dataAlert: string;
   sourceCarryUnpaid: number;
@@ -88,6 +90,7 @@ export function contractViewToRow(v: ContractView, node?: { plate?: string; cust
     returned: String(r.returnedDate || ''),
     dday: v.dday,
     status: v.status,
+    rentalType: rentalTypeOf(r),
     ended: v.ended,
     dataAlert: String(r.dataAlert || ''),
     sourceCarryUnpaid: Number(r.sourceCarryUnpaid) || 0,
@@ -115,7 +118,7 @@ export type FleetRow = {
   // 할부
   loanCompany: string; loanPrincipal: number; loanRate: number; loanMonths: number; loanStart: string;
   // 계약(활성)
-  customer: string; phone: string; rent: number; deposit: number; termMonths: number; start: string; end: string; dday: number | null;
+  customer: string; phone: string; rentalType: string; rent: number; deposit: number; termMonths: number; start: string; end: string; dday: number | null;
   paymentDay: number; paymentTiming: string; roundDue: number; roundTotal: number;
   // 보험
   insurer: string; insEnd: string; insPremium: number;
@@ -172,6 +175,7 @@ export function buildFleetRows(vehicles: VehicleNode[], insurance: EntityRecord[
       loanStart: String(veh?.loanStartDate || ''),
       customer: active?.customer || '',
       phone: String(v?.rec.contractorPhone || ''),
+      rentalType: rentalTypeOf(v?.rec),
       rent: Number(v?.rec.monthlyRent) || 0,
       deposit: Number(v?.rec.deposit) || 0,
       termMonths: Number(v?.rec.rentalMonths) || 0,

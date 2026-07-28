@@ -69,6 +69,7 @@ curl -s -o /dev/null -w "%{http_code}" http://localhost:6006/<route>   # 200
 
 | 날짜 | 작업자 | 내용 | 상태 |
 |---|---|---|---|
+| 2026-07-29 | Cursor | 계약 rentalType(셀프·보험·월렌트·장기·업무용·기타) 파이프라인·폼·원장열·퀵칩 | tsc0 |
 | 2026-07-29 | Cursor | nav IA최종: 상단·처리(리스크·업무·데이터관리)·원장·시스템 · PAGE_IA/ERP/NAV 동기 | tsc0 |
 | 2026-07-29 | Cursor | /desk메뉴제거→/risk redirect · risk-ledger에 agenda어김·임박합류 · 대시보드 riskAgendaFocus | tsc0 |
 | 2026-07-28 | Cursor | 대시보드=/dev/erp-design HomeView 이식(KPI4+오늘업무+교차검증) · aging/법인별표 제거 | tsc0 |

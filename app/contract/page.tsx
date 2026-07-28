@@ -18,9 +18,16 @@ import { openIngest, openReceivables } from '@/lib/ui-bus';
 import {
   CONTRACT_FILTER_DEFS, countActiveFilters, emptyFilterValues, eqFilter, matchLedgerFilters,
 } from '@/lib/ledger-filter-defs';
+import { RENTAL_TYPES } from '@/lib/schema/contract';
+
+const RENTAL_CHIP_OPTS = [
+  { key: '전체' as const, label: '전체' },
+  ...RENTAL_TYPES.map((t) => ({ key: t, label: t })),
+];
+type RentalChip = (typeof RENTAL_CHIP_OPTS)[number]['key'];
 
 const CONTRACT_CREATE_SECTIONS: LedgerFormSection[] = [
-  { title: '계약 기본정보', open: true, fields: ['contractNo', 'status', 'contractDate', 'plate', 'carName'] },
+  { title: '계약 기본정보', open: true, fields: ['contractNo', 'status', 'rentalType', 'contractDate', 'plate', 'carName'] },
   { title: '계약자정보', fields: ['contractorName', 'contractorPhone', 'contractorBirth', 'contractorLicenseNo', 'licenseType', 'contractorAddress'] },
   { title: '기간·차량조건', fields: ['startDate', 'endDate', 'rentalMonths', 'annualMileageLimit', 'pickupPlace', 'returnPlace'] },
   { title: '요금·납부조건', fields: ['monthlyRent', 'deposit', 'reservationFee', 'paymentDay', 'paymentTiming', 'lateFeeRate', 'earlyTerminationRate'] },
@@ -34,6 +41,7 @@ export default function ContractLedgerPage() {
   const [scope, setScope] = useState<'계약유지' | '계약종료' | '전체'>('계약유지');
   const [dateBasis, setDateBasis] = useState<'계약일' | '종료일'>('계약일');
   const [riskOnly, setRiskOnly] = useState(false);
+  const [rentalChip, setRentalChip] = useState<RentalChip>('전체');
   const [range, setRange] = useState({ from: '', to: '' });
   const [filterOpen, setFilterOpen] = useState(false);
   const [detailFilters, setDetailFilters] = useState(() => emptyFilterValues(CONTRACT_FILTER_DEFS));
@@ -45,7 +53,7 @@ export default function ContractLedgerPage() {
     .map((record) => contractMasterRow(record, TODAY))
     .sort((a, b) => Number(a.ended) - Number(b.ended) || a.endDate.localeCompare(b.endDate)), [contracts]);
   const searchedRows = useMemo(() => allRows.filter((r) =>
-    textMatch(q, r.company, r.contractNo, r.plate, r.carName, r.contractorName, r.contractorPhone, r.contractorLicenseNo, r.status, r.dataAlert, r.riskLabel),
+    textMatch(q, r.company, r.contractNo, r.plate, r.carName, r.contractorName, r.contractorPhone, r.contractorLicenseNo, r.status, r.rentalType, r.dataAlert, r.riskLabel),
   ), [allRows, q]);
   const latest = useMemo(() => allRows.reduce((latestDate, row) => {
     const date = dateBasis === '종료일' ? (row.returnedDate || row.endDate) : (row.contractDate || row.startDate);
@@ -58,12 +66,13 @@ export default function ContractLedgerPage() {
   const rows = useMemo(() => searchedRows.filter((r) => {
     if (!(scope === '전체' || (scope === '계약유지' ? !r.ended : r.ended))) return false;
     if (riskOnly && !r.atRisk) return false;
+    if (rentalChip !== '전체' && r.rentalType !== rentalChip) return false;
     if (!matchLedgerFilters(r, detailFilters, contractFilterMatchers)) return false;
     const date = dateBasis === '종료일' ? (r.returnedDate || r.endDate) : (r.contractDate || r.startDate);
     if (range.from && (!date || date < range.from)) return false;
     if (range.to && (!date || date > range.to)) return false;
     return true;
-  }), [searchedRows, scope, riskOnly, detailFilters, contractFilterMatchers, dateBasis, range.from, range.to]);
+  }), [searchedRows, scope, riskOnly, rentalChip, detailFilters, contractFilterMatchers, dateBasis, range.from, range.to]);
   const contractStatuses = useMemo(() => [...new Set(allRows.map((r) => r.status).filter(Boolean))].sort(), [allRows]);
   const endReasons = useMemo(() => [...new Set(allRows.map((r) => r.endReason).filter(Boolean))].sort(), [allRows]);
   const detailFilterCount = countActiveFilters(detailFilters, CONTRACT_FILTER_DEFS);
@@ -113,6 +122,11 @@ export default function ContractLedgerPage() {
           value={riskOnly ? '리스크' : null}
           onChange={(v) => setRiskOnly(v === '리스크')}
           options={[{ key: '리스크', label: '리스크' }]}
+        />
+        <FilterChips
+          value={rentalChip}
+          onChange={(v) => setRentalChip(v ?? '전체')}
+          options={RENTAL_CHIP_OPTS}
         />
         <PeriodBar latest={latest} initial="전체" size="sm" onRange={setRange} />
       </>}

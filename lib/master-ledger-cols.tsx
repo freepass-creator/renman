@@ -147,6 +147,7 @@ const C0 = {
   company: { key: 'company', label: '회사명', pin: true, priority: 2, render: (r) => r.company, text: (r) => r.company },
   contractNo: { key: 'contractNo', label: '계약번호', pin: true, priority: 1, render: (r) => dash(r.contractNo), text: (r) => r.contractNo },
   status: { key: 'status', label: '계약상태', align: 'c', priority: 1, render: (r) => <Badge tone={r.ended ? 'gray' : 'green'}>{r.status}</Badge>, text: (r) => r.status },
+  rentalType: { key: 'rentalType', label: '대여형태', align: 'c', priority: 2, render: (r) => dash(r.rentalType), text: (r) => r.rentalType },
   contractorName: { key: 'contractorName', label: '계약자', priority: 1, render: (r) => dash(r.contractorName), text: (r) => r.contractorName },
   contractorPhone: { key: 'contractorPhone', label: '연락처', priority: 3, render: (r) => dash(r.contractorPhone), text: (r) => r.contractorPhone },
   plate: { key: 'plate', label: '계약차량', priority: 1, render: (r) => dash(r.plate), text: (r) => r.plate },
@@ -187,7 +188,7 @@ const cx = (key: keyof ContractMasterRow, label: string, opts?: { date?: boolean
 
 /** 계약 열 카탈로그 — 새 항목은 여기 정의 후 SHEET_KEYS / DETAIL_DEFS에 key만. */
 const CONTRACT_COL_CATALOG: SheetCol<ContractMasterRow>[] = [
-  C0.company, C0.contractNo, C0.status, C0.contractorName, C0.contractorPhone,
+  C0.company, C0.contractNo, C0.status, C0.rentalType, C0.contractorName, C0.contractorPhone,
   C0.plate, C0.carName, C0.contractDate, C0.startDate, C0.endDate,
   C0.monthlyRent, C0.deposit, C0.paymentDay, C0.paymentTiming, C0.paymentMethod, C0.risk, C0.net, C0.alert,
   cx('contractorBirth', '생년월일', { date: true }), cx('contractorLicenseNo', '면허번호'),
@@ -209,11 +210,11 @@ const CONTRACT_COL_CATALOG: SheetCol<ContractMasterRow>[] = [
 /** 계약 엑셀 열 — `계약 · 엑셀기본|엑셀전체 · +|-key` @see lib/ledger-ext.ts */
 export const CONTRACT_SHEET_KEYS: SheetViewKeys = {
   basic: [
-    'company', 'contractNo', 'status', 'contractorName', 'plate',
+    'company', 'contractNo', 'status', 'rentalType', 'contractorName', 'plate',
     'endDate', 'monthlyRent', 'paymentDay', 'paymentTiming', 'riskLabel', 'net', 'alert',
   ],
   all: [
-    'company', 'contractNo', 'status', 'contractorName', 'contractorPhone',
+    'company', 'contractNo', 'status', 'rentalType', 'contractorName', 'contractorPhone',
     'plate', 'carName', 'contractDate', 'startDate', 'endDate',
     'monthlyRent', 'deposit', 'paymentDay', 'paymentTiming', 'paymentMethod', 'riskLabel', 'net', 'alert',
     'contractorBirth', 'contractorLicenseNo', 'licenseType', 'contractorAddress',
@@ -239,7 +240,7 @@ export const CONTRACT_DETAIL_DEFS: DetailSectionDef[] = [
     title: '계약 기본',
     open: true,
     keys: [
-      'company', 'contractNo', 'status', 'plate', 'carName', 'contractDate', 'startDate', 'endDate', 'alert',
+      'company', 'contractNo', 'status', 'rentalType', 'plate', 'carName', 'contractDate', 'startDate', 'endDate', 'alert',
     ],
   },
   {

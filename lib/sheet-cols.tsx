@@ -222,18 +222,23 @@ const FL = {
   },
   // 비고 — 자유 메모(차량 note/memo). 없으면 —.
   note: { key: 'note', label: '비고', render: (r) => r.note || '—', text: (r) => r.note },
+  rentalType: {
+    key: 'rentalType', label: '대여형태', align: 'c',
+    render: (r) => r.rentalType || '—',
+    text: (r) => r.rentalType,
+  },
 } satisfies Record<string, SheetCol<FleetRow>>;
 
 /** 기본 = 자산기본(차번·법인·상태·차명·연식) + 계약조건 + 수납/리스크. 한 셀 한 값 · 자리 고정.
  *  정렬 배정 — 가운데(짧은값·날짜·배지)=CENTER · 금액은 FL align'r' 유지. */
-const CENTER_ALIGN = new Set(['co', 'status', 'year', 'term', 'start', 'end', 'dday', 'od', 'stage', 'warn', 'own', 'util', 'phone', 'gps', 'acqDate', 'loanMon', 'loanStart', 'insurer', 'insEnd', 'loanCo', 'inspect', 'paymentDay', 'paymentTiming', 'round']);
+const CENTER_ALIGN = new Set(['co', 'status', 'year', 'term', 'start', 'end', 'dday', 'od', 'stage', 'warn', 'own', 'util', 'phone', 'gps', 'acqDate', 'loanMon', 'loanStart', 'insurer', 'insEnd', 'loanCo', 'inspect', 'paymentDay', 'paymentTiming', 'round', 'rentalType']);
 const alignCols = (cols: SheetCol<FleetRow>[]): SheetCol<FleetRow>[] =>
   cols.map((c) => (CENTER_ALIGN.has(c.key) ? { ...c, align: 'c' as const } : c));
 
 /** 운영 열 카탈로그 — 새 항목은 FL에 정의 후 SHEET_KEYS에 key만. */
 const FLEET_COL_CATALOG: SheetCol<FleetRow>[] = alignCols([
   FL.co, FL.plate, FL.status, FL.maker, FL.sub, FL.year,
-  FL.cust, FL.phone, FL.term, FL.start, FL.end, FL.dep, FL.rent, FL.paymentDay, FL.paymentTiming, FL.round, FL.dday,
+  FL.cust, FL.phone, FL.rentalType, FL.term, FL.start, FL.end, FL.dep, FL.rent, FL.paymentDay, FL.paymentTiming, FL.round, FL.dday,
   FL.net, FL.od, FL.stage, FL.warn, FL.note,
   FL.car, FL.loc, FL.own, FL.util,
   FL.vin, FL.acqDate, FL.acqPrice, FL.gps,
@@ -245,12 +250,12 @@ const FLEET_COL_CATALOG: SheetCol<FleetRow>[] = alignCols([
 export const FLEET_SHEET_KEYS: SheetViewKeys = {
   basic: [
     'co', 'plate', 'status', 'maker', 'sub', 'year',
-    'cust', 'phone', 'term', 'start', 'end', 'dep', 'rent', 'paymentDay', 'paymentTiming', 'round', 'dday',
+    'cust', 'phone', 'rentalType', 'term', 'start', 'end', 'dep', 'rent', 'paymentDay', 'paymentTiming', 'round', 'dday',
     'net', 'od', 'stage', 'warn', 'note',
   ],
   all: [
     'co', 'plate', 'status', 'maker', 'sub', 'year',
-    'cust', 'phone', 'term', 'start', 'end', 'dep', 'rent', 'paymentDay', 'paymentTiming', 'round', 'dday',
+    'cust', 'phone', 'rentalType', 'term', 'start', 'end', 'dep', 'rent', 'paymentDay', 'paymentTiming', 'round', 'dday',
     'net', 'od', 'stage', 'warn', 'note',
     'car', 'loc', 'own', 'util',
     'vin', 'acqDate', 'acqPrice', 'gps',
@@ -271,7 +276,7 @@ export const FLEET_DETAIL_DEFS: DetailSectionDef[] = [
   },
   {
     title: '계약',
-    keys: ['cust', 'phone', 'term', 'start', 'end', 'dep', 'rent', 'paymentDay', 'paymentTiming', 'round', 'dday'],
+    keys: ['cust', 'phone', 'rentalType', 'term', 'start', 'end', 'dep', 'rent', 'paymentDay', 'paymentTiming', 'round', 'dday'],
   },
   {
     title: '수납·리스크',
