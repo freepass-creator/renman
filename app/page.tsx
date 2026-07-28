@@ -19,13 +19,14 @@ import {
 import { useIsMobile } from '@/lib/use-mobile';
 
 const GROUPS: HomeSheetGroup[] = ['미결', '리스크', '휴차'];
+type GroupFilter = '전체' | HomeSheetGroup;
 
 export default function HomePage() {
   const router = useRouter();
   const mobile = useIsMobile();
   const { contracts, vehicles, insurances, penalties, history, loading } = useDashboardData();
   const [q, setQ] = useState('');
-  const [group, setGroup] = useState<HomeSheetGroup | null>(null);
+  const [group, setGroup] = useState<GroupFilter>('전체');
   const [range, setRange] = useState({ from: '', to: '' });
   const [colView, setColView] = useState<LedgerColView>('기본');
 
@@ -37,7 +38,7 @@ export default function HomePage() {
     textMatch(q, r.group, r.kind, r.plate, r.customer, r.carName, r.status, r.due),
   ), [allRows, q]);
   const rows = useMemo(() => searched.filter((r) => {
-    if (group && r.group !== group) return false;
+    if (group !== '전체' && r.group !== group) return false;
     if (range.from || range.to) {
       if (!r.dueDate) return false;
       if (range.from && r.dueDate < range.from) return false;
@@ -49,6 +50,7 @@ export default function HomePage() {
   const latest = useMemo(() => allRows.reduce((acc, r) => (r.dueDate > acc ? r.dueDate : acc), TODAY), [allRows]);
   const shortcuts = useMemo(() => homeLedgerShortcuts(), []);
   const counts = useMemo(() => ({
+    전체: searched.length,
     미결: searched.filter((r) => r.group === '미결').length,
     리스크: searched.filter((r) => r.group === '리스크').length,
     휴차: searched.filter((r) => r.group === '휴차').length,
@@ -81,10 +83,12 @@ export default function HomePage() {
             style={{ width: mobile ? '100%' : 240 }}
           />
           <FilterChips
-            allowOff
             value={group}
-            onChange={setGroup}
-            options={GROUPS.map((key) => ({ key, label: key, count: counts[key] || undefined }))}
+            onChange={(v) => { if (v) setGroup(v); }}
+            options={([
+              { key: '전체' as const, label: '전체', count: counts.전체 || undefined },
+              ...GROUPS.map((key) => ({ key, label: key, count: counts[key] || undefined })),
+            ])}
           />
           <PeriodBar latest={latest || TODAY} initial="전체" size="sm" onRange={setRange} />
         </>
@@ -108,7 +112,7 @@ export default function HomePage() {
       loading={loading}
       empty={(
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16 }}>
-          <span>{group ? `${group} 없음` : '오늘 급한 것 없음'}</span>
+          <span>{group === '전체' ? '오늘 급한 것 없음' : `${group} 없음`}</span>
           {shortcutBar}
         </div>
       )}

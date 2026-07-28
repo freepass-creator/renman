@@ -9,23 +9,25 @@ import { Rows, ObjRow, EmptyState, PageLoading, Btn, FilterChips, C, SPACE_M } f
 import { MHead } from '@/components/m/MHead';
 
 const GROUPS: HomeSheetGroup[] = ['미결', '리스크', '휴차'];
+type GroupFilter = '전체' | HomeSheetGroup;
 
 export default function MHome() {
   const router = useRouter();
   const { data: [vs = [], cs = [], ins = [], hs = [], pens = []], loading } = useEntityLists([
     'vehicle', 'contract', 'insurance', 'history', 'penalty',
   ]);
-  const [group, setGroup] = useState<HomeSheetGroup | null>(null);
+  const [group, setGroup] = useState<GroupFilter>('전체');
   const rows = useMemo(
     () => buildHomeSheetRows(vs, cs, ins, pens, hs, TODAY),
     [vs, cs, ins, pens, hs],
   );
   const shown = useMemo(
-    () => (group ? rows.filter((r) => r.group === group) : rows),
+    () => (group === '전체' ? rows : rows.filter((r) => r.group === group)),
     [rows, group],
   );
   const shortcuts = useMemo(() => homeLedgerShortcuts(), []);
   const counts = useMemo(() => ({
+    전체: rows.length,
     미결: rows.filter((r) => r.group === '미결').length,
     리스크: rows.filter((r) => r.group === '리스크').length,
     휴차: rows.filter((r) => r.group === '휴차').length,
@@ -38,15 +40,17 @@ export default function MHome() {
         : (
           <div style={{ padding: '12px 14px 24px', display: 'flex', flexDirection: 'column', gap: 16 }}>
             <FilterChips
-              allowOff
               value={group}
-              onChange={setGroup}
-              options={GROUPS.map((key) => ({ key, label: key, count: counts[key] || undefined }))}
+              onChange={(v) => { if (v) setGroup(v); }}
+              options={[
+                { key: '전체' as const, label: '전체', count: counts.전체 || undefined },
+                ...GROUPS.map((key) => ({ key, label: key, count: counts[key] || undefined })),
+              ]}
             />
             {shown.length === 0 ? (
               <EmptyState variant="ok">오늘 급한 것 없음</EmptyState>
             ) : (
-              <Rows title={group || '주의'} tone="red" n={shown.length} collapsible id="m-home-sheet">
+              <Rows title={group === '전체' ? '주의' : group} tone="red" n={shown.length} collapsible id="m-home-sheet">
                 {shown.map((item) => (
                   <ObjRow
                     key={item.id}

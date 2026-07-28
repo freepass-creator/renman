@@ -70,6 +70,7 @@ curl -s -o /dev/null -w "%{http_code}" http://localhost:6006/<route>   # 200
 
 | 날짜 | 작업자 | 내용 | 상태 |
 |---|---|---|---|
+| 2026-07-28 | Cursor | 홈 필터칩 [전체·미결·리스크·휴차] · 전체 기본 · LedgerFrame 엑셀 유지 | tsc0 |
 | 2026-07-28 | Cursor | 홈=LedgerFrame엑셀(미결·리스크·휴차) · home-briefing 시트SSOT · /m리스트동일 · 바로가기하단 | tsc0 |
 | 2026-07-28 | Cursor | lucide 잔여: OcrCrosscheck⚠·Drawer↑↓ → AlertTriangle/ChevronUp/Down | tsc0 |
 | 2026-07-28 | Cursor | 홈=오늘브리핑(Page+트리아지) · home-briefing SSOT · /m공용 · desk일정복원 · 렌즈탭폐기 | tsc0 |
