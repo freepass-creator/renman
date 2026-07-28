@@ -332,13 +332,6 @@ function WorkLedgerInner() {
           ><Plus size={14} /> {creating ? '취소' : '업무 생성'}</Btn>
         )}
       </LedgerActions>}
-      tools={!penaltyMode ? (
-        <LedgerActions aria-label="워크플로">
-          <Btn size="sm" variant="ghost" iconOnly tip="과태료 OCR" href="/penalty/upload">
-            <UploadCloud size={14} />
-          </Btn>
-        </LedgerActions>
-      ) : undefined}
       filters={<>
         <Search
           size="sm"
