@@ -37,7 +37,7 @@ export type MobileTabDef = {
 export const MOBILE_TAB_DEFS: MobileTabDef[] = [
   { id: 'home', label: '홈', href: '/', icon: Home, match: (p) => p === '/', group: '허브', tier: pageTier('/') },
   { id: 'status', label: '운영', href: '/status', icon: LayoutDashboard, match: (p) => p.startsWith('/status'), group: '허브', tier: pageTier('/status') },
-  { id: 'desk', label: '일정', href: '/?tab=일정', icon: CalendarCheck, match: (p) => p === '/' || p.startsWith('/desk'), group: '허브', tier: pageTier('/') },
+  { id: 'desk', label: '일정', href: '/desk', icon: CalendarCheck, match: (p) => p.startsWith('/desk'), group: '허브', tier: pageTier('/desk') },
   { id: 'upload', label: '업로드', href: '/ingest', icon: Upload, match: (p) => p.startsWith('/ingest'), group: '허브', tier: pageTier('/ingest') },
   { id: 'asset', label: '자산', href: '/asset', icon: CarFront, match: (p) => p.startsWith('/asset'), group: '원장', tier: pageTier('/asset') },
   { id: 'contract', label: '계약', href: '/contract', icon: FileText, match: (p) => p.startsWith('/contract'), group: '원장', tier: pageTier('/contract') },

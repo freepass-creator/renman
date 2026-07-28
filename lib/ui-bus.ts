@@ -2,8 +2,23 @@
 // focus = 온 이유(task): unpaid(수납)·return(반납)·inspect(검사)·deploy(투입)·doc(서류)·loan|insurance → 360이 해당 액션을 띄움
 // 세계관: 차번·기간·계약자 축이 끊기지 않게 열기 — openCar / openCustomer / openPayments.
 export const openCar = (plate: unknown, focus?: string) => window.dispatchEvent(new CustomEvent('jpk:open-car', { detail: { plate: String(plate || ''), focus: focus || '' } }));
-/** 홈 렌즈 전환 — 운영|일정|콕핏|리스크. 자금은 openFinance. */
-export const openLens = (lens: string) => window.dispatchEvent(new CustomEvent('jpk:lens', { detail: lens }));
+/** 홈 렌즈 전환 — 전용 페이지로. */
+export const openLens = (lens: string) => {
+  if (typeof window === 'undefined') return;
+  const map: Record<string, string> = {
+    운영: '/status',
+    일정: '/desk',
+    콕핏: '/',
+    미결: '/receivables',
+    리스크: '/receivables',
+    휴차: '/status',
+    요약: '/',
+    돈: '/cash',
+    자금: '/cash',
+  };
+  const href = map[lens] || '/';
+  window.dispatchEvent(new CustomEvent('jpk:navigate', { detail: { href } }));
+};
 export const openCustomer = (key: unknown) => window.dispatchEvent(new CustomEvent('jpk:open-customer', { detail: { key: String(key || '') } }));
 /** 수납매칭 — 입금→계약 파이프 입구. SPA push(CarDrawer jpk:navigate). 풀리로드 금지. */
 export const openPayments = () => {
@@ -15,10 +30,10 @@ export const openReceivables = () => {
   if (typeof window === 'undefined') return;
   window.dispatchEvent(new CustomEvent('jpk:navigate', { detail: { href: '/receivables' } }));
 };
-/** 재무현황 — 출금·미분류 등. facet=미분류면 미분류 탭·칩. */
+/** 재무/자금 — /cash (구 /finance 흡수). facet=미분류면 미분류 필터. */
 export const openFinance = (opts?: { unclassified?: boolean }) => {
   if (typeof window === 'undefined') return;
-  const href = opts?.unclassified ? '/finance?facet=미분류' : '/finance';
+  const href = opts?.unclassified ? '/cash?facet=미분류' : '/cash';
   window.dispatchEvent(new CustomEvent('jpk:navigate', { detail: { href } }));
 };
 // 문서 인쇄 오버레이(내용증명 등) — 라우트 없이 전역 PrintHost로
