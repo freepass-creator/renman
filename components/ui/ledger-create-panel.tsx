@@ -2,13 +2,15 @@
 
 import { useMemo, useState } from 'react';
 import { ChevronRight, Plus, Save, X } from 'lucide-react';
-import { COMPANIES, companyLabel } from '@/lib/companies';
+import { COMPANIES, companyLabel, companyShort } from '@/lib/companies';
 import { ENTITIES, type EntityRecord, type Field } from '@/lib/intake/entities';
 import { saveIntake } from '@/lib/intake';
 import { resolveWriteCompany, NEED_COMPANY } from '@/lib/scope';
 import { useSession } from '@/lib/session';
 import { toast } from '@/lib/toast';
-import { Btn, Input, Select } from './controls';
+import { Btn, Input, PillTabs, Select } from './controls';
+import { LedgerPanelFooter } from './ledger-actions';
+import { C } from './tokens';
 
 export type LedgerFormSection = {
   title: string;
@@ -49,7 +51,12 @@ export function LedgerCreatePanel({
 }) {
   const { companyId, scopeAll, user } = useSession();
   const entity = ENTITIES[entityKey];
-  const [form, setForm] = useState<EntityRecord>(() => ({ ...(initial || {}) }));
+  const [form, setForm] = useState<EntityRecord>(() => {
+    const base = { ...(initial || {}) };
+    // 단일 회사일 때만 폼 기본값 · 저장은 resolveWriteCompany 게이트
+    if (!base.companyId && COMPANIES.length === 1) base.companyId = COMPANIES[0];
+    return base;
+  });
   const [busy, setBusy] = useState(false);
   const selectedFields = useMemo(() => {
     const wanted = new Set(sections.flatMap((section) => section.fields));
@@ -119,22 +126,44 @@ export function LedgerCreatePanel({
           <div className="ledger-record-panel__title">{title}</div>
         </div>
         <button type="button" className="ledger-record-panel__close" onClick={onClose} aria-label="신규등록 패널 닫기">
-          <X size={16} />
+          <X size={14} />
         </button>
       </header>
 
       <div className="ledger-create-panel__body">
         {prefix}
+        {prefix}
         {scopeAll && (
-          <div className="ledger-create-panel__company">
-            <label>
-              회사명 <span>*</span>
-              <Select value={String(form.companyId || '')} onChange={(event) => change('companyId', event.target.value)}>
-                <option value="">회사를 선택하세요</option>
-                {COMPANIES.map((company) => <option value={company} key={company}>{companyLabel(company)}</option>)}
-              </Select>
-            </label>
-          </div>
+          quick ? (
+            <div className="ledger-create-panel__company" role="group" aria-label="회사 선택">
+              <div className="ledger-create-panel__company-label">
+                회사명 <span>*</span>
+                {!String(form.companyId || '').trim() && (
+                  <em style={{ fontStyle: 'normal', fontWeight: 600, color: C.mute, marginLeft: 6 }}>탭해서 선택</em>
+                )}
+              </div>
+              <PillTabs
+                size="sm"
+                value={String(form.companyId || '')}
+                onChange={(id) => change('companyId', id)}
+                tabs={COMPANIES.map((id) => ({
+                  key: id,
+                  label: companyShort(id),
+                  title: companyLabel(id),
+                }))}
+              />
+            </div>
+          ) : (
+            <div className="ledger-create-panel__company">
+              <label>
+                회사명 <span>*</span>
+                <Select value={String(form.companyId || '')} onChange={(event) => change('companyId', event.target.value)}>
+                  <option value="">회사를 선택하세요</option>
+                  {COMPANIES.map((company) => <option value={company} key={company}>{companyLabel(company)}</option>)}
+                </Select>
+              </label>
+            </div>
+          )
         )}
 
         {quick && (
@@ -142,7 +171,7 @@ export function LedgerCreatePanel({
             <label className="ledger-create-panel__field">
               <span>업무 내용 <b>*</b></span>
               <Input
-                autoFocus
+                autoFocus={!scopeAll || !!String(form.companyId || '').trim()}
                 value={String(form.title || '')}
                 onChange={(event) => change('title', event.target.value)}
                 placeholder="업무 내용을 한 줄로 입력하세요"
@@ -189,13 +218,10 @@ export function LedgerCreatePanel({
         ))}
       </div>
 
-      <footer className="ledger-create-panel__footer">
-        <span>등록일·등록자는 저장 시 자동 기록됩니다.</span>
-        <div>
-          <Btn size="sm" variant="ghost" disabled={busy} onClick={onClose}>취소</Btn>
-          <Btn size="sm" disabled={busy || !canSave} onClick={save}><Save size={14} /> {busy ? '저장 중…' : '생성'}</Btn>
-        </div>
-      </footer>
+      <LedgerPanelFooter hint="등록일·등록자는 저장 시 자동 기록됩니다.">
+        <Btn size="sm" variant="ghost" disabled={busy} onClick={onClose}>취소</Btn>
+        <Btn size="sm" disabled={busy || !canSave} onClick={save}><Save size={14} /> {busy ? '저장 중…' : '생성'}</Btn>
+      </LedgerPanelFooter>
     </section>
   );
 }
