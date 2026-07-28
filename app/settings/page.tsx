@@ -145,7 +145,7 @@ export default function SettingsPage() {
   const hub = HUB.filter((h) => !h.hqOnly || isOperator);
   // 초기화면 후보 = 햄버거 메뉴 전 항목(권한 필터). 홈 포함.
   const landingItems = NAV_GROUPS.flatMap((g) => g.items).filter((it) => !it.hqOnly || isOperator);
-  const landingLabel = landingItems.find((it) => it.href === landing)?.label || '홈';
+  const landingLabel = landingItems.find((it) => it.href === landing)?.label || '대시보드';
 
   return (
     <Page title="설정" meta={`${user.name} · ${roleLabel(user.role)}`} tools={<WorkbenchBar />} noCompany>

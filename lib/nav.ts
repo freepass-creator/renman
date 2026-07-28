@@ -4,13 +4,13 @@
  * 데이터 층 = lib/domain/layers · 티어 = lib/tier.
  *
  * 2026-07 IA:
- *   허브 = 홈 · 운영현황 · 리스크관리 · 데이터센터
+ *   허브 = 대시보드 · 운영현황 · 리스크관리 · 데이터센터
  *   원장 = 자산 · 계약 · 자금 · 업무
- *   홈 = KPI 허브(함대·오늘끝낼일·계속관리). 예외 엑셀=/risk(risk-ledger). 일정=/desk.
+ *   대시보드(/) = 관제 콕핏(KPI 타일 + 법인별). 예외 엑셀=/risk · 일정=/desk.
  *   원장 = 마스터 표 + 더블클릭 우측 상세패널 (별도 상세페이지 축소 수순)
  */
 import {
-  Table2, Wallet, Settings, Database, ListTodo, Home,
+  Table2, Wallet, Settings, Database, ListTodo,
   CarFront, FileText, LayoutDashboard, Upload, CalendarCheck, TriangleAlert, type LucideIcon,
 } from 'lucide-react';
 import type { Tier } from './tier';
@@ -42,7 +42,7 @@ export type PageIA = {
  */
 export const PAGE_IA: PageIA[] = [
   // ── 허브 ──
-  { href: '/', label: '홈', role: 'hub', layer: 'mixed', tier: '라이트', view: 'KPI 허브 · 함대·오늘끝낼일·계속관리', grab: 'none', grabHow: '—' },
+  { href: '/', label: '대시보드', role: 'hub', layer: 'mixed', tier: '라이트', view: '관제 콕핏 · KPI 타일 + 법인별', grab: 'none', grabHow: '—' },
   { href: '/status', label: '운영현황', role: 'view', layer: 'mixed', tier: '라이트', view: '차량 1대=1행 통합원장 · LedgerFrame', grab: 'none', grabHow: '—' },
   { href: '/desk', label: '일정관리', role: 'view', layer: 'event', tier: '라이트', view: 'buildAgenda · LedgerFrame', grab: 'none', grabHow: '—' },
   { href: '/risk', label: '리스크관리', role: 'hub', layer: 'mixed', tier: '라이트', view: 'risk-ledger · LedgerFrame · 미완료·미납·만기·휴차', grab: 'none', grabHow: '—' },
@@ -69,7 +69,7 @@ export const PAGE_IA: PageIA[] = [
   // ── 레거시 리다이렉트 ──
   { href: '/sheet', label: '운영원장→자산', role: 'view', layer: 'ledger', tier: '라이트', view: 'redirect /asset', grab: 'none', grabHow: '—' },
   { href: '/finance', label: '재무현황→자금', role: 'view', layer: 'ledger', tier: '라이트', view: 'redirect /cash', grab: 'none', grabHow: '—' },
-  { href: '/ops', label: '마이페이지→홈', role: 'hub', layer: 'mixed', tier: '라이트', view: 'redirect /', grab: 'none', grabHow: '—' },
+  { href: '/ops', label: '마이페이지→대시보드', role: 'hub', layer: 'mixed', tier: '라이트', view: 'redirect /', grab: 'none', grabHow: '—' },
 ];
 
 export const PAGE_BY_HREF: Record<string, PageIA> = Object.fromEntries(PAGE_IA.map((p) => [p.href, p]));
@@ -111,9 +111,9 @@ export const ERP_MENU_TREE: ErpMenuNode[] = [
     id: 'hub',
     label: '허브',
     href: '/',
-    icon: Home,
+    icon: LayoutDashboard,
     children: [
-      { id: 'home', label: '홈', href: '/', icon: Home },
+      { id: 'home', label: '대시보드', href: '/', icon: LayoutDashboard },
       { id: 'status', label: '운영현황', href: '/status', icon: LayoutDashboard },
       { id: 'risk', label: '리스크관리', href: '/risk', icon: TriangleAlert },
       { id: 'ingest', label: '데이터센터', href: '/ingest', icon: Upload },
@@ -146,7 +146,7 @@ export const ERP_MENU_TREE: ErpMenuNode[] = [
 /** 햄버거/사이드 렌더러용. ERP_MENU_TREE와 라벨·href 동기. */
 export const NAV_GROUPS: NavGroup[] = [
   { title: '', items: [
-    { href: '/', label: '홈', icon: Home, tier: '라이트' },
+    { href: '/', label: '대시보드', icon: LayoutDashboard, tier: '라이트' },
     { href: '/status', label: '운영현황', icon: LayoutDashboard, tier: '라이트' },
     { href: '/desk', label: '일정관리', icon: CalendarCheck, tier: '라이트' },
     { href: '/risk', label: '리스크관리', icon: TriangleAlert, tier: '라이트' },

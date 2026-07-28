@@ -7,7 +7,7 @@
  */
 import { useEffect, useMemo, useState } from 'react';
 import {
-  Home, LayoutDashboard, Upload, CarFront, ListTodo,
+  LayoutDashboard, Upload, CarFront, ListTodo,
   Wallet, FileText, CalendarCheck,
   type LucideIcon,
 } from 'lucide-react';
@@ -35,7 +35,7 @@ export type MobileTabDef = {
 };
 
 export const MOBILE_TAB_DEFS: MobileTabDef[] = [
-  { id: 'home', label: '홈', href: '/', icon: Home, match: (p) => p === '/', group: '허브', tier: pageTier('/') },
+  { id: 'home', label: '대시보드', href: '/', icon: LayoutDashboard, match: (p) => p === '/', group: '허브', tier: pageTier('/') },
   { id: 'status', label: '운영', href: '/status', icon: LayoutDashboard, match: (p) => p.startsWith('/status'), group: '허브', tier: pageTier('/status') },
   { id: 'desk', label: '일정', href: '/desk', icon: CalendarCheck, match: (p) => p.startsWith('/desk'), group: '허브', tier: pageTier('/desk') },
   { id: 'upload', label: '업로드', href: '/ingest', icon: Upload, match: (p) => p.startsWith('/ingest'), group: '허브', tier: pageTier('/ingest') },

@@ -46,4 +46,4 @@ alwaysApply: true
 - ❌ /m을 반응형 웹 축소로 만들기 (전문 페이지로 간다).
 - ❌ 같은 개념(가동상태·미수·잔액)을 웹·모바일이 각자 계산 (데이터 2벌).
 - ❌ redirect된 레거시 페이지(`/sheet`·`/finance`·`/ops`) 되살리기.
-- ❌ 홈(`/`)에 엑셀 표·Facet 큐 복원. 홈 = **관제 대시보드**(제목=관제 · 한눈 Metric 스트립 · 일정 본체). 예외 엑셀=`/risk` · 일정 원장=`/desk`. 표시 헬퍼=`lib/home-kpi` · 집계=`computeDashboard`/`buildAgenda`/`selectPendingWork`. 데이터센터는 Metric 금지 → tools ghost CTA.
+- ❌ 홈(`/`)에 엑셀 예외 큐·Facet 복원. 홈(/) = **«대시보드»**(관제 콕핏: KPI 타일 + 법인별 + 추이). 예외 엑셀=리스크관리(/risk)·일정=/desk. 데이터 손롤 금지.

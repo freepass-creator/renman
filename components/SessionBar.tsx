@@ -2,7 +2,7 @@
 import { useState, useEffect, type CSSProperties } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { ChevronLeft, Menu, X, Home } from 'lucide-react';
+import { ChevronLeft, Menu, X, LayoutDashboard } from 'lucide-react';
 import { useSession, roleLabel } from '@/lib/session';
 import { useAppBarSlots } from '@/lib/appbar';
 import { useIsMobile } from '@/lib/use-mobile';
@@ -201,7 +201,7 @@ export default function TopBar() {
         <div style={{ position: 'fixed', left: 0, right: 0, bottom: 0, zIndex: 55, background: C.taupeBg, borderTop: `1px solid ${line}`, boxShadow: 'var(--shadow-sm)' }}>
           <div style={{ maxWidth: slots.contentMax ?? 1480, margin: '0 auto', padding: `8px ${slots.contentPad ?? 20}px`, display: 'flex', alignItems: 'center', gap: 8, boxSizing: 'border-box' }}>
             <button onClick={goBack} title="이전" style={barBtn}><ChevronLeft size={15} /> 이전</button>
-            <Link href="/" title="홈" style={barBtn}><Home size={15} /> 홈</Link>
+            <Link href="/" title="대시보드" style={barBtn}><LayoutDashboard size={15} /> 대시보드</Link>
             <span style={{ flex: 1 }} />
             {slots.actions}
           </div>
