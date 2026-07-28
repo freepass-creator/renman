@@ -63,7 +63,7 @@ export const PAGE_IA: PageIA[] = [
   // ── 딥링크 (메뉴 비노출 · URL 유지) ──
   { href: '/payments', label: '자금일보(딥링크)', role: 'work', layer: 'event', tier: '라이트', view: '입금매칭 — /cash에서 진입', grab: 'none', grabHow: '매칭·분류' },
   { href: '/receivables', label: '미수관리(딥링크)', role: 'work', layer: 'event', tier: '라이트', view: '회수 큐 — 계약/자금 CTA', grab: 'context', grabHow: '연락' },
-  { href: '/penalty', label: '과태료(딥링크)', role: 'work', layer: 'event', tier: '라이트', view: '업무원장·업로드', grab: 'both', grabHow: '매칭' },
+  { href: '/penalty', label: '과태료(딥링크)', role: 'work', layer: 'event', tier: '라이트', view: '→업무관리 과태료', grab: 'both', grabHow: '매칭' },
   { href: '/dispatch', label: '배차(딥링크)', role: 'work', layer: 'event', tier: '스탠다드', view: '출고·반납', grab: 'context', grabHow: '위저드' },
   { href: '/vehicle/[plate]', label: '차량상세', role: 'view', layer: 'ledger', tier: '라이트', assetKind: 'physical', view: '자산 패널「차량 상세」→ 축소 수순', grab: 'context', grabHow: '그자리 편집' },
   { href: '/search', label: '찾기', role: 'hub', layer: 'mixed', tier: '라이트', view: '상단 검색 전체결과 · 점프용(상세 IA 아님)', grab: 'none', grabHow: '—' },

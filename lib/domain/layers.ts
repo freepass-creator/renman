@@ -90,7 +90,7 @@ export const EVENT_FLOWS = [
   { key: 'receivables', label: '미수관리', writes: 'history·contract 상태', href: '/receivables' },
   { key: 'cash-journal', label: '자금일보', writes: 'bank_tx↔contract 연결 → 재무현황', href: '/payments' },
   { key: 'repair', label: '차량수선', writes: 'history', href: '/repair' },
-  { key: 'penalty', label: '과태료관리', writes: 'penalty', href: '/penalty' },
+  { key: 'penalty', label: '과태료관리', writes: 'penalty', href: '/work?group=과태료' },
   { key: 'ingest', label: '데이터관리', writes: '원장+이벤트 엔티티', href: '/ingest' },
   { key: 'inbox', label: '증빙수집', writes: 'inbox→매칭', href: '/inbox' },
   { key: 'quicklog', label: 'QuickLog', writes: 'history', href: null },

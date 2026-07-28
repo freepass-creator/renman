@@ -57,7 +57,7 @@ export function PenaltyDocs({ penalties, companyId, onClose, onSubmitted }: { pe
     <>
       <style>{`@media print { body { visibility: hidden !important; } .print-doc, .print-doc * { visibility: visible !important; } .print-doc { position: static !important; box-shadow: none !important; margin: 0 auto !important; } .no-print { display: none !important; } } @page { size: A4; margin: 12mm; }`}</style>
       <div className="no-print" style={{ maxWidth: 794, margin: '0 auto 12px', display: 'flex', gap: 8, padding: '0 10px', alignItems: 'center', flexWrap: 'wrap' }}>
-        <Btn variant="ghost" onClick={onClose}>← 과태료</Btn>
+        <Btn variant="ghost" onClick={onClose}>← 업무·과태료</Btn>
         <span style={{ fontSize: 12.5, color: C.mute }}>매칭 {items.length}건 · 공문 {groups.size}장 + 사실확인서 {items.length}부</span>
         <span style={{ flex: 1 }} />
         <Btn variant="ghost" onClick={submit} disabled={busy || !items.length}>{busy ? '처리 중…' : '변경부과 신청 처리'}</Btn>
