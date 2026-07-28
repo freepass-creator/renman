@@ -95,6 +95,15 @@ export default function RiskPage() {
       meta="챙길 예외·미완료·미납·만기·휴차"
       tools={(
         <LedgerActions aria-label="문서">
+          {(group === '미납' || group === '전체') && unpaidRows.length > 0 && (
+            <Btn
+              size="sm"
+              variant="ghost"
+              onClick={() => setNoticeSel(new Set(unpaidRows.map((r) => r.id)))}
+            >
+              미납 전체선택
+            </Btn>
+          )}
           <Btn
             size="sm"
             variant="danger"
