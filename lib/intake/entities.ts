@@ -148,8 +148,8 @@ export const ENTITIES: Record<string, Entity> = {
     key: 'work_item', label: '업무', layer: ENTITY_LAYER.work_item, source: '업무 직접입력', idFrom: 'workId',
     fields: [
       { key: 'date', label: '업무일', type: 'date', required: true },
-        { key: 'category', label: '업무구분', type: 'select', required: true, options: ['미분류', '일정', '고객상담', '정비·수선', '사고', '과태료', '자금', '문서', '일반', '기타'] },
-        { key: 'status', label: '상태', type: 'select', options: ['미분류', '접수', '예정', '진행중', '보류', '완료', '취소'] },
+      { key: 'category', label: '업무구분', type: 'select', required: true, options: ['일정', '고객상담', '정비·수선', '사고', '문서', '기타'] },
+      { key: 'status', label: '상태', type: 'select', options: ['미분류', '접수', '예정', '진행중', '보류', '완료', '취소'] },
       { key: 'priority', label: '우선순위', type: 'select', options: ['긴급', '높음', '보통', '낮음'] },
       { key: 'title', label: '업무내용', type: 'text', required: true },
       { key: 'targetType', label: '대상구분', type: 'select', options: ['자산', '계약', '고객', '자금', '회사', '기타'] },
@@ -161,6 +161,36 @@ export const ENTITIES: Record<string, Entity> = {
       { key: 'vendor', label: '업체/거래처', type: 'text' },
       { key: 'amount', label: '금액(원)', type: 'number' },
       { key: 'description', label: '상세내용', type: 'text' },
+      // ── 일정 ──
+      { key: 'endDate', label: '종료일', type: 'date', manual: true },
+      { key: 'location', label: '장소', type: 'text', manual: true },
+      // ── 고객상담 ──
+      { key: 'callChannel', label: '채널', type: 'select', options: ['전화', '문자', '방문', '카톡', '기타'], manual: true },
+      { key: 'callDirection', label: '방향', type: 'select', options: ['인바운드', '아웃바운드'], manual: true },
+      { key: 'callResult', label: '상담결과', type: 'select', options: ['안내완료', '재연락', '이관', '미연결', '기타'], manual: true },
+      { key: 'nextActionDate', label: '다음조치일', type: 'date', manual: true },
+      // ── 정비·수선 (WorkForm 정렬) ──
+      { key: 'maintType', label: '정비유형', type: 'select', options: ['정기점검', '소모품교체', '수리', '판금·도색', '타이어', '기타'], manual: true },
+      { key: 'mileage', label: '주행거리(km)', type: 'number', manual: true },
+      { key: 'nextMaintDate', label: '다음정비예정', type: 'date', manual: true },
+      // ── 사고 ──
+      { key: 'accRole', label: '가해/피해', type: 'select', options: ['가해', '피해'], manual: true },
+      { key: 'faultPct', label: '내 과실(%)', type: 'number', manual: true },
+      { key: 'damageArea', label: '사고부위', type: 'text', manual: true },
+      { key: 'damageFrame', label: '골격손상', type: 'select', options: ['없음', '경미', '있음'], manual: true },
+      { key: 'insuranceAmount', label: '보험처리금(원)', type: 'number', manual: true },
+      { key: 'selfPay', label: '자기부담금(원)', type: 'number', manual: true },
+      { key: 'repairInDate', label: '입고일', type: 'date', manual: true },
+      { key: 'repairOutDate', label: '출고예정일', type: 'date', manual: true },
+      { key: 'rentalCar', label: '대차', type: 'select', options: ['미제공', '대차중', '대차반납'], manual: true },
+      { key: 'insuranceCompany', label: '보험사', type: 'text', manual: true },
+      { key: 'insuranceNo', label: '접수번호', type: 'text', manual: true },
+      { key: 'otherCar', label: '상대 차량번호', type: 'text', manual: true },
+      { key: 'otherInsurance', label: '상대 보험사', type: 'text', manual: true },
+      { key: 'otherInsuranceNo', label: '상대 접수번호', type: 'text', manual: true },
+      // ── 문서 ──
+      { key: 'docKind', label: '서류종류', type: 'select', options: ['계약서', '등록증', '보험증권', '견적서', '영수증', '기타'], manual: true },
+      { key: 'docStatus', label: '서류상태', type: 'select', options: ['요청', '수령', '검토', '보관', '반려'], manual: true },
     ],
   },
   customer: {

@@ -10,7 +10,7 @@ import { openCar } from '@/lib/ui-bus';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
   Badge, Btn, C, FilterChips, LedgerActions, LedgerCreatePanel, LedgerFilterButton, LedgerFilterFields, LedgerFilterPanel, LedgerFrame, LedgerRecordPanel, PageLoading, Search, won,
-  PeriodBar, Select, type LedgerColView, type LedgerFormSection, type SheetCol,
+  PeriodBar, Select, type LedgerColView, type SheetCol,
 } from '@/components/ui';
 import { useIsMobile } from '@/lib/use-mobile';
 import { todayKST } from '@/lib/contracts/dates';
@@ -25,9 +25,9 @@ import {
   buildPenaltyBucketRow, buildPenaltyWorkRows,
   type PenaltyKind, type PenaltyProcess, type PenaltyWorkRow,
 } from '@/lib/penalty-work';
+import { WORK_SECTIONS_BY_KIND, type WorkGroup } from '@/lib/work-form-sections';
 import { PenaltyBucketPanel } from '@/components/work/PenaltyBucketPanel';
 
-type WorkGroup = '일정' | '고객상담' | '정비·수선' | '사고' | '과태료' | '문서' | '기타';
 type WorkGroupFilter = '전체' | WorkGroup;
 type WorkSource = 'work_item' | 'history' | 'penalty' | 'inbox';
 
@@ -65,11 +65,6 @@ const WORK_SOURCE_LABEL: Record<WorkSource, string> = {
   penalty: '과태료',
   inbox: '문서함',
 };
-const WORK_CREATE_SECTIONS: LedgerFormSection[] = [
-  { title: '업무 분류', open: true, fields: ['date', 'category', 'status', 'priority'] },
-  { title: '대상·연결정보', fields: ['targetType', 'plate', 'contractNo', 'customerName'] },
-  { title: '처리정보', fields: ['dueDate', 'assigneeName', 'vendor', 'amount', 'description'] },
-];
 
 const PENALTY_ROW_BG = 'color-mix(in srgb, var(--brand) 10%, var(--bg-card))';
 
@@ -416,13 +411,15 @@ function WorkLedgerInner() {
           key="new-work"
           entityKey="work_item"
           title="업무 생성"
-          sections={WORK_CREATE_SECTIONS}
+          sectionsByKind={WORK_SECTIONS_BY_KIND}
+          kindField="category"
+          fallbackKind="기타"
           quick
           initial={{
             date: todayKST(),
-            status: '미분류',
-            category: '미분류',
-            workType: '미분류',
+            status: '접수',
+            category: '기타',
+            workType: '기타',
             title: '',
           }}
           onClose={() => setCreating(false)}

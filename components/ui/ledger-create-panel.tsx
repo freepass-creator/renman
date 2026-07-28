@@ -9,6 +9,7 @@ import { resolveWriteCompany, NEED_COMPANY } from '@/lib/scope';
 import { useSession } from '@/lib/session';
 import { toast } from '@/lib/toast';
 import { Btn, Input, PillTabs, Select } from './controls';
+import { FormGrid } from './detail';
 import { LedgerPanelFooter } from './ledger-actions';
 import { C } from './tokens';
 
@@ -33,6 +34,9 @@ export function LedgerCreatePanel({
   entityKey,
   title,
   sections,
+  sectionsByKind,
+  kindField = 'category',
+  fallbackKind = '기타',
   initial,
   quick,
   prefix,
@@ -41,7 +45,13 @@ export function LedgerCreatePanel({
 }: {
   entityKey: string;
   title: string;
-  sections: LedgerFormSection[];
+  /** 고정 섹션. sectionsByKind 있으면 kind 값으로 대체. */
+  sections?: LedgerFormSection[];
+  /** erp4 field-group — 구분(Select) 값 → 섹션 목록. */
+  sectionsByKind?: Record<string, LedgerFormSection[]>;
+  /** sectionsByKind 키로 쓸 폼 필드(기본 category). */
+  kindField?: string;
+  fallbackKind?: string;
   initial?: EntityRecord;
   /** 회사만으로도 저장하되 아래 상세 입력은 선택적으로 유지한다. */
   quick?: boolean;
@@ -58,10 +68,19 @@ export function LedgerCreatePanel({
     return base;
   });
   const [busy, setBusy] = useState(false);
+
+  const activeSections = useMemo(() => {
+    if (sectionsByKind) {
+      const kind = String(form[kindField] || '');
+      return sectionsByKind[kind] || sectionsByKind[fallbackKind] || sections || [];
+    }
+    return sections || [];
+  }, [sectionsByKind, sections, form, kindField, fallbackKind]);
+
   const selectedFields = useMemo(() => {
-    const wanted = new Set(sections.flatMap((section) => section.fields));
+    const wanted = new Set(activeSections.flatMap((section) => section.fields));
     return entity?.fields.filter((field) => wanted.has(field.key)) || [];
-  }, [entity, sections]);
+  }, [entity, activeSections]);
   const fieldByKey = useMemo(() => new Map(selectedFields.map((field) => [field.key, field])), [selectedFields]);
 
   if (!entity) return null;
@@ -71,7 +90,11 @@ export function LedgerCreatePanel({
     : selectedFields.every((field) => !field.required || !!String(form[field.key] ?? '').trim());
   const canSave = companyReady && fieldsReady;
 
-  const change = (key: string, value: string) => setForm((current) => ({ ...current, [key]: value }));
+  const change = (key: string, value: string) => setForm((current) => {
+    const next: EntityRecord = { ...current, [key]: value };
+    if (key === 'category') next.workType = value;
+    return next;
+  });
 
   async function save() {
     const targetCompany = resolveWriteCompany(companyId, { companyId: form.companyId });
@@ -96,6 +119,7 @@ export function LedgerCreatePanel({
       const record = normalizedForm(selectedFields, {
         ...form,
         companyId: targetCompany,
+        workType: form.workType || form.category,
         createdBy: user.email || user.name,
         createdAt: new Date().toISOString(),
         inputSource: '원장 직접입력',
@@ -131,7 +155,6 @@ export function LedgerCreatePanel({
       </header>
 
       <div className="ledger-create-panel__body">
-        {prefix}
         {prefix}
         {scopeAll && (
           quick ? (
@@ -186,36 +209,18 @@ export function LedgerCreatePanel({
           </div>
         )}
 
-        {sections.map((section, sectionIndex) => (
-          <details className="ledger-create-panel__section" open={section.open ?? sectionIndex === 0} key={section.title}>
-            <summary><ChevronRight className="ledger-create-panel__chevron" size={14} aria-hidden="true" />{section.title}</summary>
-            <div className="ledger-create-panel__grid">
-              {section.fields.map((key) => {
-                const field = fieldByKey.get(key);
-                if (!field) return null;
-                const value = String(form[field.key] ?? '');
-                return (
-                  <label key={field.key} className="ledger-create-panel__field">
-                    <span>{field.label}{field.required && <b> *</b>}</span>
-                    {field.type === 'select' ? (
-                      <Select value={value} onChange={(event) => change(field.key, event.target.value)}>
-                        <option value="">선택</option>
-                        {(field.options || []).map((option) => <option value={option} key={option}>{option}</option>)}
-                      </Select>
-                    ) : (
-                      <Input
-                        type={field.type === 'date' ? 'date' : field.type === 'number' ? 'number' : 'text'}
-                        value={value}
-                        onChange={(event) => change(field.key, event.target.value)}
-                      />
-                    )}
-                    {field.note && <small>{field.note}</small>}
-                  </label>
-                );
-              })}
-            </div>
-          </details>
-        ))}
+        {activeSections.map((section, sectionIndex) => {
+          const sectionFields = section.fields
+            .map((key) => fieldByKey.get(key))
+            .filter((field): field is Field => !!field);
+          if (!sectionFields.length) return null;
+          return (
+            <details className="ledger-create-panel__section" open={section.open ?? sectionIndex === 0} key={section.title}>
+              <summary><ChevronRight className="ledger-create-panel__chevron" size={14} aria-hidden="true" />{section.title}</summary>
+              <FormGrid fields={sectionFields} form={form} onChange={change} cols={2} />
+            </details>
+          );
+        })}
       </div>
 
       <LedgerPanelFooter hint="등록일·등록자는 저장 시 자동 기록됩니다.">
