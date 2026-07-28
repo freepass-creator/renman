@@ -121,7 +121,7 @@ export function LedgerFrame<R>({
 
   // ERP: 제목·필터줄·패널 유지 · 표 자리만 PageLoading.
   return (
-    <Page frame title={title} meta={meta} right={right} noCompany icon={icon}>
+    <Page frame title={title} meta={meta} noCompany icon={icon}>
       {hint != null && (
         typeof hint === 'string' || typeof hint === 'number'
           ? <Message variant="info">{hint}</Message>
@@ -138,6 +138,7 @@ export function LedgerFrame<R>({
         {stats}
         {viewControl}
         {tools}
+        {right}{/* 주액션(생성/등록) — 표 바로 위 도구 줄 맨 오른쪽(도구 옆). 제목 줄엔 두지 않음. */}
       </div>
 
       <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
