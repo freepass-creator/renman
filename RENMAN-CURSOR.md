@@ -70,6 +70,7 @@ curl -s -o /dev/null -w "%{http_code}" http://localhost:6006/<route>   # 200
 
 | 날짜 | 작업자 | 내용 | 상태 |
 |---|---|---|---|
+| 2026-07-28 | Cursor | 대시보드=/dev/erp-design HomeView 이식(KPI4+오늘업무+교차검증) · aging/법인별표 제거 | tsc0 |
 | 2026-07-28 | Cursor | Sec collapsible={false} 추가 · 대시보드 3구획 접기/셰브론 제거 | tsc0 |
 | 2026-07-28 | Cursor | 홈 삭제·대시보드 신규(LedgerFrame·KPI+aging+법인별) · home-kpi 폐기 · computeKPI/kpiByCompany SSOT | tsc0 |
 | 2026-07-28 | Cursor | 홈→대시보드(관제콕핏): nav LayoutDashboard · KPI타일+법인별 ExcelSheet · home-kpi/kpi SSOT · 추이생략 | tsc0 |

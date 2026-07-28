@@ -1,72 +1,194 @@
 'use client';
 /**
- * 대시보드(/) — 관제 콕핏.
- * 셸 = LedgerFrame(회사 스코프·헤더 존 규격). 본문 = KPI + 법인별 표.
- * 데이터 = computeKPI · kpiByCompany · buildCashLedger · groupOfLabel (도메인 SSOT만).
+ * 대시보드(/) — `/dev/erp-design` HomeView 시안 1:1 이식.
+ *   KPI 4칸(가동률·휴차·미수율·오늘업무) + 오늘 집중 업무 + 데이터 교차검증.
+ *   셸 = LedgerFrame(회사 스코프). Sec 접기 없음. 색=C.* 토큰만.
+ *   데이터 = computeKPI · computeDashboard · buildAgenda · selectPendingWork.
  */
-import { useMemo } from 'react';
+import { useMemo, type CSSProperties, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import { UploadCloud } from 'lucide-react';
 import {
-  LedgerFrame, Sec, Cards, Metric, Btn, ExcelSheet, EmptyState, won, C,
-  type SheetCol,
+  LedgerFrame, Btn, EmptyState, ListBox, ListRow, won, C, R, NUM, SPACE_GROUP_M,
 } from '@/components/ui';
 import { TODAY } from '@/lib/dashboard-consts';
-import { COMPANIES, companyDisplay } from '@/lib/companies';
-import { computeKPI, kpiByCompany, type KPI } from '@/lib/kpi';
-import { buildCashLedger } from '@/lib/finance/cash-ledger';
-import { groupOfLabel } from '@/lib/payments/ledger-subjects';
+import { computeKPI } from '@/lib/kpi';
+import { computeDashboard } from '@/lib/operating-snapshot';
+import { buildAgenda } from '@/lib/agenda';
+import { selectPendingWork } from '@/lib/snapshot/selectors';
 import { useEntityLists } from '@/lib/use-entity-lists';
-import { openIngest } from '@/lib/ui-bus';
+import { openCar, openIngest } from '@/lib/ui-bus';
+import { useIsMobile } from '@/lib/use-mobile';
 
-const CO_COLS: SheetCol<KPI>[] = [
-  { key: 'co', label: '법인', render: (r) => companyDisplay(r.companyId), text: (r) => companyDisplay(r.companyId) },
-  { key: 'held', label: '보유', align: 'r', sortNum: true, render: (r) => r.totalVehicles, text: (r) => r.totalVehicles },
-  { key: 'run', label: '운행', align: 'r', sortNum: true, render: (r) => r.running, text: (r) => r.running },
-  { key: 'idle', label: '휴차', align: 'r', sortNum: true, render: (r) => r.idle, text: (r) => r.idle },
-  { key: 'util', label: '가동률', align: 'r', sortNum: true, render: (r) => `${r.util}%`, text: (r) => r.util },
-  {
-    key: 'misuA', label: '운행중 미수', align: 'r', sortNum: true,
-    render: (r) => (r.misuActive ? <span style={{ color: C.danger, fontWeight: 700 }}>{won(r.misuActive)}</span> : '—'),
-    text: (r) => r.misuActive,
-  },
-  {
-    key: 'misuT', label: '총 미수', align: 'r', sortNum: true,
-    render: (r) => (r.totalUnpaid ? won(r.totalUnpaid) : '—'),
-    text: (r) => r.totalUnpaid,
-  },
-];
-
-function monthOpProfit(bank: Parameters<typeof buildCashLedger>[0], card: Parameters<typeof buildCashLedger>[1], today: string): number {
-  const ym = today.slice(0, 7);
-  let inc = 0;
-  let exp = 0;
-  for (const row of buildCashLedger(bank, card)) {
-    if (String(row.date || '').slice(0, 7) !== ym) continue;
-    if (groupOfLabel(row.category) !== '영업') continue;
-    inc += row.inAmt;
-    exp += row.outAmt;
-  }
-  return inc - exp;
+function Soft(loading: boolean, n: number | string): number | string {
+  return loading ? '…' : n;
 }
+
+function KpiTile({
+  label, value, unit, meta, bar, onClick,
+}: {
+  label: string;
+  value: ReactNode;
+  unit?: string;
+  meta?: string;
+  bar?: ReactNode;
+  onClick?: () => void;
+}) {
+  const mobile = useIsMobile();
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      style={{
+        minHeight: mobile ? 126 : 148,
+        border: `1px solid ${C.line}`,
+        borderRadius: R,
+        background: C.card,
+        textAlign: 'left',
+        padding: mobile ? '13px 14px' : '17px 18px',
+        cursor: onClick ? 'pointer' : 'default',
+        display: 'flex',
+        flexDirection: 'column',
+        boxShadow: 'var(--shadow-sm)',
+      }}
+    >
+      <span style={{ fontSize: 11, fontWeight: 700, color: C.sub }}>{label}</span>
+      <span style={{
+        display: 'block', marginTop: 14, fontSize: mobile ? 25 : 30, lineHeight: 1,
+        fontWeight: 800, letterSpacing: '-0.04em', fontFamily: NUM, fontVariantNumeric: 'tabular-nums', color: C.ink,
+      }}>
+        {value}
+        {unit != null && <small style={{ fontSize: 14, marginLeft: 2, fontWeight: 600 }}>{unit}</small>}
+      </span>
+      {meta != null && (
+        <span style={{ display: 'block', marginTop: 10, fontSize: 10.5, color: C.mute }}>{meta}</span>
+      )}
+      {bar != null && <div style={{ marginTop: 'auto', paddingTop: 14 }}>{bar}</div>}
+    </button>
+  );
+}
+
+function Bar({ pct, tone = 'ok' }: { pct: number; tone?: 'ok' | 'danger' | 'warn' }) {
+  const fill = tone === 'danger' ? C.danger : tone === 'warn' ? C.warn : C.ok;
+  const w = Math.max(0, Math.min(100, pct));
+  return (
+    <div style={{ height: 4, borderRadius: 2, background: 'var(--bg-stripe)', overflow: 'hidden' }}>
+      <div style={{ width: `${w}%`, height: '100%', background: fill }} />
+    </div>
+  );
+}
+
+function Panel({
+  title, desc, action, children,
+}: {
+  title: string; desc: string; action?: ReactNode; children: ReactNode;
+}) {
+  return (
+    <section style={{
+      border: `1px solid ${C.line}`, borderRadius: R, background: C.card, overflow: 'hidden',
+      display: 'flex', flexDirection: 'column', minHeight: 0,
+    }}>
+      <div style={{
+        minHeight: 64, padding: '14px 16px', borderBottom: `1px solid ${C.line}`,
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12,
+      }}>
+        <div style={{ minWidth: 0 }}>
+          <div style={{ fontSize: 14, fontWeight: 800, color: C.ink }}>{title}</div>
+          <div style={{ fontSize: 11, color: C.mute, marginTop: 3 }}>{desc}</div>
+        </div>
+        {action}
+      </div>
+      <div style={{ flex: 1, minHeight: 0 }}>{children}</div>
+    </section>
+  );
+}
+
+const gridKpi: CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: 'repeat(4, minmax(0, 1fr))',
+  gap: 12,
+};
+const gridHome: CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: 'minmax(0, 1.55fr) minmax(280px, 1fr)',
+  gap: 16,
+};
 
 export default function DashboardPage() {
   const router = useRouter();
-  const { data: [contracts = [], vehicles = [], bank = [], card = []], loading } = useEntityLists([
-    'contract', 'vehicle', 'bank_tx', 'card_tx',
+  const mobile = useIsMobile();
+  const { data: [contracts = [], vehicles = [], insurances = [], penalties = [], bankTx = []], loading } = useEntityLists([
+    'contract', 'vehicle', 'insurance', 'penalty', 'bank_tx',
   ]);
 
-  const total = useMemo(() => computeKPI(contracts, vehicles, TODAY), [contracts, vehicles]);
-  const byCo = useMemo(() => kpiByCompany(contracts, vehicles, TODAY, COMPANIES), [contracts, vehicles]);
-  const pnl = useMemo(() => monthOpProfit(bank, card, TODAY), [bank, card]);
+  const kpi = useMemo(() => computeKPI(contracts, vehicles, TODAY), [contracts, vehicles]);
+  const D = useMemo(
+    () => computeDashboard({ contracts, vehicles, insurances, penalties, bankTx }, TODAY),
+    [contracts, vehicles, insurances, penalties, bankTx],
+  );
+  const pending = useMemo(() => selectPendingWork(D), [D]);
+  const agenda = useMemo(
+    () => buildAgenda(contracts, vehicles, insurances, penalties),
+    [contracts, vehicles, insurances, penalties],
+  );
 
-  const v = (n: number | string) => (loading ? '…' : n);
+  const focus = useMemo(() => {
+    const rank = (s: string) => (s === '어김' ? 0 : s === '임박' ? 1 : 2);
+    return agenda
+      .filter((a) => a.status === '어김' || a.status === '임박')
+      .sort((a, b) => rank(a.status) - rank(b.status) || a.dday - b.dday)
+      .slice(0, 5);
+  }, [agenda]);
+
+  const delayedN = useMemo(() => agenda.filter((a) => a.status === '어김').length, [agenda]);
+  const misuRate = kpi.monthlyBilled > 0
+    ? Math.round((kpi.misuActive / kpi.monthlyBilled) * 1000) / 10
+    : 0;
+
+  const ocrN = D.compliance.length;
+  const mismatchN = D.insMismatch.length;
+  const unmatchedN = D.unmatchedTx.length + D.ghostPlates.length;
+
+  const validations = useMemo(() => {
+    const rows: { key: string; title: string; sub: string; badge: string; plate?: string }[] = [];
+    for (const x of D.compliance.slice(0, 3)) {
+      rows.push({
+        key: `c:${String(x.rec.plate)}:${x.flags[0]?.code || ''}`,
+        title: '컴플라이언스',
+        sub: `${x.rec.plate || '—'} · ${x.flags[0]?.detail || x.flags[0]?.code || '검토'}`,
+        badge: '검토',
+        plate: String(x.rec.plate || ''),
+      });
+    }
+    for (const x of D.insMismatch.slice(0, 2)) {
+      rows.push({
+        key: `i:${String(x.rec.plate)}:${x.detail}`,
+        title: '보험불일치',
+        sub: `${x.rec.plate || '—'} · ${x.detail}`,
+        badge: '검토',
+        plate: String(x.rec.plate || ''),
+      });
+    }
+    for (const plate of D.ghostPlates.slice(0, 2)) {
+      rows.push({
+        key: `g:${plate}`,
+        title: '차량 미등록',
+        sub: `${plate} · 계약만 있고 차량원장 없음`,
+        badge: '매칭',
+        plate,
+      });
+    }
+    return rows.slice(0, 5);
+  }, [D]);
+
   const go = (href: string) => router.push(href);
-
-  // 미수 aging 막대 = computeKPI.aging SSOT (월별 추이 SSOT 없음 → 이걸로 대체)
-  const agingMax = Math.max(1, ...total.aging);
-  const agingLabels = ['0~30일', '31~60일', '61~90일', '90일+'] as const;
-  const agingTone = [C.ok, C.warn, C.warn, C.danger] as const;
+  const dateLabel = (() => {
+    try {
+      return new Date(`${TODAY}T12:00:00`).toLocaleDateString('ko-KR', {
+        year: 'numeric', month: 'long', day: 'numeric', weekday: 'long',
+      });
+    } catch { return TODAY; }
+  })();
 
   return (
     <LedgerFrame
@@ -79,80 +201,165 @@ export default function DashboardPage() {
         </Btn>
       )}
       body={(
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 20, paddingBottom: 24 }}>
-          <Sec id="dash-kpi" title="KPI" desc="클릭 → 원장·리스크" collapsible={false} hideable={false}>
-            <Cards min={128} fit>
-              <Metric
-                label="보유"
-                value={v(`${total.totalVehicles}대`)}
-                onClick={() => go('/status')}
-              />
-              <Metric
-                label="가동률"
-                value={v(`${total.util}%`)}
-                hint={loading ? undefined : `운행 ${total.running}`}
-                tone={!loading && total.util >= 70 ? 'ok' : !loading && total.util < 50 ? 'warn' : 'ink'}
-                onClick={() => go('/status')}
-              />
-              <Metric
-                label="운행중 미수"
-                value={v(won(total.misuActive))}
-                tone={!loading && total.misuActive > 0 ? 'danger' : 'ink'}
-                onClick={() => go('/risk')}
-              />
-              <Metric
-                label="휴차"
-                value={v(total.idle)}
-                tone={!loading && total.idle > 0 ? 'warn' : 'ink'}
-                onClick={() => go('/risk')}
-              />
-              <Metric
-                label="손익"
-                value={v(won(pnl))}
-                hint={loading ? undefined : '이번달 영업'}
-                tone={!loading && pnl < 0 ? 'danger' : !loading && pnl > 0 ? 'ok' : 'ink'}
-                onClick={() => go('/cash')}
-              />
-            </Cards>
-          </Sec>
+        <div style={{
+          display: 'flex', flexDirection: 'column', gap: SPACE_GROUP_M,
+          padding: mobile ? '8px 0 24px' : '4px 0 28px', maxWidth: 1500,
+        }}>
+          {/* 시안: pageHeader */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: mobile ? 'flex-start' : 'flex-end', gap: 12, flexWrap: 'wrap' }}>
+            <div>
+              <div style={{ fontSize: 10, fontWeight: 700, color: C.mute, letterSpacing: '0.04em' }}>{dateLabel}</div>
+              <div style={{ fontSize: mobile ? 20 : 24, fontWeight: 800, letterSpacing: '-0.03em', color: C.ink, marginTop: 4 }}>운영 현황</div>
+              <div style={{ fontSize: 12, color: C.sub, marginTop: 6 }}>가동과 회수에 집중해야 할 항목을 먼저 보여드립니다.</div>
+            </div>
+            <div style={{ display: 'inline-flex', gap: 7 }}>
+              <Btn size="sm" variant="ghost" onClick={() => go('/desk')}>일정</Btn>
+              <Btn size="sm" variant="solid" onClick={() => go('/work')}>업무</Btn>
+            </div>
+          </div>
 
-          <Sec id="dash-aging" title="미수 aging" desc="운행중 미수 · 경과별" collapsible={false} hideable={false}>
-            {loading ? (
-              <EmptyState variant="sec">…</EmptyState>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                {total.aging.map((amt, i) => (
-                  <div key={agingLabels[i]} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <span style={{ width: 66, flex: '0 0 66px', fontSize: 12, color: C.mute }}>{agingLabels[i]}</span>
-                    <div style={{ flex: 1, height: 18, background: 'var(--bg-stripe)', borderRadius: 'var(--radius)', overflow: 'hidden' }}>
-                      <div style={{
-                        width: `${Math.round((amt / agingMax) * 100)}%`,
-                        height: '100%',
-                        background: agingTone[i],
+          {/* 시안: kpiGrid 4 */}
+          <div style={{
+            ...gridKpi,
+            gridTemplateColumns: mobile ? 'repeat(2, minmax(0, 1fr))' : 'repeat(4, minmax(0, 1fr))',
+          }}>
+            <KpiTile
+              label="보유차량 가동률"
+              value={Soft(loading, kpi.util)}
+              unit="%"
+              meta={loading ? undefined : `가동 ${kpi.running}대 / 운영대상 ${kpi.totalVehicles}대`}
+              bar={<Bar pct={loading ? 0 : kpi.util} tone={kpi.util >= 70 ? 'ok' : kpi.util < 50 ? 'warn' : 'ok'} />}
+              onClick={() => go('/status')}
+            />
+            <KpiTile
+              label="공차·휴차"
+              value={Soft(loading, kpi.idle)}
+              unit="대"
+              meta={loading ? undefined : `휴차 ${kpi.idle} · 보유 ${kpi.totalVehicles}`}
+              bar={<Bar pct={loading || !kpi.totalVehicles ? 0 : Math.round((kpi.idle / kpi.totalVehicles) * 100)} tone="warn" />}
+              onClick={() => go('/risk')}
+            />
+            <KpiTile
+              label="현재 미수율"
+              value={Soft(loading, misuRate)}
+              unit="%"
+              meta={loading ? undefined : `미수 ${won(kpi.misuActive)} / 월청구 ${won(kpi.monthlyBilled)}`}
+              bar={<Bar pct={loading ? 0 : Math.min(100, misuRate)} tone="danger" />}
+              onClick={() => go('/risk')}
+            />
+            <KpiTile
+              label="오늘의 업무"
+              value={Soft(loading, pending.count)}
+              unit="건"
+              meta={loading ? undefined : `미결 ${pending.count} · 어김 ${delayedN}`}
+              bar={(
+                <div style={{ display: 'flex', gap: 4 }}>
+                  {Array.from({ length: 4 }).map((_, i) => (
+                    <i
+                      key={i}
+                      style={{
+                        height: 4, flex: 1, borderRadius: 2,
+                        background: !loading && i < Math.min(4, delayedN) ? C.danger : C.mute,
+                        opacity: !loading && i < Math.min(4, delayedN) ? 1 : 0.35,
+                        display: 'block',
                       }}
-                      />
-                    </div>
-                    <span style={{
-                      width: 120, flex: '0 0 120px', textAlign: 'right',
-                      fontSize: 12.5, fontWeight: 700, fontVariantNumeric: 'tabular-nums',
-                    }}>
-                      {won(amt)}
-                    </span>
+                    />
+                  ))}
+                </div>
+              )}
+              onClick={() => go('/desk')}
+            />
+          </div>
+
+          {/* 시안: homeGrid — 업무 | 교차검증 */}
+          <div style={{
+            ...gridHome,
+            gridTemplateColumns: mobile ? '1fr' : 'minmax(0, 1.55fr) minmax(280px, 1fr)',
+          }}>
+            <Panel
+              title="오늘 집중할 업무"
+              desc="위험도와 기한을 기준으로 정렬했습니다."
+              action={<Btn size="sm" variant="ghost" onClick={() => go('/desk')}>전체 업무 보기</Btn>}
+            >
+              {loading ? (
+                <EmptyState variant="sec">…</EmptyState>
+              ) : focus.length === 0 ? (
+                <EmptyState variant="ok">오늘 급한 업무 없음</EmptyState>
+              ) : (
+                <ListBox>
+                  {focus.map((a) => (
+                    <ListRow
+                      key={a.key}
+                      badge={a.status}
+                      badgeTone={a.status === '어김' ? 'red' : 'amber'}
+                      main={`${a.plate || '—'} · ${a.title}`}
+                      sub={`${a.kind} · ${a.date}`}
+                      right={(
+                        <span style={{
+                          fontSize: 12, fontWeight: 700, fontFamily: NUM, fontVariantNumeric: 'tabular-nums',
+                          color: a.status === '어김' ? C.danger : C.warn,
+                        }}>
+                          {a.dday < 0 ? `${-a.dday}일 지남` : a.dday === 0 ? '오늘' : `D-${a.dday}`}
+                        </span>
+                      )}
+                      onClick={() => { if (a.plate) openCar(a.plate); else go('/desk'); }}
+                    />
+                  ))}
+                </ListBox>
+              )}
+            </Panel>
+
+            <Panel
+              title="데이터 교차검증"
+              desc="원장과 증명서가 다른 항목입니다."
+              action={<Btn size="sm" variant="ghost" onClick={() => go('/risk')}>검토함 열기</Btn>}
+            >
+              <div style={{
+                display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)',
+                margin: 14, border: `1px solid ${C.line}`, borderRadius: R, overflow: 'hidden',
+              }}>
+                {[
+                  { label: 'OCR·준수', n: ocrN },
+                  { label: '값 불일치', n: mismatchN },
+                  { label: '미매칭', n: unmatchedN },
+                ].map((x, i) => (
+                  <div
+                    key={x.label}
+                    style={{
+                      padding: 12,
+                      borderRight: i < 2 ? `1px solid ${C.line}` : undefined,
+                      display: 'grid', gap: 4,
+                    }}
+                  >
+                    <span style={{ fontSize: 10, color: C.mute }}>{x.label}</span>
+                    <strong style={{ fontSize: 20, fontFamily: NUM, fontVariantNumeric: 'tabular-nums', color: C.ink }}>
+                      {Soft(loading, x.n)}
+                    </strong>
                   </div>
                 ))}
               </div>
-            )}
-          </Sec>
-
-          <Sec id="dash-co" title="법인별" desc="보유 · 가동 · 미수" collapsible={false} hideable={false}>
-            {loading ? (
-              <EmptyState variant="sec">…</EmptyState>
-            ) : byCo.length === 0 ? (
-              <EmptyState variant="sec">표시할 법인이 없습니다</EmptyState>
-            ) : (
-              <ExcelSheet cols={CO_COLS} rows={byCo} rowKey={(r) => r.companyId} />
-            )}
-          </Sec>
+              {loading ? (
+                <EmptyState variant="sec">…</EmptyState>
+              ) : validations.length === 0 ? (
+                <EmptyState variant="ok">교차검증 이슈 없음</EmptyState>
+              ) : (
+                <div style={{ padding: '0 8px 10px' }}>
+                  <ListBox>
+                    {validations.map((r) => (
+                      <ListRow
+                        key={r.key}
+                        badge={r.badge}
+                        badgeTone="amber"
+                        main={r.title}
+                        sub={r.sub}
+                        onClick={() => { if (r.plate) openCar(r.plate); else go('/risk'); }}
+                      />
+                    ))}
+                  </ListBox>
+                </div>
+              )}
+            </Panel>
+          </div>
         </div>
       )}
     />
