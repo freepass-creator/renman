@@ -21,22 +21,13 @@
 
 ## 2. 지금 할 일 (요약 — 상세는 WORK-ORDER)
 
-**A그룹 = ✅ 완료** (2026-07-20). A-0~A-3 코드 반영됨. WORK-ORDER 본문 상태도 맞춤.
+**IA (2026-07):** 허브=홈(대시보드)·운영현황(통합시트)·일정관리(기한엑셀)·데이터센터.  
+원장=자산·계약·자금·업무. 일정=`buildAgenda` 어김/임박/예정 · LedgerFrame.  
+홈=지표 한눈(함대·일정어김·미수) — 엑셀 표는 각 메뉴.
 
-**B그룹 진행** (2026-07-22 기준):
+**Claude 검증 포인트:** `PAGE_IA`/`NAV_GROUPS` · 리다이렉트 · 패널 수정 · `/cash` tools CTA · 버튼 zone · `tsc --noEmit`.
 
-| | 항목 | 상태 |
-|---|---|---|
-| B-5 | 로딩층 `useEntityLists` | ✅ 거의 완료 (특수=company/trash/settings) |
-| B-2 | 쓰기 퍼널 `commit*` | ✅ UI 핫스팟 · 엔진 잔여 |
-| B-3 | 상태 SSOT | ✅ 1차 · 산재 잔여 |
-| **B-1** | 미수 원장 엔진 | ⚠ 완화만 · **다음 본격** |
-| B-4 | 필드 스키마 | ⬜ 마지막 |
-
-**데이터:** frozen 시드 live 사업현황 재생성(2026-07-22) — 차량 163·계약 177·carry≡net.  
-**오픈:** `DEPLOY.md` 게이트(Rules·env·마스터)는 배포/설정 작업.
-
-지금: **B-1** 또는 오픈 게이트.
+**B그룹 잔여:** B-1 미수 원장 엔진 · B-4 필드 스키마 · globals 레거시.
 
 ---
 
@@ -79,6 +70,52 @@ curl -s -o /dev/null -w "%{http_code}" http://localhost:6006/<route>   # 200
 
 | 날짜 | 작업자 | 내용 | 상태 |
 |---|---|---|---|
+| 2026-07-28 | Cursor | UIUX-SPEC 헤더 컨트롤 존 규격표 갱신(CompanyFilter·solid sm·Select) | tsc0 |
+| 2026-07-28 | Cursor | work 구분 PillTabs→Select · asset/contract/work 주액션 solid sm · receivables actions→WB · penalty sm | tsc0 |
+| 2026-07-28 | Cursor | 회사스코프 통일: ingest companySlot→CompanyFilter · 홈 meta 법인명 중복 제거 | tsc0 |
+| 2026-07-28 | Cursor | ledger-create-panel COMPANIES[0] 프리필 예외 주석(저장=resolveWriteCompany) | tsc0 |
+| 2026-07-28 | Cursor | cash 계좌 파생·집계 → buildBankAccountLedger(cash-ledger.ts) · 페이지는 결과만 | tsc0 |
+| 2026-07-28 | Cursor | asset/contract 통계 배지 → ledger-stats SSOT · riskDebtSum=selectReceivables | tsc0 |
+| 2026-07-28 | Cursor | asset 가동상태=linkFleet ownership·utilization(status와 동일 축) | tsc0 |
+| 2026-07-28 | Cursor | 홈=LedgerFrame엑셀(요약·미결·리스크·휴차·일정) · 메뉴일정제거 · /desk→홈탭 | tsc0 |
+| 2026-07-28 | Cursor | 홈=기존양식 복원(FacetPage+일정/미결/운영/리스크+Rail+Sec) · LedgerFrame홈 폐기 | tsc0 |
+| 2026-07-28 | Cursor | 홈 갈아엎기: LedgerFrame+칩(미결/리스크/함대)+SECTION_MAP 큐 · Facet/얇은KPI 폐기 | tsc0 |
+| 2026-07-28 | Cursor | 계약·운영: 납부조건 분리 → 결제일 + 선불/후불(+납부방법) 열 | tsc0 |
+| 2026-07-28 | Cursor | 홈=원장동일셸(Page+WB+투입아이콘)+Sec한눈 · 옛Facet렌즈 폐기 | tsc0 |
+| 2026-07-28 | Cursor | 홈 복원: Facet+일정/미결/운영/리스크+Sec · Agenda·FacetPage rail · KPI-only 폐기 | tsc0 |
+| 2026-07-28 | Cursor | 버튼 SSOT(tools=iconOnly) · 자산/계약 생성↓담기 · work/status/desk/list 맞춤 · 홈 유지 | tsc0 |
+| 2026-07-28 | Cursor | Btn iconOnly+tip · 자금/ingest tools 파일럿 · 홈=함대/오늘끝낼일/계속관리 · 투입아이콘 | tsc0 |
+| 2026-07-28 | Cursor | 원장 확장 규격: `ledger-ext` · SHEET/DETAIL/FILTER keys · 요청=`시트·축·+/-key` (엑셀열 포함) | tsc0 |
+| 2026-07-28 | Cursor | 세부필터 SSOT: `*_FILTER_DEFS`+`LedgerFilterFields` · 요청=`시트·필터·key` · 전 원장 배선 | tsc0 |
+| 2026-07-28 | Cursor | 상세 필드 추가 SSOT: `*_DETAIL_DEFS`+`buildDetailSections` · 요청=`시트·섹션·key` | tsc0 |
+| 2026-07-28 | Cursor | 원장 상세패널 전부 섹션접기: work/desk/status/cash(+ASSET/CONTRACT) · FLEET/AGENDA_DETAIL_SECTIONS | tsc0 |
+| 2026-07-28 | Cursor | 상세패널 접기: open+onToggle 토글 · cols 선택 · 계약「미수·종료」 · WORK-ORDER 표기 | tsc0 |
+| 2026-07-28 | Cursor | P0: FilterChips 원장 빠른필터(asset/contract/cash/desk/status) · ingest→LedgerFrame(body/view/companySlot) · 로딩=표자리만 | tsc0 |
+| 2026-07-28 | Cursor | UI 크롬 검수 캔버스: 원장/Facet/ingest 공통·고유·손롤·P0(FilterChips·ingest Frame) | 분석 |
+| 2026-07-28 | Cursor | EmptyState `sheet` variant · LedgerFrame/ingest 빈칸=패널과 높이맞춤(상단 작은박스 제거) | tsc0 |
+| 2026-07-28 | Cursor | 데이터센터 전면재구성: Page frame+필터줄+시트/투입패널(원장형) · Sec/Metric 폐기 · OCR·엑셀·저장 엔진 유지 | tsc0 |
+| 2026-07-28 | Cursor | 브라우저 직접검증(/work): 스피너1·필터유지·작업영역중앙(dx0) · Playwright 로그인 후 측정 | 확인 |
+| 2026-07-28 | Cursor | PageLoading=작업영역 정중앙(absolute) · LedgerFrame은 필터줄 유지+표자리 스피너 | tsc0 |
+| 2026-07-28 | Cursor | ERP 로딩 환경: Page/FacetPage/LedgerFrame `loading` · 셸유지+본문 PageLoading · soft-load유지 · WORK-ORDER §0.4 | tsc0 |
+| 2026-07-28 | Cursor | PageLoading=본문 자리 복귀(풀스크린 덮기 철회) · Gate만 셸 전 부트 | tsc0 |
+| 2026-07-28 | Cursor | 로딩 스피너 2중 분산 수정 시도(PageLoading 풀스크린) → 페이지바깥만이라 철회 | 철회 |
+| 2026-07-28 | Cursor | 옛 양식 폐기: Agenda/MySchedule/MyDesk/home-lenses → archive · 설정 mydesk 제거 · tsconfig archive 제외 | tsc0 |
+| 2026-07-28 | Cursor | 일정관리=LedgerFrame(어김/임박/예정) · 홈=운영 대시보드(함대·일정·리스크 KPI) · 메뉴명 일정관리 | tsc0 |
+| 2026-07-28 | Cursor | 홈·데이터센터 전면재작성: 홈=오늘/허브/원장 ListBox · ingest=필터줄+right저장·설명/back제거 | tsc0 |
+| 2026-07-28 | Cursor | 운영현황 교체: 옛 OpsLens/Facet 폐기 → LedgerFrame+FleetRow(차량1행) · desk도 Page규격 | tsc0 |
+| 2026-07-28 | Cursor | 원장 버튼 규격 고정: 우측=stats→보기→tools · 쓰기/워크플로/필터/보기 분류 · Frame 순서 맞춤 | tsc0 |
+| 2026-07-28 | Cursor | 허브 복귀: 홈·`/status`운영·`/desk`일정미결·ingest메뉴 · nav/mobile · TopSearch=찾기 · `/ops`→desk | tsc0 |
+| 2026-07-28 | Cursor | `/cash` 하루루프 안내 Message 제거(설명배너 불필요) | 완료 |
+| 2026-07-28 | Cursor | 계약 미수→리스크: 필터/통계/컬럼 · risk-ops(미수·보험·반납) · 통합관리=라이트+빠른입력 후속 메모 | tsc0 |
+| 2026-07-28 | Cursor | 스피너 영구: hung :6006(node 1.6GB) 재기동 · store.list fetch/getIdToken에 withTimeout | tsc0 |
+| 2026-07-28 | Cursor | 원장 패널 크롬 통일: 헤더/하단바 `--ledger-head-h`/`--ledger-foot-h` 36 · FilterPanel도 동일 footer | tsc0 |
+| 2026-07-28 | Cursor | 원장 상세패널 섹션접기: ASSET/CONTRACT_DETAIL_SECTIONS · LedgerRecordPanel details | tsc0 |
+| 2026-07-28 | Cursor | 원장 필터줄 SSOT(회사·검색·세부필터필수·범위·기간) · `/work` FilterBtn+상태/담당/원천 패널 | tsc0 |
+| 2026-07-28 | Cursor | `/vehicle/[plate]`=VehicleDetail 고정스크롤4장 배럴복귀 · Sample360 동기 · VehiclePage(탭시안) 제거(경쟁SSOT) | tsc0 |
+| 2026-07-28 | Cursor | 회사선택: quick(업무)=Pill칩 · 정식생성(자산·계약)=드롭다운 유지(성격별) | tsc0 |
+| 2026-07-28 | Cursor | 원장 필터줄 높이 통일: CompanyFilter/PeriodBar/FilterBtn 전부 sm(28) · 옆 Search·Select와 맞춤 | tsc0 |
+| 2026-07-28 | Cursor | 원장 버튼 규격: LedgerActions/PanelFooter · Frame.tools · right=쓰기·tools=루프/OCR · zone당 solid1 | tsc0 |
+| 2026-07-28 | Cursor | IA단순화 고정: PAGE_IA/NAV·리다이렉트(/sheet,/finance,/ops)·LedgerEditPanel·/cash 하루루프CTA · Claude검증용 | tsc0 |
 | 2026-07-27 | Cursor | 스위치플랜 마이그레이션 버튼(`MigrateDataButton`) · `/dev/data`·빈 원장 CTA · 메뉴명 변경 | tsc0 |
 | 2026-07-27 | Cursor | 원장 더블클릭 토글닫기(페이지 setSelected) · 클릭/더블클릭 타이머·user-select 보정 · thead/패널헤더 12px·36h 통일 | tsc0 |
 | 2026-07-27 | Cursor | 원장: 같은행 재더블클릭=패널닫기 · thead/패널헤더/Page타이틀 `--ledger-head-h:36` 통일 | tsc0 |
