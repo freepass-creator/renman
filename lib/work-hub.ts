@@ -32,11 +32,11 @@ export const PIPE = {
   penalty: { href: '/penalty', label: '과태료관리' },
   ingest: { href: '/ingest', label: '데이터센터' },
   inbox: { href: '/inbox', label: '증빙수집' },
-  work: { href: '/work', label: '업무현황' },
-  finance: { href: '/finance', label: '재무현황' },
-  asset: { href: '/asset', label: '자산현황' },
-  contract: { href: '/contract', label: '계약현황' },
-  sheet: { href: '/sheet', label: '운영시트' },
+  work: { href: '/work', label: '업무관리' },
+  finance: { href: '/cash', label: '자금관리' },
+  asset: { href: '/asset', label: '자산관리' },
+  contract: { href: '/contract', label: '계약관리' },
+  sheet: { href: '/asset', label: '자산관리' },
 } as const;
 export type PipeId = keyof typeof PIPE;
 

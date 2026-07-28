@@ -1,8 +1,20 @@
 /** 계약 운영 필터 술어 — 목록/렌즈에서 손롤 금지, 이 술어로 통일. */
 import { ymd } from './dates';
 import { type ContractView } from '../contract-ops';
+import { ageFromBirth } from '../compliance';
 
-export type ContractFilter = '전체' | '대기' | '운행' | '만기임박' | '만기경과' | '반납예정' | '종료' | '미수';
+export type ContractFilter = '전체' | '대기' | '운행' | '만기임박' | '만기경과' | '반납예정' | '종료' | '리스크';
+
+/** 리스크 = 계약 불이행. risk-ops와 동일 3종(미수·보험·반납). (risk-ops 직import 금지 — contract-ops↔filters 순환) */
+function isAtRisk(v: ContractView, today: string): boolean {
+  if (v.net > 0) return true;
+  const driver = Number(v.rec.driverAge) || ageFromBirth(v.rec.contractorBirth, today) || 0;
+  const insAge = Number(v.rec.insuranceAge) || 0;
+  if (driver && insAge && driver < insAge) return true;
+  const end = ymd(v.rec.endDate);
+  if (v.status === '운행' && end && !ymd(v.rec.returnedDate) && end < today) return true;
+  return false;
+}
 
 export function passesFilter(v: ContractView, f: ContractFilter, today: string): boolean {
   switch (f) {
@@ -13,6 +25,6 @@ export function passesFilter(v: ContractView, f: ContractFilter, today: string):
     case '만기경과': return v.status === '운행' && v.dday != null && v.dday < 0;
     case '반납예정': return v.status === '운행' && !!ymd(v.rec.returnScheduledDate);
     case '종료': return v.ended;
-    case '미수': return v.net > 0;
+    case '리스크': return isAtRisk(v, today);
   }
 }

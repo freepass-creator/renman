@@ -15,8 +15,8 @@ import { ALL_COMPANIES, COMPANIES, companyLabel, companyShort } from '@/lib/comp
 
 /* 입력·버튼·탭·칩 — 인터랙션 컨트롤 원자. 높이·폰트 = CTRL (ERP4 동기). */
 
-// 회사(법인) 필터 — 셸 툴바 SSOT. 웹32 · 모바일40.
-export function CompanyFilter() {
+// 회사(법인) 필터 — 셸 툴바 SSOT. size=md면 웹32 · sm이면 원장 필터줄(28)과 맞춤.
+export function CompanyFilter({ size = 'md' }: { size?: 'sm' | 'md' }) {
   const { companyId, setCompanyId, isOperator } = useSession();
   const mobile = useIsMobile();
   const [open, setOpen] = React.useState(false);
@@ -28,15 +28,16 @@ export function CompanyFilter() {
       : mobile ? companyShort(companyId) : companyLabel(companyId);
   const options = [ALL_COMPANIES, ...COMPANIES];
   const pick = (c: string) => { haptic.tap(); setCompanyId(c); setOpen(false); };
-  const h = ctrlH(mobile);
+  const cs: CtrlSize = size === 'sm' ? 'sm' : 'md';
+  const h = ctrlH(mobile, cs);
 
   return (
     <div style={{ position: 'relative', flexShrink: 0 }}>
       <button type="button" data-ui="action" onClick={() => { haptic.tap(); setOpen((o) => !o); }} title="보는 회사"
-        style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: h, boxSizing: 'border-box', padding: mobile ? '0 14px' : '0 11px', border: `1px solid ${C.line}`, borderRadius: R, background: C.card, cursor: 'pointer', fontSize: ctrlFs(mobile), fontWeight: 700, color: C.ink, whiteSpace: 'nowrap', flexShrink: 0, boxShadow: SH.rest, WebkitTapHighlightColor: 'transparent' }}>
-        <Building2 size={mobile ? 16 : 14} color={C.mute} style={{ flexShrink: 0 }} />
+        style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: h, boxSizing: 'border-box', padding: mobile ? '0 14px' : (size === 'sm' ? '0 10px' : '0 11px'), border: `1px solid ${C.line}`, borderRadius: R, background: C.card, cursor: 'pointer', fontSize: ctrlFs(mobile, cs), fontWeight: 700, color: C.ink, whiteSpace: 'nowrap', flexShrink: 0, boxShadow: SH.rest, WebkitTapHighlightColor: 'transparent' }}>
+        <Building2 size={mobile ? 16 : (size === 'sm' ? 13 : 14)} color={C.mute} style={{ flexShrink: 0 }} />
         {trigger}
-        <ChevronDown size={mobile ? 15 : 13} color={C.mute} style={{ flexShrink: 0 }} />
+        <ChevronDown size={mobile ? 15 : (size === 'sm' ? 12 : 13)} color={C.mute} style={{ flexShrink: 0 }} />
       </button>
       {open && mobile && (
         <Drawer title="회사 선택" onClose={() => setOpen(false)}>
@@ -151,17 +152,50 @@ export function ToggleChips<T extends string>({ selected, onToggle, options, siz
   );
 }
 
-/* 퀵필터 — 단일선택. 칩 높이 = ctrlChipH (웹28 · 모바일40). */
-export type ChipOpt<T extends string> = { key: T; label: string; count?: number };
-export function FilterChips<T extends string>({ value, onChange, options }: { value: T; onChange: (v: T) => void; options: ChipOpt<T>[] }) {
+/* 퀵필터 — 단일선택 칩. 칩 높이 = ctrlChipH (웹28 · 모바일40).
+ *   allowOff: 활성 재클릭 → null (원장 빠른필터).
+ *   count: 우측 상단 뱃지(미분류 건수 등). */
+export type ChipOpt<T extends string> = { key: T; label: React.ReactNode; count?: number };
+export function FilterChips<T extends string>({
+  value, onChange, options, allowOff = false,
+}: {
+  value: T | null;
+  onChange: (v: T | null) => void;
+  options: ChipOpt<T>[];
+  allowOff?: boolean;
+}) {
   const mobile = useIsMobile();
   return (
-    <div style={{ display: 'flex', flexWrap: 'wrap', gap: mobile ? 8 : 6, marginTop: 0 }}>
+    <div style={{ display: 'inline-flex', flexWrap: 'wrap', gap: mobile ? 8 : 6, alignItems: 'center' }} role="group">
       {options.map((o) => {
         const active = value === o.key;
+        const badge = o.count != null && o.count > 0;
         return (
-          <button key={o.key} type="button" data-ui="toggle" onClick={() => { haptic.select(); onChange(o.key); }} aria-pressed={active} style={toggleStyle(active, 'sm', mobile)}>
+          <button
+            key={o.key}
+            type="button"
+            data-ui="toggle"
+            onClick={() => {
+              haptic.select();
+              if (active && allowOff) onChange(null);
+              else onChange(o.key);
+            }}
+            aria-pressed={active}
+            style={{
+              ...toggleStyle(active, 'sm', mobile),
+              position: badge ? 'relative' : undefined,
+              overflow: badge ? 'visible' : undefined,
+            }}
+          >
             {o.label}
+            {badge && (
+              <span style={{
+                position: 'absolute', top: -6, right: -6, minWidth: 16, height: 16, padding: '0 4px',
+                borderRadius: 999, background: C.danger, color: C.inverse, boxSizing: 'border-box',
+                fontSize: 10, fontWeight: 800, lineHeight: '15px', textAlign: 'center',
+                fontVariantNumeric: 'tabular-nums', boxShadow: `0 0 0 2px ${C.bg}`,
+              }}>{o.count! > 99 ? '99+' : o.count}</span>
+            )}
           </button>
         );
       })}
@@ -188,27 +222,64 @@ export function IconBtn({ children, onClick, title, active, disabled }: { childr
   );
 }
 
-export function Btn({ children, onClick, variant = 'solid', size = 'md', disabled, href, block }: { children: React.ReactNode; onClick?: () => void; variant?: 'solid' | 'ghost' | 'danger'; size?: 'sm' | 'md' | 'lg'; disabled?: boolean; href?: string; block?: boolean }) {
+export function Btn({
+  children, onClick, variant = 'solid', size = 'md', disabled, href, block,
+  tip, iconOnly = false, 'aria-pressed': ariaPressed,
+}: {
+  children: React.ReactNode;
+  onClick?: () => void;
+  variant?: 'solid' | 'ghost' | 'danger';
+  size?: 'sm' | 'md' | 'lg';
+  disabled?: boolean;
+  href?: string;
+  block?: boolean;
+  /** hover/long-press 설명 · aria-label. iconOnly면 필수에 가깝게. */
+  tip?: string;
+  /** 정사각 아이콘만 — tools/ghost 반복액션. tip으로 설명. */
+  iconOnly?: boolean;
+  'aria-pressed'?: boolean;
+}) {
   const mobile = useIsMobile();
   const lg = size === 'lg'; // 현장 위저드 푸터(터치 48) — ERP4엔 없고 renman 유지
   const cs: CtrlSize = size === 'sm' ? 'sm' : 'md';
   const h = lg ? 48 : ctrlH(mobile, cs);
   const fs = lg ? 15 : ctrlFs(mobile, cs);
-  const pad = lg ? '0 18px' : mobile ? '0 18px' : (size === 'sm' ? '0 11px' : '0 14px');
+  const pad = iconOnly ? 0 : (lg ? '0 18px' : mobile ? '0 18px' : (size === 'sm' ? '0 11px' : '0 14px'));
   const s: React.CSSProperties = {
-    height: h, boxSizing: 'border-box', padding: pad, borderRadius: R,
+    height: h, width: iconOnly ? h : (block ? '100%' : undefined), boxSizing: 'border-box', padding: pad, borderRadius: R,
     fontWeight: lg || mobile ? 700 : 600, fontSize: fs, letterSpacing: '-0.01em', lineHeight: 1,
     cursor: disabled ? 'not-allowed' : 'pointer', opacity: disabled ? 0.5 : 1,
     border: `1px solid ${disabled ? C.line : variant === 'solid' ? C.brand : variant === 'danger' ? 'var(--red-border)' : C.line}`,
     background: variant === 'solid' ? (disabled ? C.line : C.brand) : C.taupeBg,
     color: variant === 'solid' ? C.inverse : variant === 'danger' ? 'var(--red-text)' : C.ink,
     boxShadow: disabled ? 'none' : variant === 'solid' ? SH.card : SH.rest,
-    textDecoration: 'none', display: block ? 'flex' : 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6, whiteSpace: 'nowrap',
-    width: block ? '100%' : undefined,
+    textDecoration: 'none', display: block ? 'flex' : 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: iconOnly ? 0 : 6, whiteSpace: 'nowrap',
     transition: 'filter .12s ease, box-shadow .12s ease',
     pointerEvents: disabled ? 'none' : 'auto',
+    flexShrink: 0,
   };
-  return href ? <a href={href} data-ui="action" data-clickable="" style={s}>{children}</a> : <button type="button" data-ui="action" onClick={onClick ? () => { haptic.tap(); onClick(); } : undefined} disabled={disabled} style={{ ...s, WebkitTapHighlightColor: 'transparent' }}>{children}</button>;
+  const label = tip || undefined;
+  if (href) {
+    return (
+      <a href={href} data-ui="action" data-clickable="" title={label} aria-label={label} style={s}>
+        {children}
+      </a>
+    );
+  }
+  return (
+    <button
+      type="button"
+      data-ui="action"
+      title={label}
+      aria-label={label}
+      aria-pressed={ariaPressed}
+      onClick={onClick ? () => { haptic.tap(); onClick(); } : undefined}
+      disabled={disabled}
+      style={{ ...s, WebkitTapHighlightColor: 'transparent' }}
+    >
+      {children}
+    </button>
+  );
 }
 
 export function Input({ size = 'md', style, ...rest }: Omit<React.InputHTMLAttributes<HTMLInputElement>, 'size'> & { size?: 'sm' | 'md' }) {
@@ -220,7 +291,7 @@ export function Select({ size = 'md', style, children, ...rest }: Omit<React.Sel
   return <select {...rest} style={{ ...selectStyle(size === 'sm', mobile), ...style }}>{children}</select>;
 }
 
-export function PeriodBar({ latest, initial = '월간', onRange }: { latest?: string; initial?: Period; onRange: (r: { from: string; to: string }) => void }) {
+export function PeriodBar({ latest, initial = '월간', onRange, size = 'md' }: { latest?: string; initial?: Period; onRange: (r: { from: string; to: string }) => void; size?: 'sm' | 'md' }) {
   const mobile = useIsMobile();
   const today = React.useMemo(() => todayKST(), []);
   const [period, setPeriod] = React.useState<Period>(initial);
@@ -232,29 +303,29 @@ export function PeriodBar({ latest, initial = '월간', onRange }: { latest?: st
   const canNav = !custom && period !== '전체';
   const onRangeRef = React.useRef(onRange); onRangeRef.current = onRange;
   React.useEffect(() => { onRangeRef.current(range); }, [range.from, range.to]);
-  const nh = ctrlH(mobile);
+  const nh = ctrlH(mobile, size);
   const nav: React.CSSProperties = { height: nh, width: nh, boxSizing: 'border-box', border: `1px solid ${C.line}`, borderRadius: R, background: C.card, cursor: 'pointer', color: C.mute, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 };
   return (
     <div style={{ display: 'inline-flex', alignItems: 'center', gap: mobile ? SPACE_M : 8, flexWrap: 'wrap' }}>
-      <Select size="md" value={custom ? '직접' : period}
+      <Select size={size} value={custom ? '직접' : period}
         onChange={(e) => { const v = e.target.value; if (v === '직접') setCustom({ from: range.from || refDate, to: range.to || refDate }); else { setCustom(null); setPeriod(v as Period); setRef(null); } }}>
         {PERIODS.map((p) => <option key={p} value={p}>{p}</option>)}
         <option value="직접">기간 지정</option>
       </Select>
       {custom ? (
         <>
-          <Input size="md" type="date" value={custom.from} onChange={(e) => setCustom((c) => ({ from: e.target.value, to: c?.to || e.target.value }))} />
+          <Input size={size} type="date" value={custom.from} onChange={(e) => setCustom((c) => ({ from: e.target.value, to: c?.to || e.target.value }))} />
           <span style={{ color: C.faint }}>~</span>
-          <Input size="md" type="date" value={custom.to} onChange={(e) => setCustom((c) => ({ from: c?.from || e.target.value, to: e.target.value }))} />
+          <Input size={size} type="date" value={custom.to} onChange={(e) => setCustom((c) => ({ from: c?.from || e.target.value, to: e.target.value }))} />
         </>
       ) : isAll ? (
-        <span style={{ fontSize: ctrlFs(mobile), fontWeight: 700, color: C.ink }}>전체 기간</span>
+        <span style={{ fontSize: ctrlFs(mobile, size), fontWeight: 700, color: C.ink }}>전체 기간</span>
       ) : (
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
           <button style={nav} onClick={() => canNav && setRef(shiftPeriod(refDate, period, -1))} aria-label="이전 기간"><ChevronLeft size={mobile ? 18 : 16} /></button>
-          <span style={{ fontSize: ctrlFs(mobile), fontWeight: 700, color: C.ink, minWidth: 104, textAlign: 'center', fontVariantNumeric: 'tabular-nums' }}>{periodTitle(refDate, period)}</span>
+          <span style={{ fontSize: ctrlFs(mobile, size), fontWeight: 700, color: C.ink, minWidth: 104, textAlign: 'center', fontVariantNumeric: 'tabular-nums' }}>{periodTitle(refDate, period)}</span>
           <button style={nav} onClick={() => canNav && setRef(shiftPeriod(refDate, period, 1))} aria-label="다음 기간"><ChevronRight size={mobile ? 18 : 16} /></button>
-          <button type="button" onClick={() => setRef(today)} title="오늘이 포함된 기간으로" style={{ height: nh, boxSizing: 'border-box', padding: '0 11px', marginLeft: 5, border: `1px solid ${C.line}`, borderRadius: R, background: C.taupeBg, cursor: 'pointer', color: C.mute, fontSize: mobile ? 14 : 12, fontWeight: 700, flexShrink: 0 }}>오늘</button>
+          <button type="button" onClick={() => setRef(today)} title="오늘이 포함된 기간으로" style={{ height: nh, boxSizing: 'border-box', padding: '0 11px', marginLeft: 5, border: `1px solid ${C.line}`, borderRadius: R, background: C.taupeBg, cursor: 'pointer', color: C.mute, fontSize: mobile ? 14 : (size === 'sm' ? 12 : 12), fontWeight: 700, flexShrink: 0 }}>오늘</button>
         </span>
       )}
     </div>

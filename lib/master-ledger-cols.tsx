@@ -1,5 +1,8 @@
 import { Badge, C, won, type SheetCol } from '@/components/ui';
 import type { AssetMasterRow, ContractMasterRow } from './master-ledgers';
+import {
+  buildDetailSections, buildSheetViews, type DetailSectionDef, type SheetViewKeys,
+} from './ledger-ext';
 
 const dash = (v: unknown) => (v === '' || v === null || v === undefined || v === 0 ? '—' : String(v));
 const date = (v: string) => v ? v.slice(0, 10) : '—';
@@ -25,17 +28,14 @@ const A = {
   mileage: { key: 'mileage', label: '주행거리', align: 'r', priority: 3, render: (r) => number(r.mileage, 'km'), text: (r) => r.mileage },
 } satisfies Record<string, SheetCol<AssetMasterRow>>;
 
-export const ASSET_MASTER_BASIC_COLS: SheetCol<AssetMasterRow>[] = [
-  A.company, A.plate, A.status, A.carName, A.maker, A.modelLine, A.inspectionTo,
-];
-
 const ax = (key: keyof AssetMasterRow, label: string, opts?: { date?: boolean; money?: boolean; num?: string; align?: 'l' | 'c' | 'r' }): SheetCol<AssetMasterRow> => ({
   key: String(key), label, align: opts?.align,
   render: (r) => opts?.date ? date(String(r[key] || '')) : opts?.money ? money(Number(r[key]) || 0) : opts?.num != null ? number(Number(r[key]) || 0, opts.num) : dash(r[key]),
   text: (r) => r[key] as string | number,
 });
 
-export const ASSET_MASTER_EXPANDED_COLS: SheetCol<AssetMasterRow>[] = [
+/** 자산 열 카탈로그 — 새 항목은 여기 정의 후 SHEET_KEYS / DETAIL_DEFS에 key만. */
+const ASSET_COL_CATALOG: SheetCol<AssetMasterRow>[] = [
   A.company, A.assetCode, A.plate, A.status, A.carName, A.maker, A.modelLine,
   A.subModel, A.trim, A.modelYear, A.vin, A.ownerName, A.firstReg, A.inspectionTo, A.mileage,
   ax('documentNo', '문서확인번호'), ax('certIssueDate', '등록증발급일', { date: true }),
@@ -62,6 +62,87 @@ export const ASSET_MASTER_EXPANDED_COLS: SheetCol<AssetMasterRow>[] = [
   ax('optionList', '선택옵션'), ax('saleDate', '매각일', { date: true }), ax('salePrice', '매각가', { money: true, align: 'r' }),
 ];
 
+/**
+ * 자산 엑셀 열 — 추가/삭제 요청: `자산 · 엑셀기본|엑셀전체 · +|-key`
+ * @see lib/ledger-ext.ts
+ */
+export const ASSET_SHEET_KEYS: SheetViewKeys = {
+  basic: ['company', 'plate', 'status', 'carName', 'maker', 'modelLine', 'inspectionTo'],
+  all: [
+    'company', 'assetCode', 'plate', 'status', 'carName', 'maker', 'modelLine',
+    'subModel', 'trim', 'modelYear', 'vin', 'ownerName', 'firstReg', 'inspectionTo', 'mileage',
+    'documentNo', 'certIssueDate', 'vehicleType', 'usage', 'typeNumber', 'engineType',
+    'ownerBizNo', 'useAddress', 'approvalNumber',
+    'fuel', 'displacement', 'ratedOutput', 'cylinders', 'driveType', 'transmission',
+    'exteriorColor', 'interiorColor', 'variant',
+    'lengthMm', 'widthMm', 'heightMm', 'grossWeightKg', 'seats', 'maxLoadKg', 'fuelEfficiency',
+    'inspectionFrom', 'inspectionType',
+    'acquisitionPrice', 'consumerPrice', 'optionPrice', 'optionDiscount', 'taxExempt',
+    'purchasedDate', 'acquisitionDate', 'supplier',
+    'loanKind', 'loanCompany', 'loanMonths', 'loanPrincipal', 'loanRemainingPrincipal', 'loanRate', 'loanStartDate',
+    'insuranceCompany', 'insurancePolicyNo', 'insuranceExpiryDate',
+    'gpsProvider', 'gpsDeviceId', 'gpsInstalledDate', 'gpsControl',
+    'dealerAgency', 'dealerContact', 'dealerPhone', 'optionList', 'saleDate', 'salePrice',
+  ],
+};
+
+const _assetViews = buildSheetViews(ASSET_COL_CATALOG, ASSET_SHEET_KEYS);
+export const ASSET_MASTER_BASIC_COLS = _assetViews.basic;
+export const ASSET_MASTER_EXPANDED_COLS = _assetViews.expanded;
+
+/**
+ * 자산 상세 — 필드 추가 요청 시 해당 섹션 keys에만 push.
+ * 예: `자산 · 등록증정보 · ownerPhone`
+ * 컬럼 정의가 없으면 위 ASSET_MASTER_EXPANDED_COLS에 ax() 먼저.
+ */
+export const ASSET_DETAIL_DEFS: DetailSectionDef[] = [
+  {
+    title: '등록·상태',
+    open: true,
+    keys: ['company', 'assetCode', 'plate', 'status', 'carName', 'mileage'],
+  },
+  {
+    title: '등록증정보',
+    keys: [
+      'documentNo', 'certIssueDate', 'firstReg', 'vin', 'ownerName', 'ownerBizNo', 'useAddress',
+      'vehicleType', 'usage', 'typeNumber', 'engineType', 'approvalNumber',
+      'inspectionFrom', 'inspectionTo', 'inspectionType',
+    ],
+  },
+  {
+    title: '제조·제원',
+    keys: [
+      'maker', 'modelLine', 'subModel', 'trim', 'variant', 'modelYear', 'yearMonth',
+      'fuel', 'displacement', 'ratedOutput', 'cylinders', 'driveType', 'transmission',
+      'exteriorColor', 'interiorColor', 'optionList',
+      'lengthMm', 'widthMm', 'heightMm', 'grossWeightKg', 'seats', 'maxLoadKg', 'fuelEfficiency',
+    ],
+  },
+  {
+    title: '취득정보',
+    keys: [
+      'supplier', 'purchasedDate', 'acquisitionDate', 'acquisitionPrice', 'consumerPrice',
+      'optionPrice', 'optionDiscount', 'taxExempt', 'dealerAgency', 'dealerContact', 'dealerPhone',
+      'saleDate', 'salePrice',
+    ],
+  },
+  {
+    title: '금융·할부',
+    keys: [
+      'loanKind', 'loanCompany', 'loanMonths', 'loanPrincipal', 'loanRemainingPrincipal', 'loanRate', 'loanStartDate',
+    ],
+  },
+  {
+    title: '보험·GPS',
+    keys: [
+      'insuranceCompany', 'insurancePolicyNo', 'insuranceExpiryDate',
+      'gpsProvider', 'gpsDeviceId', 'gpsInstalledDate', 'gpsControl',
+    ],
+  },
+];
+
+export const ASSET_DETAIL_SECTIONS = buildDetailSections(ASSET_MASTER_EXPANDED_COLS, ASSET_DETAIL_DEFS);
+
 const C0 = {
   company: { key: 'company', label: '회사명', pin: true, priority: 2, render: (r) => r.company, text: (r) => r.company },
   contractNo: { key: 'contractNo', label: '계약번호', pin: true, priority: 1, render: (r) => dash(r.contractNo), text: (r) => r.contractNo },
@@ -75,15 +156,28 @@ const C0 = {
   endDate: { key: 'endDate', label: '종료일', priority: 2, render: (r) => date(r.endDate), text: (r) => r.endDate },
   monthlyRent: { key: 'monthlyRent', label: '월대여료', align: 'r', priority: 1, render: (r) => money(r.monthlyRent), text: (r) => r.monthlyRent },
   deposit: { key: 'deposit', label: '보증금', align: 'r', priority: 3, render: (r) => money(r.deposit), text: (r) => r.deposit },
-  payment: { key: 'payment', label: '납부조건', priority: 4, render: (r) => `${r.paymentDay || 25}일 · ${r.paymentTiming}${r.paymentMethod ? ` · ${r.paymentMethod}` : ''}`, text: (r) => `${r.paymentDay} ${r.paymentTiming} ${r.paymentMethod}` },
-  net: { key: 'net', label: '미수', align: 'r', priority: 1, render: (r) => r.net ? <span style={{ color: C.danger, fontWeight: 700 }}>{won(r.net)}</span> : '—', text: (r) => r.net },
+  paymentDay: {
+    key: 'paymentDay', label: '결제일', align: 'c', priority: 3,
+    render: (r) => (r.paymentDay ? `${r.paymentDay}일` : '—'),
+    text: (r) => r.paymentDay || '',
+  },
+  paymentTiming: {
+    key: 'paymentTiming', label: '선불/후불', align: 'c', priority: 3,
+    render: (r) => {
+      const t = r.paymentTiming || '선불';
+      return t === '후불' ? <Badge tone="amber">후불</Badge> : <Badge tone="gray">선불</Badge>;
+    },
+    text: (r) => r.paymentTiming || '선불',
+  },
+  paymentMethod: {
+    key: 'paymentMethod', label: '납부방법', priority: 4,
+    render: (r) => dash(r.paymentMethod),
+    text: (r) => r.paymentMethod,
+  },
+  risk: { key: 'riskLabel', label: '리스크', priority: 1, render: (r) => r.atRisk ? <Badge tone="red">{r.riskLabel}</Badge> : '—', text: (r) => r.riskLabel },
+  net: { key: 'net', label: '미수금액', align: 'r', priority: 1, render: (r) => r.net ? <span style={{ color: C.danger, fontWeight: 700 }}>{won(r.net)}</span> : '—', text: (r) => r.net },
   alert: { key: 'alert', label: '데이터알람', priority: 2, render: (r) => r.dataAlert ? <Badge tone="amber">{r.dataAlert}</Badge> : <Badge tone="green">원본 대사완료</Badge>, text: (r) => r.dataAlert || '원본 대사완료' },
 } satisfies Record<string, SheetCol<ContractMasterRow>>;
-
-export const CONTRACT_MASTER_BASIC_COLS: SheetCol<ContractMasterRow>[] = [
-  C0.company, C0.contractNo, C0.status, C0.contractorName, C0.plate,
-  C0.endDate, C0.monthlyRent, C0.net, C0.alert,
-];
 
 const cx = (key: keyof ContractMasterRow, label: string, opts?: { date?: boolean; money?: boolean; num?: string; align?: 'l' | 'c' | 'r' }): SheetCol<ContractMasterRow> => ({
   key: String(key), label, align: opts?.align,
@@ -91,10 +185,11 @@ const cx = (key: keyof ContractMasterRow, label: string, opts?: { date?: boolean
   text: (r) => r[key] as string | number,
 });
 
-export const CONTRACT_MASTER_EXPANDED_COLS: SheetCol<ContractMasterRow>[] = [
+/** 계약 열 카탈로그 — 새 항목은 여기 정의 후 SHEET_KEYS / DETAIL_DEFS에 key만. */
+const CONTRACT_COL_CATALOG: SheetCol<ContractMasterRow>[] = [
   C0.company, C0.contractNo, C0.status, C0.contractorName, C0.contractorPhone,
   C0.plate, C0.carName, C0.contractDate, C0.startDate, C0.endDate,
-  C0.monthlyRent, C0.deposit, C0.payment, C0.net, C0.alert,
+  C0.monthlyRent, C0.deposit, C0.paymentDay, C0.paymentTiming, C0.paymentMethod, C0.risk, C0.net, C0.alert,
   cx('contractorBirth', '생년월일', { date: true }), cx('contractorLicenseNo', '면허번호'),
   cx('licenseType', '면허종별'), cx('contractorAddress', '주소'),
   cx('rentalMonths', '대여기간', { num: '개월', align: 'r' }), cx('annualMileageLimit', '연주행한도', { num: 'km', align: 'r' }),
@@ -110,3 +205,77 @@ export const CONTRACT_MASTER_EXPANDED_COLS: SheetCol<ContractMasterRow>[] = [
   cx('overdueDays', '연체일', { num: '일', align: 'r' }), cx('unpaidCount', '미납회차', { num: '회', align: 'r' }),
   cx('sourceCarryUnpaid', '사업현황 미수', { money: true, align: 'r' }), cx('reconciliationDelta', '원본차이', { money: true, align: 'r' }),
 ];
+
+/** 계약 엑셀 열 — `계약 · 엑셀기본|엑셀전체 · +|-key` @see lib/ledger-ext.ts */
+export const CONTRACT_SHEET_KEYS: SheetViewKeys = {
+  basic: [
+    'company', 'contractNo', 'status', 'contractorName', 'plate',
+    'endDate', 'monthlyRent', 'paymentDay', 'paymentTiming', 'riskLabel', 'net', 'alert',
+  ],
+  all: [
+    'company', 'contractNo', 'status', 'contractorName', 'contractorPhone',
+    'plate', 'carName', 'contractDate', 'startDate', 'endDate',
+    'monthlyRent', 'deposit', 'paymentDay', 'paymentTiming', 'paymentMethod', 'riskLabel', 'net', 'alert',
+    'contractorBirth', 'contractorLicenseNo', 'licenseType', 'contractorAddress',
+    'rentalMonths', 'annualMileageLimit', 'deliveredDate', 'returnScheduledDate', 'returnedDate',
+    'pickupPlace', 'returnPlace', 'reservationFee',
+    'driverAgeMin', 'driverAge', 'insuranceAge', 'lateFeeRate', 'earlyTerminationRate',
+    'cdw', 'deductible', 'superCover', 'additionalDrivers', 'withDriver', 'fuelOut', 'fuelIn',
+    'depositSettledDate', 'endReason', 'overdueDays', 'unpaidCount',
+    'sourceCarryUnpaid', 'reconciliationDelta',
+  ],
+};
+
+const _contractViews = buildSheetViews(CONTRACT_COL_CATALOG, CONTRACT_SHEET_KEYS);
+export const CONTRACT_MASTER_BASIC_COLS = _contractViews.basic;
+export const CONTRACT_MASTER_EXPANDED_COLS = _contractViews.expanded;
+
+/**
+ * 계약 상세 — 필드 추가 요청 시 해당 섹션 keys에만 push.
+ * 예: `계약 · 요금·납부 · discountRate`
+ */
+export const CONTRACT_DETAIL_DEFS: DetailSectionDef[] = [
+  {
+    title: '계약 기본',
+    open: true,
+    keys: [
+      'company', 'contractNo', 'status', 'plate', 'carName', 'contractDate', 'startDate', 'endDate', 'alert',
+    ],
+  },
+  {
+    title: '계약자',
+    keys: [
+      'contractorName', 'contractorPhone', 'contractorBirth', 'contractorLicenseNo', 'licenseType', 'contractorAddress',
+    ],
+  },
+  {
+    title: '기간·인도',
+    keys: [
+      'rentalMonths', 'annualMileageLimit', 'deliveredDate', 'returnScheduledDate', 'returnedDate',
+      'pickupPlace', 'returnPlace', 'fuelOut', 'fuelIn',
+    ],
+  },
+  {
+    title: '요금·납부',
+    keys: [
+      'monthlyRent', 'deposit', 'reservationFee', 'paymentDay', 'paymentTiming', 'paymentMethod', 'net',
+      'lateFeeRate', 'earlyTerminationRate',
+    ],
+  },
+  {
+    title: '보험·특약',
+    keys: [
+      'cdw', 'deductible', 'superCover', 'driverAgeMin', 'driverAge', 'insuranceAge',
+      'additionalDrivers', 'withDriver',
+    ],
+  },
+  {
+    title: '미수·종료',
+    keys: [
+      'riskLabel', 'overdueDays', 'unpaidCount', 'sourceCarryUnpaid', 'reconciliationDelta',
+      'depositSettledDate', 'endReason',
+    ],
+  },
+];
+
+export const CONTRACT_DETAIL_SECTIONS = buildDetailSections(CONTRACT_MASTER_EXPANDED_COLS, CONTRACT_DETAIL_DEFS);

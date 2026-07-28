@@ -10,6 +10,7 @@ import { type SheetRow, type ContractRow, type FleetRow } from './sheet-rows';
 import { collectionStage } from './domain/status';
 import { dday } from './dashboard-consts';
 import { AlertTriangle } from 'lucide-react';
+import { buildDetailSections, buildSheetViews, type DetailSectionDef, type SheetViewKeys } from './ledger-ext';
 
 const toneBadge = (t: SheetRow['tone']): 'green' | 'amber' | 'red' | 'gray' =>
   t === 'ok' ? 'green' : t === 'warn' ? 'amber' : t === 'danger' ? 'red' : 'gray';
@@ -198,13 +199,20 @@ const FL = {
     },
     text: (r) => r.warnings.map((w) => w.label).join(' · '),
   },
-  // 결제일 + 선/후불 — 자동이체일 + 선불/후불(후=주황·선=회색). 계약 없으면 —.
-  pay: {
-    key: 'pay', label: '결제일', align: 'c',
-    render: (r) => r.paymentDay
-      ? <span style={{ whiteSpace: 'nowrap' }}>{r.paymentDay}일 <span style={{ color: r.paymentTiming === '후불' ? C.warn : C.mute, fontWeight: 700 }}>{r.paymentTiming === '후불' ? '후' : '선'}</span></span>
-      : '—',
-    text: (r) => (r.paymentDay ? `${r.paymentDay}일 ${r.paymentTiming}` : ''),
+  // 결제일 · 선불/후불 — 한 셀에 합치지 않음(각각 열).
+  paymentDay: {
+    key: 'paymentDay', label: '결제일', align: 'c',
+    render: (r) => (r.paymentDay ? `${r.paymentDay}일` : '—'),
+    text: (r) => (r.paymentDay ? `${r.paymentDay}일` : ''),
+  },
+  paymentTiming: {
+    key: 'paymentTiming', label: '선불/후불', align: 'c',
+    render: (r) => {
+      if (!r.paymentDay && !r.paymentTiming) return '—';
+      const t = r.paymentTiming === '후불' ? '후불' : '선불';
+      return <span style={{ color: t === '후불' ? C.warn : C.mute, fontWeight: 700 }}>{t}</span>;
+    },
+    text: (r) => (r.paymentDay || r.paymentTiming ? (r.paymentTiming === '후불' ? '후불' : '선불') : ''),
   },
   // 회차 — 도래/총(예 11/12). 계약 없으면 —.
   round: {
@@ -216,30 +224,70 @@ const FL = {
   note: { key: 'note', label: '비고', render: (r) => r.note || '—', text: (r) => r.note },
 } satisfies Record<string, SheetCol<FleetRow>>;
 
-/** 기본 = 자산식별 + 계약자·연락처 + 기간·D-day + 월렌트 + 미수 (운영현황 스캔 필수, erp5 운영현황 준거). */
-/** 기본 = 자산기본(차번·법인·상태·차명·연식) + 계약조건(계약자·기간·보증금·대여료·잔여D-day) + 수납/리스크(미수·회수단계·⚠).
- *  한 셀 한 값 · 자리 고정. 세부(현위치·연락처·VIN·취득·GPS·할부상세·보험·검사만기)는 전체뷰로. */
-// 정렬 배정 — 좌(식별자·이름·VIN)=기본 · 우(금액·율)=각 FL의 align'r' 유지 · 가운데(짧은값·날짜·배지·코드)=아래 집합으로 일괄.
-const CENTER_ALIGN = new Set(['co', 'status', 'year', 'term', 'start', 'end', 'dday', 'od', 'stage', 'warn', 'own', 'util', 'phone', 'gps', 'acqDate', 'loanMon', 'loanStart', 'insurer', 'insEnd', 'loanCo', 'inspect', 'pay', 'round']);
+/** 기본 = 자산기본(차번·법인·상태·차명·연식) + 계약조건 + 수납/리스크. 한 셀 한 값 · 자리 고정.
+ *  정렬 배정 — 가운데(짧은값·날짜·배지)=CENTER · 금액은 FL align'r' 유지. */
+const CENTER_ALIGN = new Set(['co', 'status', 'year', 'term', 'start', 'end', 'dday', 'od', 'stage', 'warn', 'own', 'util', 'phone', 'gps', 'acqDate', 'loanMon', 'loanStart', 'insurer', 'insEnd', 'loanCo', 'inspect', 'paymentDay', 'paymentTiming', 'round']);
 const alignCols = (cols: SheetCol<FleetRow>[]): SheetCol<FleetRow>[] =>
   cols.map((c) => (CENTER_ALIGN.has(c.key) ? { ...c, align: 'c' as const } : c));
 
-export const FLEET_BASIC_COLS: SheetCol<FleetRow>[] = alignCols([
-  FL.co, FL.plate, FL.status, FL.maker, FL.sub, FL.year,                                   // 필수식별=회사명·차량번호 + 자산
-  FL.cust, FL.phone, FL.term, FL.start, FL.end, FL.dep, FL.rent, FL.pay, FL.round, FL.dday, // 계약
+/** 운영 열 카탈로그 — 새 항목은 FL에 정의 후 SHEET_KEYS에 key만. */
+const FLEET_COL_CATALOG: SheetCol<FleetRow>[] = alignCols([
+  FL.co, FL.plate, FL.status, FL.maker, FL.sub, FL.year,
+  FL.cust, FL.phone, FL.term, FL.start, FL.end, FL.dep, FL.rent, FL.paymentDay, FL.paymentTiming, FL.round, FL.dday,
   FL.net, FL.od, FL.stage, FL.warn, FL.note,
-]);
-
-/** 전체 = 기본 열 «그대로» + 부가 열이 우측에 쭉 붙음(연식·VIN·취득·검사·GPS·할부·보험·연체).
- *  기본 열 순서·자리는 고정(눈이 같은 데를 본다) — 확장은 앞에 끼워넣지 않고 뒤로만. */
-/** 전체 = 기본 열 그대로 + 나머지 정보 전부(현위치·연락처·소유·가동·자산스펙·할부·보험·검사·연체). 자리 고정 — 뒤로만 확장. */
-export const FLEET_EXPANDED_COLS: SheetCol<FleetRow>[] = alignCols([
-  ...FLEET_BASIC_COLS,
   FL.car, FL.loc, FL.own, FL.util,
   FL.vin, FL.acqDate, FL.acqPrice, FL.gps,
   FL.loanCo, FL.loanAmt, FL.loanRate, FL.loanMon, FL.loanStart,
   FL.insurer, FL.insEnd, FL.insPrem, FL.inspect,
 ]);
+
+/** 운영 엑셀 열 — `운영 · 엑셀기본|엑셀전체 · +|-key` @see lib/ledger-ext.ts */
+export const FLEET_SHEET_KEYS: SheetViewKeys = {
+  basic: [
+    'co', 'plate', 'status', 'maker', 'sub', 'year',
+    'cust', 'phone', 'term', 'start', 'end', 'dep', 'rent', 'paymentDay', 'paymentTiming', 'round', 'dday',
+    'net', 'od', 'stage', 'warn', 'note',
+  ],
+  all: [
+    'co', 'plate', 'status', 'maker', 'sub', 'year',
+    'cust', 'phone', 'term', 'start', 'end', 'dep', 'rent', 'paymentDay', 'paymentTiming', 'round', 'dday',
+    'net', 'od', 'stage', 'warn', 'note',
+    'car', 'loc', 'own', 'util',
+    'vin', 'acqDate', 'acqPrice', 'gps',
+    'loanCo', 'loanAmt', 'loanRate', 'loanMon', 'loanStart',
+    'insurer', 'insEnd', 'insPrem', 'inspect',
+  ],
+};
+
+const _fleetViews = buildSheetViews(FLEET_COL_CATALOG, FLEET_SHEET_KEYS);
+export const FLEET_BASIC_COLS = _fleetViews.basic;
+export const FLEET_EXPANDED_COLS = _fleetViews.expanded;
+
+export const FLEET_DETAIL_DEFS: DetailSectionDef[] = [
+  {
+    title: '차량·상태',
+    open: true,
+    keys: ['co', 'plate', 'status', 'maker', 'sub', 'year', 'car', 'loc', 'own', 'util'],
+  },
+  {
+    title: '계약',
+    keys: ['cust', 'phone', 'term', 'start', 'end', 'dep', 'rent', 'paymentDay', 'paymentTiming', 'round', 'dday'],
+  },
+  {
+    title: '수납·리스크',
+    keys: ['net', 'od', 'stage', 'warn', 'note'],
+  },
+  {
+    title: '자산·취득',
+    keys: ['vin', 'acqDate', 'acqPrice', 'gps', 'inspect'],
+  },
+  {
+    title: '금융·보험',
+    keys: ['loanCo', 'loanAmt', 'loanRate', 'loanMon', 'loanStart', 'insurer', 'insEnd', 'insPrem'],
+  },
+];
+
+export const FLEET_DETAIL_SECTIONS = buildDetailSections(FLEET_EXPANDED_COLS, FLEET_DETAIL_DEFS);
 
 /** 사이드필터 칩 → 기본뷰에서 «필터 걸면 자동 노출»할 대응 컬럼. 값을 보며 거른다.
  *  (상태·미수·가동은 이미 기본 컬럼이라 생략 — 없는 것만.) */

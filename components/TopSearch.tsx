@@ -1,9 +1,10 @@
 'use client';
 /**
- * 상단바 전역 검색 — «검색 전용» 인라인 타입어헤드. 팝업 창 안 뜸(입력 검색창 밑에 결과 바로).
- *   · 차량·손님·계약을 찾아 클릭 → 차량360 이동(찾아가기). 담기·페이지이동 «명령»은 없음(그건 메뉴/데이터센터).
- *   · Enter·「전체 결과」 → /search 페이지(차량·계약·손님·보험·과태료·거래 전부).
- * 데스크톱: 상단바 가운데 입력 + 드롭다운. 모바일: 상단바 검색아이콘 → /search(좁은 헤더에 드롭다운 대신 페이지).
+ * 상단바 전역 검색 — «찾기»(점프). 통합조회·상세 IA가 아님.
+ *   · 차량·손님·계약 찾아 클릭 → 해당 대상으로 이동(현재 openCar).
+ *   · Enter·「전체 결과」 → /search.
+ *   · 별도 상세페이지 폐지 수순이면 목적지를 원장 패널 선택으로 바꾸면 됨(검색창 자체는 유지).
+ * 데스크톱: 상단바 가운데 입력 + 드롭다운. 모바일: 검색아이콘 → /search.
  */
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -75,7 +76,7 @@ export function TopSearch() {
             else if (e.key === 'Enter') { e.preventDefault(); if (results[sel]) goCar(results[sel].plate); else goAll(); }
             else if (e.key === 'Escape') setFocused(false);
           }}
-          placeholder="차량·손님·계약 검색"
+          placeholder="찾기 · 차량·손님·계약"
           style={{ flex: 1, minWidth: 0, border: 'none', background: 'none', outline: 'none', fontSize: 12.5, color: C.ink }}
         />
       </div>

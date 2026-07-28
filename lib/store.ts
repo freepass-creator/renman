@@ -224,10 +224,14 @@ class FirestoreAdapter implements StoreAdapter {
       try {
         const { apiAuthHeaders } = await import('./api-headers');
         const headers = await apiAuthHeaders();
-        const res = await fetch(`/api/entities/${encodeURIComponent(entityKey)}?companyId=${encodeURIComponent(companyId)}`, {
-          headers,
-          cache: 'no-store',
-        });
+        const res = await withTimeout(
+          fetch(`/api/entities/${encodeURIComponent(entityKey)}?companyId=${encodeURIComponent(companyId)}`, {
+            headers,
+            cache: 'no-store',
+          }),
+          12_000,
+          `list ${entityKey}`,
+        );
         if (!res.ok) throw new Error(`서버 조회 실패 (${res.status})`);
         const body = await res.json() as { rows?: EntityRecord[] };
         return Array.isArray(body.rows) ? body.rows : [];
@@ -244,7 +248,11 @@ class FirestoreAdapter implements StoreAdapter {
       console.warn(`Firestore list(${entityKey}) 직접 조회 실패 — 서버 인증 경로로 전환:`, (e as Error).message);
       const { apiAuthHeaders } = await import('./api-headers');
       const headers = await apiAuthHeaders();
-      const res = await fetch(`/api/entities/${encodeURIComponent(entityKey)}?companyId=${encodeURIComponent(companyId)}`, { headers, cache: 'no-store' });
+      const res = await withTimeout(
+        fetch(`/api/entities/${encodeURIComponent(entityKey)}?companyId=${encodeURIComponent(companyId)}`, { headers, cache: 'no-store' }),
+        12_000,
+        `list-fallback ${entityKey}`,
+      );
       if (!res.ok) throw new Error(`서버 조회 실패 (${res.status})`);
       const body = await res.json() as { rows?: EntityRecord[] };
       return Array.isArray(body.rows) ? body.rows : [];

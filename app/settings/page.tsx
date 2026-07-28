@@ -17,10 +17,9 @@ import { NAV_GROUPS } from '@/lib/nav';
 import { WorkbenchBar } from '@/components/WorkbenchBar';
 import { closePeriod, reopenPeriod, useClosedPeriods } from '@/lib/finance/period-lock';
 import { MobileTabsSettings, useMobileTabs } from '@/lib/mobile-tabs';
-import { MyDeskSettings, useMyDeskPicked } from '@/lib/my-desk';
 import { toast } from '@/lib/toast';
 
-type OpenKey = 'landing' | 'mydesk' | 'tabs' | 'export' | 'closing' | null;
+type OpenKey = 'landing' | 'tabs' | 'export' | 'closing' | null;
 
 const EXPORTS: { key: string; label: string }[] = [
   { key: 'vehicle', label: '차량' }, { key: 'contract', label: '계약' }, { key: 'penalty', label: '과태료' },
@@ -100,7 +99,6 @@ function ClosingBody({ companyId, actor }: { companyId: string; actor: string })
 
 export default function SettingsPage() {
   const { user, companyId, scopeAll, isOperator } = useSession();
-  const { picked } = useMyDeskPicked();
   const { ids: tabIds } = useMobileTabs();
   const [msg, setMsg] = useState('');
   const [sending, setSending] = useState(false);
@@ -110,7 +108,7 @@ export default function SettingsPage() {
   useEffect(() => {
     try {
       const v = localStorage.getItem('jpk:landing') || '';
-      if (v === 'mydesk') setLanding('/ops');            // 레거시 키 → href
+      if (v === 'mydesk') setLanding('/desk');            // 레거시 → 일정관리
       else if (v === 'field') setLanding('/dispatch');
       else if (!v || v === 'home') setLanding('/');
       else setLanding(v);
@@ -184,13 +182,6 @@ export default function SettingsPage() {
               </div>
             </ExpandPad>
           )}
-          <ListRow
-            main={<CollMain open={open === 'mydesk'}>마이페이지 섹션</CollMain>}
-            sub="내 업무에 담을 섹션"
-            right={<span style={{ fontSize: 12.5, color: C.mute }}>{picked.length}개</span>}
-            onClick={() => toggle('mydesk')}
-          />
-          {open === 'mydesk' && <ExpandPad><MyDeskSettings /></ExpandPad>}
           <ListRow
             main={<CollMain open={open === 'tabs'}>모바일 하단 메뉴</CollMain>}
             sub="하단 탭 구성"

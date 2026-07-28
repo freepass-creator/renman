@@ -1,9 +1,44 @@
 'use client';
 
 import React from 'react';
-import { X } from 'lucide-react';
+import { ChevronRight, X } from 'lucide-react';
 import type { SheetCol } from './excel-sheet';
+import { LedgerPanelFooter } from './ledger-actions';
 import { C } from './tokens';
+
+export type LedgerRecordSection<T> = {
+  title: React.ReactNode;
+  cols: SheetCol<T>[];
+  /** 기본 펼침. 없으면 첫 섹션만 연다. */
+  open?: boolean;
+};
+
+function RecordSection<T>({
+  title,
+  cols,
+  initiallyOpen,
+  fieldList,
+}: {
+  title: React.ReactNode;
+  cols: SheetCol<T>[];
+  initiallyOpen: boolean;
+  fieldList: (fieldCols: SheetCol<T>[]) => React.ReactNode;
+}) {
+  const [open, setOpen] = React.useState(initiallyOpen);
+  return (
+    <details
+      className="ledger-record-panel__section"
+      open={open}
+      onToggle={(event) => setOpen((event.currentTarget as HTMLDetailsElement).open)}
+    >
+      <summary>
+        <ChevronRight className="ledger-record-panel__chevron" size={14} aria-hidden="true" />
+        {title}
+      </summary>
+      {fieldList(cols)}
+    </details>
+  );
+}
 
 export function LedgerRecordPanel<T>({
   title,
@@ -11,14 +46,18 @@ export function LedgerRecordPanel<T>({
   row,
   cols,
   sections,
+  actions,
   children,
   onClose,
 }: {
   title: React.ReactNode;
   subtitle?: React.ReactNode;
   row: T;
-  cols: SheetCol<T>[];
-  sections?: Array<{ title: React.ReactNode; cols: SheetCol<T>[] }>;
+  /** sections 없을 때 평탄 필드. sections 있으면 폴백·생략 가능. */
+  cols?: SheetCol<T>[];
+  sections?: LedgerRecordSection<T>[];
+  /** 패널 footer 액션 — solid 1 + ghost. LedgerPanelFooter로 감싼다. */
+  actions?: React.ReactNode;
   children?: React.ReactNode;
   onClose: () => void;
 }) {
@@ -33,6 +72,8 @@ export function LedgerRecordPanel<T>({
     </dl>
   );
 
+  const hasSections = !!sections?.length;
+
   return (
     <section className="ledger-record-panel" aria-label="선택 행 상세정보">
       <header className="ledger-record-panel__header">
@@ -45,13 +86,27 @@ export function LedgerRecordPanel<T>({
         </button>
       </header>
 
-      {sections?.length ? sections.map((section, index) => (
-        <div key={index} style={{ borderTop: index ? `1px solid ${C.line}` : undefined }}>
-          <div style={{ padding: '10px 14px 2px', fontSize: 12, fontWeight: 800, color: C.ink }}>{section.title}</div>
-          {fieldList(section.cols)}
-        </div>
-      )) : fieldList(cols)}
-      {children}
+      <div className="ledger-record-panel__body">
+        {hasSections ? (
+          <div className="ledger-record-panel__sections">
+            {sections!.map((section, index) => {
+              const key = typeof section.title === 'string' ? section.title : `sec-${index}`;
+              return (
+                <RecordSection
+                  key={key}
+                  title={section.title}
+                  cols={section.cols}
+                  initiallyOpen={section.open ?? index === 0}
+                  fieldList={fieldList}
+                />
+              );
+            })}
+          </div>
+        ) : fieldList(cols ?? [])}
+        {children}
+      </div>
+
+      {actions != null && <LedgerPanelFooter>{actions}</LedgerPanelFooter>}
     </section>
   );
 }

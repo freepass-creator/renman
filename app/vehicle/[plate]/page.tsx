@@ -8,9 +8,9 @@ import { useAppBar } from '@/lib/appbar';
 export const dynamic = 'force-dynamic';
 
 /**
- * 차량 상세 = /dev/car-desk 시안과 동일 셸.
- *   · Page frame = 뷰포트 전폭·높이 고정 · 창스크롤 잠금 · 패널 안만 스크롤
- *   · 앱바 depth = ←·번호판 · contentMax 사실상 전폭
+ * 차량 상세 — freepass식 고정 스크롤 4장(지금 · 이 차 · 수납·정산 · 이력).
+ *   · Page frame · 앱바 depth(← · 번호판)
+ *   · DnD/탭렌즈 없음 · 엔진은 useVehicleDetail
  */
 export default function Vehicle360Page() {
   const plate = decodeURIComponent(String(useParams().plate));

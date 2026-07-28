@@ -53,46 +53,84 @@
 | 지표(요약) | `<Cards min={128} fit>`+`<Metric label value tone onClick>` | `<StatBar>`(박스)·손롤 카드 |
 | 필터 | `<FacetRail>`(데스크톱 좌측) · 모바일=`검색 옆 필터 버튼→Drawer`(빠른필터 칩바 금지) | 모바일 상단 칩바 상시 · 손롤 칩 |
 | 기간·날짜 | `<PeriodBar latest onRange>` (당일~연간·전체·기간지정 from~to, ‹›스텝) | 손롤 select·date input |
-| 로딩 | `<PageLoading/>` | 손롤 `.spin` 스피너 |
-| 빈 상태 | `<EmptyState>` · `variant`: **page**(기본·박스+CTA) / **sec**(Sec 안 한줄) / **ok**(미결 큐 비움=정상·초록체크) | 손롤 안내 div · 홈만 `Ok` 따로 |
+| 로딩 | `<Page loading>`/`<LedgerFrame loading>`→본문 `PageLoading` · `<Loading>` · `<LoadingOverlay>` · 부트=`Gate` | 손롤 스피너 · 데이터로딩 풀스크린 |
+| 빈 상태 | `<EmptyState>` · `page`/`sheet`(원장 칸 높이맞춤)/`sec`/`ok` | 손롤 안내 div · 시트칸에 page박스(높이 어긋남) |
 | 버튼 | `<Btn variant size>` (solid/ghost/danger) · 탭/칩=`PillTabs`/`FilterChips`=`toggleStyle` SSOT | 손롤 `<button style>`·높이 38/30 |
 | 목록 | `<DataTable cols rows onRow>` **또는** 카드행(flex column gap)+`<ObjCard>` | — |
 | 상세(뎁스) | `<DetailShell onBack>` + `<KV>`/`<DetailGrid>` | 손롤 back·헤더 |
 | 입력 | `<Input>`·`<Select>`·`<Search>`·`<FormGrid>` (폼=스키마) | 손롤 input style |
 | 뎁스 화면 | 차량=`<Vehicle360>`, 손님=`<Customer360>` | 재구현 |
-| 일정·내업무 | `<Agenda ctx facets>` · `<MyDesk ctx>` | 페이지 재구현 |
-| 입출고 | `/work`→`/dispatch`(Sec: 오늘·출고·반납·재고) · `/m`·`/field`=리다이렉트 | 별도「현장」·형제 탭 허브 |
+| 일정 | `/desk` `LedgerFrame` + `buildAgenda` (어김·임박·예정) | 홈에 달력 Agenda 재구현 |
+| 입출고 | `/dispatch`(딥링크) · `/m`·`/field`=리다이렉트 | 별도「현장」·형제 탭 허브 |
 
 ## 화면 구조
-홈 = 회사(전 법인 또는 선택 법인) 전체(탭: 일정·**미결 업무**·**운영현황**·**리스크관리**). 운영현황=지표 한눈(함대·계약·자금·현장) · FacetRail 동일.
 
-**섹션 배치 기준 = 「오늘 끝낼 수 있는가」** (글자로 나누지 말고 성질로 나눈다):
+**2026-07 IA** — 허브 = **홈(한눈) · 운영현황 · 일정관리 · 데이터센터** · 원장 = **자산 · 계약 · 자금 · 업무**.  
+원장·일정·운영 = `LedgerFrame` 마스터 표 + **더블클릭 ↔ 우측 상세패널**.  
+**2026-07 IA** — 허브 = **홈 · 운영현황 · 데이터센터** · 원장 = **자산 · 계약 · 자금 · 업무**.  
+홈 = `LedgerFrame` 탭 **요약·미결·리스크·휴차·일정**(엑셀) · 일정관리 메뉴 흡수(`/desk`→`/?tab=일정`).  
+원장·운영 = `LedgerFrame` 마스터 표 + **더블클릭 ↔ 우측 상세패널**.  
+**버린 양식:** Facet 렌즈 홈 · 메뉴「일정관리」단독 · Metric-only 얇은 홈.
 
-| 탭 | 성질 | 예 |
+| 메뉴 | 라우트 | 비고 |
 |---|---|---|
-| **미결 업무** | 처리하면 **큐에서 사라짐** | 반납회수·배차충돌·과태료신청·서류첨부·자금미분류 |
-| **리스크관리** | 처리해도 **계속 관리됨** | **미수**·컴플라이언스·보증금·정합성 |
-| **운영현황** | ② 지표(저장 없음) | 함대·계약·자금·현장 |
-| **일정** | 시간축 | 반납·검사·보험·과태료 예정 |
+| 홈 | `/` | LedgerFrame · 요약/미결/리스크/휴차/일정 |
+| 운영현황 | `/status` | 차량 1대=1행 통합 |
+| 데이터센터 | `/ingest` | OCR·엑셀·직접 |
+| 자산관리 | `/asset` | 차량 마스터 |
+| 계약관리 | `/contract` | 계약 · 리스크 |
+| 자금관리 | `/cash` | 계좌+일보 |
+| 업무관리 | `/work` | 정비·과태료·상담 |
+| 데이터 마이그레이션 | `/dev/data` | 본사 |
 
-- **미수 SSOT = `r-unpaid`(리스크관리)**. 미결에 두면 큐가 영영 안 비워진다. 옛 `s-unpaid`는 통합·삭제.
-- 차량 상태(정비·사고 `s-repair`)는 업무가 아니라 **자산 속성** → `자산` 그룹.
-- 새 섹션은 위 표로 먼저 가른 뒤 `SECTIONS`에 `group`을 정한다. 애매하면 **"처리하면 사라지나?"** 로 판정. **마이페이지(/ops)** = 개인(탭: 일정·업무). 일정=**회사 일정(Agenda)+내 일정(MySchedule) Sec 한 화면**(서브탭 금지) · FacetRail 상시.
-**티어:** 라이트=홈·마이·현황(+설정·검색)·그자리 처리. 스탠다드+=메뉴「비즈니스」(배차·미수·자금일보…). 경영 티어=손익 등. `BUILD_TIER`=`lib/tier`.
-계정: **본사**=전 법인 합본·전환, **법인 소속 직원**=배정된 법인만. (옛 수탁/위탁 개념 없음.)
-설정에서 초기화면(홈/마이페이지) 선택 → `jpk:landing`=`mydesk`면 /ops (세션당 1회). 일정·내업무는 홈·마이페이지가 **같은 공용 컴포넌트** 공유. **현장·이벤트 업무** = `/work` 허브 → 업무 페이지. 옛 `/m`·`/field`·landing=`field`는 `/dispatch`로 흡수.
+**레거시 URL (메뉴 재노출 금지 · 리다이렉트):** `/sheet`→`/asset` · `/finance`→`/cash` · `/desk`→`/?tab=일정` · `/ops`→`/?tab=미결`.  
+`/payments`·`/receivables`·`/penalty` = 딥링크. `/ingest`=데이터센터(메뉴).
 
-**버튼 자리(placement) 표준:** 페이지 액션=`<Page right>` · 섹션 액션=`<Sec right>` · 인라인 처리(반납·입금 등)=그 자리 인라인 확장(팝업 X).
+**버튼 자리·hierarchy (원장 SSOT — `LedgerActions` / `LedgerPanelFooter`):**
 
-**모바일 크롬 SSOT (이전 상·하단 중복 금지 — iOS/Android push 수순):**
+| 종류 | zone | 형태 | variant | 내용 | 예 |
+|---|---|---|---|---|---|
+| **쓰기** | `Page.right` | **라벨**(필수 쓰기만) · 보조=`iconOnly`+`tip` | **solid ≤1** · 보조 ghost | 레코드 입력. **탄생(등록증·통장·계약서)=데이터센터** — 원장 solid「생성」금지 | 자금 단건 · 업무 메모 · (자산/계약=투입 아이콘만) |
+| **워크플로** | `LedgerFrame tools` | **`iconOnly`+`tip`만** | **전부 ghost** | 다른 화면으로 일 넘기기 · **맨 우측** | 담기 → 매칭 → 미수 · OCR |
+| **필터** | 필터줄 좌측 | 칩/Select | — | 목록 거르기 · **액션 금지** | 검색·세부필터·범위·칩·기간 |
+| **보기** | 필터줄 우측 | 라벨 | PillTabs | 열 밀도 | 기본 / 전체 |
+| **통계** | 보기 앞 | 텍스트 | — | 숫자 한눈 (버튼 아님) | 입금 · 출금 |
+| **패널** | footer | 라벨 | solid 1 + ghost | 수정/저장 solid · 취소·회수 ghost · 2차 이동=`iconOnly`+`tip` | |
+
+우측 클러스터 순서(고정): **`stats` → `기본/전체` → `tools`**.  
+워크플로 버튼 순서 = **업무 흐름 순**(넣기 → 처리 → 확인).  
+홈 tools = WorkbenchBar(탭·검색·회사) · FacetRail · 생성 버튼 없음.
+
+원장 밀도 = 전부 `Btn sm`(웹28). `md`/`lg`는 일반 페이지·현장 CTA만.
+
+**패널 크롬 (좌 필터 · 우 상세 · 생성/수정 공통):**
+- 헤더 높이 = `--ledger-head-h`(36) · 하단바 = `--ledger-foot-h`(36) · `LedgerPanelFooter`만
+- 닫기 X = 14 · 헤더 타이틀 클래스 = `ledger-record-panel__title`
+
+**원장 필터줄 슬롯 (왼쪽→오른쪽, 전부 `sm`) — 화면마다 같은 자리:**
+
+| 슬롯 | 원자 | 자산 | 계약 | 자금 | 업무 |
+|---|---|---|---|---|---|
+| 회사 | `CompanyFilter` (Frame) | ✅ | ✅ | ✅ | ✅ |
+| 검색 | `Search` | ✅ | ✅ | ✅ | ✅ |
+| **세부필터** | `LedgerFilterButton`+Panel | 상태·제조사 | 상태·종료사유 | 과목·매칭·계좌구분 | **상태·담당·원천** |
+| 범위/구분 | Select 또는 PillTabs | 보유/처분… | 유지/종료… | 입출금/계좌… | 업무구분 탭 |
+| 빠른칩 | toggle (선택) | 계약중·휴차… | **리스크** | 입금·출금·미분류… | — |
+| 기간 | `PeriodBar` | ✅ | ✅ | ✅ | ✅ |
+| (우측) | **stats → 기본/전체 → tools** | | | | |
+
+세부필터 버튼은 **원장 4면 공통 필수**. 담당자·상태처럼 “가끔 쓰는 조건”은 줄에 두지 말고 패널로.  
+필터줄에 쓰기·워크플로 버튼을 끼워 넣지 말 것.
+
+**모바일 크롬 SSOT:**
 
 | 화면 | 상단 | 하단 | 비고 |
 |---|---|---|---|
-| **허브** (홈·메뉴·탭 진입 목록) | TopBar(제목·메뉴) · PageToolBar | 탭바 · (Facet면) 필터시트 | ERP4와 동일 골격 |
-| **뎁스** (`DetailShell` depth) | TopBar(제목·메뉴) | 이전 + 액션(탭 숨김) | 차량360·손님360·엔티티상세 |
-| **오버레이** (`DetailShell fixed`) | 제목만 | 이전 + 액션 | SessionBar 밖, 하단 1곳 |
+| **허브** (원장·업무 목록) | TopBar(제목·메뉴) · PageToolBar | 탭바 | ERP4 골격 |
+| **뎁스** (`DetailShell` depth) | TopBar | 이전+액션(탭 숨김) | 차량상세 등 |
+| **오버레이** (`DetailShell fixed`) | 제목만 | 이전+액션 | SessionBar 밖 |
 
-새 화면은 위 표만 따른다. 메뉴로 가는 허브에 `back={router.back}` 금지. 페이지에 이전/홈/탭을 손롤하지 말 것.
+새 화면은 위 표만 따른다. 허브에 `back={router.back}` 금지.
 
 **컨트롤 크기·폰트 규격 (= freepass ERP4 `CTRL` — 페이지에서 height 숫자 금지):**
 - 웹: **md=32** · **sm=28**. 모바일: **md=40** · **sm=36**. 칩=웹28 / 모바일40 (`ctrlChipH`).
@@ -112,24 +150,23 @@
 | **③ 이벤트** | 자산 가동 중 쌓이는 사건. 업무 메뉴. | 정비·사고·과태료·수집·입출고 처리 |
 
 계약 성립 ≠ 이벤트. 차량구매·계약성립·계좌개설 = 각각 현물/계약/자금 **자산 생성**. 현황(자산·계약·재무)=① 생애만. 엔티티=`ENTITY_LAYER` · 페이지=`PAGE_IA.layer`.
-**메뉴 SSOT** = `lib/nav` `NAV_GROUPS` (페이지 역할표 = `PAGE_IA`). 업무 목록 = `lib/work-hub` `WORK_PAGES`.
+**메뉴 SSOT** = `lib/nav` `NAV_GROUPS` / `ERP_MENU_TREE` (역할표 = `PAGE_IA`). 업무 딥링크 = `lib/work-hub` `WORK_PAGES`.
 
 | 그룹 | 항목 | 기준 |
 |---|---|---|
-| (최상단) | 홈 · 마이페이지 · **데이터센터** | 내가 있는 자리 + **모든 데이터 투입구**(`role:'input'`) |
-| 현황 | 자산·계약·재무현황 · 운영시트 | ① 원장 조회 |
-| **업무** | 배차관리 · 차량수선 · 미수관리 · 자금일보 · 과태료관리 · 증빙수집 | **고유 업무만** |
-| 경영 | 손익현황 | ② 지표 |
+| 원장 | 자산 · 계약 · 자금 | ① 마스터 표 + 우측 패널 |
+| 업무 | 업무관리 | ③ 사건·처리 통합 |
+| 시스템 | 마이그레이션 · 설정 | 본사 반영 / 계정 |
 
-- **데이터센터(`/ingest`)** = 원장·이벤트 **전 엔티티** 투입구(OCR·엑셀·직접). 선택기는 데이터 3층으로 묶어 노출(`ENTITY_LAYER`).
-- **증빙수집(`/inbox`)** ≠ 데이터센터. 남이 올린 걸 매칭하는 **큐**(`대기`→`매칭`)라 업무 쪽.
-- **`/work` 업무현황은 메뉴에 없다** — 메뉴가 이미 같은 목록. 페이지는 유지(모바일 하단탭 「업무」 진입점 + `WorkHubBack` 6곳).
-- **고객관리는 페이지가 아니다** — 통화·이슈는 계약에 붙는다(`lib/activity-match`). 독촉·반납협의 «하는 김에» 남기는 것이라 독립 업무로 서지 않는다.
+- **데이터센터(`/ingest`)** = 원장형 틀(필터줄·시트·우측 투입패널). OCR·엑셀·직접 · `right`=저장 · 대기/저장본.
+- **자금 하루 루프** = `/cash`: 대량/담기 → 매칭(`/payments`) → 미수(`/receivables`). 메뉴 재노출 금지.
+- **고객관리는 페이지가 아니다** — 통화·이슈는 계약에 붙는다(`lib/activity-match`).
 
 ## 기능(엔진) 공용 규격 — SSOT, 새 기능은 여기 붙인다
 
 - **도메인 연결:** `lib/domain/model.ts` — `linkFleet`(차↔계약↔손님↔채권), `classifyContract`(진행×채권), `classifyVehicle`(소유×가동), `handoverHistory`(손바뀜), `recommendNextRent`(재렌트가). 상태·연결은 페이지서 손롤 X, 여기서 따다 씀.
-- **섹션/대시보드:** `lib/section-registry` `buildSectionCtx`→`SECTION_MAP`. 홈 렌즈·마이페이지·일정이 같은 ctx 공유. 일정=`ctx.agenda`(`lib/agenda`).
+- **섹션/대시보드:** 홈=`LedgerFrame`+탭(요약·미결·리스크·휴차·일정) · `/status`=운영 원장.  
+  `section-registry` = repair 등 딥링크 Sec SSOT.
 - **섹션 순서·이동:** `lib/use-sec-order` `useSecOrder(key, defaults)` — `<Sec>`은 **접힌 상태에서만** 드래그앤드롭으로 이동(↑↓ 금지). 어느 페이지든 같은 엔진으로(페이지 손롤 금지).
 - **콘텐츠 폭:** 본문 `maxWidth: 1680`(Page·홈 통일).
 - **저장/집계:** `lib/store`(`getStore()`, id=`lib/domain/ids` `newId`) · `lib/operating-snapshot`(`computeDashboard` = 반영 숫자 SSOT) · `lib/use-dashboard-data`(로딩 훅).

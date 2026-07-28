@@ -1,11 +1,13 @@
 /**
  * 재무원장 열 SSOT — 계좌 입·출금 스트림(CashRow).
- *   CMS집금 / CMS미연결(업로드) / CMS연결(집금 하위행).
+ * 엑셀 추가/삭제: `자금 · 엑셀기본|엑셀전체 · +|-key` @see lib/ledger-ext.ts
+ * (카탈로그·KEYS는 아래 CASH_SHEET_KEYS — BASIC/EXPANDED와 동기.)
  */
 import { Badge, C, type SheetCol } from '@/components/ui';
 import { companyDisplay } from '@/lib/companies';
 import { groupOfLabel, isUnclassified, kindOfLabel } from '@/lib/payments/ledger-subjects';
 import type { CashRow } from '@/lib/finance/cash-ledger';
+import type { SheetViewKeys } from '@/lib/ledger-ext';
 
 const coName = (r: CashRow) => companyDisplay(r.companyId);
 const amt = (n: number) => (n ? n.toLocaleString('ko-KR') : '—');
@@ -142,3 +144,12 @@ export const CASH_EXPANDED_COLS: SheetCol<CashRow>[] = [
   { key: 'ent', label: '원천', align: 'c', render: (r) => r.entity, text: (r) => r.entity },
   { key: 'key', label: '키', render: (r) => r.recKey || '—', text: (r) => r.recKey },
 ];
+
+/** 자금 엑셀 열 keys — 추가/삭제 요청 시 여기와 BASIC/EXPANDED를 같이 맞춤. */
+export const CASH_SHEET_KEYS: SheetViewKeys = {
+  basic: ['co', 'acctName', 'acct', 'match', 'date', 'in', 'out', 'cat', 'content', 'alert'],
+  all: [
+    'co', 'acctName', 'acct', 'match', 'date', 'in', 'out', 'cat', 'content', 'alert',
+    'flowNature', 'fundNature', 'matchedContract', 'matchedSchedule', 'src', 'ent', 'key',
+  ],
+};

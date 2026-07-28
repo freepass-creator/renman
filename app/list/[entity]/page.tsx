@@ -4,8 +4,9 @@ import { useSession } from '@/lib/session';
 import { ENTITIES, type EntityRecord } from '@/lib/intake/entities';
 import { computeAssetLedgerEntry } from '@/lib/payments/asset-ledger';
 import type { Vehicle } from '@/lib/payments/types';
+import { UploadCloud } from 'lucide-react';
 import { openIngest } from '@/lib/ui-bus';
-import { Page, Sec, Cards, Metric, DataTable, Btn, Badge, EmptyState, TextLink, won, C, Panel, type Col, PageLoading } from '@/components/ui';
+import { Page, Sec, Cards, Metric, DataTable, Btn, EmptyState, TextLink, won, C, Panel, LedgerActions, type Col, PageLoading } from '@/components/ui';
 import { WorkbenchBar } from '@/components/WorkbenchBar';
 import { companyLabel } from '@/lib/companies';
 import { TODAY } from '@/lib/dashboard-consts';
@@ -56,7 +57,13 @@ export default function ListPage() {
   return (
     <Page title={entity.label} meta={`${companyLabel(companyId)} · ${records.length}건 · ${user.role}`}
       tools={<WorkbenchBar />}
-      right={<Btn variant="solid" onClick={() => openIngest(entityKey)}>+ {entity.label} 담기</Btn>}>
+      right={(
+        <LedgerActions aria-label="투입">
+          <Btn size="sm" variant="ghost" iconOnly tip={`${entity.label} 담기 — 데이터센터`} onClick={() => openIngest(entityKey)}>
+            <UploadCloud size={14} />
+          </Btn>
+        </LedgerActions>
+      )}>
       <Sec title="현황" desc="엔티티 요약">
         <Cards min={128} fit>
           <Metric label="데이터 건수" value={loading ? '…' : records.length} tone="ink" />

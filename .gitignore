@@ -21,3 +21,12 @@ tsc-result.txt
 # Firebase Admin service-account credentials (never commit)
 renman-dd0a2-firebase-adminsdk-fbsvc-c489c146ce.json
 firebase-debug.log
+
+# --- redesign session hygiene ---
+*.log
+.tmp-browser/
+tools/_tmp*
+.vercel/
+# 루트 민감/사무 문서 — 절대 커밋 금지
+/*.pdf
+/*.xlsx

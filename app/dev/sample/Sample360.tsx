@@ -1,7 +1,7 @@
 'use client';
 /**
- * 360 세부 시안 — 웹=좌레일+우작업면, focus가 작업면 우선(실 VehiclePage와 동일 골격).
- *   DetailShell → 신분/미결/CTA 레일 · 본문 패널(연결 우선).
+ * 360 세부 시안 — 실 VehicleDetail과 동일 골격(고정 스크롤 4장).
+ *   SectionLabel: 지금 · 이 차 · 수납·정산 · 이력
  */
 import { DetailShell, Sec, Cards, Metric, Btn, EmptyState, Message, Badge, SectionLabel, C, SPACE_GROUP_M } from '@/components/ui';
 import { openCar, openIngest } from '@/lib/ui-bus';
@@ -39,7 +39,7 @@ export function Sample360Design({
     >
       <div style={{ display: 'flex', flexDirection: 'column', gap: SPACE_GROUP_M }}>
         <Message variant="info">
-          <b>ERP 워크벤치.</b> 좌=컨텍스트·작업선택 · 우=선택한 작업만. 연결(focus)이 첫 작업 영역을 연다.
+          <b>고정 스크롤 세부.</b> 위에서 아래로만 — 지금 · 이 차 · 수납·정산 · 이력. 탭/DnD 없음.
         </Message>
 
         <SectionLabel mt={0}>지금</SectionLabel>

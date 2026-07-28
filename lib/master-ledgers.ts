@@ -2,6 +2,7 @@ import { companyShort } from './companies';
 import { computeContractView } from './contract-ops';
 import type { EntityRecord } from './intake/entities';
 import { OUT } from './domain/status';
+import { contractRisks } from './risk-ops';
 
 const str = (v: unknown) => String(v ?? '').trim();
 const num = (v: unknown) => Number(v) || 0;
@@ -81,10 +82,15 @@ export type ContractMasterRow = {
   fuelOut: string; fuelIn: string; depositSettledDate: string; endReason: string;
   net: number; overdueDays: number; unpaidCount: number;
   sourceCarryUnpaid: number; reconciliationDelta: number; dataAlert: string;
+  /** 계약 불이행 여부 — risk-ops SSOT (미수·보험·반납 등). */
+  atRisk: boolean;
+  /** 리스크 종류 요약 (미수·보험불일치·반납지남). */
+  riskLabel: string;
 };
 
 export function contractMasterRow(raw: EntityRecord, today: string): ContractMasterRow {
   const view = computeContractView(raw, today);
+  const risks = contractRisks(raw, today, view);
   const companyId = str(raw.companyId);
   return {
     raw, companyId, company: companyShort(companyId), contractNo: str(raw.contractNo || raw._key),
@@ -109,5 +115,7 @@ export function contractMasterRow(raw: EntityRecord, today: string): ContractMas
     net: view.net, overdueDays: view.overdueDays, unpaidCount: view.count,
     sourceCarryUnpaid: num(raw.sourceCarryUnpaid), reconciliationDelta: num(raw.reconciliationDelta),
     dataAlert: str(raw.dataAlert),
+    atRisk: risks.length > 0,
+    riskLabel: risks.map((r) => r.kind).join(' · '),
   };
 }

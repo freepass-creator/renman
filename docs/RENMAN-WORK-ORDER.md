@@ -41,6 +41,11 @@ const { data: [cs, hs], loading } = useEntityLists(['contract', 'history']);
 - ❌ **금지**: `useState(loading)+useEffect+getStore().list` 보일러플레이트 복붙
 - ❌ **금지**: `addEventListener('jpk:saved')` 손롤 구독 (훅에 내장돼 있음)
 - 이 훅이 캐시 warm 체크(`listsCached`)로 **페이지 전환 스피너 튐**을 막아줌
+- **ERP 로딩 UX (자리 고정)**:
+  - 부트(셸 전) = 세션 `Gate` 풀스크린만
+  - 목록 cold = `Page`/`FacetPage`/`LedgerFrame` `loading` → 제목·톱바 유지, **본문만** `PageLoading`
+  - 긴 쓰기 = `LoadingOverlay` · 인라인 = `Loading`
+  - ❌ 데이터 로딩을 페이지 바깥 풀스크린으로 덮지 말 것 · ❌ 필터줄+0통계 위에 스피너 이중 배치 금지(`LedgerFrame`이 처리)
 
 ### 0.5 기타 고정 규칙
 - 커밋: **로컬만. push 금지** (명시 요청 시에만). commit author = `dudguq@gmail.com`
@@ -170,11 +175,16 @@ const { data: [cs, hs], loading } = useEntityLists(['contract', 'history']);
 | `lib/domain/fuel.ts` | `FUEL_LEVELS` (연료 잔량 enum) |
 | `lib/domain/early-termination.ts` | 중도해지 위약금 |
 | `lib/payments/ledger-subjects.ts` | 계정과목 · `groupOfLabel` · `vatOfLabel` |
-| `components/ui` `Page`/`FacetPage` | 페이지 헤더 = `[제목][전체회사]` 자동 (페이지가 손롤 금지) |
+| `components/ui` `Page`/`FacetPage` | 페이지 헤더 = `[제목][전체회사]` 자동 · `loading`이면 본문만 `PageLoading`(셸 유지) |
 | `components/ui` `TextLink` | 표·카드 안 인라인 링크(번호판·임차인·EmptyState CTA) — 손롤 `<button style>` 금지 |
 | `components/WorkbenchBar` | 툴바 SSOT (검색·탭·뷰·액션) |
 | `components/ui` `WizPanel` | 현장 위저드 인라인 껍데기(Modal 풀스크린 대체) — Delivery/Return |
-| `components/ui` `LedgerFrame` | **원장 틀 SSOT**(재무원장 시안) — Page frame+상단필터+기본/전체+ExcelSheet. FacetRail/뷰토글 금지 |
+| `components/ui` `LedgerFrame` | **원장 틀 SSOT** — 필터줄 좌 · 우측=`stats→view(기본/전체|커스텀)→tools` · `right`=쓰기 · `companySlot`/`body`/`view`(데이터센터 등) · 로딩=표자리만 |
+| `components/ui` `Btn` `iconOnly`+`tip` | **tools=전부 iconOnly+tip** · right 쓰기=라벨 solid≤1(보조 ghost icon) · 자산/계약 탄생=`openIngest` · 홈 투입 아이콘 · `IconBtn` 겹치면 Btn 우선 |
+| `components/ui` `LedgerActions` / `LedgerPanelFooter` | 쓰기/워크플로/패널 버튼 무리 (zone당 solid 1 · tools=ghost icon · Btn sm) — 표=CLAUDE「버튼 자리·hierarchy」 |
+| `components/ui` `LedgerCreatePanel` / `LedgerEditPanel` / `LedgerRecordPanel` | 원장 생성·그자리수정·조회 패널 · 조회=`sections`→`<details>` 접기(첫 섹션만 기본 펼침) |
+| `lib/ledger-ext` · `*_SHEET_KEYS` · `*_DETAIL_DEFS` · `*_FILTER_DEFS` | **원장 항목 추가·삭제 규격(틀)** — 요청 ``시트 · 축 · +\|-key`` · 축=`엑셀기본`/`엑셀전체`/`섹션명`/`필터` · 언제든 push/splice |
+| `components/MigrateDataButton` | 스위치플랜 마이그레이션(본사) |
 | `components/ui` `SectionLabel` | 상세 그룹 소제목(무박스) — freepass ERP4 동기. 360 운영·자산·계약·이력 |
 | `components/ui` `Disclosure` | 접이식(할부스케줄 등) — Sec와 별개 · 제목 줄 눌러 표 인라인 펼침 |
 

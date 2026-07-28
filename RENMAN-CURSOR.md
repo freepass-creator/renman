@@ -70,6 +70,9 @@ curl -s -o /dev/null -w "%{http_code}" http://localhost:6006/<route>   # 200
 
 | 날짜 | 작업자 | 내용 | 상태 |
 |---|---|---|---|
+| 2026-07-28 | Cursor | 홈·/m홈=검색+바로가기만(지표·예외그리드제거) · home-briefing폐기 · SSOT=risk-ledger | tsc0 |
+| 2026-07-28 | Cursor | 홈A안 랜딩(검색·리스크요약·바로가기) · home-briefing/cols폐기 · 예외SSOT=risk-ledger만 | tsc0 |
+| 2026-07-28 | Cursor | /risk 리스크관리 LedgerFrame · risk-ledger SSOT · nav·/m/risk칩 정합 · home-briefing 래퍼 | tsc0 |
 | 2026-07-28 | Cursor | 홈 필터칩 [전체·미결·리스크·휴차] · 전체 기본 · LedgerFrame 엑셀 유지 | tsc0 |
 | 2026-07-28 | Cursor | 홈=LedgerFrame엑셀(미결·리스크·휴차) · home-briefing 시트SSOT · /m리스트동일 · 바로가기하단 | tsc0 |
 | 2026-07-28 | Cursor | lucide 잔여: OcrCrosscheck⚠·Drawer↑↓ → AlertTriangle/ChevronUp/Down | tsc0 |

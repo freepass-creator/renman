@@ -1,11 +1,11 @@
 'use client';
 /* 로딩 프리미티브 — `components/ui` 배럴이 재노출한다(import는 '@/components/ui'로).
- * 경쟁 SSOT 아님: `PageLoading`(misc.tsx)이 이 Spinner 위에 세워진 페이지 표준이고,
- * 아래 셋은 서로 자리가 다르다 — 섞어 쓰지 말 것.
- *   Spinner        = 최소 단위(다른 원자가 조립용으로만)
- *   Loading        = 인라인(버튼 옆·문장 안). PageLoading으로 대체 불가(52vh 블록이라 레이아웃 깨짐)
- *   LoadingOverlay = 긴 작업 전체 덮기(고정 오버레이)
- * 페이지 본문 로딩은 전부 `PageLoading`. */
+ * ERP 통상 3층 (자리 섞지 말 것):
+ *   1) Gate(session)     = 셸 생기기 전 부트만 풀스크린
+ *   2) PageLoading       = 톱바·제목 유지, 작업영역(본문)만. Page/FacetPage/LedgerFrame `loading`
+ *   3) LoadingOverlay    = 긴 쓰기·마이그레이션 스크림(z 250)
+ *   + Loading            = 인라인(버튼 옆). 52vh/플렉스 본문 금지
+ * Spinner = 조립 단위만. soft-load(listsCached)면 스피너 생략. */
 import { SCRIM, SCRIM_FG } from './ui/tokens';
 export function Spinner({ size = 16, stroke = 2, color = 'currentColor' }: { size?: number; stroke?: number; color?: string }) {
   return (

@@ -343,13 +343,13 @@ function AuthLink({ onClick, children }: { onClick: () => void; children: ReactN
 }
 
 function Gate({ title, desc, loading, onLogout }: { title: string; desc?: string; loading?: boolean; onLogout?: () => void }) {
-  // 부트 로딩 = 깔끔한 스피너만(브랜드 박스·카드 없음). PageLoading과 동일 룩(로딩 표준 SSOT).
+  // 세션 부트만 풀스크린(셸 없음). 데이터 로딩은 페이지 안 PageLoading — 여기로 끌어올리지 말 것.
   if (loading) {
     return (
       <div role="status" aria-busy="true" aria-live="polite"
-        style={{ position: 'fixed', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12, background: '#fff' }}>
-        <Spinner size={28} stroke={2.5} color="#1B2A4A" />
-        <div style={{ fontSize: 12.5, color: '#5f6368' }}>{title}</div>
+        style={{ position: 'fixed', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12, background: 'var(--bg-page)' }}>
+        <Spinner size={28} stroke={2.5} color="var(--brand)" />
+        <div style={{ fontSize: 12.5, color: 'var(--text-sub)' }}>{title}</div>
       </div>
     );
   }

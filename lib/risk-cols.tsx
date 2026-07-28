@@ -1,17 +1,16 @@
 /**
- * 홈 주의원장 열 — 미결·리스크·휴차.
- * 컬럼: 구분 · 차번 · 대상 · 차명 · 기한 · 금액 · 상태
+ * 리스크관리 엑셀 열 — 구분 · 차번 · 대상 · 차명 · 기한 · 금액 · 상태
  */
 import React from 'react';
 import { Badge, won, C, type SheetCol } from '@/components/ui';
-import type { HomeSheetRow } from './home-briefing';
+import type { RiskSheetRow } from './risk-ledger';
 import { buildSheetViews, type SheetViewKeys } from './ledger-ext';
 
-const toneColor = (tone: HomeSheetRow['tone']) => (
+const toneColor = (tone: RiskSheetRow['tone']) => (
   tone === 'danger' ? C.danger : tone === 'warn' ? C.warn : tone === 'brand' ? C.brand : C.mute
 );
 
-const CATALOG: SheetCol<HomeSheetRow>[] = [
+const CATALOG: SheetCol<RiskSheetRow>[] = [
   {
     key: 'group', label: '구분', priority: 1, align: 'c',
     render: (r) => <Badge tone={r.badgeTone}>{r.group}</Badge>,
@@ -56,11 +55,11 @@ const CATALOG: SheetCol<HomeSheetRow>[] = [
   },
 ];
 
-export const HOME_SHEET_KEYS: SheetViewKeys = {
+export const RISK_SHEET_KEYS: SheetViewKeys = {
   basic: ['group', 'plate', 'customer', 'carName', 'due', 'amount', 'status'],
   all: ['group', 'kind', 'plate', 'customer', 'carName', 'due', 'amount', 'status'],
 };
 
-const views = buildSheetViews(CATALOG, HOME_SHEET_KEYS);
-export const HOME_BASIC_COLS = views.basic;
-export const HOME_EXPANDED_COLS = views.expanded;
+const views = buildSheetViews(CATALOG, RISK_SHEET_KEYS);
+export const RISK_BASIC_COLS = views.basic;
+export const RISK_EXPANDED_COLS = views.expanded;
