@@ -188,7 +188,7 @@ export default function DashboardPage() {
       meta="관제"
       showColView={false}
       tools={(
-        <Btn size="sm" variant="ghost" iconOnly tip="데이터센터" onClick={() => openIngest()}>
+        <Btn size="sm" variant="ghost" iconOnly tip="데이터관리" onClick={() => openIngest()}>
           <UploadCloud size={14} />
         </Btn>
       )}

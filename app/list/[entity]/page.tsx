@@ -59,7 +59,7 @@ export default function ListPage() {
       tools={<WorkbenchBar />}
       right={(
         <LedgerActions aria-label="투입">
-          <Btn size="sm" variant="ghost" iconOnly tip={`${entity.label} 담기 — 데이터센터`} onClick={() => openIngest(entityKey)}>
+          <Btn size="sm" variant="ghost" iconOnly tip={`${entity.label} 담기 — 데이터관리`} onClick={() => openIngest(entityKey)}>
             <UploadCloud size={14} />
           </Btn>
         </LedgerActions>

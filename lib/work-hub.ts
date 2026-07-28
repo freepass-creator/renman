@@ -17,7 +17,7 @@ export const WORK_PAGES = [
   { href: '/payments', label: '자금일보', desc: '입금↔계약 매칭 · CMS · 재무현황 공급', secs: '미매칭 · 제안 · CMS', kind: 'work' as const, tier: '스탠다드' as const },
   { href: '/repair', label: '차량수선', desc: '정비·사고수리·상품화·세차', secs: '정비·사고 · 그 밖의 상태', kind: 'work' as const, tier: '스탠다드' as const },
   { href: '/penalty', label: '과태료관리', desc: '고지·매칭·변경부과', secs: '미매칭 · 진행 · 종결', kind: 'work' as const, tier: '스탠다드' as const },
-  { href: '/ingest', label: '데이터센터', desc: 'OCR·엑셀·직접 입력 — 원장+이벤트 전부', secs: '엔티티 선택 · 검토 · 저장', kind: 'input' as const, tier: '스탠다드' as const },
+  { href: '/ingest', label: '데이터관리', desc: 'OCR·엑셀·직접 입력 — 원장+이벤트 전부', secs: '엔티티 선택 · 검토 · 저장', kind: 'input' as const, tier: '스탠다드' as const },
   { href: '/inbox', label: '증빙수집', desc: '현장 사진·서명 대기', secs: '업로드 · 대기 · 매칭', kind: 'input' as const, tier: '스탠다드' as const },
 ] as const;
 
@@ -30,7 +30,7 @@ export const PIPE = {
   payments: { href: '/payments', label: '자금일보' },
   repair: { href: '/repair', label: '차량수선' },
   penalty: { href: '/penalty', label: '과태료관리' },
-  ingest: { href: '/ingest', label: '데이터센터' },
+  ingest: { href: '/ingest', label: '데이터관리' },
   inbox: { href: '/inbox', label: '증빙수집' },
   work: { href: '/work', label: '업무관리' },
   finance: { href: '/cash', label: '자금관리' },

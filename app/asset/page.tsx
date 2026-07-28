@@ -119,7 +119,7 @@ export default function AssetLedgerPage() {
         ><Plus size={14} /> {creating ? '생성 취소' : '자산 생성'}</Btn>
       </LedgerActions>}
       tools={<LedgerActions aria-label="워크플로">
-        <Btn size="sm" variant="ghost" iconOnly tip="등록증·자료 투입 — 데이터센터" onClick={() => openIngest('vehicle')}>
+        <Btn size="sm" variant="ghost" iconOnly tip="등록증·자료 투입 — 데이터관리" onClick={() => openIngest('vehicle')}>
           <UploadCloud size={14} />
         </Btn>
       </LedgerActions>}
@@ -177,9 +177,9 @@ export default function AssetLedgerPage() {
       onColView={setColView}
       loading={loading || contractsLoading}
       empty={<>
-        등록된 자산이 없습니다. 등록증은 데이터센터에서 담으세요.
+        등록된 자산이 없습니다. 등록증은 데이터관리에서 담으세요.
         <div style={{ marginTop: 14, display: 'flex', justifyContent: 'center', gap: 8 }}>
-          <Btn size="sm" variant="ghost" onClick={() => openIngest('vehicle')}><UploadCloud size={14} /> 데이터센터</Btn>
+          <Btn size="sm" variant="ghost" onClick={() => openIngest('vehicle')}><UploadCloud size={14} /> 데이터관리</Btn>
           <MigrateDataButton size="sm" />
         </div>
       </>}

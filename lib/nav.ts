@@ -3,11 +3,12 @@
  * 앱 IA SSOT — 메뉴 → 페이지 → 잡기(입력) → 보기.
  * 데이터 층 = lib/domain/layers · 티어 = lib/tier.
  *
- * 2026-07 IA:
- *   허브 = 대시보드 · 운영현황 · 리스크관리 · 데이터센터
- *   원장 = 자산 · 계약 · 자금 · 업무
- *   대시보드(/) = 관제 콕핏(KPI 타일 + 법인별). 예외 엑셀=/risk (일정 어김·임박 흡수).
- *   원장 = 마스터 표 + 더블클릭 우측 상세패널 (별도 상세페이지 축소 수순)
+ * 2026-07 IA (최종):
+ *   (상단) 대시보드 · 운영현황
+ *   처리 = 리스크관리 · 업무관리 · 데이터관리
+ *   원장 = 자산 · 계약 · 자금
+ *   시스템 = 설정 · 데이터 마이그레이션(hqOnly)
+ *   /desk → /risk (레거시). PAGE_IA · ERP_MENU_TREE · NAV_GROUPS 동기.
  */
 import {
   Table2, Wallet, Settings, Database, ListTodo,
@@ -41,17 +42,19 @@ export type PageIA = {
  * 메뉴 노출은 NAV_GROUPS / ERP_MENU_TREE. 레거시 href는 리다이렉트용으로만 남긴다.
  */
 export const PAGE_IA: PageIA[] = [
-  // ── 허브 ──
-  { href: '/', label: '대시보드', role: 'hub', layer: 'mixed', tier: '라이트', view: '관제 콕핏 · KPI 타일 + 법인별', grab: 'none', grabHow: '—' },
+  // ── 상단 ──
+  { href: '/', label: '대시보드', role: 'hub', layer: 'mixed', tier: '라이트', view: '관제 콕핏 · KPI 타일 + 오늘집중', grab: 'none', grabHow: '—' },
   { href: '/status', label: '운영현황', role: 'view', layer: 'mixed', tier: '라이트', view: '차량 1대=1행 통합원장 · LedgerFrame', grab: 'none', grabHow: '—' },
+
+  // ── 처리 ──
   { href: '/risk', label: '리스크관리', role: 'hub', layer: 'mixed', tier: '라이트', view: 'risk-ledger · LedgerFrame · 미완료·미납·만기·휴차(+일정 어김·임박)', grab: 'none', grabHow: '—' },
-  { href: '/ingest', label: '데이터센터', role: 'input', layer: 'mixed', tier: '라이트', view: 'OCR·엑셀·직접 투입', grab: 'batch', grabHow: '담기' },
+  { href: '/work', label: '업무관리', role: 'work', layer: 'event', tier: '라이트', view: '정비·일정·과태료·상담 통합', grab: 'context', grabHow: '행·생성' },
+  { href: '/ingest', label: '데이터관리', role: 'input', layer: 'mixed', tier: '라이트', view: 'OCR·엑셀·직접 투입', grab: 'batch', grabHow: '담기' },
 
   // ── 원장 ──
   { href: '/asset', label: '자산관리', role: 'view', layer: 'ledger', tier: '라이트', assetKind: 'physical', view: '차량 1대=1행 · 더블클릭 상세패널', grab: 'both', grabHow: '생성·패널수정 · 마이그레이션' },
   { href: '/contract', label: '계약관리', role: 'view', layer: 'ledger', tier: '라이트', assetKind: 'contract', view: '계약 1건=1행 · 더블클릭 상세패널 · 리스크(불이행)', grab: 'both', grabHow: '생성·패널수정 · 리스크 CTA' },
   { href: '/cash', label: '자금관리', role: 'view', layer: 'ledger', tier: '라이트', assetKind: 'cash', view: '계좌+입출금 · CMS매칭', grab: 'batch', grabHow: '단건·대량 입력 · 담기' },
-  { href: '/work', label: '업무관리', role: 'work', layer: 'event', tier: '라이트', view: '정비·일정·과태료·상담 통합', grab: 'context', grabHow: '행·생성' },
 
   // ── 시스템 ──
   { href: '/settings', label: '설정', role: 'system', layer: 'system', tier: '라이트', view: '계정·초기화면', grab: 'none', grabHow: '—' },
@@ -87,7 +90,7 @@ export type NavGroup = { title: string; items: NavItem[] };
 
 /**
  * ERP 메뉴 정보구조 SSOT.
- * 원장 = 확정 현재 상태 · 업무 = 사건/처리 · 상태·기간은 메뉴가 아니라 필터/views.
+ * 처리 = 예외·사건·투입 · 원장 = 확정 현재 상태 · 상태·기간은 메뉴가 아니라 필터/views.
  */
 export type MenuView = {
   id: string;
@@ -108,15 +111,24 @@ export type ErpMenuNode = {
 
 export const ERP_MENU_TREE: ErpMenuNode[] = [
   {
-    id: 'hub',
-    label: '허브',
+    id: 'top',
+    label: '',
     href: '/',
     icon: LayoutDashboard,
     children: [
       { id: 'home', label: '대시보드', href: '/', icon: LayoutDashboard },
       { id: 'status', label: '운영현황', href: '/status', icon: LayoutDashboard },
+    ],
+  },
+  {
+    id: 'process',
+    label: '처리',
+    href: '/risk',
+    icon: TriangleAlert,
+    children: [
       { id: 'risk', label: '리스크관리', href: '/risk', icon: TriangleAlert },
-      { id: 'ingest', label: '데이터센터', href: '/ingest', icon: Upload },
+      { id: 'work', label: '업무관리', href: '/work', icon: ListTodo },
+      { id: 'ingest', label: '데이터관리', href: '/ingest', icon: Upload },
     ],
   },
   {
@@ -128,38 +140,39 @@ export const ERP_MENU_TREE: ErpMenuNode[] = [
       { id: 'asset-ledger', label: '자산관리', href: '/asset', icon: CarFront, views: [{ id: 'asset-status', label: '소유·가동 상태' }] },
       { id: 'contract-ledger', label: '계약관리', href: '/contract', icon: FileText, views: [{ id: 'contract-status', label: '진행·만기·리스크' }] },
       { id: 'money-ledger', label: '자금관리', href: '/cash', icon: Wallet, views: [{ id: 'accounts-daily', label: '계좌+일보' }] },
-      { id: 'work-ledger', label: '업무관리', href: '/work', icon: ListTodo, views: [{ id: 'all-work', label: '정비·일정·과태료' }] },
     ],
   },
   {
     id: 'system',
     label: '시스템',
-    href: '/dev/data',
+    href: '/settings',
     icon: Settings,
     children: [
-      { id: 'dev-tools', label: '데이터 마이그레이션', href: '/dev/data', icon: Database, hqOnly: true },
       { id: 'settings', label: '설정', href: '/settings', icon: Settings },
+      { id: 'dev-tools', label: '데이터 마이그레이션', href: '/dev/data', icon: Database, hqOnly: true },
     ],
   },
 ];
 
-/** 햄버거/사이드 렌더러용. ERP_MENU_TREE와 라벨·href 동기. */
+/** 햄버거/사이드 렌더러용. ERP_MENU_TREE와 라벨·href·그룹 순서 동기. */
 export const NAV_GROUPS: NavGroup[] = [
   { title: '', items: [
     { href: '/', label: '대시보드', icon: LayoutDashboard, tier: '라이트' },
     { href: '/status', label: '운영현황', icon: LayoutDashboard, tier: '라이트' },
+  ] },
+  { title: '처리', items: [
     { href: '/risk', label: '리스크관리', icon: TriangleAlert, tier: '라이트' },
-    { href: '/ingest', label: '데이터센터', icon: Upload, tier: '라이트' },
+    { href: '/work', label: '업무관리', icon: ListTodo, tier: '라이트' },
+    { href: '/ingest', label: '데이터관리', icon: Upload, tier: '라이트' },
   ] },
   { title: '원장', items: [
     { href: '/asset', label: '자산관리', icon: CarFront, tier: '라이트' },
     { href: '/contract', label: '계약관리', icon: FileText, tier: '라이트' },
     { href: '/cash', label: '자금관리', icon: Wallet, tier: '라이트' },
-    { href: '/work', label: '업무관리', icon: ListTodo, tier: '라이트' },
   ] },
   { title: '시스템', items: [
-    { href: '/dev/data', label: '데이터 마이그레이션', icon: Database, tier: '라이트', hqOnly: true },
     { href: '/settings', label: '설정', icon: Settings, tier: '라이트' },
+    { href: '/dev/data', label: '데이터 마이그레이션', icon: Database, tier: '라이트', hqOnly: true },
   ] },
 ];
 

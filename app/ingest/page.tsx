@@ -1,6 +1,6 @@
 'use client';
 /**
- * 데이터센터 — 전 엔티티 투입구 (OCR·엑셀·직접).
+ * 데이터관리 — 전 엔티티 투입구 (OCR·엑셀·직접).
  * LedgerFrame 공용 셸 + body(시트) + sidePanel(투입). 엔진(saveIntake·OCR·xlsx) 유지.
  */
 import { Suspense, useEffect, useMemo, useState } from 'react';
@@ -346,7 +346,7 @@ function IngestInner() {
 
   return (
     <LedgerFrame
-      title="데이터센터"
+      title="데이터관리"
       meta="OCR · 엑셀 · 직접"
       showColView={false}
       filters={(

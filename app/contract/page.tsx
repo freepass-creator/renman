@@ -89,7 +89,7 @@ export default function ContractLedgerPage() {
         ><Plus size={14} /> {creating ? '생성 취소' : '계약 생성'}</Btn>
       </LedgerActions>}
       tools={<LedgerActions aria-label="워크플로">
-        <Btn size="sm" variant="ghost" iconOnly tip="계약서·자료 투입 — 데이터센터" onClick={() => openIngest('contract')}>
+        <Btn size="sm" variant="ghost" iconOnly tip="계약서·자료 투입 — 데이터관리" onClick={() => openIngest('contract')}>
           <UploadCloud size={14} />
         </Btn>
         <Btn size="sm" variant="ghost" iconOnly tip="미수 회수" onClick={() => openReceivables()}>
@@ -121,9 +121,9 @@ export default function ContractLedgerPage() {
       onColView={setColView}
       loading={loading}
       empty={<>
-        등록된 계약이 없습니다. 계약서는 데이터센터에서 담으세요.
+        등록된 계약이 없습니다. 계약서는 데이터관리에서 담으세요.
         <div style={{ marginTop: 14, display: 'flex', justifyContent: 'center', gap: 8 }}>
-          <Btn size="sm" variant="ghost" onClick={() => openIngest('contract')}><UploadCloud size={14} /> 데이터센터</Btn>
+          <Btn size="sm" variant="ghost" onClick={() => openIngest('contract')}><UploadCloud size={14} /> 데이터관리</Btn>
           <MigrateDataButton size="sm" />
         </div>
       </>}

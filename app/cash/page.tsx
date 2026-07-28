@@ -185,7 +185,7 @@ function CashBulkInputPanel({ onClose }: { onClose: () => void }) {
           )}
         </div>
       </div>
-      <LedgerPanelFooter hint={ready ? '입력원이 준비되었습니다. 분석·검토 단계는 데이터센터와 연결됩니다.' : '파일·링크·텍스트 중 하나를 입력하세요.'}>
+      <LedgerPanelFooter hint={ready ? '입력원이 준비되었습니다. 분석·검토 단계는 데이터관리와 연결됩니다.' : '파일·링크·텍스트 중 하나를 입력하세요.'}>
         <Btn size="sm" variant="ghost" onClick={onClose}>취소</Btn>
         <Btn size="sm" disabled>분석 준비</Btn>
       </LedgerPanelFooter>
@@ -613,7 +613,7 @@ export default function CashLedgerPage() {
   );
   const dayLoopTools = (
     <LedgerActions aria-label="워크플로">
-      <Btn size="sm" variant="ghost" iconOnly tip="통장 담기 — 데이터센터" onClick={() => openIngest('bank_tx')}>
+      <Btn size="sm" variant="ghost" iconOnly tip="통장 담기 — 데이터관리" onClick={() => openIngest('bank_tx')}>
         <Landmark size={14} />
       </Btn>
       <Btn size="sm" variant="ghost" iconOnly tip="매칭 — 입금·계약 연결" onClick={() => openPayments()}>
