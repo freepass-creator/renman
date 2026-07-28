@@ -7,8 +7,8 @@
  */
 import { useEffect, useMemo, useState } from 'react';
 import {
-  Home, LayoutDashboard, Search, Upload, Settings, LayoutGrid, Car,
-  ReceiptText, Wallet, FileText, Inbox, TrendingUp, ShieldAlert,
+  Home, LayoutDashboard, Upload, CarFront, ListTodo,
+  Wallet, FileText, CalendarCheck,
   type LucideIcon,
 } from 'lucide-react';
 import { useSession } from '@/lib/session';
@@ -20,7 +20,7 @@ import { Btn, C, SPACE_M, toggleStyle } from '@/components/ui';
 
 export type MobileTabId =
   | 'operations' | 'money' | 'work'
-  | 'home' | 'mydesk' | 'search' | 'upload' | 'settings'
+  | 'home' | 'status' | 'desk' | 'mydesk' | 'search' | 'upload' | 'settings'
   | 'dispatch' | 'asset' | 'receivables' | 'finance' | 'contract'
   | 'inbox' | 'penalty' | 'payments' | 'pnl' | 'integrity';
 
@@ -35,20 +35,24 @@ export type MobileTabDef = {
 };
 
 export const MOBILE_TAB_DEFS: MobileTabDef[] = [
-  { id: 'asset', label: '자산', href: '/asset', icon: Car, match: (p) => p.startsWith('/asset'), group: '관리', tier: pageTier('/asset') },
-  { id: 'contract', label: '계약', href: '/contract', icon: FileText, match: (p) => p.startsWith('/contract'), group: '관리', tier: pageTier('/contract') },
-  { id: 'money', label: '자금', href: '/cash', icon: Wallet, match: (p) => p.startsWith('/cash'), group: '관리', tier: pageTier('/cash') },
-  { id: 'work', label: '업무', href: '/work', icon: LayoutGrid, match: (p) => p.startsWith('/work'), group: '관리', tier: pageTier('/work') },
+  { id: 'home', label: '홈', href: '/', icon: Home, match: (p) => p === '/', group: '허브', tier: pageTier('/') },
+  { id: 'status', label: '운영', href: '/status', icon: LayoutDashboard, match: (p) => p.startsWith('/status'), group: '허브', tier: pageTier('/status') },
+  { id: 'desk', label: '일정', href: '/?tab=일정', icon: CalendarCheck, match: (p) => p === '/' || p.startsWith('/desk'), group: '허브', tier: pageTier('/') },
+  { id: 'upload', label: '업로드', href: '/ingest', icon: Upload, match: (p) => p.startsWith('/ingest'), group: '허브', tier: pageTier('/ingest') },
+  { id: 'asset', label: '자산', href: '/asset', icon: CarFront, match: (p) => p.startsWith('/asset'), group: '원장', tier: pageTier('/asset') },
+  { id: 'contract', label: '계약', href: '/contract', icon: FileText, match: (p) => p.startsWith('/contract'), group: '원장', tier: pageTier('/contract') },
+  { id: 'money', label: '자금', href: '/cash', icon: Wallet, match: (p) => p.startsWith('/cash'), group: '원장', tier: pageTier('/cash') },
+  { id: 'work', label: '업무', href: '/work', icon: ListTodo, match: (p) => p.startsWith('/work'), group: '원장', tier: pageTier('/work') },
 ];
 
 export const MOBILE_TAB_MAP: Record<string, MobileTabDef> = Object.fromEntries(MOBILE_TAB_DEFS.map((t) => [t.id, t]));
 
-/** 라이트 코어 — 홈·마이·현황·설정. 스탠다드+=업무 허브·미수를 기본에 포함(막힘 없이 진입). */
-const PREFERRED_LIGHT: MobileTabId[] = ['asset', 'contract', 'money', 'work'];
+/** 라이트 코어 — 홈·미결·원장. */
+const PREFERRED_LIGHT: MobileTabId[] = ['home', 'desk', 'asset', 'contract', 'work'];
 const PREFERRED_STANDARD: MobileTabId[] = PREFERRED_LIGHT;
 
 export const MAX_MOBILE_TABS = 5;
-export const MOBILE_TAB_GROUPS = ['관리'] as const;
+export const MOBILE_TAB_GROUPS = ['허브', '원장'] as const;
 
 function allowedTab(id: string): id is MobileTabId {
   const t = MOBILE_TAB_MAP[id];

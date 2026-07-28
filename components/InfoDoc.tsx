@@ -7,7 +7,7 @@ import type { DocVersion } from '@/lib/docs';
 import { KV, Btn, Badge, OcrCrosscheck, Select, Input, C, ctrlH, type KVRow } from '@/components/ui';
 import { type CrosscheckResult } from '@/lib/ocr-crosscheck';
 import { useIsMobile } from '@/lib/use-mobile';
-import { ChevronDown, FileText } from 'lucide-react';
+import { ChevronDown, Check, FileText } from 'lucide-react';
 import FileDrop from '@/components/FileDrop';
 
 /**
@@ -114,7 +114,7 @@ export function InfoDoc({
           <ChevronDown size={15} color={C.sub} style={{ flexShrink: 0, transform: collapsed ? 'rotate(-90deg)' : 'none', transition: 'transform .15s' }} />
           <span style={{ fontSize: 13.5, fontWeight: 800, letterSpacing: '-0.01em', color: C.ink }}>{title}</span>
         </button>
-        <Badge tone={attached ? 'green' : hasOcr ? 'amber' : 'gray'}>{attached ? '첨부됨 ✓' : hasOcr ? 'OCR만 · 미첨부' : '미첨부'}</Badge>
+        <Badge tone={attached ? 'green' : hasOcr ? 'amber' : 'gray'}>{attached ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>첨부됨 <Check size={12} strokeWidth={2.6} aria-hidden /></span> : hasOcr ? 'OCR만 · 미첨부' : '미첨부'}</Badge>
         {!collapsed && (desc ? <span style={{ fontSize: 11.5, color: C.faint, flex: 1, minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{desc}</span> : <span style={{ flex: 1 }} />)}
         {collapsed && <span style={{ flex: 1 }} />}
         {!collapsed && (editing
@@ -166,7 +166,7 @@ export function InfoDoc({
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, flexWrap: 'wrap', fontSize: 11.5 }}>
                 <span style={{ color: C.mute, maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={pending.fileName}>{pending.fileName}</span>
-                <Badge tone={pending.url ? 'green' : 'amber'}>{pending.url ? '첨부됨 ✓' : '파일 미첨부'}</Badge>
+                <Badge tone={pending.url ? 'green' : 'amber'}>{pending.url ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>첨부됨 <Check size={12} strokeWidth={2.6} aria-hidden /></span> : '파일 미첨부'}</Badge>
                 <Badge tone={pending.ocr ? 'blue' : 'gray'}>{pending.ocr ? 'OCR 완료' : 'OCR 없음 · 수기'}</Badge>
                 <span style={{ flex: 1 }} />
                 <Btn size="sm" variant="ghost" onClick={() => { setPending(null); setConfirm({}); }}>다시 선택</Btn>

@@ -1,6 +1,7 @@
 'use client';
 import { useState } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
+import { ChevronDown } from 'lucide-react';
 import {
   Sec, Cards, Metric, ObjCard, Btn, TextLink, Badge, KV, EmptyState, Message, Input, Select,
   SectionLabel, Disclosure, th, thR, td, tdR, won, C, SH, PageLoading, SPACE_GROUP_M, type KVRow,
@@ -30,7 +31,7 @@ function PrintMenu({ items }: { items: { label: string; run: () => void }[] }) {
   if (items.length === 1) return <Btn size="sm" variant="ghost" onClick={items[0].run}>{items[0].label}</Btn>;
   return (
     <span style={{ position: 'relative', display: 'inline-flex' }}>
-      <Btn size="sm" variant="ghost" onClick={() => setOpen((o) => !o)}>출력▾</Btn>
+      <Btn size="sm" variant="ghost" onClick={() => setOpen((o) => !o)}>출력 <ChevronDown size={13} strokeWidth={2.2} aria-hidden /></Btn>
       {open && (
         <>
           <span style={{ position: 'fixed', inset: 0, zIndex: 40 }} onClick={() => setOpen(false)} />

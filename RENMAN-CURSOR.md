@@ -70,6 +70,7 @@ curl -s -o /dev/null -w "%{http_code}" http://localhost:6006/<route>   # 200
 
 | 날짜 | 작업자 | 내용 | 상태 |
 |---|---|---|---|
+| 2026-07-28 | Cursor | lucide 아이콘 통일: 유니코드→lucide · Page/LedgerFrame 타이틀=nav icon · mobile-tabs=nav | tsc0 |
 | 2026-07-28 | Cursor | UIUX-SPEC 헤더 컨트롤 존 규격표 갱신(CompanyFilter·solid sm·Select) | tsc0 |
 | 2026-07-28 | Cursor | work 구분 PillTabs→Select · asset/contract/work 주액션 solid sm · receivables actions→WB · penalty sm | tsc0 |
 | 2026-07-28 | Cursor | 회사스코프 통일: ingest companySlot→CompanyFilter · 홈 meta 법인명 중복 제거 | tsc0 |

@@ -1,6 +1,7 @@
 'use client';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { Home, RotateCw } from 'lucide-react';
 import { Btn, C } from '@/components/ui';
 
 /**
@@ -62,13 +63,13 @@ export default function MobilePreview() {
           {DEVICES.map((d) => (
             <Btn key={d.key} size="sm" variant={d.key === dev.key ? 'solid' : 'ghost'} onClick={() => setDev(d)}>{d.label}</Btn>
           ))}
-          <Btn size="sm" variant="ghost" onClick={reload}>↻</Btn>
+          <Btn size="sm" variant="ghost" iconOnly tip="새로고침" onClick={reload}><RotateCw size={14} /></Btn>
           <Btn size="sm" variant="ghost" onClick={() => router.push('/')}>데스크톱으로</Btn>
         </div>
       </div>
 
       <div style={{ width: dev.w, maxWidth: '100%', display: 'flex', alignItems: 'center', gap: 8, padding: '6px 12px', borderRadius: 999, background: C.taupeBg, border: `1px solid ${C.line}`, boxSizing: 'border-box' }}>
-        <button onClick={home} title="프레임 홈(/m)" style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: C.mute, fontSize: 14, lineHeight: 1, padding: 0 }}>⌂</button>
+        <button type="button" onClick={home} title="프레임 홈(/m)" style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: C.mute, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', padding: 0 }}><Home size={14} strokeWidth={2.2} aria-hidden /></button>
         <div style={{ flex: 1, minWidth: 0, fontSize: 12, color: C.mute, fontFamily: MONO, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{path}</div>
         <span style={{ fontSize: 11, color: C.faint }}>{dev.w}×{dev.h}</span>
       </div>

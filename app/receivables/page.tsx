@@ -25,6 +25,7 @@ import { useEntityLists } from '@/lib/use-entity-lists';
 import { commitUpdate } from '@/lib/commit';
 import { resolveWriteCompany, NEED_COMPANY } from '@/lib/scope';
 import { useSecOrder } from '@/lib/use-sec-order';
+import { Check } from 'lucide-react';
 
 const RECV_SECS = ['recv-status', 'recv-list'] as const;
 
@@ -217,7 +218,7 @@ export default function ReceivablesPage() {
                       name={String(rec.contractorName || '—')}
                       carType={String(rec.plate || '')}
                       fields={[
-                        ['내용증명', rec.noticeSentDate ? `✓ ${String(rec.noticeSentDate)}` : '미발송'],
+                        ['내용증명', rec.noticeSentDate ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><Check size={12} strokeWidth={2.6} aria-hidden />{String(rec.noticeSentDate)}</span> : '미발송'],
                         ['시동제어', immob ? `적용중 (${String(rec.engineDisabledAt || '').slice(0, 10)})` : needLock ? '전환 필요' : '—'],
                         ['최근 연락', r.contact ? `${String(r.contact.category)} · ${String(r.contact.date)}` : '없음'],
                         ...(r.st.nextAction ? [['다음', r.st.nextAction] as [string, string]] : []),

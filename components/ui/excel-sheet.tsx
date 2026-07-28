@@ -1,5 +1,6 @@
 'use client';
 import React from 'react';
+import { Check, ChevronDown, ChevronUp } from 'lucide-react';
 import { useIsMobile } from '@/lib/use-mobile';
 import { haptic } from '@/lib/haptics';
 import { C, R, SH, thX, thXR, thXC, thXPin, tdX, tdXR, tdXC, tdXPin, ctrlH, ctrlFs } from './tokens';
@@ -100,8 +101,8 @@ function FilterPop<T>({ col, x, y, rows, sel, onSel, sort, onSort, onClose }: {
           borderRadius: R, boxShadow: SH.pop, padding: 8,
         }}>
         <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
-          <button type="button" onClick={() => setDir('asc')} style={btn(isS('asc'))}>↑ 오름</button>
-          <button type="button" onClick={() => setDir('desc')} style={btn(isS('desc'))}>↓ 내림</button>
+          <button type="button" onClick={() => setDir('asc')} style={btn(isS('asc'))}><ChevronUp size={12} strokeWidth={2.4} aria-hidden /> 오름</button>
+          <button type="button" onClick={() => setDir('desc')} style={btn(isS('desc'))}><ChevronDown size={12} strokeWidth={2.4} aria-hidden /> 내림</button>
         </div>
         <Search value={q} onChange={(e) => setQ(e.target.value)} placeholder="값 검색" size="sm" wrapStyle={{ width: '100%', marginBottom: 6 }} />
         <div style={{ maxHeight: 240, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 1 }}>
@@ -116,7 +117,7 @@ function FilterPop<T>({ col, x, y, rows, sel, onSel, sort, onSort, onClose }: {
                     background: on ? C.head : 'transparent', fontWeight: 600,
                     fontSize: 12, color: C.ink,
                   }}>
-                  <span style={{ width: 12, color: on ? C.brand : C.line2 }}>{on ? '✓' : ''}</span>
+                  <span style={{ width: 12, color: on ? C.brand : C.line2, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>{on ? <Check size={12} strokeWidth={2.6} aria-hidden /> : null}</span>
                   <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{v}</span>
                   <span style={{ fontSize: 11, color: C.faint, fontVariantNumeric: 'tabular-nums' }}>{n}</span>
                 </button>
@@ -252,8 +253,10 @@ export function ExcelSheet<T>({
                     } : undefined}>
                     <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
                       {c.label}
-                      {colSort?.key === c.key && <span style={{ fontSize: 9 }}>{colSort.dir === 'asc' ? '↑' : '↓'}</span>}
-                      {!!colFilter[c.key]?.size && <span style={{ fontSize: 9 }}>▼</span>}
+                      {colSort?.key === c.key && (colSort.dir === 'asc'
+                        ? <ChevronUp size={11} strokeWidth={2.4} aria-hidden />
+                        : <ChevronDown size={11} strokeWidth={2.4} aria-hidden />)}
+                      {!!colFilter[c.key]?.size && <ChevronDown size={10} strokeWidth={2.4} aria-hidden />}
                     </span>
                   </th>
                 );

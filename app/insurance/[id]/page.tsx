@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import { AlertTriangle } from 'lucide-react';
 import { useSession } from '@/lib/session';
 import { getStore } from '@/lib/store';
 import { normPlate } from '@/lib/plate';
@@ -58,7 +59,7 @@ export default function Insurance360() {
       </Panel>
 
       {insts.length > 0 && (
-        <Panel title={`분납 회차 (insurance-calc 산출${sumOk === false ? ' · ⚠ 합계 불일치' : sumOk ? ' · 합계 일치' : ''})`}>
+        <Panel title={<span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>분납 회차 (insurance-calc 산출{sumOk === false ? <> · <AlertTriangle size={13} strokeWidth={2.2} aria-hidden color={C.warn} /> 합계 불일치</> : sumOk ? ' · 합계 일치' : ''})</span>}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
             <thead><tr><th style={th}>회차</th><th style={th}>납기일</th><th style={thR}>금액</th><th style={th}>상태</th></tr></thead>
             <tbody>

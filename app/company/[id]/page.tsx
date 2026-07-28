@@ -3,7 +3,7 @@
 // 접기/펼치기 + 카탈로그에서 추가/제거. 자산·자금이 이 법인에 귀속되는 뿌리 설정.
 import { useEffect, useState, type CSSProperties } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { Plus, X, Trash2, Building2 } from 'lucide-react';
+import { Plus, X, Trash2, Building2, AlertTriangle } from 'lucide-react';
 import { useSession } from '@/lib/session';
 import { getStore } from '@/lib/store';
 import { COMPANIES, companyLabel, companyShort } from '@/lib/companies';
@@ -149,8 +149,8 @@ function VehicleRegModule({ m, set, owned }: MP & { owned: number }) {
       </div>
       {(mism || overCap) && (
         <div style={{ fontSize: 12, color: C.danger, fontWeight: 600, display: 'flex', flexDirection: 'column', gap: 2 }}>
-          {mism && <span>⚠ 등록 대수({reg})와 보유 차량({owned})이 다릅니다 — 증차·감차 신고 확인.</span>}
-          {overCap && <span>⚠ 등록 대수({reg})가 차고지 수용({cap})을 초과합니다.</span>}
+          {mism && <span style={{ display: 'inline-flex', alignItems: 'flex-start', gap: 4 }}><AlertTriangle size={13} strokeWidth={2.2} aria-hidden style={{ flexShrink: 0, marginTop: 1 }} />등록 대수({reg})와 보유 차량({owned})이 다릅니다 — 증차·감차 신고 확인.</span>}
+          {overCap && <span style={{ display: 'inline-flex', alignItems: 'flex-start', gap: 4 }}><AlertTriangle size={13} strokeWidth={2.2} aria-hidden style={{ flexShrink: 0, marginTop: 1 }} />등록 대수({reg})가 차고지 수용({cap})을 초과합니다.</span>}
         </div>
       )}
       <div>

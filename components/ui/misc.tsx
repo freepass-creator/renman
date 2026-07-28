@@ -9,14 +9,34 @@ import { Spinner } from '../Spinner';
 
 /* 카드·지표·상태/이슈 어휘 등 — UI 키트의 "나머지" 원자 모음. */
 
-// 페이지 로딩 — 본문 중앙 스피너. 빈 화면이 아니라 "자리 차지한 로딩"으로 보이게.
+/** ERP 작업영역 로딩 — 남은 본문 칸을 채우고 그 안 정중앙.
+ *  풀스크린/페이지 바깥 덮기 금지(세션 Gate·LoadingOverlay). */
 export function PageLoading({ label = '불러오는 중…' }: { label?: string }) {
-  // 로딩 표준 SSOT — 박스·부제 없이 스피너 + 옅은 라벨만(깔끔). Gate 부트 로딩도 동일 룩.
   return (
-    <div role="status" aria-busy="true" aria-live="polite"
-      style={{ minHeight: 'min(52vh, 420px)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12, padding: '48px 20px' }}>
-      <Spinner size={28} stroke={2.5} color={C.brand} />
-      <div style={{ fontSize: 12.5, color: C.mute }}>{label}</div>
+    <div
+      style={{
+        flex: 1,
+        alignSelf: 'stretch',
+        width: '100%',
+        minHeight: 'min(50vh, 360px)',
+        position: 'relative',
+      }}
+    >
+      <div role="status" aria-busy="true" aria-live="polite"
+        style={{
+          position: 'absolute',
+          inset: 0,
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: 12,
+          padding: 20,
+          boxSizing: 'border-box',
+        }}>
+        <Spinner size={28} stroke={2.5} color={C.brand} />
+        <div style={{ fontSize: 12.5, color: C.mute }}>{label}</div>
+      </div>
     </div>
   );
 }
@@ -35,7 +55,7 @@ export function Stepper({ steps }: { steps: Step[] }) {
               background: s.state === 'done' ? 'var(--green-text)' : s.state === 'current' ? C.brand : C.card,
               color: s.state === 'todo' ? C.lineStrong : C.inverse, border: `2px solid ${dotColor(s.state)}`,
               boxShadow: s.state === 'current' ? `0 0 0 3px color-mix(in srgb, ${C.brand} 18%, transparent)` : 'none' }}>
-              {s.state === 'done' ? '✓' : i + 1}
+              {s.state === 'done' ? <Check size={12} strokeWidth={2.6} aria-hidden /> : i + 1}
             </div>
             <div style={{ marginTop: 6, fontSize: mobile ? 10.5 : 12, fontWeight: s.state === 'current' ? 800 : 600, color: s.state === 'todo' ? C.faint : C.ink, textAlign: 'center', lineHeight: 1.25, whiteSpace: mobile ? 'normal' : 'nowrap' }}>{s.label}</div>
             {!mobile && <div style={{ fontSize: 10.5, color: C.faint, fontFamily: NUM, fontVariantNumeric: 'tabular-nums', minHeight: 13 }}>{s.date || ''}</div>}
@@ -175,10 +195,12 @@ export function OcrCrosscheck({ result }: { result?: CrosscheckResult | null }) 
 /**
  * 빈 상태 SSOT — 손롤 div 금지.
  *   · page  페이지·필터 전체 없음(+CTA). 박스 센터.
+ *   · page  기본. 본문 빈 목록(박스+안내).
+ *   · sheet 원장 시트 칸(필터 아래·패널 옆). 남은 높이 채우고 가운데 — 패널과 높이 맞춤.
  *   · sec   Sec 안 목록 없음. 조용한 한 줄(현황 생애·상세 하위).
  *   · ok    미결/리스크 큐가 비어 있음 = 정상. 초록 체크(홈·업무).
  */
-export type EmptyVariant = 'page' | 'sec' | 'ok';
+export type EmptyVariant = 'page' | 'sheet' | 'sec' | 'ok';
 export function EmptyState({ children, variant = 'page' }: { children: React.ReactNode; variant?: EmptyVariant }) {
   if (variant === 'ok') {
     return (
@@ -189,6 +211,31 @@ export function EmptyState({ children, variant = 'page' }: { children: React.Rea
   }
   if (variant === 'sec') {
     return <div style={{ fontSize: 12.5, color: C.faint, padding: '2px 0' }}>{children}</div>;
+  }
+  if (variant === 'sheet') {
+    // 원장·데이터센터 작업칸 — 패널과 같은 1px 카드로 남은 높이 채움(어정쩡한 상단 박스 금지).
+    return (
+      <div role="status" style={{
+        flex: 1,
+        alignSelf: 'stretch',
+        width: '100%',
+        minHeight: 0,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '28px 24px',
+        textAlign: 'center',
+        color: C.mute,
+        border: `1px solid ${C.line}`,
+        borderRadius: R,
+        background: C.card,
+        fontSize: 13,
+        lineHeight: 1.55,
+        boxSizing: 'border-box',
+      }}>
+        {children}
+      </div>
+    );
   }
   return (
     <div style={{

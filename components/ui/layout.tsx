@@ -1,16 +1,19 @@
 'use client';
 import React, { useEffect } from 'react';
+import { usePathname } from 'next/navigation';
 import { useIsMobile } from '@/lib/use-mobile';
 import { useAppBar } from '@/lib/appbar';
 import { FacetFilterProvider } from '@/lib/facet-filter-ctx';
-import { ChevronDown, ChevronLeft, EyeOff, GripVertical } from 'lucide-react';
+import { ChevronDown, ChevronLeft, EyeOff, GripVertical, type LucideIcon } from 'lucide-react';
 import { C, R, NUM, SH, ctrlH } from './tokens';
 import { PAGE_PAD_M, PAGE_HEAD_PB_M, SPACE_M, SPACE_GROUP_M } from './tokens';
 import { CompanyFilter, Btn } from './controls';
+import { PageLoading } from './misc';
+import { navIconForPath } from '@/lib/nav';
 
 /* 페이지 골격 · 패널 · 섹션 · 세부 진입 껍데기 — 레이아웃 원자. */
 
-export function Page({ title, meta, left, mid, right, tools, children, fill, frame, back, noCompany }: {
+export function Page({ title, meta, left, mid, right, tools, children, fill, frame, back, noCompany, loading, icon }: {
   title?: React.ReactNode; meta?: React.ReactNode; left?: React.ReactNode; mid?: React.ReactNode; right?: React.ReactNode;
   /** 셸 툴바 SSOT — WorkbenchBar. title 옆(또는 모바일 전폭). mid/right 손롤 툴바 대신 이걸 쓴다. */
   tools?: React.ReactNode;
@@ -18,17 +21,36 @@ export function Page({ title, meta, left, mid, right, tools, children, fill, fra
   noCompany?: boolean;
   /** 엑셀 시트 모드 — 본문(children)이 뷰포트를 꽉 채우고 자체 스크롤(헤더 틀고정). 페이지 스크롤 없음. */
   frame?: boolean;
-  children: React.ReactNode; fill?: boolean; back?: () => void;
+  /** ERP 목록 로딩 — 제목·셸 유지, 본문만 PageLoading(작업영역 정중앙). children은 무시. */
+  loading?: boolean;
+  /**
+   * 타이틀 앞 nav 아이콘. 생략=현재 경로의 nav icon(SSOT=lib/nav).
+   * false=숨김 · LucideIcon=강제 지정.
+   */
+  icon?: LucideIcon | false;
+  children?: React.ReactNode; fill?: boolean; back?: () => void;
 }) {
   const mobile = useIsMobile();
+  const pathname = usePathname() || '/';
   const frameMode = !!frame && !mobile;
   const hasTitle = title != null && title !== '';
+  const NavIcon = icon === false
+    ? undefined
+    : (icon || (typeof title === 'string' ? navIconForPath(pathname) : undefined));
+  const titleNode: React.ReactNode = NavIcon && typeof title === 'string'
+    ? (
+      <span style={{ display: 'inline-flex', alignItems: 'center', gap: frameMode ? 5 : 8 }}>
+        <NavIcon size={frameMode ? 13 : 18} strokeWidth={2.2} aria-hidden color={C.ink} />
+        {title}
+      </span>
+    )
+    : title;
   // 모바일: 제목→TopBar 상태창(ERP4). 웹: 본문 h1.
   useAppBar(
     mobile && hasTitle
-      ? { ...(back ? { back } : {}), title }
+      ? { ...(back ? { back } : {}), title: titleNode }
       : (back ? { back } : null),
-    [mobile, back, typeof title === 'string' ? title : 0],
+    [mobile, back, typeof title === 'string' ? title : 0, NavIcon, pathname],
   );
   // frame: 창(html/body) 스크롤 잠금 — 상단바 고정 · 스크롤은 본문/패널 안만.
   useEffect(() => {
@@ -89,7 +111,7 @@ export function Page({ title, meta, left, mid, right, tools, children, fill, fra
             flexShrink: 0,
             lineHeight: 1.2,
             whiteSpace: frameMode ? 'nowrap' : undefined,
-          }}>{title}</h1>
+          }}>{titleNode}</h1>
         )}
         {!shellOwnsCompany && !noCompany && <CompanyFilter />}
         {left != null ? (
@@ -104,22 +126,42 @@ export function Page({ title, meta, left, mid, right, tools, children, fill, fra
         {right != null && <><span style={{ flex: tools != null ? 0 : 1, minWidth: tools != null ? 0 : 8 }} />{right}</>}
       </div>
       )}
-      {frameMode ? <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>{children}</div> : children}
+      {frameMode
+        ? <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>{loading ? <PageLoading /> : children}</div>
+        : loading ? <PageLoading /> : children}
     </main>
   );
 }
 
-/** 전폭 워크벤치 셸. 좌측 FacetRail은 폐기하고 필터는 각 엑셀 뷰어의 상단 도구줄에서만 처리한다. */
-export function FacetPage({ title, meta, left, mid, right, tools, rail, frame, back, children }: {
+/** 전폭 워크벤치 셸. 홈·업무 등 FacetRail 쓰는 면 — 좌측 인-플로우 필터(콘텐츠를 민다).
+ *  원장(LedgerFrame)은 상단 필터줄만 쓰므로 rail 안 넘김. */
+export function FacetPage({ title, meta, left, mid, right, tools, rail, frame, back, loading, children, icon }: {
   title?: React.ReactNode; meta?: React.ReactNode; left?: React.ReactNode; mid?: React.ReactNode; right?: React.ReactNode;
-  tools?: React.ReactNode; rail?: React.ReactNode | null; frame?: boolean; back?: () => void; children: React.ReactNode;
+  tools?: React.ReactNode; rail?: React.ReactNode | null; frame?: boolean; back?: () => void;
+  loading?: boolean; children?: React.ReactNode; icon?: LucideIcon | false;
 }) {
-  void rail;
+  const mobile = useIsMobile();
+  const hasRail = rail != null;
+  /* 필터 = 인-플로우(오버레이 아님). 데스크톱=좌측 열이 콘텐츠를 민다(flex row) · 모바일=콘텐츠 위 블록.
+     열림은 FacetFilterBtn(검색창 옆) 토글 → 닫히면 FacetRail이 null 반환 → 콘텐츠 전폭(fill).
+     undefined = 필터 안 씀(손익·부가세=maxWidth 가운데). */
+  const usesRail = rail !== undefined;
+  const page = (
+    <Page title={title} meta={meta} left={left} mid={mid} right={right} tools={tools} fill={usesRail && !mobile} frame={frame} back={back} loading={loading} icon={icon}>
+      {mobile && hasRail ? rail : null}{/* 모바일: 인-플로우 블록(닫히면 null) */}
+      {children}
+    </Page>
+  );
   return (
     <FacetFilterProvider>
-      <Page title={title} meta={meta} left={left} mid={mid} right={right} tools={tools} fill frame={frame} back={back}>
-        {children}
-      </Page>
+      {mobile || !usesRail ? page : (
+        <div style={{ display: 'flex', alignItems: 'stretch', minHeight: 'calc(100vh - var(--fp-bar-h))' }}>
+          {/* 데스크톱: 좌측 인-플로우 열(닫히면 null→전폭). 로딩중(rail=null)엔 200px 자리를 잡아 완료 시 흔들림 방지
+              — open은 마운트마다 true로 시작하므로 로딩 자리(200)와 완료 레일(200)이 일치 = shift 0. */}
+          {hasRail ? rail : <div aria-hidden style={{ flex: '0 0 200px', borderRight: '1px solid var(--border)', background: 'var(--bg-card)' }} />}
+          {page}
+        </div>
+      )}
     </FacetFilterProvider>
   );
 }
