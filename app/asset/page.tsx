@@ -1,19 +1,25 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { Plus } from 'lucide-react';
-import { assetMasterRow, contractMasterRow, type AssetMasterRow } from '@/lib/master-ledgers';
-import { ASSET_MASTER_BASIC_COLS, ASSET_MASTER_EXPANDED_COLS } from '@/lib/master-ledger-cols';
+import { ExternalLink, Pencil, Plus, UploadCloud } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { assetMasterRow, type AssetMasterRow } from '@/lib/master-ledgers';
+import { ASSET_DETAIL_SECTIONS, ASSET_MASTER_BASIC_COLS, ASSET_MASTER_EXPANDED_COLS } from '@/lib/master-ledger-cols';
 import { useEntityList } from '@/lib/use-entity-lists';
 import { textMatch } from '@/lib/search-match';
 import {
-  Btn, C, LedgerCreatePanel, LedgerFilterButton, LedgerFilterPanel, LedgerFrame, LedgerRecordPanel, PeriodBar, Search, Select, toggleStyle,
+  Btn, C, FilterChips, LedgerActions, LedgerCreatePanel, LedgerEditPanel, LedgerFilterButton, LedgerFilterFields, LedgerFilterPanel, LedgerFrame, LedgerRecordPanel, PeriodBar, Search, Select,
   type LedgerColView, type LedgerFormSection,
 } from '@/components/ui';
 import { useIsMobile } from '@/lib/use-mobile';
 import { TODAY } from '@/lib/dashboard-consts';
-import { VEHICLE_DISPOSE_PLAN } from '@/lib/domain/status';
-
+import { linkFleet, type Fleet } from '@/lib/domain/model';
+import { normPlate } from '@/lib/plate';
+import { MigrateDataButton } from '@/components/MigrateDataButton';
+import { openIngest } from '@/lib/ui-bus';
+import {
+  ASSET_FILTER_DEFS, countActiveFilters, emptyFilterValues, eqFilter, matchLedgerFilters,
+} from '@/lib/ledger-filter-defs';
 type AssetOwnershipScope = '보유자산' | '처분자산' | '전체자산';
 type AssetQuickFilter = '계약중' | '휴차' | '매각대기';
 type AllAssetQuickFilter = '보유' | '처분';
@@ -29,13 +35,14 @@ function matchesOwnership(row: AssetMasterRow, scope: AssetOwnershipScope): bool
   return scope === '전체자산' || (scope === '보유자산' ? !row.disposed : row.disposed);
 }
 
-function matchesQuickFilter(row: AssetMasterRow, filter: AssetQuickFilter | null, activeContractPlates: Set<string>): boolean {
+/** 가동·처분예정 = linkFleet(ownership·utilization) SSOT — status 원장과 동일. */
+function matchesQuickFilter(row: AssetMasterRow, filter: AssetQuickFilter | null, fleet: Fleet): boolean {
   if (!filter) return true;
-  if (filter === '계약중') return !row.disposed && activeContractPlates.has(row.plate);
-  if (filter === '휴차') {
-    return !row.disposed && !activeContractPlates.has(row.plate) && !VEHICLE_DISPOSE_PLAN.has(row.status);
-  }
-  return !row.disposed && VEHICLE_DISPOSE_PLAN.has(row.status);
+  const node = fleet.byPlate.get(normPlate(row.plate));
+  if (!node) return false;
+  if (filter === '계약중') return node.ownership === '보유중' && node.utilization === '운행';
+  if (filter === '휴차') return node.ownership === '보유중' && node.utilization === '휴차';
+  return node.ownership === '처분예정';
 }
 
 const ASSET_CREATE_SECTIONS: LedgerFormSection[] = [
@@ -57,52 +64,73 @@ export default function AssetLedgerPage() {
   const [dateBasis, setDateBasis] = useState<AssetDateBasis>('취득일');
   const [range, setRange] = useState({ from: '', to: '' });
   const [filterOpen, setFilterOpen] = useState(false);
-  const [detailStatus, setDetailStatus] = useState('');
-  const [detailMaker, setDetailMaker] = useState('');
+  const [detailFilters, setDetailFilters] = useState(() => emptyFilterValues(ASSET_FILTER_DEFS));
   const [colView, setColView] = useState<LedgerColView>('기본');
   const [selected, setSelected] = useState<ReturnType<typeof assetMasterRow> | null>(null);
   const [creating, setCreating] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const router = useRouter();
   const allRows = useMemo(() => vehicles.map(assetMasterRow).sort((a, b) => a.plate.localeCompare(b.plate, 'ko')), [vehicles]);
+  const fleet = useMemo(() => linkFleet(vehicles, contracts, TODAY), [vehicles, contracts]);
   const searchedRows = useMemo(() => allRows.filter((r) =>
     textMatch(q, r.company, r.assetCode, r.plate, r.status, r.carName, r.maker, r.modelLine, r.subModel, r.trim, r.vin, r.ownerName),
   ), [allRows, q]);
-  const activeContractPlates = useMemo(() => new Set(
-    contracts.map((contract) => contractMasterRow(contract, TODAY)).filter((contract) => !contract.ended).map((contract) => contract.plate),
-  ), [contracts]);
   const latest = useMemo(() => allRows.reduce((latestDate, row) => {
     const date = dateBasis === '처분일' ? row.saleDate : (row.acquisitionDate || row.purchasedDate || row.firstReg);
     return date > latestDate ? date : latestDate;
   }, TODAY), [allRows, dateBasis]);
+  const assetFilterMatchers = useMemo(() => ({
+    status: eqFilter<ReturnType<typeof assetMasterRow>>((r) => r.status),
+    maker: eqFilter<ReturnType<typeof assetMasterRow>>((r) => r.maker),
+  }), []);
   const rows = useMemo(() => searchedRows.filter((r) => {
-    if (!matchesOwnership(r, ownershipScope) || !matchesQuickFilter(r, quickFilter, activeContractPlates)) return false;
-    if (detailStatus && r.status !== detailStatus) return false;
-    if (detailMaker && r.maker !== detailMaker) return false;
+    if (!matchesOwnership(r, ownershipScope) || !matchesQuickFilter(r, quickFilter, fleet)) return false;
+    if (!matchLedgerFilters(r, detailFilters, assetFilterMatchers)) return false;
     if (ownershipScope === '전체자산' && allAssetQuickFilter === '보유' && r.disposed) return false;
     if (ownershipScope === '전체자산' && allAssetQuickFilter === '처분' && !r.disposed) return false;
     const date = dateBasis === '처분일' ? r.saleDate : (r.acquisitionDate || r.purchasedDate || r.firstReg);
     if (range.from && (!date || date < range.from)) return false;
     if (range.to && (!date || date > range.to)) return false;
     return true;
-  }), [searchedRows, ownershipScope, quickFilter, allAssetQuickFilter, activeContractPlates, detailStatus, detailMaker, dateBasis, range.from, range.to]);
+  }), [searchedRows, ownershipScope, quickFilter, fleet, allAssetQuickFilter, detailFilters, assetFilterMatchers, dateBasis, range.from, range.to]);
   const assetStatuses = useMemo(() => [...new Set(allRows.map((r) => r.status).filter(Boolean))].sort(), [allRows]);
   const assetMakers = useMemo(() => [...new Set(allRows.map((r) => r.maker).filter(Boolean))].sort(), [allRows]);
-  const detailFilterCount = Number(!!detailStatus) + Number(!!detailMaker);
+  const detailFilterCount = countActiveFilters(detailFilters, ASSET_FILTER_DEFS);
   const held = searchedRows.filter((r) => !r.disposed).length;
   const disposed = searchedRows.filter((r) => r.disposed).length;
-  const contracted = searchedRows.filter((r) => !r.disposed && activeContractPlates.has(r.plate)).length;
-  const idle = searchedRows.filter((r) =>
-    !r.disposed && !activeContractPlates.has(r.plate) && !VEHICLE_DISPOSE_PLAN.has(r.status),
-  ).length;
-  const salePending = searchedRows.filter((r) => !r.disposed && VEHICLE_DISPOSE_PLAN.has(r.status)).length;
+  const contracted = searchedRows.filter((r) => {
+    const n = fleet.byPlate.get(normPlate(r.plate));
+    return n?.ownership === '보유중' && n.utilization === '운행';
+  }).length;
+  const idle = searchedRows.filter((r) => {
+    const n = fleet.byPlate.get(normPlate(r.plate));
+    return n?.ownership === '보유중' && n.utilization === '휴차';
+  }).length;
+  const salePending = searchedRows.filter((r) => fleet.byPlate.get(normPlate(r.plate))?.ownership === '처분예정').length;
 
   return (
     <LedgerFrame
       title="자산관리"
       meta="차량 1대 1행 · 등록·소유·제원·취득·검사·금융·보험"
-      right={<Btn size="sm" variant={creating ? 'ghost' : 'solid'} aria-pressed={creating} onClick={() => {
-        setSelected(null);
-        setCreating((open) => !open);
-      }}><Plus size={14} /> {creating ? '생성 취소' : '자산 생성'}</Btn>}
+      right={<LedgerActions aria-label="쓰기">
+        <Btn
+          size="sm"
+          variant="ghost"
+          iconOnly
+          tip={creating ? '수기 생성 취소' : '수기 생성(예외)'}
+          aria-pressed={creating}
+          onClick={() => {
+            setSelected(null);
+            setEditing(false);
+            setCreating((open) => !open);
+          }}
+        ><Plus size={14} /></Btn>
+      </LedgerActions>}
+      tools={<LedgerActions aria-label="워크플로">
+        <Btn size="sm" variant="ghost" iconOnly tip="등록증·자료 투입 — 데이터센터" onClick={() => openIngest('vehicle')}>
+          <UploadCloud size={14} />
+        </Btn>
+      </LedgerActions>}
       filters={<>
         <Search size="sm" placeholder="차량번호·VIN·차명·소유자·상태" value={q} onChange={(e) => setQ(e.target.value)} style={{ width: mobile ? '100%' : 300 }} />
         <LedgerFilterButton open={filterOpen} count={detailFilterCount} onClick={() => setFilterOpen((open) => !open)} />
@@ -129,67 +157,62 @@ export default function AssetLedgerPage() {
           </Select>
         )}
         {ownershipScope === '보유자산' && (
-          <span style={{ display: 'inline-flex', gap: 6, flexWrap: 'wrap' }} aria-label="빠른 필터">
-            {ASSET_QUICK_FILTERS.map((filter) => {
-              const active = quickFilter === filter;
-              return (
-                <button
-                  key={filter}
-                  type="button"
-                  data-ui="toggle"
-                  aria-pressed={active}
-                  onClick={() => setQuickFilter((current) => current === filter ? null : filter)}
-                  style={toggleStyle(active, 'sm', mobile)}
-                >
-                  {ASSET_QUICK_FILTER_LABEL[filter]}
-                </button>
-              );
-            })}
-          </span>
+          <FilterChips
+            allowOff
+            value={quickFilter}
+            onChange={setQuickFilter}
+            options={ASSET_QUICK_FILTERS.map((filter) => ({ key: filter, label: ASSET_QUICK_FILTER_LABEL[filter] }))}
+          />
         )}
         {ownershipScope === '전체자산' && (
-          <span style={{ display: 'inline-flex', gap: 6, flexWrap: 'wrap' }} aria-label="전체자산 빠른 필터">
-            {(['보유', '처분'] as AllAssetQuickFilter[]).map((filter) => {
-              const active = allAssetQuickFilter === filter;
-              return (
-                <button
-                  key={filter}
-                  type="button"
-                  data-ui="toggle"
-                  aria-pressed={active}
-                  onClick={() => {
-                    const next = active ? null : filter;
-                    setAllAssetQuickFilter(next);
-                    setDateBasis(next === '처분' ? '처분일' : '취득일');
-                  }}
-                  style={toggleStyle(active, 'sm', mobile)}
-                >
-                  {filter}
-                </button>
-              );
-            })}
-          </span>
+          <FilterChips
+            allowOff
+            value={allAssetQuickFilter}
+            onChange={(next) => {
+              setAllAssetQuickFilter(next);
+              setDateBasis(next === '처분' ? '처분일' : '취득일');
+            }}
+            options={[
+              { key: '보유', label: '보유' },
+              { key: '처분', label: '처분' },
+            ]}
+          />
         )}
-        <PeriodBar latest={latest} initial="전체" onRange={setRange} />
+        <PeriodBar latest={latest} initial="전체" size="sm" onRange={setRange} />
       </>}
       stats={<span style={{ fontSize: 12.5, color: C.mute }}>보유 <b>{held}</b> · 계약중 <b style={{ color: C.ok }}>{contracted}</b> · 휴차 <b style={{ color: C.warn }}>{idle}</b> · 매각대기 <b>{salePending}</b> · 처분 <b>{disposed}</b></span>}
       colView={colView}
       onColView={setColView}
       loading={loading || contractsLoading}
-      empty="등록된 자산이 없습니다."
+      empty={<>
+        등록된 자산이 없습니다. 등록증은 데이터센터에서 담으세요.
+        <div style={{ marginTop: 14, display: 'flex', justifyContent: 'center', gap: 8 }}>
+          <Btn size="sm" variant="ghost" onClick={() => openIngest('vehicle')}><UploadCloud size={14} /> 데이터센터</Btn>
+          <MigrateDataButton size="sm" />
+        </div>
+      </>}
       cols={colView === '기본' ? ASSET_MASTER_BASIC_COLS : ASSET_MASTER_EXPANDED_COLS}
       rows={rows}
       rowKey={(r) => r.plate}
       selectedRowKey={selected?.plate}
       onRowDoubleClick={(row) => {
         setCreating(false);
+        setEditing(false);
         setSelected(row);
       }}
-      onCloseDetail={() => setSelected(null)}
+      onCloseDetail={() => { setSelected(null); setEditing(false); }}
       filterPanel={filterOpen ? (
-        <LedgerFilterPanel title="자산 세부 필터" onClose={() => setFilterOpen(false)} onReset={() => { setDetailStatus(''); setDetailMaker(''); }}>
-          <label><span style={{ display: 'block', fontSize: 12, fontWeight: 800, marginBottom: 6 }}>차량상태</span><Select value={detailStatus} onChange={(e) => setDetailStatus(e.target.value)} style={{ width: '100%' }}><option value="">전체</option>{assetStatuses.map((value) => <option key={value} value={value}>{value}</option>)}</Select></label>
-          <label><span style={{ display: 'block', fontSize: 12, fontWeight: 800, marginBottom: 6 }}>제조사</span><Select value={detailMaker} onChange={(e) => setDetailMaker(e.target.value)} style={{ width: '100%' }}><option value="">전체</option>{assetMakers.map((value) => <option key={value} value={value}>{value}</option>)}</Select></label>
+        <LedgerFilterPanel
+          title="자산 세부 필터"
+          onClose={() => setFilterOpen(false)}
+          onReset={() => setDetailFilters(emptyFilterValues(ASSET_FILTER_DEFS))}
+        >
+          <LedgerFilterFields
+            defs={ASSET_FILTER_DEFS}
+            values={detailFilters}
+            onChange={(key, value) => setDetailFilters((prev) => ({ ...prev, [key]: value }))}
+            options={{ status: assetStatuses, maker: assetMakers }}
+          />
         </LedgerFilterPanel>
       ) : null}
       sidePanel={creating ? (
@@ -201,13 +224,34 @@ export default function AssetLedgerPage() {
           initial={{ status: '등록대기' }}
           onClose={() => setCreating(false)}
         />
+      ) : selected && editing ? (
+        <LedgerEditPanel
+          key={`edit-asset:${selected.plate}`}
+          entityKey="vehicle"
+          title={`${selected.plate} 수정`}
+          sections={ASSET_CREATE_SECTIONS}
+          record={selected.raw}
+          onClose={() => setEditing(false)}
+          onSaved={(record) => setSelected(assetMasterRow(record))}
+        />
       ) : selected ? (
         <LedgerRecordPanel
           title={selected.plate}
           subtitle={`${selected.carName || '차명 미입력'} · ${selected.status}`}
           row={selected}
           cols={ASSET_MASTER_EXPANDED_COLS}
-          onClose={() => setSelected(null)}
+          sections={ASSET_DETAIL_SECTIONS}
+          onClose={() => { setSelected(null); setEditing(false); }}
+          actions={<>
+            <Btn size="sm" onClick={() => setEditing(true)}><Pencil size={14} /> 수정</Btn>
+            <Btn
+              size="sm"
+              variant="ghost"
+              iconOnly
+              tip="차량 상세"
+              onClick={() => router.push(`/vehicle/${encodeURIComponent(selected.plate)}`)}
+            ><ExternalLink size={14} /></Btn>
+          </>}
         />
       ) : null}
     />
