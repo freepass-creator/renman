@@ -1,6 +1,7 @@
 // 자금일보 통합 원장 — 데이터센터로 수집된 계좌(bank_tx)·CMS·카드매출·법인카드(card_tx)를
 // 단일 자금 스트림(CashRow)으로 합친다. 각 건은 계정과목(category)으로 분류. 분류 저장은 원본 엔티티로.
 import { type EntityRecord } from '@/lib/intake/entities';
+import { companyDisplay } from '@/lib/companies';
 import { type LedgerKind, kindOfLabel, isUnclassified, UNCLASSIFIED } from '@/lib/payments/ledger-subjects';
 
 export type CashSource = '계좌' | 'CMS' | '카드매출' | '법인카드';
@@ -29,6 +30,148 @@ export type CashRow = {
   nest?: CashNest;
   parentId?: string;
 };
+
+/** 계좌관리 원장 행 — 명시 account 레코드 + bank_tx 파생. */
+export type BankAccountRow = {
+  id: string;
+  companyId: string;
+  company: string;
+  bankName: string;
+  accountNumber: string;
+  accountAlias: string;
+  accountHolder: string;
+  accountType: string;
+  status: string;
+  openedDate: string;
+  closedDate: string;
+  openingBalance: number;
+  importMethod: string;
+  memo: string;
+  createdAt: string;
+  createdBy: string;
+  updatedAt: string;
+  transactionCount: number;
+  totalIn: number;
+  totalOut: number;
+  currentBalance: number;
+  lastTxDate: string;
+  raw: EntityRecord;
+};
+
+export function accountRecordToRow(record: EntityRecord): BankAccountRow {
+  return {
+    id: String(record._key || record.accountNumber || record.id || ''),
+    companyId: String(record.companyId || ''),
+    company: companyDisplay(String(record.companyId || '')),
+    bankName: String(record.bankName || ''),
+    accountNumber: String(record.accountNumber || ''),
+    accountAlias: String(record.accountAlias || ''),
+    accountHolder: String(record.accountHolder || ''),
+    accountType: String(record.accountType || ''),
+    status: String(record.status || '사용중'),
+    openedDate: String(record.openedDate || ''),
+    closedDate: String(record.closedDate || ''),
+    openingBalance: Number(record.openingBalance) || 0,
+    importMethod: String(record.importMethod || ''),
+    memo: String(record.memo || ''),
+    createdAt: String(record.createdAt || ''),
+    createdBy: String(record.createdBy || ''),
+    updatedAt: String(record.updatedAt || ''),
+    transactionCount: 0,
+    totalIn: 0,
+    totalOut: 0,
+    currentBalance: Number(record.openingBalance) || 0,
+    lastTxDate: '',
+    raw: record,
+  };
+}
+
+function accountIdentity(companyId: string, accountNumber: string, alias: string): string {
+  return `${companyId}:${accountNumber.replace(/\D/g, '') || alias}`;
+}
+
+function matchTxToAccount(tx: CashRow, companyId: string, accountNo: string, accountAlias: string): boolean {
+  if (tx.companyId !== companyId) return false;
+  const txNo = tx.account.replace(/\D/g, '');
+  return (accountNo && txNo === accountNo) || (!!accountAlias && tx.accountName === accountAlias);
+}
+
+/** bank_tx에서 명시 계좌에 없는 계좌를 파생하고, 기간 내 입출·잔액을 붙인다. */
+export function buildBankAccountLedger(
+  accountRecords: EntityRecord[],
+  bank: EntityRecord[],
+  scopedCashRows: CashRow[],
+  balanceCashRows: CashRow[],
+): BankAccountRow[] {
+  const explicit = accountRecords.map(accountRecordToRow);
+  const seen = new Set(explicit.map((row) => accountIdentity(row.companyId, row.accountNumber, row.accountNumber)));
+  const derived: BankAccountRow[] = [];
+  for (const record of bank) {
+    if (String(record.settlementRole || '') === 'item') continue;
+    const rawAccount = String(record.accountNumber || '').trim();
+    const sourceLabel = String(record.account || '').trim();
+    const explicitLabel = String(record.accountAlias || record.accountName || record.bankName || '').trim();
+    const labeledAccount = /계좌|법인카드|\([^)]*\d{4}\)/.test(sourceLabel);
+    if (!rawAccount && !explicitLabel && !labeledAccount) continue;
+    const accountNumber = rawAccount;
+    const companyId = String(record.companyId || '');
+    const accountAlias = explicitLabel || sourceLabel;
+    const identity = accountIdentity(companyId, accountNumber, accountAlias);
+    if (seen.has(identity)) continue;
+    seen.add(identity);
+    const bankName = String(record.bankName || accountAlias.match(/\(([^0-9)]+)/)?.[1] || '');
+    derived.push({
+      id: `derived:${identity}`,
+      companyId,
+      company: companyDisplay(companyId),
+      bankName,
+      accountNumber,
+      accountAlias,
+      accountHolder: String(record.accountHolder || ''),
+      accountType: String(record.accountType || '입출금'),
+      status: '사용중',
+      openedDate: '',
+      closedDate: '',
+      openingBalance: 0,
+      importMethod: '입출금내역 자동구성',
+      memo: '',
+      createdAt: '',
+      createdBy: '원장',
+      updatedAt: '',
+      transactionCount: 0,
+      totalIn: 0,
+      totalOut: 0,
+      currentBalance: 0,
+      lastTxDate: '',
+      raw: record,
+    });
+  }
+  return [...explicit, ...derived].map((row) => {
+    const accountNo = row.accountNumber.replace(/\D/g, '');
+    const txs = scopedCashRows.filter((tx) => {
+      if (tx.nest === 'cms-item' || tx.entity !== 'bank_tx') return false;
+      return matchTxToAccount(tx, row.companyId, accountNo, row.accountAlias);
+    });
+    const latestWithBalance = balanceCashRows.find((tx) => {
+      if (tx.raw.balance === '' || tx.raw.balance == null) return false;
+      return matchTxToAccount(tx, row.companyId, accountNo, row.accountAlias);
+    });
+    let totalIn = 0, totalOut = 0;
+    for (const tx of txs) {
+      totalIn += tx.inAmt;
+      totalOut += tx.outAmt;
+    }
+    return {
+      ...row,
+      transactionCount: txs.length,
+      totalIn,
+      totalOut,
+      currentBalance: latestWithBalance ? Number(latestWithBalance.raw.balance) || 0 : row.openingBalance,
+      lastTxDate: txs[0]?.date || '',
+    };
+  });
+}
+
 
 export function isCmsMethod(b: EntityRecord): boolean {
   const method = String(b.method || '');
