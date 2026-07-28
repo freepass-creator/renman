@@ -225,7 +225,7 @@ export default function WorkLedgerPage() {
             setSelected(null);
             setCreating((open) => !open);
           }}
-        ><Plus size={14} /> {creating ? '메모 취소' : '메모 업무'}</Btn>
+        ><Plus size={14} /> {creating ? '취소' : '업무 생성'}</Btn>
       </LedgerActions>}
       tools={<LedgerActions aria-label="워크플로">
         <Btn size="sm" variant="ghost" iconOnly tip="과태료 OCR" href="/penalty/upload">
@@ -244,7 +244,7 @@ export default function WorkLedgerPage() {
       colView={colView}
       onColView={setColView}
       loading={loading}
-      empty="업무가 없습니다. 우측 + 로 메모하거나 과태료 OCR로 담으세요."
+      empty="업무가 없습니다. 우측 «업무 생성» 또는 과태료 OCR로 담으세요."
       cols={colView === '기본' ? BASIC_COLS : ALL_COLS}
       rows={rows}
       rowKey={(r) => r.id}
