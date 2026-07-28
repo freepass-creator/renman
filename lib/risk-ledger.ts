@@ -1,7 +1,7 @@
 /**
  * 리스크관리 원장 SSOT — 웹(/risk) · 모바일(/m/risk) 단일.
- * linkFleet/buildFleetRows · selectReceivables(동일 net) · buildAgenda(어김→미완료 · 임박→만기).
- * 구분: 미완료 · 미납 · 만기 · 휴차. 페이지 손롤 집계 금지.
+ * linkFleet/buildFleetRows · selectReceivables · buildAgenda(어김→미완료 · 임박→만기)
+ * · buildHomePendingRows(업무 미처리→미완료). 구분: 미완료 · 미납 · 만기 · 휴차.
  * 일정관리(/desk)는 /risk로 흡수.
  */
 import { type EntityRecord } from '@/lib/intake/entities';
@@ -11,6 +11,8 @@ import { buildFleetRows, type FleetRow } from '@/lib/sheet-rows';
 import { buildAgenda, type AgendaItem } from '@/lib/agenda';
 import { computeContractView } from '@/lib/contract-ops';
 import { selectReceivables } from '@/lib/snapshot/selectors';
+import { computeDashboard } from '@/lib/operating-snapshot';
+import { buildHomePendingRows } from '@/lib/home-rows';
 import type { BadgeTone } from '@/components/ui/misc';
 import { NAV_GROUPS, type NavItem } from '@/lib/nav';
 
@@ -91,6 +93,7 @@ export function buildRiskSheetRows(
   penalties: EntityRecord[],
   history: EntityRecord[] = [],
   today: string = TODAY,
+  bankTx: EntityRecord[] = [],
 ): RiskSheetRow[] {
   const fleet = linkFleet(vehicles, contracts, today);
   const rows = buildFleetRows(fleet.vehicles, insurances, fleet.contracts, history, today);
@@ -207,6 +210,24 @@ export function buildRiskSheetRows(
     }));
   }
 
+  // ── 업무 미처리 → 미완료 (buildHomePendingRows SSOT · 반납지남은 만기경과와 중복 스킵) ──
+  const dash = computeDashboard({ contracts, vehicles, insurances, penalties, bankTx }, today);
+  for (const p of buildHomePendingRows(dash)) {
+    if (p.kind === '반납지남') continue;
+    const fr = p.plate ? byPlate.get(p.plate) : undefined;
+    push(rowOf('미완료', {
+      id: `미완료:업무:${p.id}`,
+      kind: p.kind,
+      plate: p.plate,
+      customer: p.title || '—',
+      carName: fr ? carNameOf(fr) : '—',
+      due: p.detail || '—',
+      dueDate: '',
+      amount: Math.max(0, p.amount),
+      status: '미처리',
+    }));
+  }
+
   // ── 휴차 ──
   for (const r of held.filter((x) => x.ownership === '보유중' && x.util === '휴차').sort((a, b) => a.plate.localeCompare(b.plate, 'ko'))) {
     push(rowOf('휴차', {
@@ -235,9 +256,10 @@ export function buildRiskSheet(
   penalties: EntityRecord[],
   history: EntityRecord[] = [],
   today: string = TODAY,
+  bankTx: EntityRecord[] = [],
 ): RiskSheet {
   return {
-    rows: buildRiskSheetRows(vehicles, contracts, insurances, penalties, history, today),
+    rows: buildRiskSheetRows(vehicles, contracts, insurances, penalties, history, today, bankTx),
     receivables: selectReceivables(contracts, today),
   };
 }

@@ -13,13 +13,13 @@ type GroupFilter = '전체' | RiskSheetGroup;
 
 export default function MRisk() {
   const router = useRouter();
-  const { data: [vs = [], cs = [], ins = [], hs = [], pens = []], loading } = useEntityLists([
-    'vehicle', 'contract', 'insurance', 'history', 'penalty',
+  const { data: [vs = [], cs = [], ins = [], hs = [], pens = [], bt = []], loading } = useEntityLists([
+    'vehicle', 'contract', 'insurance', 'history', 'penalty', 'bank_tx',
   ]);
   const [group, setGroup] = useState<GroupFilter>('전체');
   const rows = useMemo(
-    () => buildRiskSheetRows(vs, cs, ins, pens, hs, TODAY),
-    [vs, cs, ins, pens, hs],
+    () => buildRiskSheetRows(vs, cs, ins, pens, hs, TODAY, bt),
+    [vs, cs, ins, pens, hs, bt],
   );
   const shown = useMemo(
     () => (group === '전체' ? rows : rows.filter((r) => r.group === group)),

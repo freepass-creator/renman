@@ -21,15 +21,15 @@ type GroupFilter = '전체' | RiskSheetGroup;
 
 export default function RiskPage() {
   const mobile = useIsMobile();
-  const { contracts, vehicles, insurances, penalties, history, loading } = useDashboardData();
+  const { contracts, vehicles, insurances, penalties, history, bankTx, loading } = useDashboardData();
   const [q, setQ] = useState('');
   const [group, setGroup] = useState<GroupFilter>('전체');
   const [range, setRange] = useState({ from: '', to: '' });
   const [colView, setColView] = useState<LedgerColView>('기본');
 
   const allRows = useMemo(
-    () => buildRiskSheetRows(vehicles, contracts, insurances, penalties, history),
-    [vehicles, contracts, insurances, penalties, history],
+    () => buildRiskSheetRows(vehicles, contracts, insurances, penalties, history, TODAY, bankTx),
+    [vehicles, contracts, insurances, penalties, history, bankTx],
   );
   const searched = useMemo(() => allRows.filter((r) =>
     textMatch(q, r.group, r.kind, r.plate, r.customer, r.carName, r.status, r.due),
