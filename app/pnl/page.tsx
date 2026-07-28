@@ -7,6 +7,7 @@ import { WorkbenchBar } from '@/components/WorkbenchBar';
 import { useCashHubNav } from '@/components/CashHubTabs';
 import { companyLabel } from '@/lib/companies';
 import { buildCashLedger, aggregateBySubject, type SubjectAgg } from '@/lib/finance/cash-ledger';
+import { operatingProfit, operatingProfitTrend } from '@/lib/finance/operating-profit';
 import { groupOfLabel } from '@/lib/payments/ledger-subjects';
 import { loanTotalsInRange } from '@/lib/finance/loan-schedule';
 import { useCashLedgerLists } from '@/lib/use-cash-ledger-lists';
@@ -27,30 +28,16 @@ export default function PnlPage() {
   const inRange = useMemo(() => rows.filter((r) => (!range.from || r.date >= range.from) && (!range.to || r.date <= range.to)), [rows, range]);
   const subjects = useMemo(() => aggregateBySubject(inRange), [inRange]);
   const loan = useMemo(() => loanTotalsInRange(veh, range.from, range.to), [veh, range]);
+  const opProfit = useMemo(() => operatingProfit(inRange), [inRange]);
+  const trend = useMemo(() => operatingProfitTrend(rows, 12), [rows]);
 
-  // 최근 12개월 영업손익 추이(기간필터 무관 — 전체 원장에서 월별 집계)
-  const trend = useMemo(() => {
-    const now = new Date();
-    const months = Array.from({ length: 12 }, (_, i) => { const d = new Date(now.getFullYear(), now.getMonth() - 11 + i, 1); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; });
-    const by = new Map(months.map((m) => [m, { inc: 0, exp: 0 }]));
-    for (const r of rows) {
-      const b = by.get(String(r.date || '').slice(0, 7)); if (!b) continue;
-      if (groupOfLabel(r.category) !== '영업') continue;
-      b.inc += r.inAmt; b.exp += r.outAmt;
-    }
-    const list = months.map((m) => { const b = by.get(m)!; return { m, inc: b.inc, exp: b.exp, profit: b.inc - b.exp }; });
-    const max = Math.max(1, ...list.map((x) => Math.max(x.inc, x.exp)));
-    return { list, max };
-  }, [rows]);
-
-  // 영업(손익) vs 자본·금융(손익 외) 분리
+  // 영업(손익) vs 자본·금융(손익 외) 분리 — 과목표. 합계는 과목 합(표시), 영업손익=SSOT.
   const opIncome = subjects.filter((s) => s.kind === '수입' && groupOfLabel(s.label) === '영업');
   const opExpense = subjects.filter((s) => s.kind === '지출' && groupOfLabel(s.label) === '영업');
   const capFin = subjects.filter((s) => { const g = groupOfLabel(s.label); return g === '자본' || g === '금융'; });
   const unclass = subjects.filter((s) => s.kind === '미분류');
   const totalIn = opIncome.reduce((s, x) => s + x.inAmt, 0);
   const totalOut = opExpense.reduce((s, x) => s + x.outAmt, 0);
-  const opProfit = totalIn - totalOut;
   const loanInterest = loan.interest;               // 할부이자(우리 계산) = 금융비용
   const preTax = opProfit - loanInterest;           // 세전이익
   const margin = totalIn > 0 ? Math.round((preTax / totalIn) * 100) : 0;

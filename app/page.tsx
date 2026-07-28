@@ -2,7 +2,7 @@
 /**
  * 대시보드(/) — 백지 신규. 관제 KPI + 법인별 요약.
  *   셸=LedgerFrame · Sec 접기 없음 · 색=C.* 토큰.
- *   데이터=computeKPI · kpiByCompany · buildCashLedger(손익) SSOT만.
+ *   데이터=computeKPI · kpiByCompany · operatingProfit* SSOT만.
  */
 import { useMemo, type CSSProperties, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
@@ -14,7 +14,9 @@ import { TODAY } from '@/lib/dashboard-consts';
 import { computeKPI, kpiByCompany, type KPI } from '@/lib/kpi';
 import { COMPANIES, companyShort } from '@/lib/companies';
 import { buildCashLedger } from '@/lib/finance/cash-ledger';
-import { groupOfLabel } from '@/lib/payments/ledger-subjects';
+import {
+  operatingProfit, operatingProfitByCompany, operatingProfitTrend,
+} from '@/lib/finance/operating-profit';
 import { useEntityLists } from '@/lib/use-entity-lists';
 import { useIsMobile } from '@/lib/use-mobile';
 
@@ -110,44 +112,9 @@ export default function DashboardPage() {
   const byCo = useMemo(() => kpiByCompany(contracts, vehicles, TODAY, COMPANIES), [contracts, vehicles]);
 
   const cash = useMemo(() => buildCashLedger(bankTx, cardTx), [bankTx, cardTx]);
-  const opProfit = useMemo(() => {
-    let inc = 0;
-    let exp = 0;
-    for (const r of cash) {
-      if (groupOfLabel(r.category) !== '영업') continue;
-      inc += r.inAmt;
-      exp += r.outAmt;
-    }
-    return inc - exp;
-  }, [cash]);
-
-  const profitByCo = useMemo(() => {
-    const map = new Map<string, number>();
-    for (const r of cash) {
-      if (groupOfLabel(r.category) !== '영업') continue;
-      const id = String(r.companyId || '');
-      map.set(id, (map.get(id) || 0) + r.inAmt - r.outAmt);
-    }
-    return map;
-  }, [cash]);
-
-  const trend = useMemo(() => {
-    const now = new Date(`${TODAY}T12:00:00`);
-    const months = Array.from({ length: 6 }, (_, i) => {
-      const d = new Date(now.getFullYear(), now.getMonth() - 5 + i, 1);
-      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-    });
-    const by = new Map(months.map((m) => [m, 0]));
-    for (const r of cash) {
-      if (groupOfLabel(r.category) !== '영업') continue;
-      const m = String(r.date || '').slice(0, 7);
-      if (!by.has(m)) continue;
-      by.set(m, (by.get(m) || 0) + r.inAmt - r.outAmt);
-    }
-    const list = months.map((m) => ({ m, profit: by.get(m) || 0 }));
-    const maxAbs = Math.max(1, ...list.map((x) => Math.abs(x.profit)));
-    return { list, maxAbs };
-  }, [cash]);
+  const opProfit = useMemo(() => operatingProfit(cash), [cash]);
+  const profitByCo = useMemo(() => operatingProfitByCompany(cash), [cash]);
+  const trend = useMemo(() => operatingProfitTrend(cash, 6, TODAY), [cash]);
 
   const coRows: CoRow[] = useMemo(() => byCo.map((k) => ({
     ...k,
