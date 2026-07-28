@@ -70,6 +70,7 @@ curl -s -o /dev/null -w "%{http_code}" http://localhost:6006/<route>   # 200
 
 | 날짜 | 작업자 | 내용 | 상태 |
 |---|---|---|---|
+| 2026-07-28 | Cursor | 홈 삭제·대시보드 신규(LedgerFrame·KPI+aging+법인별) · home-kpi 폐기 · computeKPI/kpiByCompany SSOT | tsc0 |
 | 2026-07-28 | Cursor | 홈→대시보드(관제콕핏): nav LayoutDashboard · KPI타일+법인별 ExcelSheet · home-kpi/kpi SSOT · 추이생략 | tsc0 |
 | 2026-07-28 | Cursor | /risk filters 순서=검색→칩→PeriodBar(규격) · asset·contract·cash·work·status는 이미 동일 | tsc0 |
 | 2026-07-28 | Cursor | 홈 관제 재배치: 제목=관제 · 한눈(Metric스트립) · 일정본체 · Message경고 · 옛3Sec폐기 | tsc0 |
