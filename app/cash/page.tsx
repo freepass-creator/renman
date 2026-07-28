@@ -656,7 +656,7 @@ export default function CashLedgerPage() {
     return (
       <LedgerFrame
         title="자금관리"
-        meta="계좌 1개 1행 · 상태·등록일·등록자·수집방법"
+        meta="계좌·입출금·CMS"
         right={createActions}
         tools={dayLoopTools}
         colView={colView}
@@ -735,11 +735,7 @@ export default function CashLedgerPage() {
     );
   }
 
-  const ledgerMeta = ledgerKind === 'CMS 원천내역'
-    ? 'CMS 청구·출금 결과와 계좌 정산 연결'
-    : ledgerKind === '법인카드 원천내역'
-      ? '법인카드 승인·취소 내역과 계좌 결제 연결'
-      : '실제 계좌 입출금 1건 1행';
+  const ledgerMeta = '계좌·입출금·CMS';
   const ledgerEmpty = (
     <>
       {ledgerKind === 'CMS 원천내역'

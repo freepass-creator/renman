@@ -180,7 +180,7 @@ export default function DashboardPage() {
   return (
     <LedgerFrame
       title="대시보드"
-      meta="관제"
+      meta="한눈 지표"
       showColView={false}
       body={(
         <div style={{

@@ -84,7 +84,7 @@ export default function ContractLedgerPage() {
   return (
     <LedgerFrame
       title="계약관리"
-      meta="계약 1건 1행 · 계약자·차량·기간·납부 · 리스크(불이행)"
+      meta="계약 1건=1행·손님·기간·미수"
       right={<LedgerActions aria-label="쓰기">
         <Btn
           size="sm"

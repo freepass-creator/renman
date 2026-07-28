@@ -56,6 +56,7 @@ export default function RiskPage() {
   return (
     <LedgerFrame
       title="리스크관리"
+      meta="챙길 예외·미완료·미납·만기·휴차"
       filters={(
         <>
           <Search

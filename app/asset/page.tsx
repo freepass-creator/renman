@@ -105,7 +105,7 @@ export default function AssetLedgerPage() {
   return (
     <LedgerFrame
       title="자산관리"
-      meta="차량 1대 1행 · 등록·소유·제원·취득·검사·금융·보험"
+      meta="차량 원장"
       right={<LedgerActions aria-label="쓰기">
         <Btn
           size="sm"

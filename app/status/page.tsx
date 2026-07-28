@@ -104,7 +104,7 @@ export default function StatusPage() {
   return (
     <LedgerFrame
       title="운영현황"
-      meta="차량 1대 1행 · 자산+계약+미수 · 저장 없는 통합 조회"
+      meta="차량 1대=1행·자산+계약+미수·조회 전용"
       tools={<LedgerActions aria-label="워크플로">
         <Btn size="sm" variant="ghost" iconOnly tip="자산 원장" href="/asset"><Car size={14} /></Btn>
         <Btn size="sm" variant="ghost" iconOnly tip="계약 원장" href="/contract"><FileText size={14} /></Btn>

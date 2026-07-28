@@ -347,7 +347,7 @@ function IngestInner() {
   return (
     <LedgerFrame
       title="데이터관리"
-      meta="OCR · 엑셀 · 직접"
+      meta="OCR·엑셀·직접 투입"
       showColView={false}
       filters={(
         <>
