@@ -187,13 +187,17 @@ export function Panel({ title, action, children }: { title: React.ReactNode; act
 const hiddenReg = new Map<string, React.ReactNode>();
 const emitSec = () => { if (typeof window !== 'undefined') window.dispatchEvent(new Event('jpk:sec-change')); };
 const SEC_DND = 'text/jpk-sec-id';
-export function Sec({ id, title, n, desc, tone, right, hideable = true, onReorder, order, children }: { id?: string; title: React.ReactNode; n?: number; desc?: React.ReactNode; tone?: 'ink' | 'danger' | 'ok' | 'warn'; right?: React.ReactNode; hideable?: boolean; onReorder?: (fromId: string, toId: string) => void; order?: number; children: React.ReactNode }) {
+export function Sec({ id, title, n, desc, tone, right, hideable = true, collapsible = true, onReorder, order, children }: {
+  id?: string; title: React.ReactNode; n?: number; desc?: React.ReactNode; tone?: 'ink' | 'danger' | 'ok' | 'warn';
+  right?: React.ReactNode; hideable?: boolean; /** false면 접기/셰브론 없음(항상 펼침). 대시보드 등. */
+  collapsible?: boolean; onReorder?: (fromId: string, toId: string) => void; order?: number; children: React.ReactNode;
+}) {
   const mobile = useIsMobile();
   const key = id ? `jpk:sec:${id}` : '';
   const [state, setState] = React.useState<'open' | 'collapsed' | 'hidden'>('open');
   const [over, setOver] = React.useState(false);
   React.useEffect(() => {
-    if (!key || !id) return;
+    if (!collapsible || !key || !id) return;
     const sid = id;
     const s = localStorage.getItem(key);
     if (s === 'collapsed') setState('collapsed');
@@ -201,16 +205,18 @@ export function Sec({ id, title, n, desc, tone, right, hideable = true, onReorde
     function onShow(e: Event) { if ((e as CustomEvent).detail === sid) { setState('open'); localStorage.setItem(key, 'open'); hiddenReg.delete(sid); emitSec(); } }
     window.addEventListener('jpk:sec-show', onShow);
     return () => { window.removeEventListener('jpk:sec-show', onShow); hiddenReg.delete(sid); emitSec(); };
-  }, [key, id]);
+  }, [key, id, collapsible]);
   const set = (s: 'open' | 'collapsed' | 'hidden') => { setState(s); if (key) localStorage.setItem(key, s); if (id) { if (s === 'hidden') hiddenReg.set(id, title); else hiddenReg.delete(id); emitSec(); } };
   const nc = tone === 'danger' ? C.danger : tone === 'ok' ? C.ok : tone === 'warn' ? C.warn : C.sub;
-  if (state === 'hidden') return null;
-  const canReorder = !!(id && onReorder);
+  if (collapsible && state === 'hidden') return null;
+  const open = !collapsible || state === 'open';
+  const canReorder = !!(collapsible && id && onReorder);
   const canDrag = canReorder && state === 'collapsed' && !mobile;   // 모바일=드래그 재정렬 숨김(헤더 잡동사니 제거)
   const hit = mobile ? 40 : 22;
   // 모바일: 무리끼리 SPACE_GROUP_M · 무리 안(제목↔본문·버튼) SPACE_M
   const mt = mobile ? SPACE_GROUP_M : 22;
-  const hasTrail = (state !== 'collapsed' && right != null) || canDrag || (!!hideable && !!id && !mobile);
+  const canHide = collapsible && hideable && !!id && !mobile;
+  const hasTrail = (open && right != null) || canDrag || canHide;
   return (
     <section id={id} style={{ marginTop: mt, scrollMarginTop: mobile ? 68 : 62, outline: over ? `2px solid ${C.accent}` : 'none', outlineOffset: 6, borderRadius: R, transition: 'outline-color .1s', order }}
       onDragOver={canReorder ? (e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; if (!over) setOver(true); } : undefined}
@@ -224,16 +230,24 @@ export function Sec({ id, title, n, desc, tone, right, hideable = true, onReorde
       {/* 웹=한 줄 고정(nowrap) — 접기/펼치기 때 오른쪽 버튼이 2번째 줄로 «튀어» 헤더 높이가 확 바뀌던 것 제거.
           desc가 flex:1 말줄임으로 폭을 흡수, 버튼은 flexShrink:0으로 제자리. 모바일은 wrap 유지(터치·스택). */}
       <div style={{ display: 'flex', alignItems: 'center', gap: mobile ? SPACE_M : 8, marginBottom: mobile ? SPACE_M : 9, flexWrap: mobile ? 'wrap' : 'nowrap', minHeight: ctrlH(mobile) }}>
-        <button onClick={() => set(state === 'open' ? 'collapsed' : 'open')} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, border: 'none', background: 'none', cursor: 'pointer', padding: 0, minHeight: mobile ? 32 : undefined, maxWidth: '100%', WebkitTapHighlightColor: 'transparent' }}>
-          <ChevronDown size={mobile ? 18 : 15} color={C.sub} style={{ flexShrink: 0, transform: state === 'open' ? 'none' : 'rotate(-90deg)', transition: 'transform .15s' }} />
-          <span style={{ fontSize: mobile ? 15 : 13.5, fontWeight: 800, letterSpacing: '-0.01em', color: C.ink }}>{title}</span>
-          {n != null && <span style={{ fontSize: mobile ? 15 : 13, fontWeight: 800, color: nc, fontFamily: NUM, fontVariantNumeric: 'tabular-nums' }}>{n}</span>}
-          {tone === 'danger' && n != null && n > 0 && <span className="attn-dot" style={{ marginLeft: 4 }} title="처리 필요" />}
-        </button>
+        {collapsible ? (
+          <button type="button" onClick={() => set(state === 'open' ? 'collapsed' : 'open')} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, border: 'none', background: 'none', cursor: 'pointer', padding: 0, minHeight: mobile ? 32 : undefined, maxWidth: '100%', WebkitTapHighlightColor: 'transparent' }}>
+            <ChevronDown size={mobile ? 18 : 15} color={C.sub} style={{ flexShrink: 0, transform: state === 'open' ? 'none' : 'rotate(-90deg)', transition: 'transform .15s' }} />
+            <span style={{ fontSize: mobile ? 15 : 13.5, fontWeight: 800, letterSpacing: '-0.01em', color: C.ink }}>{title}</span>
+            {n != null && <span style={{ fontSize: mobile ? 15 : 13, fontWeight: 800, color: nc, fontFamily: NUM, fontVariantNumeric: 'tabular-nums' }}>{n}</span>}
+            {tone === 'danger' && n != null && n > 0 && <span className="attn-dot" style={{ marginLeft: 4 }} title="처리 필요" />}
+          </button>
+        ) : (
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 7, maxWidth: '100%' }}>
+            <span style={{ fontSize: mobile ? 15 : 13.5, fontWeight: 800, letterSpacing: '-0.01em', color: C.ink }}>{title}</span>
+            {n != null && <span style={{ fontSize: mobile ? 15 : 13, fontWeight: 800, color: nc, fontFamily: NUM, fontVariantNumeric: 'tabular-nums' }}>{n}</span>}
+            {tone === 'danger' && n != null && n > 0 && <span className="attn-dot" style={{ marginLeft: 4 }} title="처리 필요" />}
+          </div>
+        )}
         {desc && !mobile ? <span style={{ fontSize: 11.5, color: C.faint, flex: 1, minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{desc}</span> : null}
         {hasTrail && (
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: mobile ? SPACE_M : 6, marginLeft: 'auto', flexShrink: 0, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-            {state !== 'collapsed' && right}
+            {open && right}
             {canDrag && (
               <span
                 draggable
@@ -245,11 +259,11 @@ export function Sec({ id, title, n, desc, tone, right, hideable = true, onReorde
                 <GripVertical size={mobile ? 18 : 15} />
               </span>
             )}
-            {hideable && id && !mobile && <button onClick={() => set('hidden')} title="이 섹션 숨기기(맨 아래로)" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: hit, height: hit, border: 'none', background: 'none', cursor: 'pointer', color: C.faint, WebkitTapHighlightColor: 'transparent' }}><EyeOff size={mobile ? 16 : 13} /></button>}
+            {canHide && <button type="button" onClick={() => set('hidden')} title="이 섹션 숨기기(맨 아래로)" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: hit, height: hit, border: 'none', background: 'none', cursor: 'pointer', color: C.faint, WebkitTapHighlightColor: 'transparent' }}><EyeOff size={mobile ? 16 : 13} /></button>}
           </span>
         )}
       </div>
-      {state === 'open' && children}
+      {open && children}
     </section>
   );
 }

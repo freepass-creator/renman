@@ -80,7 +80,7 @@ export default function DashboardPage() {
       )}
       body={(
         <div style={{ display: 'flex', flexDirection: 'column', gap: 20, paddingBottom: 24 }}>
-          <Sec id="dash-kpi" title="KPI" desc="클릭 → 원장·리스크">
+          <Sec id="dash-kpi" title="KPI" desc="클릭 → 원장·리스크" collapsible={false} hideable={false}>
             <Cards min={128} fit>
               <Metric
                 label="보유"
@@ -116,7 +116,7 @@ export default function DashboardPage() {
             </Cards>
           </Sec>
 
-          <Sec id="dash-aging" title="미수 aging" desc="운행중 미수 · 경과별">
+          <Sec id="dash-aging" title="미수 aging" desc="운행중 미수 · 경과별" collapsible={false} hideable={false}>
             {loading ? (
               <EmptyState variant="sec">…</EmptyState>
             ) : (
@@ -144,7 +144,7 @@ export default function DashboardPage() {
             )}
           </Sec>
 
-          <Sec id="dash-co" title="법인별" desc="보유 · 가동 · 미수">
+          <Sec id="dash-co" title="법인별" desc="보유 · 가동 · 미수" collapsible={false} hideable={false}>
             {loading ? (
               <EmptyState variant="sec">…</EmptyState>
             ) : byCo.length === 0 ? (
