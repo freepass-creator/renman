@@ -172,7 +172,11 @@ export default function ReceivablesPage() {
     <FacetPage
       title="미수관리"
       meta={`${scopeAll ? '전체 회사' : companyLabel(companyId)} · 미수 ${D.count}건`}
-      tools={<WorkbenchBar mid={<WorkHubBack />} search={{ value: q, onChange: setQ, placeholder: '손님·차량·계약' }} stat={<span style={{ fontSize: 13, fontWeight: 800, color: D.totalUnpaid > 0 ? C.danger : C.ok, whiteSpace: 'nowrap' }}>미수 {won(D.totalUnpaid)}</span>} />}
+      tools={<WorkbenchBar mid={<WorkHubBack />} search={{ value: q, onChange: setQ, placeholder: '손님·차량·계약' }} stat={<span style={{ fontSize: 13, fontWeight: 800, color: D.totalUnpaid > 0 ? C.danger : C.ok, whiteSpace: 'nowrap' }}>미수 {won(D.totalUnpaid)}</span>} actions={<>
+        <Btn size="sm" variant="ghost" onClick={() => setNoticeSel(new Set(noticeTodoFiltered.map((r) => String(r.rec._key || ''))))} disabled={noticeTodoFiltered.length === 0}>대상 선택 ({noticeTodoFiltered.length})</Btn>
+        <Btn size="sm" variant="danger" onClick={() => sendNoticeBulk(noticeTargets.map((r) => r.rec))} disabled={noticeTargets.length === 0}>내용증명 일괄{noticeTargets.length ? ` (${noticeTargets.length})` : ''}</Btn>
+        <Btn size="sm" onClick={() => setNotify(true)} disabled={smsCount === 0}>문자 발송{smsCount ? ` (${smsCount})` : ''}</Btn>
+      </>} />}
       rail={!loading ? <FacetRail lensKey="미수" facets={facets} onToggle={toggleFacet} onReset={resetFacets} counts={counts} /> : null}
     >
       {order.map((id) => {
@@ -194,12 +198,7 @@ export default function ReceivablesPage() {
           );
         }
         return (
-          <Sec key={id} id={id} title="미수 목록" n={filtered.length} desc="금액 큰 순 · 체크 후 내용증명 일괄 · 자리에서 단건·시동제어·연락" onReorder={reorder}
-            right={<span style={{ display: 'inline-flex', gap: SPACE_M, flexWrap: 'wrap' }}>
-              <Btn variant="ghost" onClick={() => setNoticeSel(new Set(noticeTodoFiltered.map((r) => String(r.rec._key || ''))))} disabled={noticeTodoFiltered.length === 0}>대상 선택 ({noticeTodoFiltered.length})</Btn>
-              <Btn variant="danger" onClick={() => sendNoticeBulk(noticeTargets.map((r) => r.rec))} disabled={noticeTargets.length === 0}>내용증명 일괄{noticeTargets.length ? ` (${noticeTargets.length})` : ''}</Btn>
-              <Btn onClick={() => setNotify(true)} disabled={smsCount === 0}>문자 발송{smsCount ? ` (${smsCount})` : ''}</Btn>
-            </span>}>
+          <Sec key={id} id={id} title="미수 목록" n={filtered.length} desc="금액 큰 순 · 체크 후 내용증명 일괄 · 자리에서 단건·시동제어·연락" onReorder={reorder}>
             {loading ? <PageLoading /> : filtered.length === 0 ? <EmptyState variant="sec">해당 미수 없음</EmptyState> :
               <div style={{ display: 'flex', flexDirection: 'column', gap: SPACE_M }}>
                 {filtered.map((r, i) => { const rec = r.rec; const immob = !!rec.engineDisabled; const needLock = !r.v.ended && !immob && (r.st.stage === '시동제어' || r.st.stage === '내용증명' || r.st.stage === '채권화'); const rowId = String(rec._key ?? `row-${i}`); const logOn = logKey === rowId; const checked = noticeSel.has(rowId); return (

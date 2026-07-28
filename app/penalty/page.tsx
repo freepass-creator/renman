@@ -126,8 +126,8 @@ export default function PenaltyProcess() {
           search={{ value: q, onChange: setQ, placeholder: '차량·위반·책임자' }}
           stat={<span style={{ fontSize: 13, fontWeight: 800, color: C.warn, whiteSpace: 'nowrap' }}>총 {won(total)}</span>}
           actions={<>
-            {matched > 0 && <Btn variant="ghost" href="/penalty/docs"><span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><FileText size={15} /> 변경부과 공문 ({matched})</span></Btn>}
-            <Btn href="/penalty/upload"><span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><UploadCloud size={15} /> 고지서 등록 (OCR)</span></Btn>
+            {matched > 0 && <Btn size="sm" variant="ghost" href="/penalty/docs"><span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><FileText size={15} /> 변경부과 공문 ({matched})</span></Btn>}
+            <Btn size="sm" href="/penalty/upload"><span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><UploadCloud size={15} /> 고지서 등록 (OCR)</span></Btn>
           </>}
         />
       }
