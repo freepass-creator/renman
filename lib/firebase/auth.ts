@@ -79,15 +79,17 @@ export async function signup(p: {
 export async function loadProfile(uid: string, email: string | null): Promise<AuthProfile | null> {
   const { getAuth } = await import('firebase/auth');
   const { getFirestore, doc, getDoc } = await import('firebase/firestore');
+  const { withTimeout } = await import('../async');
   const authUser = getAuth(getFirebaseApp()!).currentUser;
   if (!authUser || authUser.uid !== uid) return null;
-  const claims = (await authUser.getIdTokenResult()).claims;
+  // getIdTokenResult는 네트워크 hang 가능 — session withTimeout만으로는 race 전에 안 풀리는 경우 대비
+  const claims = (await withTimeout(authUser.getIdTokenResult(), 6_000, 'ID 토큰')).claims;
   const systemRole = claims.systemRole;
   const companyClaim = typeof claims.companyId === 'string' ? claims.companyId : null;
   const role: Role | null = systemRole === 'hq' ? '본사' : systemRole === 'tenant' ? '법인' : null;
   if (!role || (role === '법인' && !companyClaim)) return null;
 
-  const snap = await getDoc(doc(getFirestore(getFirebaseApp()!), 'users', uid));
+  const snap = await withTimeout(getDoc(doc(getFirestore(getFirebaseApp()!), 'users', uid)), 6_000, '유저 프로필');
   const data = snap.exists() ? snap.data() as { name?: string } : {};
   return {
     uid,

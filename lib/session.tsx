@@ -68,7 +68,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       // ※ 죽은(StrictMode cleanup) 콜백이 clearTimeout 하면 안 됨 — 새 mount의 boot 탈출을 가로챔.
       const bootTo = setTimeout(() => {
         if (alive) { console.error('Auth 부트 시간초과'); setPhase((p) => (p === 'boot' ? 'signed-out' : p)); }
-      }, 10_000);
+      }, 6_000);
       const unsub = watchAuth(async (fb) => {
         if (!alive) return;
         clearTimeout(bootTo);
@@ -138,7 +138,14 @@ export function SessionProvider({ children }: { children: ReactNode }) {
           : phase === 'signed-out' ? <LoginScreen />
             : phase === 'suspended' ? <Gate title="이용이 정지된 계정입니다" desc="직원 명단에서 정지 처리되었습니다. 본사에 문의하세요." onLogout={logout} />
             : phase === 'no-profile' ? <Gate title="계정이 등록되지 않았습니다" desc="본사에서 계정에 법인·권한을 배정해야 이용할 수 있습니다." onLogout={logout} />
-              : <Gate title="불러오는 중…" loading />}
+              : (
+                <Gate
+                  title="불러오는 중…"
+                  loading
+                  // Auth hang 시 signOut 대기하지 말고 즉시 로그인 화면 — reload도 불필요
+                  onEscape={() => { setPhase('signed-out'); void signOutUser(); }}
+                />
+              )}
     </SessionContext.Provider>
   );
 }
@@ -343,14 +350,38 @@ function AuthLink({ onClick, children }: { onClick: () => void; children: ReactN
   return <button type="button" className="login-link" onClick={onClick}>{children}</button>;
 }
 
-function Gate({ title, desc, loading, onLogout }: { title: string; desc?: string; loading?: boolean; onLogout?: () => void }) {
-  // 세션 부트만 풀스크린(셸 없음). 데이터 로딩은 페이지 안 PageLoading — 여기로 끌어올리지 말 것.
+function Gate({ title, desc, loading, onLogout, onEscape }: {
+  title: string; desc?: string; loading?: boolean; onLogout?: () => void; onEscape?: () => void;
+}) {
+  // 세션 부트만 풀스크린(셸 없음). 데이터 로딩은 페이지 안 — 여기로 끌어올리지 말 것.
+  const [stuck, setStuck] = useState(false);
+  useEffect(() => {
+    if (!loading) { setStuck(false); return; }
+    const t = setTimeout(() => setStuck(true), 4_000);
+    return () => clearTimeout(t);
+  }, [loading]);
+
   if (loading) {
+    // inset 쓰지 말 것 — SSR이 top/right/bottom/left로 풀어 hydration mismatch(Next overlay) 남김
     return (
       <div role="status" aria-busy="true" aria-live="polite"
-        style={{ position: 'fixed', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12, background: 'var(--bg-page)' }}>
+        style={{
+          position: 'fixed', top: 0, right: 0, bottom: 0, left: 0,
+          display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+          gap: 12, background: 'var(--bg-page)', padding: 24,
+        }}>
         <Spinner size={28} stroke={2.5} color="var(--brand)" />
         <div style={{ fontSize: 12.5, color: 'var(--text-sub)' }}>{title}</div>
+        {stuck && (
+          <>
+            <div style={{ fontSize: 12, color: 'var(--text-weak)', textAlign: 'center', maxWidth: 280 }}>
+              인증이 오래 걸립니다. 네트워크·Firebase를 확인하거나 로그인 화면으로 나가세요.
+            </div>
+            <button type="button" className="login-submit" style={{ maxWidth: 220 }} onClick={() => onEscape?.()}>
+              로그인 화면으로
+            </button>
+          </>
+        )}
       </div>
     );
   }

@@ -70,6 +70,11 @@ curl -s -o /dev/null -w "%{http_code}" http://localhost:6006/<route>   # 200
 
 | 날짜 | 작업자 | 내용 | 상태 |
 |---|---|---|---|
+| 2026-07-28 | Cursor | /risk filters 순서=검색→칩→PeriodBar(규격) · asset·contract·cash·work·status는 이미 동일 | tsc0 |
+| 2026-07-28 | Cursor | 홈 관제 재배치: 제목=관제 · 한눈(Metric스트립) · 일정본체 · Message경고 · 옛3Sec폐기 | tsc0 |
+| 2026-07-28 | Cursor | 홈 삭제·관제 대시보드 재작성(함대·오늘끝낼일·계속관리) · lib/home-kpi · soft-fill · 엑셀금지 | tsc0 |
+| 2026-07-28 | Cursor | Gate hydration(inset→top/right/…) 제거 · 탈출=setPhase(signed-out) · loadProfile ID토큰/프로필 6s timeout | tsc0·브라우저 Issue배지소멸 |
+| 2026-07-28 | Cursor | 홈=스피너금지 soft-fill(…) · Gate 4초후 탈출버튼 · Auth boot 6s | tsc0 |
 | 2026-07-28 | Cursor | 스피너고착: session boot 죽은콜백 clearTimeout금지 · store.list/useEntityLists 15s timeout · Auth구독실패→signed-out | tsc0 |
 | 2026-07-28 | Cursor | 홈 삭제후 재작성: KPI허브(함대·오늘끝낼일·계속관리) · useEntityLists soft-load · 헤더상시 | tsc0 |
 | 2026-07-28 | Cursor | 홈=KPI허브(함대·오늘끝낼일·계속관리) · selectPendingWork · agenda미리보기5 · 데이터센터 tools강등 | tsc0 |

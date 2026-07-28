@@ -58,7 +58,13 @@ export default function RiskPage() {
       title="리스크관리"
       filters={(
         <>
-          <PeriodBar latest={latest || TODAY} initial="전체" size="sm" onRange={setRange} />
+          <Search
+            size="sm"
+            placeholder="구분·차번·대상·차명·상태"
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            style={{ width: mobile ? '100%' : 240 }}
+          />
           <FilterChips
             value={group}
             onChange={(v) => { if (v) setGroup(v); }}
@@ -67,13 +73,7 @@ export default function RiskPage() {
               ...GROUPS.map((key) => ({ key, label: key, count: counts[key] || undefined })),
             ]}
           />
-          <Search
-            size="sm"
-            placeholder="구분·차번·대상·차명·상태"
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            style={{ width: mobile ? '100%' : 240 }}
-          />
+          <PeriodBar latest={latest || TODAY} initial="전체" size="sm" onRange={setRange} />
         </>
       )}
       stats={(
