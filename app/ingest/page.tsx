@@ -1,33 +1,41 @@
 'use client';
-import { useState, useEffect } from 'react';
-import { useSearchParams, useRouter } from 'next/navigation';
+/**
+ * 데이터센터 — 전 엔티티 투입구 (OCR·엑셀·직접).
+ * LedgerFrame 공용 셸 + body(시트) + sidePanel(투입). 엔진(saveIntake·OCR·xlsx) 유지.
+ */
+import { Suspense, useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { ENTITY_LIST, ENTITIES, mapOcrToEntity, type EntityRecord } from '@/lib/intake/entities';
 import { parseCsv } from '@/lib/intake/csv';
 import { saveIntake } from '@/lib/intake';
 import { useEntityList } from '@/lib/use-entity-lists';
 import { callOcrExtract } from '@/lib/ocr-client';
 import { useSession } from '@/lib/session';
-import { COMPANIES, companyLabel, ALL_COMPANIES } from '@/lib/companies';
-import { resolveWriteCompany, NEED_COMPANY } from '@/lib/scope';
-import { Check, AlertTriangle } from 'lucide-react';
+import { companyLabel } from '@/lib/companies';
+import { resolveWriteCompany, NEED_COMPANY, isAllScope } from '@/lib/scope';
+import { layerOfEntity } from '@/lib/domain/layers';
+import { UploadCloud, Trash2, FileSpreadsheet, X, PanelRight, PanelRightClose } from 'lucide-react';
 import FileDrop from '@/components/FileDrop';
 import { toast } from '@/lib/toast';
-
-import { Page, Sec, Cards, Metric, Btn, FormGrid, Panel, PillTabs, Select, Input, th, td, C, Message, Loading, OcrCrosscheck } from '@/components/ui';
+import {
+  LedgerFrame, Btn, FormGrid, PillTabs, Select, Input, Search,
+  C, Message, Loading, OcrCrosscheck, PageLoading, EmptyState, LedgerActions,
+  ExcelSheet, LedgerPanelFooter, type SheetCol,
+} from '@/components/ui';
 import type { CrosscheckResult } from '@/lib/ocr-crosscheck';
-import { WorkbenchBar } from '@/components/WorkbenchBar';
-import { layerOfEntity } from '@/lib/domain/layers';
+import { useIsMobile } from '@/lib/use-mobile';
+import { textMatch } from '@/lib/search-match';
 
-// 담기가 URL(?type·plate)로 진입하므로 정적 프리렌더 대신 요청시 렌더(useSearchParams bailout 방지).
 export const dynamic = 'force-dynamic';
 
 type Tab = 'ocr' | 'excel' | 'manual';
+type SheetView = '대기' | '저장본';
 
-/* 엔티티 선택기 = 데이터 3층 순서(원장 → 이벤트). layerOf 는 ENTITY_LAYER SSOT.
-   여기가 «모든 데이터의 투입구»라는 걸 목록 구조로 보여준다 — 업무 기록(history·과태료)도 포함. */
+type PendingRow = EntityRecord & { _rid: string };
+
 const LAYER_TITLE: Record<string, string> = {
-  ledger: '① 원장 — 자산이 생겼다',
-  event: '③ 이벤트 — 가동 중 쌓이는 일',
+  ledger: '① 원장',
+  event: '③ 이벤트',
   system: '도구',
 };
 const ENTITY_GROUPS = (['ledger', 'event', 'system'] as const)
@@ -37,258 +45,415 @@ const ENTITY_GROUPS = (['ledger', 'event', 'system'] as const)
   }))
   .filter((g) => g.items.length > 0);
 
-export default function IngestPage() {
-  const router = useRouter();
-  const { companyId, user, scopeAll } = useSession();
+function newRid() {
+  return `p_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`;
+}
+
+function IngestInner() {
+  const mobile = useIsMobile();
+  const { companyId } = useSession();
   const sp = useSearchParams();
-  const [entityKey, setEntityKey] = useState(() => sp.get('type') || 'vehicle');   // ?type= 프리셀렉트
-  const [saveTarget, setSaveTarget] = useState('');
-  // 운영자 합본(ALL)에서는 저장 대상 회사를 명시 선택, 그 외엔 현재 회사
-  const company = scopeAll ? saveTarget : companyId;
-  const [saveMsg, setSaveMsg] = useState('');
+  const [entityKey, setEntityKey] = useState(() => sp.get('type') || 'vehicle');
   const [saving, setSaving] = useState(false);
-  const [peekSaved, setPeekSaved] = useState(false);
-  const { rows: savedList, reload: reloadSaved } = useEntityList(entityKey, { companyId: company || undefined });
-  useEffect(() => { setPeekSaved(false); }, [company, entityKey]);
-  async function saveRecords() {
-    if (!records.length) return;
-    const target = resolveWriteCompany(companyId, scopeAll ? { companyId: saveTarget } : null);
-    if (!target) { toast(NEED_COMPANY, 'error'); return; }
-    setSaving(true); setSaveMsg('');
-    try {
-      // 원본 OCR 스냅샷을 레코드에 영구 보존 (수기 교정해도 원본 추적 — feedback_ocr_preserve_original)
-      const toSave = ocrRaw && records.length === 1
-        ? [{ ...records[0], _ocrOriginal: { raw: ocrRaw, at: new Date().toISOString(), source: entity.source } }]
-        : records;
-      // 단일 통로 — 앵커 정규화·부수효과·jpk:saved 반영
-      const r = await saveIntake(entityKey, target, toSave, { context: { source: ocrRaw ? 'ocr' : tab === 'excel' ? 'upload' : 'manual' } });
-      const s = r.save;
-      const settleNote = r.sideEffects.filter((x) => x.startsWith('cms-settle:') || x.startsWith('card-settle:')).join(' · ');
-      const fx = settleNote ? ` · ${settleNote}` : (r.sideEffects.length ? ` · 부수효과 ${r.sideEffects.length}` : '');
-      setSaveMsg(`저장 ${s.saved}건 · 중복건너뜀 ${s.duplicates} · 백엔드 ${s.backend}${fx}`);
-      toast(`저장 ${s.saved}건${s.duplicates ? ` · 중복 ${s.duplicates}` : ''}${settleNote ? ` · 자동정산 ${settleNote}` : ''} — ${entity.label} (${companyLabel(target)})`, 'success');
-      setRecords([]);
-      setPeekSaved(true);
-      reloadSaved();
-    } catch (e) { setSaveMsg('저장 실패: ' + (e as Error).message); toast('저장 실패: ' + (e as Error).message, 'error'); }
-    finally { setSaving(false); }
-  }
-  const saved = peekSaved ? savedList : null;
-  function loadSaved() {
-    if (!company) { toast(NEED_COMPANY, 'error'); return; }
-    setPeekSaved(true);
-    reloadSaved();
-  }
-  const [tab, setTab] = useState<Tab>(() => sp.get('plate') ? 'manual' : 'ocr');   // 차번 프리필로 오면 직접입력 탭
-  const [records, setRecords] = useState<EntityRecord[]>([]);
-  const [ocrRaw, setOcrRaw] = useState<Record<string, unknown> | null>(null);   // 원본 OCR 보존 (감사추적)
+  const [sheetView, setSheetView] = useState<SheetView>('대기');
+  const [panelOpen, setPanelOpen] = useState(true);
+  const { rows: savedList, loading: savedLoading, reload: reloadSaved } = useEntityList(entityKey);
+  const [tab, setTab] = useState<Tab>(() => (sp.get('plate') ? 'manual' : 'ocr'));
+  const [records, setRecords] = useState<PendingRow[]>([]);
+  const [ocrRaw, setOcrRaw] = useState<Record<string, unknown> | null>(null);
   const [ocrCrosscheck, setOcrCrosscheck] = useState<CrosscheckResult | null>(null);
   const [error, setError] = useState('');
-  const [info, setInfo] = useState('');
-
-  const entity = ENTITIES[entityKey];
-
-  function reset() { setRecords([]); setError(''); setInfo(''); setOcrRaw(null); setOcrCrosscheck(null); }
-
-  // ── OCR ──
   const [file, setFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
-  async function runOcr() {
-    if (!file) { setError('파일을 선택하세요'); return; }
-    setLoading(true); reset();
-    try {
-      const r = await callOcrExtract(file, entity.ocrType || '');
-      if (!r.ok) { setError(r.error || '추출 실패'); toast('OCR 추출 실패: ' + (r.error || ''), 'error'); return; }
-      setOcrRaw(r.raw || {});   // 원본 보존
-      setOcrCrosscheck(r.crosscheck || null);
-      setRecords([mapOcrToEntity(entityKey, r.raw || {})]);
-      setInfo('OCR 추출 완료');
-      toast('OCR 추출 완료 — 아래에서 검토 후 저장', 'success');
-    } catch (e) { setError((e as Error).message); toast('OCR 실패: ' + (e as Error).message, 'error'); }
-    finally { setLoading(false); }
+  const [parsing, setParsing] = useState(false);
+  const [form, setForm] = useState<EntityRecord>(() => {
+    const p = sp.get('plate');
+    return p ? { plate: p } : {};
+  });
+  const [savedQ, setSavedQ] = useState('');
+  const [picked, setPicked] = useState<string | null>(null);
+
+  const entity = ENTITIES[entityKey];
+  useEffect(() => {
+    if (tab === 'ocr' && !entity.ocrType) setTab('excel');
+  }, [tab, entity.ocrType]);
+
+  useEffect(() => {
+    if (sheetView === '저장본') reloadSaved();
+  }, [sheetView, companyId, entityKey, reloadSaved]);
+
+  function resetQueue() {
+    setRecords([]);
+    setError('');
+    setOcrRaw(null);
+    setOcrCrosscheck(null);
+    setPicked(null);
+    setFile(null);
   }
 
-  // ── 엑셀 (.xlsx / .csv) ──
-  const [parsing, setParsing] = useState(false);
+  async function saveRecords() {
+    if (!records.length) return;
+    const target = resolveWriteCompany(companyId, null);
+    if (!target) { toast(NEED_COMPANY, 'error'); return; }
+    setSaving(true); setError('');
+    try {
+      const toSave = ocrRaw && records.length === 1
+        ? [{ ...records[0], _ocrOriginal: { raw: ocrRaw, at: new Date().toISOString(), source: entity.source } }]
+        : records.map(({ _rid, ...rest }) => rest);
+      const r = await saveIntake(entityKey, target, toSave, {
+        context: { source: ocrRaw ? 'ocr' : tab === 'excel' ? 'upload' : 'manual' },
+      });
+      const s = r.save;
+      toast(`저장 ${s.saved}건 — ${entity.label} (${companyLabel(target)})`, 'success');
+      resetQueue();
+      setSheetView('저장본');
+      reloadSaved();
+    } catch (e) {
+      setError('저장 실패: ' + (e as Error).message);
+      toast('저장 실패: ' + (e as Error).message, 'error');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function runOcr() {
+    if (!file) { setError('파일을 선택하세요'); return; }
+    setLoading(true); setError(''); setOcrCrosscheck(null);
+    try {
+      const r = await callOcrExtract(file, entity.ocrType || '');
+      if (!r.ok) { setError(r.error || '추출 실패'); toast('OCR 추출 실패', 'error'); return; }
+      setOcrRaw(r.raw || {});
+      setOcrCrosscheck(r.crosscheck || null);
+      setRecords([{ ...mapOcrToEntity(entityKey, r.raw || {}), _rid: newRid() }]);
+      setSheetView('대기');
+      setPanelOpen(true);
+      toast('OCR 추출 완료 — 검토 후 저장', 'success');
+    } catch (e) {
+      setError((e as Error).message);
+      toast('OCR 실패: ' + (e as Error).message, 'error');
+    } finally {
+      setLoading(false);
+    }
+  }
+
   async function onExcelFile(f: File) {
-    reset(); setParsing(true);
+    setError(''); setParsing(true); setOcrRaw(null); setOcrCrosscheck(null);
     toast(`${f.name} 읽는 중…`, 'info');
     try {
       const isCsv = /\.csv$/i.test(f.name);
       const recs = isCsv
         ? parseCsv(entityKey, await f.text())
         : await (await import('@/lib/intake/xlsx')).parseSpreadsheet(entityKey, f);
-      if (!recs.length) { setError(`인식된 행이 없습니다 — "${entity.label}" 형식이 맞는지 확인하세요 (계좌·CMS는 엔티티를 "계좌 거래"로)`); toast('인식된 행 0 — 엔티티/형식 확인', 'error'); return; }
-      setRecords(recs);
-      setInfo(`엑셀 ${recs.length}행 파싱 (${isCsv ? 'CSV' : 'XLSX'})`);
-      toast(`${recs.length.toLocaleString()}행 인식 — 아래에서 검토 후 저장`, 'success');
-    } catch (e) { setError('파싱 실패: ' + (e as Error).message); toast('파싱 실패: ' + (e as Error).message, 'error'); }
-    finally { setParsing(false); }
+      if (!recs.length) {
+        setError(`인식된 행이 없습니다 — "${entity.label}" 형식 확인`);
+        toast('인식된 행 0', 'error');
+        return;
+      }
+      setRecords(recs.map((r) => ({ ...r, _rid: newRid() })));
+      setSheetView('대기');
+      toast(`${recs.length.toLocaleString()}행 — 검토 후 저장`, 'success');
+    } catch (e) {
+      setError('파싱 실패: ' + (e as Error).message);
+      toast('파싱 실패', 'error');
+    } finally {
+      setParsing(false);
+    }
   }
 
-  // ── 직접입력 ──
-  const [form, setForm] = useState<EntityRecord>(() => { const p = sp.get('plate'); return p ? { plate: p } : {}; });   // ?plate= 프리필
   function submitManual() {
-    reset();
+    setError('');
     const filled = Object.fromEntries(Object.entries(form).filter(([, v]) => v !== '' && v != null));
     if (!Object.keys(filled).length) { setError('입력값이 없습니다'); return; }
-    setRecords([filled]);
-    setInfo('직접입력 1건');
+    setOcrRaw(null);
+    setOcrCrosscheck(null);
+    setRecords([{ ...filled, _rid: newRid() }]);
+    setSheetView('대기');
+    toast('직접입력 1건 — 검토 후 저장', 'success');
   }
 
-  const TABS: { k: Tab; label: string }[] = [
-    ...(entity.ocrType ? [{ k: 'ocr' as Tab, label: 'OCR (증명서)' }] : []),
-    { k: 'excel', label: entity.ocrType ? '엑셀 템플릿' : '엑셀 업로드' },
-    { k: 'manual', label: '직접입력' },
-  ];
+  const methodTabs = useMemo(() => {
+    const list: { key: Tab; label: string }[] = [];
+    if (entity.ocrType) list.push({ key: 'ocr', label: 'OCR' });
+    list.push({ key: 'excel', label: '엑셀' }, { key: 'manual', label: '직접' });
+    return list;
+  }, [entity.ocrType]);
 
-  useEffect(() => {
-    if (tab === 'ocr' && !entity.ocrType) {
-      setTab('excel');
-    }
-  }, [tab, entity.ocrType]);
+  const pendingCols = useMemo<SheetCol<PendingRow>[]>(() => {
+    const fields = entity.fields.slice(0, sheetView === '대기' ? 10 : 6);
+    return fields.map((f, i) => ({
+      key: f.key,
+      label: f.manual ? `${f.label}·직접` : f.label,
+      pin: i === 0,
+      priority: (i < 4 ? 1 : i < 7 ? 2 : 3) as 1 | 2 | 3,
+      text: (r) => String(r[f.key] ?? ''),
+      render: (r) => (
+        sheetView === '대기' ? (
+          <Input
+            size="sm"
+            value={String(r[f.key] ?? '')}
+            onChange={(e) => {
+              const v = e.target.value;
+              setRecords((prev) => prev.map((row) => row._rid === r._rid ? { ...row, [f.key]: v } : row));
+            }}
+            style={{
+              width: '100%',
+              minWidth: f.type === 'text' ? 88 : 72,
+              background: f.manual && !r[f.key] ? 'var(--orange-bg)' : undefined,
+            }}
+          />
+        ) : (
+          <span>{r[f.key] != null && r[f.key] !== '' ? String(r[f.key]) : '—'}</span>
+        )
+      ),
+    }));
+  }, [entity.fields, sheetView]);
+
+  const savedRows = useMemo(() => {
+    if (sheetView !== '저장본') return [];
+    const list = savedList || [];
+    if (!savedQ.trim()) return list;
+    return list.filter((r) => textMatch(savedQ, ...entity.fields.slice(0, 8).map((f) => r[f.key])));
+  }, [sheetView, savedList, savedQ, entity.fields]);
+
+  const savedCols = useMemo<SheetCol<EntityRecord>[]>(() => [
+    ...entity.fields.slice(0, 6).map((f, i) => ({
+      key: f.key,
+      label: f.label,
+      pin: i === 0,
+      priority: (i < 3 ? 1 : 2) as 1 | 2,
+      text: (r: EntityRecord) => String(r[f.key] ?? ''),
+      render: (r: EntityRecord) => String(r[f.key] != null && r[f.key] !== '' ? r[f.key] : '—'),
+    })),
+    {
+      key: '_at',
+      label: '저장시각',
+      priority: 3 as const,
+      text: (r: EntityRecord) => String(r.createdAt || ''),
+      render: (r: EntityRecord) => String(r.createdAt || '').slice(0, 16).replace('T', ' ') || '—',
+    },
+  ], [entity.fields]);
+
+  const sheetBusy = (sheetView === '저장본' && savedLoading) || loading;
+
+  const sheetBody = sheetBusy ? (
+    <PageLoading label={loading ? 'OCR 추출 중…' : '불러오는 중…'} />
+  ) : sheetView === '대기' ? (
+    !records.length ? (
+      <EmptyState variant="sheet">
+        대기 행이 없습니다. 오른쪽에서 {tab === 'ocr' ? 'OCR' : tab === 'excel' ? '엑셀' : '직접입력'} 후 검토·저장하세요.
+      </EmptyState>
+    ) : (
+      <ExcelSheet
+        cols={pendingCols.map((c) => ({ ...c, pin: false }))}
+        rows={records}
+        rowKey={(r) => r._rid}
+        selectedRowKey={picked}
+        onRow={(r) => setPicked(r._rid)}
+        fit
+      />
+    )
+  ) : isAllScope(companyId) ? (
+    <EmptyState variant="sheet">저장 회사를 선택하세요</EmptyState>
+  ) : (
+    <>
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center', padding: '0 0 8px', flexShrink: 0 }}>
+        <Search
+          size="sm"
+          placeholder="저장본 검색"
+          value={savedQ}
+          onChange={(e) => setSavedQ(e.target.value)}
+          style={{ width: mobile ? '100%' : 240 }}
+        />
+        <span style={{ fontSize: 12.5, color: C.mute }}>{savedRows.length}건</span>
+      </div>
+      {!savedRows.length ? (
+        <EmptyState variant="sheet">저장본 없음</EmptyState>
+      ) : (
+        <ExcelSheet
+          cols={savedCols}
+          rows={savedRows}
+          rowKey={(r, i) => String(r._key || r.id || i)}
+          fit
+        />
+      )}
+    </>
+  );
+
+  const inputPanel = panelOpen ? (
+    <section className="ledger-record-panel">
+      <header className="ledger-record-panel__header">
+        <div className="ledger-record-panel__heading">
+          <div className="ledger-record-panel__title">{entity.label} 투입</div>
+          <div className="ledger-record-panel__subtitle">
+            {tab === 'ocr' ? entity.source : tab === 'excel' ? 'xlsx · csv' : '폼 확정 → 대기'}
+          </div>
+        </div>
+        <button type="button" className="ledger-record-panel__close" onClick={() => setPanelOpen(false)} aria-label="투입패널 닫기">
+          <X size={14} />
+        </button>
+      </header>
+
+      <div className="ledger-record-panel__body" style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: 12 }}>
+        {tab === 'ocr' && (
+          <>
+            <FileDrop
+              onFile={setFile}
+              file={file}
+              accept=".pdf,.jpg,.jpeg,.png,.webp"
+              hint={`${entity.source} (PDF·JPG·PNG)`}
+            />
+            {parsing || loading ? <Loading label={loading ? '추출 중…' : '읽는 중…'} color={C.accent} /> : null}
+          </>
+        )}
+        {tab === 'excel' && (
+          <>
+            <FileDrop onFile={onExcelFile} accept=".xlsx,.xls,.csv" hint=".xlsx · .csv" />
+            {parsing && <Loading label="읽는 중…" color={C.accent} />}
+          </>
+        )}
+        {tab === 'manual' && (
+          <FormGrid fields={entity.fields} form={form} onChange={(k, v) => setForm({ ...form, [k]: v })} />
+        )}
+      </div>
+
+      <LedgerPanelFooter hint={records.length ? `대기 ${records.length}건 · 제목줄 저장` : undefined}>
+        {tab === 'ocr' && (
+          <Btn size="sm" variant="solid" onClick={runOcr} disabled={loading || !file}>
+            {loading ? '추출 중…' : 'OCR 추출'}
+          </Btn>
+        )}
+        {tab === 'excel' && (
+          <Btn
+            size="sm"
+            variant="ghost"
+            onClick={async () => {
+              const { downloadXlsxTemplate } = await import('@/lib/intake/xlsx');
+              downloadXlsxTemplate(entityKey);
+            }}
+          >
+            빈 템플릿
+          </Btn>
+        )}
+        {tab === 'manual' && (
+          <Btn size="sm" variant="solid" onClick={submitManual}>입력 확정</Btn>
+        )}
+        {records.length > 0 && sheetView === '대기' && (
+          <Btn size="sm" variant="ghost" onClick={resetQueue}>대기 비우기</Btn>
+        )}
+      </LedgerPanelFooter>
+    </section>
+  ) : null;
 
   return (
-    <Page title="데이터센터" meta="모든 데이터 투입구 · OCR·엑셀·직접입력"
-      back={() => router.back()}
-      tools={<WorkbenchBar actions={<><Btn size="sm" variant="ghost" href="/ingest/freepass">프리패스 연동</Btn><Btn size="sm" variant="ghost" href="/ingest/classify">차종 분류</Btn><Btn size="sm" variant="ghost" href="/ingest/bulk">대량 자동매칭</Btn></>} />}
-      right={<a href="/trash" style={{ fontSize: 13, color: C.mute, textDecoration: 'none', fontWeight: 600 }}>휴지통 →</a>}>
-      <p style={{ color: C.mute, fontSize: 13, marginTop: 6, lineHeight: 1.6 }}>
-        <b>모든 데이터</b>를 한곳에서 넣습니다 — 원장(차량·계약·고객·보험·계좌)뿐 아니라 <b>업무 기록(정비·통화·과태료)</b>까지.
-        OCR·엑셀·직접입력 3방식 → 같은 표준 레코드. 차·계약 화면에서의 <b>그자리</b> 조치(반납·입금·기록)와 역할이 다릅니다 —
-        여기는 <b>한곳에서 일괄</b>, 거기는 <b>일하면서 하나씩</b>. 삭제·복구는 <a href="/trash" style={{ color: C.accent }}>휴지통</a>.
-      </p>
-
-      <Sec title="수집 요약" desc="선택 엔티티·저장 대상 · 미확정(저장 전)·저장본(현재 회사)">
-        <Cards min={128} fit>
-          <Metric label="선택 엔티티" value={entity.label} tone="ink" />
-          <Metric label="저장 대상" value={company ? companyLabel(company) : '회사 선택'} tone={company ? 'ok' : 'warn'} />
-          <Metric label="미확정 레코드" value={records.length} tone={records.length ? 'warn' : 'ink'} />
-          <Metric label="저장본" value={saved == null ? '조회 대기' : saved.length} tone={saved ? 'ok' : 'ink'} />
-        </Cards>
-      </Sec>
-
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(240px, 320px) 1fr', gap: 12, alignItems: 'center', marginTop: 18 }}>
-        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
-          {/* 데이터 3층으로 묶어 보여준다 — 원장뿐 아니라 «이벤트(업무 기록)»도 여기서 넣는다는 걸
-              선택기 자체가 말하게. 층 판정은 ENTITY_LAYER SSOT(lib/domain/layers). */}
-          <Select value={entityKey} onChange={(e) => { setEntityKey(e.target.value); reset(); setForm({}); }} style={{ minWidth: 220 }}>
+    <LedgerFrame
+      title="데이터센터"
+      meta="OCR · 엑셀 · 직접"
+      showColView={false}
+      filters={(
+        <>
+          <Select
+            size="sm"
+            aria-label="엔티티"
+            value={entityKey}
+            onChange={(e) => {
+              setEntityKey(e.target.value);
+              resetQueue();
+              setForm({});
+              setSheetView('대기');
+            }}
+            style={{ minWidth: mobile ? '100%' : 200 }}
+          >
             {ENTITY_GROUPS.map((g) => (
               <optgroup key={g.title} label={g.title}>
-                {g.items.map((e) => <option key={e.key} value={e.key}>{e.label} ← {e.source}</option>)}
+                {g.items.map((e) => <option key={e.key} value={e.key}>{e.label}</option>)}
               </optgroup>
             ))}
           </Select>
-          <span style={{ fontSize: 12, color: C.faint }}>{entity.fields.length}개 필드 · 자연키 {entity.idFrom}</span>
-        </div>
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, flexWrap: 'wrap' }}>
-          {scopeAll ? (
-            <div style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 12, color: C.mute }}>
-              <span>저장 대상 회사:</span>
-              <Select value={saveTarget} onChange={(e) => setSaveTarget(e.target.value)} size="sm" style={{ fontWeight: 700 }}>
-                <option value="">— 회사 선택 —</option>
-                {COMPANIES.map((c) => <option key={c} value={c}>{companyLabel(c)}</option>)}
-              </Select>
-              <span style={{ color: C.faint }}>(합본 — 저장은 회사 지정)</span>
-            </div>
-          ) : (
-            <span style={{ fontSize: 12, color: C.mute }}>저장 대상 회사: <b>{companyLabel(company)}</b> <span style={{ color: C.faint }}>({user.role})</span></span>
-          )}
-        </div>
-      </div>
-
-      {/* 탭 — 앱 표준 PillTabs(각진 채움형) */}
-      <div style={{ marginTop: 16 }}>
-        <PillTabs tabs={TABS.map((t) => ({ key: t.k, label: t.label }))} value={tab} onChange={(k) => { setTab(k); reset(); }} />
-      </div>
-
-      <div style={{ padding: '16px 0' }}>
-        {tab === 'ocr' && (
-          <div style={{ display: 'flex', gap: 14, alignItems: 'flex-start', flexWrap: 'wrap' }}>
-            <FileDrop onFile={setFile} file={file} accept=".pdf,.jpg,.jpeg,.png,.webp" hint={`${entity.source} (PDF·JPG·PNG)`} />
-            <div style={{ marginTop: 28 }}><Btn variant="solid" onClick={runOcr} disabled={loading || !file}>{loading ? '추출 중…' : 'OCR 추출 → 매핑'}</Btn></div>
-          </div>
-        )}
-        {tab === 'excel' && (
-          <div style={{ display: 'flex', gap: 14, alignItems: 'flex-start', flexWrap: 'wrap' }}>
-            <FileDrop onFile={onExcelFile} accept=".xlsx,.xls,.csv" hint="채운 템플릿 또는 계좌·카드 내역 (.xlsx · .csv)" />
-            <div style={{ marginTop: 28, display: 'flex', gap: 10, alignItems: 'center' }}>
-              <Btn variant="ghost" onClick={async () => {
-                const { downloadXlsxTemplate } = await import('@/lib/intake/xlsx');
-                downloadXlsxTemplate(entityKey);
-              }}>＋ 빈 템플릿(.xlsx) 받기</Btn>
-              {parsing && <Loading label="파일 읽는 중…" color={C.accent} />}
-            </div>
-          </div>
-        )}
-        {tab === 'manual' && (
-          <div>
-            <FormGrid fields={entity.fields} form={form} onChange={(k, v) => setForm({ ...form, [k]: v })} />
-            <div style={{ marginTop: 12 }}><Btn variant="solid" onClick={submitManual}>입력 확정</Btn></div>
-          </div>
-        )}
-      </div>
-
-      {error && <Message variant="danger"><div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><AlertTriangle size={16} />{error}</div></Message>}
-      {info && <Message variant="success"><div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><Check size={16} />{info}</div></Message>}
-      {ocrCrosscheck && <OcrCrosscheck result={ocrCrosscheck} />}
-
-      {records.length > 0 && (
-        <Panel title="검토 및 저장">
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6, flexWrap: 'wrap' }}>
-            <span style={{ fontSize: 12, color: C.mute }}>표준 레코드 {records.length}건 · 저장 전 교정/보완</span>
-            <Btn variant="solid" onClick={saveRecords} disabled={saving}>{saving ? '저장 중…' : '저장'}</Btn>
-            {saveMsg && <span style={{ fontSize: 12, color: saveMsg.startsWith('저장 실패') ? C.danger : C.ok }}>{saveMsg}</span>}
-          </div>
-          <div style={{ overflowX: 'auto', border: `1px solid ${C.line}`, borderRadius: 'var(--radius)' }}>
-            <table style={{ borderCollapse: 'collapse', fontSize: 12.5, width: '100%' }}>
-              <thead>
-                <tr>{entity.fields.map((f) => <th key={f.key} style={{ ...th, color: f.manual ? C.warn : C.mute }}>{f.label}{f.manual ? ' ·직접' : ''}</th>)}</tr>
-              </thead>
-              <tbody>
-                {records.map((r, i) => (
-                  <tr key={i} style={{ borderTop: `1px solid ${C.line2}` }}>
-                    {entity.fields.map((f) => (
-                      <td key={f.key} style={{ padding: '3px 4px' }}>
-                        <Input size="sm" value={(r[f.key] as string) ?? ''}
-                          onChange={(e) => setRecords(records.map((rr, ri) => ri === i ? { ...rr, [f.key]: e.target.value } : rr))}
-                          style={{ width: f.type === 'text' ? 120 : 90, background: f.manual && !(r[f.key]) ? 'var(--orange-bg)' : C.card }} />
-                      </td>
-                    ))}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </Panel>
+          <PillTabs
+            size="sm"
+            value={tab}
+            onChange={(k) => { setTab(k as Tab); setError(''); setFile(null); setPanelOpen(true); }}
+            tabs={methodTabs}
+          />
+        </>
       )}
+      stats={(
+        <span style={{ fontSize: 12.5, color: C.mute }}>
+          대기 <b style={{ color: records.length ? C.warn : C.ink }}>{records.length}</b>
+          {companyId ? <> · {companyLabel(companyId)}</> : null}
+        </span>
+      )}
+      view={(
+        <PillTabs
+          size="sm"
+          value={sheetView}
+          onChange={setSheetView}
+          tabs={[
+            { key: '대기', label: '대기' },
+            { key: '저장본', label: '저장본' },
+          ]}
+        />
+      )}
+      tools={(
+        <LedgerActions aria-label="워크플로">
+          <Btn
+            size="sm"
+            variant="ghost"
+            iconOnly
+            tip={panelOpen ? '투입패널 닫기' : '투입패널 열기'}
+            onClick={() => setPanelOpen((o) => !o)}
+          >
+            {panelOpen ? <PanelRightClose size={14} /> : <PanelRight size={14} />}
+          </Btn>
+          <Btn
+            size="sm"
+            variant="ghost"
+            iconOnly
+            tip="엑셀 템플릿 받기"
+            onClick={async () => {
+              const { downloadXlsxTemplate } = await import('@/lib/intake/xlsx');
+              downloadXlsxTemplate(entityKey);
+            }}
+          >
+            <FileSpreadsheet size={14} />
+          </Btn>
+          <Btn size="sm" variant="ghost" iconOnly tip="대량 매칭" href="/ingest/bulk">
+            <UploadCloud size={14} />
+          </Btn>
+          <Btn size="sm" variant="ghost" iconOnly tip="휴지통" href="/trash">
+            <Trash2 size={14} />
+          </Btn>
+        </LedgerActions>
+      )}
+      right={(
+        <LedgerActions aria-label="쓰기">
+          <Btn
+            size="sm"
+            variant="solid"
+            tip={records.length ? `대기 ${records.length}건 저장` : '저장할 대기 행 없음'}
+            disabled={!records.length || saving || sheetView !== '대기'}
+            onClick={saveRecords}
+          >
+            {saving ? '저장 중…' : records.length ? `저장 ${records.length}건` : '저장'}
+          </Btn>
+        </LedgerActions>
+      )}
+      hint={error || (ocrCrosscheck && sheetView === '대기') ? (
+        <>
+          {error ? <Message variant="danger">{error}</Message> : null}
+          {ocrCrosscheck && sheetView === '대기' ? <OcrCrosscheck result={ocrCrosscheck} /> : null}
+        </>
+      ) : undefined}
+      body={sheetBody}
+      sidePanel={inputPanel}
+    />
+  );
+}
 
-      <Panel title="저장 데이터 확인">
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-          <Btn variant="ghost" onClick={loadSaved}>회사 「{companyLabel(company)}」 {entity.label} 저장본 보기</Btn>
-          {saved && <span style={{ fontSize: 12, color: C.mute }}>{saved.length}건 존재</span>}
-        </div>
-        {saved && (
-          <div style={{ marginTop: 10 }}>
-            <div style={{ fontSize: 12, color: C.mute, marginBottom: 6 }}>{saved.length}건 (이 회사 스코프만 — 다른 회사 데이터는 안 보임)</div>
-            {saved.length > 0 && (
-              <div style={{ overflowX: 'auto', border: `1px solid ${C.line}`, borderRadius: 'var(--radius)' }}>
-                <table style={{ borderCollapse: 'collapse', fontSize: 12.5, width: '100%' }}>
-                  <thead><tr>{entity.fields.slice(0, 6).map((f) => <th key={f.key} style={th}>{f.label}</th>)}<th style={th}>저장시각</th></tr></thead>
-                  <tbody>
-                    {saved.map((r, i) => (
-                      <tr key={i} style={{ borderTop: `1px solid ${C.line2}` }}>
-                        {entity.fields.slice(0, 6).map((f) => <td key={f.key} style={td}>{r[f.key] != null && r[f.key] !== '' ? String(r[f.key]) : '—'}</td>)}
-                        <td style={{ ...td, color: C.faint }}>{String(r.createdAt || '').slice(0, 16).replace('T', ' ')}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-        )}
-      </Panel>
-    </Page>
+export default function IngestPage() {
+  return (
+    <Suspense fallback={<PageLoading />}>
+      <IngestInner />
+    </Suspense>
   );
 }
