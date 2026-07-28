@@ -3,6 +3,7 @@ import type { AssetMasterRow, ContractMasterRow } from './master-ledgers';
 import {
   buildDetailSections, buildSheetViews, type DetailSectionDef, type SheetViewKeys,
 } from './ledger-ext';
+import { paymentTimingOf } from './schema/contract';
 
 const dash = (v: unknown) => (v === '' || v === null || v === undefined || v === 0 ? '—' : String(v));
 const date = (v: string) => v ? v.slice(0, 10) : '—';
@@ -163,12 +164,12 @@ const C0 = {
     text: (r) => r.paymentDay || '',
   },
   paymentTiming: {
-    key: 'paymentTiming', label: '선불/후불', align: 'c', priority: 3,
+    key: 'paymentTiming', label: '납부시기', align: 'c', priority: 3,
     render: (r) => {
-      const t = r.paymentTiming || '선불';
-      return t === '후불' ? <Badge tone="amber">후불</Badge> : <Badge tone="gray">선불</Badge>;
+      const t = paymentTimingOf(r.paymentTiming);
+      return t === '후납' ? <Badge tone="amber">후납</Badge> : <Badge tone="gray">선납</Badge>;
     },
-    text: (r) => r.paymentTiming || '선불',
+    text: (r) => paymentTimingOf(r.paymentTiming),
   },
   paymentMethod: {
     key: 'paymentMethod', label: '납부방법', priority: 4,

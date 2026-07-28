@@ -39,7 +39,7 @@ export const ContractSchema = z.object({
   rentalMonths: numlike,
   deposit: numlike,
   paymentDay: numlike,
-  paymentTiming: z.enum(['선불', '후불']).optional(),
+  paymentTiming: z.enum(['선납', '후납', '선불', '후불']).optional(), // 표시·입력=선납/후납 · 레거시 선불/후불 허용
 
   // 시동제어
   engineDisabled: z.boolean().optional(),
@@ -63,4 +63,18 @@ export function parseContract(v: unknown) {
 export function rentalTypeOf(rec: { rentalType?: unknown } | null | undefined): string {
   const v = String(rec?.rentalType || '');
   return (RENTAL_TYPES as readonly string[]).includes(v) ? v : '';
+}
+
+/** 납부시기 표시값 — 레거시 선불/후불 → 선납/후납. */
+export const PAYMENT_TIMINGS = ['선납', '후납'] as const;
+export type PaymentTiming = (typeof PAYMENT_TIMINGS)[number];
+
+export function paymentTimingOf(v: unknown): PaymentTiming {
+  const s = String(v || '');
+  if (s === '후납' || s === '후불') return '후납';
+  return '선납';
+}
+
+export function isPostpaidTiming(v: unknown): boolean {
+  return paymentTimingOf(v) === '후납';
 }

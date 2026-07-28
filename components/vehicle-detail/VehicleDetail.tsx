@@ -24,6 +24,7 @@ import { commitUpdate } from '@/lib/commit';
 import { TODAY, dday } from '@/lib/dashboard-consts';
 import type { EntityRecord } from '@/lib/intake/entities';
 import { useVehicleDetail, yy, remainText, scheduleTone } from './useVehicleDetail';
+import { paymentTimingOf } from '@/lib/schema/contract';
 
 function PrintMenu({ items }: { items: { label: string; run: () => void }[] }) {
   const [open, setOpen] = useState(false);
@@ -213,7 +214,7 @@ export function VehicleDetail({ plate, focus }: { plate: string; focus?: string 
                 ['계약기간', null, `${active.startDate || ''} ~ ${effectiveEndDate(active) || '미정'}${active.rentalMonths ? `  (${active.rentalMonths}개월)` : ''}`],
                 ['인수/반환장소', null, `${String(active.pickupPlace ?? '')}${active.returnPlace ? ' → ' + String(active.returnPlace) : ''}`],
                 ['월 대여료', null, active.monthlyRent ? won(active.monthlyRent) : ''],
-                ['자동이체일', null, active.paymentDay ? `매월 ${active.paymentDay}일${active.paymentTiming ? ` (${active.paymentTiming})` : ''}` : ''],
+                ['자동이체일', null, active.paymentDay ? `매월 ${active.paymentDay}일 · ${paymentTimingOf(active.paymentTiming)}` : ''],
                 ['보증금 / 예약금', null, `${active.deposit ? won(active.deposit) : '—'}${active.reservationFee ? ' / ' + won(active.reservationFee) : ''}`],
                 ['자차보험(CDW)', null, `${String(active.cdw ?? '')}${active.deductible ? ' · 면책 ' + won(active.deductible) : ''}${active.superCover === '있음' ? ' · 완전면책' : ''}`],
                 ['지연손해금율', null, active.lateFeeRate ? `${active.lateFeeRate}%` : ''],
@@ -223,15 +224,15 @@ export function VehicleDetail({ plate, focus }: { plate: string; focus?: string 
                 ['주행거리(출고→반납)', null, (active.mileageOut || active.returnMileage) ? `${active.mileageOut || '?'} → ${active.returnMileage || '?'} km` : ''],
               ] as [string, string | null, ReactNode][]} />
               <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, flexWrap: 'wrap' }}>
-                <span style={{ color: C.mute }}>납부시점</span>
-                {(['선불', '후불'] as const).map((tm) => {
-                  const on = String(active.paymentTiming || '선불') === tm;
+                <span style={{ color: C.mute }}>납부시기</span>
+                {(['선납', '후납'] as const).map((tm) => {
+                  const on = paymentTimingOf(active.paymentTiming) === tm;
                   return (
                     <Btn key={tm} size="sm" variant={on ? 'solid' : 'ghost'}
                       onClick={() => { if (!on) void doTransition({ paymentTiming: tm }, String(active._key), active); }}>{tm}</Btn>
                   );
                 })}
-                <span style={{ color: C.faint, fontSize: 11 }}>선불=1회차 인도 시 납부(1회차 미수 없음) · 후불=1회차부터 미수 가능</span>
+                <span style={{ color: C.faint, fontSize: 11 }}>선납=1회차 인도 시 납부(1회차 미수 없음) · 후납=1회차부터 미수 가능</span>
               </div>
               {(() => {
                 const hd = docHistory(active, 'handover');

@@ -3,7 +3,7 @@ import { computeContractView } from './contract-ops';
 import type { EntityRecord } from './intake/entities';
 import { OUT } from './domain/status';
 import { contractRisks } from './risk-ops';
-import { rentalTypeOf } from './schema/contract';
+import { rentalTypeOf, paymentTimingOf } from './schema/contract';
 
 const str = (v: unknown) => String(v ?? '').trim();
 const num = (v: unknown) => Number(v) || 0;
@@ -105,7 +105,7 @@ export function contractMasterRow(raw: EntityRecord, today: string): ContractMas
     pickupPlace: str(raw.pickupPlace), returnPlace: str(raw.returnPlace),
     annualMileageLimit: num(raw.annualMileageLimit), monthlyRent: view.monthlyRent,
     deposit: num(raw.deposit), reservationFee: num(raw.reservationFee),
-    paymentDay: num(raw.paymentDay), paymentTiming: str(raw.paymentTiming) || '선불',
+    paymentDay: num(raw.paymentDay), paymentTiming: paymentTimingOf(raw.paymentTiming),
     paymentMethod: str(raw.paymentMethod), driverAgeMin: num(raw.driverAgeMin),
     driverAge: num(raw.driverAge), insuranceAge: num(raw.insuranceAge),
     lateFeeRate: num(raw.lateFeeRate), earlyTerminationRate: num(raw.earlyTerminationRate),

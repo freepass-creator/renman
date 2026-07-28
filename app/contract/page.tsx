@@ -171,7 +171,7 @@ export default function ContractLedgerPage() {
           entityKey="contract"
           title="계약 생성"
           sections={CONTRACT_CREATE_SECTIONS}
-          initial={{ status: '대기', paymentTiming: '선불' }}
+          initial={{ status: '대기', paymentTiming: '선납' }}
           onClose={() => setCreating(false)}
         />
       ) : selected && editing ? (

@@ -87,7 +87,7 @@ export function recalcContract<T extends Contract>(c: T, today: string): T {
   // 선불/후불 정책 반영 — 1회차 dueDate 자동 재계산.
   // 선불: 1회차 = 계약일. 후불: 1회차 = 계약일 + 1개월.
   // paidAmount/status 보존 (이미 입금된 회차 보호) — dueDate 만 갱신.
-  const isPostpaid = c.paymentTiming === '후불';
+  const isPostpaid = c.paymentTiming === '후불' || c.paymentTiming === '후납';
   const recalcedSchedules = c.schedules.map((s) => {
     const expectedDueDate = c.contractDate
       ? addMonths(c.contractDate, isPostpaid ? s.seq : s.seq - 1, c.paymentDay)
@@ -214,11 +214,11 @@ export function generateSchedules(c: {
   termMonths: number;
   monthlyRent: number;
   paymentDay: number;
-  paymentTiming?: '선불' | '후불';
+  paymentTiming?: '선납' | '후납' | '선불' | '후불';
 }): Array<Omit<PaymentSchedule, 'id' | 'contractId'>> {
   const out: Array<Omit<PaymentSchedule, 'id' | 'contractId'>> = [];
   const total = Math.max(0, c.termMonths | 0);
-  const isPostpaid = c.paymentTiming === '후불';
+  const isPostpaid = c.paymentTiming === '후불' || c.paymentTiming === '후납';
   for (let i = 0; i < total; i++) {
     const offset = isPostpaid ? i + 1 : i;
     out.push({

@@ -11,6 +11,7 @@ import { collectionStage } from './domain/status';
 import { dday } from './dashboard-consts';
 import { AlertTriangle } from 'lucide-react';
 import { buildDetailSections, buildSheetViews, type DetailSectionDef, type SheetViewKeys } from './ledger-ext';
+import { paymentTimingOf } from './schema/contract';
 
 const toneBadge = (t: SheetRow['tone']): 'green' | 'amber' | 'red' | 'gray' =>
   t === 'ok' ? 'green' : t === 'warn' ? 'amber' : t === 'danger' ? 'red' : 'gray';
@@ -115,10 +116,10 @@ const ddayCell = (s: string) => {
   const color = d < 0 ? C.danger : d <= 7 ? C.danger : d <= 30 ? C.warn : undefined;
   return color ? <span style={{ color, fontWeight: 700 }}>{t}</span> : t;
 };
-// 남은 기간 — D-day(일수) → 년/개월/일. 0인 단위는 생략(0년 2개월 19일 → 2개월 19일). 지나면 빨강 '만기지남'. (근사: 365일=년·30일=월)
-const remainSpan = (d: number | null) => {
-  if (d == null) return '—';
-  if (d < 0) return <span style={{ color: C.danger, fontWeight: 700 }}>만기지남</span>;
+// 남은 기간 라벨 — 년/개월/일(0단위 생략). 툴팁용. 지나면 «만기지남 N일».
+export function remainSpanLabel(d: number | null): string {
+  if (d == null) return '';
+  if (d < 0) return `만기지남 ${Math.abs(d)}일`;
   let rem = d;
   const y = Math.floor(rem / 365); rem -= y * 365;
   const m = Math.floor(rem / 30); rem -= m * 30;
@@ -127,7 +128,7 @@ const remainSpan = (d: number | null) => {
   if (m) parts.push(`${m}개월`);
   if (rem) parts.push(`${rem}일`);
   return parts.length ? parts.join(' ') : '0일';
-};
+}
 const FL = {
   plate: { key: 'plate', label: '차량번호', pin: true, render: (r) => r.plate || '—', text: (r) => r.plate },
   co: { key: 'co', label: '표시명', pin: true, render: (r) => r.company || '—', text: (r) => r.company },
@@ -155,7 +156,15 @@ const FL = {
   end: { key: 'end', label: '만기', render: (r) => ymd(r.end), text: (r) => r.end },
   dday: {
     key: 'dday', label: '반납까지', align: 'r',
-    render: (r) => remainSpan(r.dday),
+    render: (r) => {
+      if (r.dday == null) return '—';
+      const tip = remainSpanLabel(r.dday);
+      const color = r.dday < 0 ? C.danger : r.dday <= 7 ? C.warn : undefined;
+      const body = r.dday === 0 ? '0' : String(r.dday);
+      return color
+        ? <span title={tip} style={{ color, fontWeight: 700 }}>{body}</span>
+        : <span title={tip}>{body}</span>;
+    },
     text: (r) => r.dday ?? '',
   },
   insurer: { key: 'insurer', label: '보험사', render: (r) => r.insurer || '—', text: (r) => r.insurer },
@@ -199,20 +208,20 @@ const FL = {
     },
     text: (r) => r.warnings.map((w) => w.label).join(' · '),
   },
-  // 결제일 · 선불/후불 — 한 셀에 합치지 않음(각각 열).
+  // 결제일 · 납부시기 — 한 셀에 합치지 않음(각각 열).
   paymentDay: {
     key: 'paymentDay', label: '결제일', align: 'c',
     render: (r) => (r.paymentDay ? `${r.paymentDay}일` : '—'),
     text: (r) => (r.paymentDay ? `${r.paymentDay}일` : ''),
   },
   paymentTiming: {
-    key: 'paymentTiming', label: '선불/후불', align: 'c',
+    key: 'paymentTiming', label: '납부시기', align: 'c',
     render: (r) => {
       if (!r.paymentDay && !r.paymentTiming) return '—';
-      const t = r.paymentTiming === '후불' ? '후불' : '선불';
-      return <span style={{ color: t === '후불' ? C.warn : C.mute, fontWeight: 700 }}>{t}</span>;
+      const t = paymentTimingOf(r.paymentTiming);
+      return <span style={{ color: t === '후납' ? C.warn : C.mute, fontWeight: 700 }}>{t}</span>;
     },
-    text: (r) => (r.paymentDay || r.paymentTiming ? (r.paymentTiming === '후불' ? '후불' : '선불') : ''),
+    text: (r) => (r.paymentDay || r.paymentTiming ? paymentTimingOf(r.paymentTiming) : ''),
   },
   // 회차 — 도래/총(예 11/12). 계약 없으면 —.
   round: {

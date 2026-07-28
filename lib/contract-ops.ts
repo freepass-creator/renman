@@ -15,6 +15,7 @@ import {
   isContractEndedStatus,
   type LifeStatus as StatusLife,
 } from './domain/status';
+import { isPostpaidTiming } from './schema/contract';
 
 export type LifeStatus = StatusLife;
 
@@ -43,10 +44,10 @@ function buildContract(rec: EntityRecord, today: string): Contract {
   const rent = Number(rec.monthlyRent) || 0;
   const term = Number(rec.rentalMonths) || 0;
   const start = ymd(rec.startDate || rec.contractDate);
-  // 결제일·선/후불 = 계약 캡처값 우선(자동이체일). 없으면 25일·선불 폴백(기존 데이터 무회귀).
+  // 결제일·납부시기 = 계약 캡처값 우선. 없으면 25일·선납 폴백(기존 데이터 무회귀). 스케줄 엔진은 선불/후불 키.
   const pd = Number(rec.paymentDay);
   const payDay = pd >= 1 && pd <= 31 ? pd : 25;
-  const timing: '선불' | '후불' = rec.paymentTiming === '후불' ? '후불' : '선불';
+  const timing: '선불' | '후불' = isPostpaidTiming(rec.paymentTiming) ? '후불' : '선불';
   let schedules = (rent && term && start)
     ? generateSchedules({ contractDate: start, termMonths: term, monthlyRent: rent, paymentDay: payDay, paymentTiming: timing })
         .map((s) => ({ ...s, id: 's' + s.seq, contractId: String(rec._key || 'c') }))

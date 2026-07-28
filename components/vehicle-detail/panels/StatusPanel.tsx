@@ -9,6 +9,7 @@ import { useDeskTier } from '@/lib/use-mobile';
 import { penaltyStatus } from '@/lib/penalty-reassign';
 import { yy, remainText, scheduleTone } from '../useVehicleDetail';
 import { fLab, fLl, Add, type PanelProps } from './shared';
+import { paymentTimingOf } from '@/lib/schema/contract';
 
 /** 한눈 필수정보 + 그 자리 입력(입금·반납은 상단 CTA) */
 export function StatusPanel({ plate, vd }: PanelProps) {
@@ -80,14 +81,14 @@ export function StatusPanel({ plate, vd }: PanelProps) {
         ['임차인', null, `${String(active.contractorName ?? '')}${active.contractorPhone ? ' · ' + String(active.contractorPhone) : ''}`],
         ['기간', null, `${yy(active.startDate)} ~ ${yy(effectiveEndDate(active))}${active.rentalMonths ? ` · ${active.rentalMonths}개월` : ''}`],
         ['월 대여료', null, active.monthlyRent ? won(active.monthlyRent) : ''],
-        ['이체일', null, active.paymentDay ? `매월 ${active.paymentDay}일${active.paymentTiming ? ` · ${active.paymentTiming}` : ''}` : ''],
+        ['이체일', null, active.paymentDay ? `매월 ${active.paymentDay}일 · ${paymentTimingOf(active.paymentTiming)}` : ''],
         ['보증금', null, active.deposit ? won(active.deposit) : '—'],
         ['CDW', null, `${String(active.cdw ?? '')}${active.deductible ? ' · 면책 ' + won(active.deductible) : ''}`],
       ] as [string, string | null, ReactNode][]} />
       <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, flexWrap: 'wrap' }}>
-        <span style={{ color: C.mute }}>납부시점</span>
-        {(['선불', '후불'] as const).map((tm) => {
-          const on = String(active.paymentTiming || '선불') === tm;
+        <span style={{ color: C.mute }}>납부시기</span>
+        {(['선납', '후납'] as const).map((tm) => {
+          const on = paymentTimingOf(active.paymentTiming) === tm;
           return (
             <Btn key={tm} size="sm" variant={on ? 'solid' : 'ghost'}
               onClick={() => { if (!on) void doTransition({ paymentTiming: tm }, String(active._key), active); }}>{tm}</Btn>

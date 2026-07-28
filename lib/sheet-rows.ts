@@ -14,7 +14,7 @@ import { normPlate } from './plate';
 import { deriveLocation } from './vehicle-location';
 import { companyShort } from './companies';
 import { rowWarnings, type SheetWarning } from './sheet-warnings';
-import { rentalTypeOf } from './schema/contract';
+import { rentalTypeOf, paymentTimingOf } from './schema/contract';
 import type { RailTone as RowRail } from '@/components/ui';   // 타입 전용 — 런타임 커플링 없음
 
 export type SheetRow = {
@@ -183,7 +183,7 @@ export function buildFleetRows(vehicles: VehicleNode[], insurance: EntityRecord[
       end: String(v?.rec.endDate || ''),
       dday: v?.dday ?? null,
       paymentDay: active ? (Number(v?.rec.paymentDay) >= 1 && Number(v?.rec.paymentDay) <= 31 ? Number(v?.rec.paymentDay) : 25) : 0,
-      paymentTiming: active ? (v?.rec.paymentTiming === '후불' ? '후불' : '선불') : '',
+      paymentTiming: active ? paymentTimingOf(v?.rec.paymentTiming) : '',
       roundDue: v?.roundDue ?? 0,
       roundTotal: v?.roundTotal ?? 0,
       insurer: String(ins?.insurer || ''),
