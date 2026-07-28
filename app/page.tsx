@@ -1,27 +1,35 @@
 'use client';
 /**
- * 대시보드(/) — `/dev/erp-design` HomeView 시안 1:1 이식.
- *   KPI 4칸(가동률·휴차·미수율·오늘업무) + 오늘 집중 업무 + 데이터 교차검증.
- *   셸 = LedgerFrame(회사 스코프). Sec 접기 없음. 색=C.* 토큰만.
- *   데이터 = computeKPI · computeDashboard · riskAgendaFocus · selectPendingWork.
+ * 대시보드(/) — 백지 신규. 관제 KPI + 법인별 요약.
+ *   셸=LedgerFrame · Sec 접기 없음 · 색=C.* 토큰.
+ *   데이터=computeKPI · kpiByCompany · buildCashLedger(손익) SSOT만.
  */
 import { useMemo, type CSSProperties, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
-import { UploadCloud } from 'lucide-react';
 import {
-  LedgerFrame, Btn, EmptyState, ListBox, ListRow, won, C, R, NUM, SPACE_GROUP_M,
+  LedgerFrame, EmptyState, ExcelSheet, won, C, R, NUM, SPACE_GROUP_M,
+  type SheetCol,
 } from '@/components/ui';
 import { TODAY } from '@/lib/dashboard-consts';
-import { computeKPI } from '@/lib/kpi';
-import { computeDashboard } from '@/lib/operating-snapshot';
-import { riskAgendaFocus } from '@/lib/risk-ledger';
-import { selectPendingWork } from '@/lib/snapshot/selectors';
+import { computeKPI, kpiByCompany, type KPI } from '@/lib/kpi';
+import { COMPANIES, companyShort } from '@/lib/companies';
+import { buildCashLedger } from '@/lib/finance/cash-ledger';
+import { groupOfLabel } from '@/lib/payments/ledger-subjects';
 import { useEntityLists } from '@/lib/use-entity-lists';
-import { openCar, openIngest } from '@/lib/ui-bus';
 import { useIsMobile } from '@/lib/use-mobile';
 
 function Soft(loading: boolean, n: number | string): number | string {
   return loading ? '…' : n;
+}
+
+function Bar({ pct, tone = 'ok' }: { pct: number; tone?: 'ok' | 'danger' | 'warn' }) {
+  const fill = tone === 'danger' ? C.danger : tone === 'warn' ? C.warn : C.ok;
+  const w = Math.max(0, Math.min(100, pct));
+  return (
+    <div style={{ height: 4, borderRadius: 2, background: 'var(--bg-stripe)', overflow: 'hidden' }}>
+      <div style={{ width: `${w}%`, height: '100%', background: fill }} />
+    </div>
+  );
 }
 
 function KpiTile({
@@ -40,12 +48,12 @@ function KpiTile({
       type="button"
       onClick={onClick}
       style={{
-        minHeight: mobile ? 126 : 148,
+        minHeight: mobile ? 118 : 136,
         border: `1px solid ${C.line}`,
         borderRadius: R,
         background: C.card,
         textAlign: 'left',
-        padding: mobile ? '13px 14px' : '17px 18px',
+        padding: mobile ? '12px 13px' : '15px 16px',
         cursor: onClick ? 'pointer' : 'default',
         display: 'flex',
         flexDirection: 'column',
@@ -54,300 +62,215 @@ function KpiTile({
     >
       <span style={{ fontSize: 11, fontWeight: 700, color: C.sub }}>{label}</span>
       <span style={{
-        display: 'block', marginTop: 14, fontSize: mobile ? 25 : 30, lineHeight: 1,
+        display: 'block', marginTop: 12, fontSize: mobile ? 22 : 28, lineHeight: 1,
         fontWeight: 800, letterSpacing: '-0.04em', fontFamily: NUM, fontVariantNumeric: 'tabular-nums', color: C.ink,
       }}>
         {value}
-        {unit != null && <small style={{ fontSize: 14, marginLeft: 2, fontWeight: 600 }}>{unit}</small>}
+        {unit != null && <small style={{ fontSize: 13, marginLeft: 2, fontWeight: 600 }}>{unit}</small>}
       </span>
       {meta != null && (
-        <span style={{ display: 'block', marginTop: 10, fontSize: 10.5, color: C.mute }}>{meta}</span>
+        <span style={{ display: 'block', marginTop: 8, fontSize: 10.5, color: C.mute }}>{meta}</span>
       )}
-      {bar != null && <div style={{ marginTop: 'auto', paddingTop: 14 }}>{bar}</div>}
+      {bar != null && <div style={{ marginTop: 'auto', paddingTop: 12 }}>{bar}</div>}
     </button>
   );
 }
 
-function Bar({ pct, tone = 'ok' }: { pct: number; tone?: 'ok' | 'danger' | 'warn' }) {
-  const fill = tone === 'danger' ? C.danger : tone === 'warn' ? C.warn : C.ok;
-  const w = Math.max(0, Math.min(100, pct));
-  return (
-    <div style={{ height: 4, borderRadius: 2, background: 'var(--bg-stripe)', overflow: 'hidden' }}>
-      <div style={{ width: `${w}%`, height: '100%', background: fill }} />
-    </div>
-  );
-}
-
-function Panel({
-  title, desc, action, children,
-}: {
-  title: string; desc: string; action?: ReactNode; children: ReactNode;
-}) {
+function Panel({ title, desc, children }: { title: string; desc: string; children: ReactNode }) {
   return (
     <section style={{
       border: `1px solid ${C.line}`, borderRadius: R, background: C.card, overflow: 'hidden',
       display: 'flex', flexDirection: 'column', minHeight: 0,
     }}>
-      <div style={{
-        minHeight: 64, padding: '14px 16px', borderBottom: `1px solid ${C.line}`,
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12,
-      }}>
-        <div style={{ minWidth: 0 }}>
-          <div style={{ fontSize: 14, fontWeight: 800, color: C.ink }}>{title}</div>
-          <div style={{ fontSize: 11, color: C.mute, marginTop: 3 }}>{desc}</div>
-        </div>
-        {action}
+      <div style={{ padding: '14px 16px', borderBottom: `1px solid ${C.line}` }}>
+        <div style={{ fontSize: 14, fontWeight: 800, color: C.ink }}>{title}</div>
+        <div style={{ fontSize: 11, color: C.mute, marginTop: 3 }}>{desc}</div>
       </div>
-      <div style={{ flex: 1, minHeight: 0 }}>{children}</div>
+      <div style={{ flex: 1, minHeight: 0, padding: 12 }}>{children}</div>
     </section>
   );
 }
 
+type CoRow = KPI & { company: string; profit: number };
+
 const gridKpi: CSSProperties = {
   display: 'grid',
-  gridTemplateColumns: 'repeat(4, minmax(0, 1fr))',
+  gridTemplateColumns: 'repeat(5, minmax(0, 1fr))',
   gap: 12,
-};
-const gridHome: CSSProperties = {
-  display: 'grid',
-  gridTemplateColumns: 'minmax(0, 1.55fr) minmax(280px, 1fr)',
-  gap: 16,
 };
 
 export default function DashboardPage() {
   const router = useRouter();
   const mobile = useIsMobile();
-  const { data: [contracts = [], vehicles = [], insurances = [], penalties = [], bankTx = []], loading } = useEntityLists([
-    'contract', 'vehicle', 'insurance', 'penalty', 'bank_tx',
+  const { data: [contracts = [], vehicles = [], bankTx = [], cardTx = []], loading } = useEntityLists([
+    'contract', 'vehicle', 'bank_tx', 'card_tx',
   ]);
 
   const kpi = useMemo(() => computeKPI(contracts, vehicles, TODAY), [contracts, vehicles]);
-  const D = useMemo(
-    () => computeDashboard({ contracts, vehicles, insurances, penalties, bankTx }, TODAY),
-    [contracts, vehicles, insurances, penalties, bankTx],
-  );
-  const pending = useMemo(() => selectPendingWork(D), [D]);
-  const focusAll = useMemo(
-    () => riskAgendaFocus(contracts, vehicles, insurances, penalties),
-    [contracts, vehicles, insurances, penalties],
-  );
-  const focus = useMemo(() => focusAll.slice(0, 5), [focusAll]);
-  const delayedN = useMemo(() => focusAll.filter((a) => a.status === '어김').length, [focusAll]);
-  const misuRate = kpi.monthlyBilled > 0
-    ? Math.round((kpi.misuActive / kpi.monthlyBilled) * 1000) / 10
-    : 0;
+  const byCo = useMemo(() => kpiByCompany(contracts, vehicles, TODAY, COMPANIES), [contracts, vehicles]);
 
-  const ocrN = D.compliance.length;
-  const mismatchN = D.insMismatch.length;
-  const unmatchedN = D.unmatchedTx.length + D.ghostPlates.length;
+  const cash = useMemo(() => buildCashLedger(bankTx, cardTx), [bankTx, cardTx]);
+  const opProfit = useMemo(() => {
+    let inc = 0;
+    let exp = 0;
+    for (const r of cash) {
+      if (groupOfLabel(r.category) !== '영업') continue;
+      inc += r.inAmt;
+      exp += r.outAmt;
+    }
+    return inc - exp;
+  }, [cash]);
 
-  const validations = useMemo(() => {
-    const rows: { key: string; title: string; sub: string; badge: string; plate?: string }[] = [];
-    for (const x of D.compliance.slice(0, 3)) {
-      rows.push({
-        key: `c:${String(x.rec.plate)}:${x.flags[0]?.code || ''}`,
-        title: '컴플라이언스',
-        sub: `${x.rec.plate || '—'} · ${x.flags[0]?.detail || x.flags[0]?.code || '검토'}`,
-        badge: '검토',
-        plate: String(x.rec.plate || ''),
-      });
+  const profitByCo = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const r of cash) {
+      if (groupOfLabel(r.category) !== '영업') continue;
+      const id = String(r.companyId || '');
+      map.set(id, (map.get(id) || 0) + r.inAmt - r.outAmt);
     }
-    for (const x of D.insMismatch.slice(0, 2)) {
-      rows.push({
-        key: `i:${String(x.rec.plate)}:${x.detail}`,
-        title: '보험불일치',
-        sub: `${x.rec.plate || '—'} · ${x.detail}`,
-        badge: '검토',
-        plate: String(x.rec.plate || ''),
-      });
+    return map;
+  }, [cash]);
+
+  const trend = useMemo(() => {
+    const now = new Date(`${TODAY}T12:00:00`);
+    const months = Array.from({ length: 6 }, (_, i) => {
+      const d = new Date(now.getFullYear(), now.getMonth() - 5 + i, 1);
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    });
+    const by = new Map(months.map((m) => [m, 0]));
+    for (const r of cash) {
+      if (groupOfLabel(r.category) !== '영업') continue;
+      const m = String(r.date || '').slice(0, 7);
+      if (!by.has(m)) continue;
+      by.set(m, (by.get(m) || 0) + r.inAmt - r.outAmt);
     }
-    for (const plate of D.ghostPlates.slice(0, 2)) {
-      rows.push({
-        key: `g:${plate}`,
-        title: '차량 미등록',
-        sub: `${plate} · 계약만 있고 차량원장 없음`,
-        badge: '매칭',
-        plate,
-      });
-    }
-    return rows.slice(0, 5);
-  }, [D]);
+    const list = months.map((m) => ({ m, profit: by.get(m) || 0 }));
+    const maxAbs = Math.max(1, ...list.map((x) => Math.abs(x.profit)));
+    return { list, maxAbs };
+  }, [cash]);
+
+  const coRows: CoRow[] = useMemo(() => byCo.map((k) => ({
+    ...k,
+    company: companyShort(k.companyId),
+    profit: profitByCo.get(k.companyId) || 0,
+  })), [byCo, profitByCo]);
+
+  const coCols: SheetCol<CoRow>[] = useMemo(() => [
+    { key: 'company', label: '법인', pin: true, render: (r) => r.company, text: (r) => r.company },
+    { key: 'veh', label: '보유', align: 'r', render: (r) => r.totalVehicles, text: (r) => r.totalVehicles },
+    { key: 'util', label: '가동률', align: 'r', render: (r) => `${r.util}%`, text: (r) => r.util },
+    { key: 'run', label: '운행', align: 'r', render: (r) => r.running, text: (r) => r.running },
+    { key: 'idle', label: '휴차', align: 'r', render: (r) => r.idle, text: (r) => r.idle },
+    {
+      key: 'misu', label: '운행미수', align: 'r',
+      render: (r) => r.misuActive ? <span style={{ color: C.danger, fontWeight: 700 }}>{won(r.misuActive)}</span> : '—',
+      text: (r) => r.misuActive,
+    },
+    {
+      key: 'profit', label: '영업손익', align: 'r',
+      render: (r) => (
+        <span style={{ color: r.profit >= 0 ? C.ok : C.danger, fontWeight: 700 }}>{won(r.profit)}</span>
+      ),
+      text: (r) => r.profit,
+    },
+  ], []);
 
   const go = (href: string) => router.push(href);
-  const dateLabel = (() => {
-    try {
-      return new Date(`${TODAY}T12:00:00`).toLocaleDateString('ko-KR', {
-        year: 'numeric', month: 'long', day: 'numeric', weekday: 'long',
-      });
-    } catch { return TODAY; }
-  })();
 
   return (
     <LedgerFrame
       title="대시보드"
       meta="관제"
       showColView={false}
-      tools={(
-        <Btn size="sm" variant="ghost" iconOnly tip="데이터관리" onClick={() => openIngest()}>
-          <UploadCloud size={14} />
-        </Btn>
-      )}
       body={(
         <div style={{
           display: 'flex', flexDirection: 'column', gap: SPACE_GROUP_M,
           padding: mobile ? '8px 0 24px' : '4px 0 28px', maxWidth: 1500,
         }}>
-          {/* 시안: pageHeader */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: mobile ? 'flex-start' : 'flex-end', gap: 12, flexWrap: 'wrap' }}>
-            <div>
-              <div style={{ fontSize: 10, fontWeight: 700, color: C.mute, letterSpacing: '0.04em' }}>{dateLabel}</div>
-              <div style={{ fontSize: mobile ? 20 : 24, fontWeight: 800, letterSpacing: '-0.03em', color: C.ink, marginTop: 4 }}>운영 현황</div>
-              <div style={{ fontSize: 12, color: C.sub, marginTop: 6 }}>가동과 회수에 집중해야 할 항목을 먼저 보여드립니다.</div>
-            </div>
-            <div style={{ display: 'inline-flex', gap: 7 }}>
-              <Btn size="sm" variant="ghost" onClick={() => go('/risk')}>리스크</Btn>
-              <Btn size="sm" variant="solid" onClick={() => go('/work')}>업무</Btn>
-            </div>
-          </div>
-
-          {/* 시안: kpiGrid 4 */}
           <div style={{
             ...gridKpi,
-            gridTemplateColumns: mobile ? 'repeat(2, minmax(0, 1fr))' : 'repeat(4, minmax(0, 1fr))',
+            gridTemplateColumns: mobile ? 'repeat(2, minmax(0, 1fr))' : 'repeat(5, minmax(0, 1fr))',
           }}>
             <KpiTile
-              label="보유차량 가동률"
+              label="보유"
+              value={Soft(loading, kpi.totalVehicles)}
+              unit="대"
+              meta={loading ? undefined : `운행 ${kpi.running} · 계약 ${kpi.activeContracts}`}
+              bar={<Bar pct={loading || !kpi.totalVehicles ? 0 : 100} />}
+              onClick={() => go('/asset')}
+            />
+            <KpiTile
+              label="가동률"
               value={Soft(loading, kpi.util)}
               unit="%"
-              meta={loading ? undefined : `가동 ${kpi.running}대 / 운영대상 ${kpi.totalVehicles}대`}
-              bar={<Bar pct={loading ? 0 : kpi.util} tone={kpi.util >= 70 ? 'ok' : kpi.util < 50 ? 'warn' : 'ok'} />}
+              meta={loading ? undefined : `운행 ${kpi.running} / 보유 ${kpi.totalVehicles}`}
+              bar={<Bar pct={loading ? 0 : kpi.util} tone={kpi.util >= 70 ? 'ok' : 'warn'} />}
               onClick={() => go('/status')}
             />
             <KpiTile
-              label="공차·휴차"
+              label="운행중미수"
+              value={Soft(loading, won(kpi.misuActive))}
+              meta={loading ? undefined : `건수 ${kpi.unpaidCount} · 반환미수 ${won(kpi.misuReturned)}`}
+              bar={<Bar pct={loading || !kpi.monthlyBilled ? 0 : Math.min(100, Math.round((kpi.misuActive / kpi.monthlyBilled) * 100))} tone="danger" />}
+              onClick={() => go('/risk')}
+            />
+            <KpiTile
+              label="휴차"
               value={Soft(loading, kpi.idle)}
               unit="대"
-              meta={loading ? undefined : `휴차 ${kpi.idle} · 보유 ${kpi.totalVehicles}`}
+              meta={loading ? undefined : `보유 대비 ${kpi.totalVehicles ? Math.round((kpi.idle / kpi.totalVehicles) * 100) : 0}%`}
               bar={<Bar pct={loading || !kpi.totalVehicles ? 0 : Math.round((kpi.idle / kpi.totalVehicles) * 100)} tone="warn" />}
               onClick={() => go('/risk')}
             />
             <KpiTile
-              label="현재 미수율"
-              value={Soft(loading, misuRate)}
-              unit="%"
-              meta={loading ? undefined : `미수 ${won(kpi.misuActive)} / 월청구 ${won(kpi.monthlyBilled)}`}
-              bar={<Bar pct={loading ? 0 : Math.min(100, misuRate)} tone="danger" />}
-              onClick={() => go('/risk')}
-            />
-            <KpiTile
-              label="오늘의 업무"
-              value={Soft(loading, pending.count)}
-              unit="건"
-              meta={loading ? undefined : `미결 ${pending.count} · 어김 ${delayedN}`}
-              bar={(
-                <div style={{ display: 'flex', gap: 4 }}>
-                  {Array.from({ length: 4 }).map((_, i) => (
-                    <i
-                      key={i}
-                      style={{
-                        height: 4, flex: 1, borderRadius: 2,
-                        background: !loading && i < Math.min(4, delayedN) ? C.danger : C.mute,
-                        opacity: !loading && i < Math.min(4, delayedN) ? 1 : 0.35,
-                        display: 'block',
-                      }}
-                    />
-                  ))}
-                </div>
-              )}
-              onClick={() => go('/risk')}
+              label="손익"
+              value={Soft(loading, won(opProfit))}
+              meta={loading ? undefined : `영업수입−영업비용 · 월청구 ${won(kpi.monthlyBilled)}`}
+              bar={<Bar pct={loading ? 0 : Math.min(100, Math.abs(opProfit) > 0 ? 70 : 0)} tone={opProfit >= 0 ? 'ok' : 'danger'} />}
+              onClick={() => go('/cash')}
             />
           </div>
 
-          {/* 시안: homeGrid — 업무 | 교차검증 */}
           <div style={{
-            ...gridHome,
-            gridTemplateColumns: mobile ? '1fr' : 'minmax(0, 1.55fr) minmax(280px, 1fr)',
+            display: 'grid',
+            gridTemplateColumns: mobile ? '1fr' : 'minmax(0, 1.6fr) minmax(240px, 1fr)',
+            gap: 16,
           }}>
-            <Panel
-              title="오늘 집중할 업무"
-              desc="위험도와 기한을 기준으로 정렬했습니다."
-              action={<Btn size="sm" variant="ghost" onClick={() => go('/risk')}>리스크 전체</Btn>}
-            >
+            <Panel title="법인별 요약" desc="보유·가동·미수·영업손익 — 같은 KPI SSOT.">
               {loading ? (
                 <EmptyState variant="sec">…</EmptyState>
-              ) : focus.length === 0 ? (
-                <EmptyState variant="ok">오늘 급한 업무 없음</EmptyState>
+              ) : coRows.length === 0 ? (
+                <EmptyState variant="sec">표시할 법인이 없습니다</EmptyState>
               ) : (
-                <ListBox>
-                  {focus.map((a) => (
-                    <ListRow
-                      key={a.key}
-                      badge={a.status}
-                      badgeTone={a.status === '어김' ? 'red' : 'amber'}
-                      main={`${a.plate || '—'} · ${a.title}`}
-                      sub={`${a.kind} · ${a.date}`}
-                      right={(
-                        <span style={{
-                          fontSize: 12, fontWeight: 700, fontFamily: NUM, fontVariantNumeric: 'tabular-nums',
-                          color: a.status === '어김' ? C.danger : C.warn,
-                        }}>
-                          {a.dday < 0 ? `${-a.dday}일 지남` : a.dday === 0 ? '오늘' : `D-${a.dday}`}
-                        </span>
-                      )}
-                      onClick={() => { if (a.plate) openCar(a.plate); else go('/risk'); }}
-                    />
-                  ))}
-                </ListBox>
+                <ExcelSheet cols={coCols} rows={coRows} rowKey={(r) => r.companyId} />
               )}
             </Panel>
 
-            <Panel
-              title="데이터 교차검증"
-              desc="원장과 증명서가 다른 항목입니다."
-              action={<Btn size="sm" variant="ghost" onClick={() => go('/risk')}>검토함 열기</Btn>}
-            >
-              <div style={{
-                display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)',
-                margin: 14, border: `1px solid ${C.line}`, borderRadius: R, overflow: 'hidden',
-              }}>
-                {[
-                  { label: 'OCR·준수', n: ocrN },
-                  { label: '값 불일치', n: mismatchN },
-                  { label: '미매칭', n: unmatchedN },
-                ].map((x, i) => (
-                  <div
-                    key={x.label}
-                    style={{
-                      padding: 12,
-                      borderRight: i < 2 ? `1px solid ${C.line}` : undefined,
-                      display: 'grid', gap: 4,
-                    }}
-                  >
-                    <span style={{ fontSize: 10, color: C.mute }}>{x.label}</span>
-                    <strong style={{ fontSize: 20, fontFamily: NUM, fontVariantNumeric: 'tabular-nums', color: C.ink }}>
-                      {Soft(loading, x.n)}
-                    </strong>
-                  </div>
-                ))}
-              </div>
+            <Panel title="영업손익 추이" desc="최근 6개월 · 현금 기준.">
               {loading ? (
                 <EmptyState variant="sec">…</EmptyState>
-              ) : validations.length === 0 ? (
-                <EmptyState variant="ok">교차검증 이슈 없음</EmptyState>
               ) : (
-                <div style={{ padding: '0 8px 10px' }}>
-                  <ListBox>
-                    {validations.map((r) => (
-                      <ListRow
-                        key={r.key}
-                        badge={r.badge}
-                        badgeTone="amber"
-                        main={r.title}
-                        sub={r.sub}
-                        onClick={() => { if (r.plate) openCar(r.plate); else go('/risk'); }}
-                      />
-                    ))}
-                  </ListBox>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: '4px 2px' }}>
+                  {trend.list.map((x) => {
+                    const pct = Math.round((Math.abs(x.profit) / trend.maxAbs) * 100);
+                    return (
+                      <div key={x.m} style={{ display: 'grid', gridTemplateColumns: '52px 1fr 72px', gap: 8, alignItems: 'center' }}>
+                        <span style={{ fontSize: 11, color: C.mute, fontFamily: NUM }}>{x.m.slice(5)}</span>
+                        <div style={{ height: 8, borderRadius: 4, background: 'var(--bg-stripe)', overflow: 'hidden' }}>
+                          <div style={{
+                            width: `${pct}%`, height: '100%',
+                            background: x.profit >= 0 ? C.ok : C.danger,
+                          }} />
+                        </div>
+                        <span style={{
+                          fontSize: 11, fontWeight: 700, textAlign: 'right', fontFamily: NUM,
+                          color: x.profit >= 0 ? C.ink : C.danger,
+                        }}>
+                          {won(x.profit)}
+                        </span>
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </Panel>
