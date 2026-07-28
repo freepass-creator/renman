@@ -1,329 +1,333 @@
-﻿# RENMAN-CURSOR.md ??Cursor 吏꾩엯??
+# RENMAN-CURSOR.md — Cursor 진입점
 
-> renman (jpkerp6) ?뚰꽣移?ERP. **Cursor媛 ???뚯씪遺???쎄퀬 ?쒖옉?쒕떎.**
-> 吏??뚯씪: `CLAUDE.md` (Claude 吏꾩엯????Claude Code媛 ?먮룞 濡쒕뵫?섎뒗 洹쒖빟 ?뚯씪?대씪 ?대쫫 怨좎젙).
-> ???뚯씪? **吏꾩엯?먯씪 肉? 洹쒓꺽 蹂몃Ц? ?꾨옒 怨듭슜 臾몄꽌 ?섎굹**瑜?媛由ы궓?? (蹂몃Ц????踰뚮줈 蹂듬텤?섏? 留?寃???洹멸쾶 ???꾨줈?앺듃媛 怨좎튂怨??덈뒗 諛붾줈 洹?臾몄젣)
+> renman (jpkerp6) 렌터카 ERP. **Cursor가 이 파일부터 읽고 시작한다.**
+> 짝 파일: `CLAUDE.md` (Claude 진입점 — Claude Code가 자동 로딩하는 규약 파일이라 이름 고정).
+> 두 파일은 **진입점일 뿐, 규격 본문은 아래 공용 문서 하나**를 가리킨다. (본문을 두 벌로 복붙하지 말 것 — 그게 이 프로젝트가 고치고 있는 바로 그 문제)
 
 ---
 
-## 1. 臾몄꽌 吏?????대뵒??萸먭? ?덈굹
+## 1. 문서 지도 — 어디에 뭐가 있나
 
-| 臾몄꽌 | ?댁슜 | ?몄젣 蹂대굹 |
+| 문서 | 내용 | 언제 보나 |
 |---|---|---|
-| **`docs/RENMAN-WORK-ORDER.md`** | **?묒뾽吏?쒖꽌 쨌 洹쒓꺽??(蹂몃Ц SSOT)**. ?덈? 洹쒓꺽 쨌 A洹몃９(吏湲??由?寃? 쨌 B洹몃９(援ъ“ 媛쒗렪) 쨌 怨듭슜 ?먯옄 ??쨌 ?덊떚?⑦꽩 | **?묒뾽 ???꾨룆** |
-| `CLAUDE.md` | 肄붾뱶 洹쒓꺽 (UI 怨듭슜 洹쒓꺽 쨌 ?붾㈃ 援ъ“ 쨌 ?곗씠??3痢?쨌 湲곕뒫 ?붿쭊 SSOT 쨌 媛쒕컻 ?쒖빟) | 肄붾뱶 ?곌린 ??|
-| `DEPLOY.md` | 諛고룷 쨌 **?ㅽ뵂 ???꾩닔 寃뚯씠??*(env 쨌 Firestore rules 諛고룷 쨌 ?щ줈?ㅽ뀒?뚰듃 寃利?쨌 留덉뒪??怨꾩젙 쨌 API ?쒗겕由? | 諛고룷쨌?ㅽ뵂 ??|
-| **`docs/CACHE.md`** | **諛깆뾽 SSOT** ??`.next` ?꾨줈?앺듃 ???좎?, 諛깆뾽 ??罹먯떆 ?쒖쇅 | 諛깆뾽쨌??PC쨌?⑸웾 |
-| `tools/archive/architecture-cleanup-handoff.md` | Cursor Phase 0~3 ?뺣━ ?대젰 쨌 Phase 4 ?붿뿬 | ?댁쟾 留λ씫 ?뺤씤 |
-| `README.md` | 濡쒖뺄 ?ㅽ뻾 | ?섍꼍 ?명똿 |
+| **`docs/RENMAN-WORK-ORDER.md`** | **작업지시서 · 규격서 (본문 SSOT)**. 절대 규격 · A그룹(지금 틀린 것) · B그룹(구조 개편) · 공용 원자 표 · 안티패턴 | **작업 전 필독** |
+| `CLAUDE.md` | 코드 규격 (UI 공용 규격 · 화면 구조 · 데이터 3층 · 기능 엔진 SSOT · 개발 제약) | 코드 쓰기 전 |
+| `DEPLOY.md` | 배포 · **오픈 전 필수 게이트**(env · Firestore rules 배포 · 크로스테넌트 검증 · 마스터 계정 · API 시크릿) | 배포·오픈 전 |
+| **`docs/CACHE.md`** | **백업 SSOT** — `.next` 프로젝트 안 유지, 백업 시 캐시 제외 | 백업·새 PC·용량 |
+| `tools/archive/architecture-cleanup-handoff.md` | Cursor Phase 0~3 정리 이력 · Phase 4 잔여 | 이전 맥락 확인 |
+| `README.md` | 로컬 실행 | 환경 세팅 |
 
 ---
 
-## 2. 吏湲?????(?붿빟 ???곸꽭??WORK-ORDER)
+## 2. 지금 할 일 (요약 — 상세는 WORK-ORDER)
 
-**IA (2026-07 理쒖쥌):** (?곷떒)??쒕낫?쑣룹슫?곹쁽??쨌 泥섎━=由ъ뒪??룹뾽臾는룸뜲?댄꽣愿由?쨌 ?먯옣=?먯궛쨌怨꾩빟쨌?먭툑 쨌 ?쒖뒪??  
-`/desk`??/risk`. 由ъ뒪??`risk-ledger`(+agenda ?닿?쨌?꾨컯). ??쒕낫??`riskAgendaFocus`.
+**IA (2026-07):** 허브=홈(대시보드)·운영현황(통합시트)·일정관리(기한엑셀)·데이터센터.  
+원장=자산·계약·자금·업무. 일정=`buildAgenda` 어김/임박/예정 · LedgerFrame.  
+홈=지표 한눈(함대·일정어김·미수) — 엑셀 표는 각 메뉴.
 
-**Claude 寃利??ъ씤??** `PAGE_IA`/`NAV_GROUPS` 쨌 由щ떎?대젆??쨌 ?⑤꼸 ?섏젙 쨌 `/cash` tools CTA 쨌 踰꾪듉 zone 쨌 `tsc --noEmit`.
+**Claude 검증 포인트:** `PAGE_IA`/`NAV_GROUPS` · 리다이렉트 · 패널 수정 · `/cash` tools CTA · 버튼 zone · `tsc --noEmit`.
 
-**B洹몃９ ?붿뿬:** B-1 誘몄닔 ?먯옣 ?붿쭊 쨌 B-4 ?꾨뱶 ?ㅽ궎留?쨌 globals ?덇굅??
+**B그룹 잔여:** B-1 미수 원장 엔진 · B-4 필드 스키마 · globals 레거시.
 
 ---
 
-## 3. ?덈? 洹쒓꺽 (?붿빟 ???닿만 寃쎌슦 ?섎룎由?
+## 3. 절대 규격 (요약 — 어길 경우 되돌림)
 
 ```bash
-# ?묒뾽 ?⑥쐞留덈떎 ?????듦낵?댁빞 ?꾨즺
+# 작업 단위마다 둘 다 통과해야 완료
 node node_modules/typescript/bin/tsc -p tsconfig.json --noEmit   # EXIT 0
 curl -s -o /dev/null -w "%{http_code}" http://localhost:6006/<route>   # 200
 ```
-- ?좑툘 **turbo dev ?ㅽ뻾 以?`npm run build` 湲덉?**
-- ??? `resolveWriteCompany()` (`lib/scope.ts`) ?꾩닔 ??`COMPANIES[0]`쨌`'switchplan'` ?꾩쓽 ?대갚 **湲덉?**
-- 紐⑸줉 濡쒕뵫: `useEntityLists()` (`lib/use-entity-lists.ts`) ??濡쒕뵫 蹂댁씪?ы뵆?덉씠??蹂듬텤쨌`jpk:saved` ?먮· 援щ룆 **湲덉?**
-- ??젣: soft-delete留?(`store.remove`). ?섎뱶??젣 湲덉?
-- ?섏씠吏?먯꽌 吏묎퀎쨌?곹깭?먯젙 **?먮· 湲덉?** (?붾㈃留덈떎 ?レ옄 ?щ씪吏???먯씤)
-- **?덈줈 留뚮뱾湲???grep?쇰줈 湲곗〈 援ы쁽 ?뺤씤** (以묐났 援ы쁽?????꾨줈?앺듃 二쇰맂 遺梨?
-- 而ㅻ컠 濡쒖뺄留? **push 湲덉?**. author `dudguq@gmail.com`
+- ⚠️ **turbo dev 실행 중 `npm run build` 금지**
+- 저장: `resolveWriteCompany()` (`lib/scope.ts`) 필수 — `COMPANIES[0]`·`'switchplan'` 임의 폴백 **금지**
+- 목록 로딩: `useEntityLists()` (`lib/use-entity-lists.ts`) — 로딩 보일러플레이트 복붙·`jpk:saved` 손롤 구독 **금지**
+- 삭제: soft-delete만 (`store.remove`). 하드삭제 금지
+- 페이지에서 집계·상태판정 **손롤 금지** (화면마다 숫자 달라지는 원인)
+- **새로 만들기 전 grep으로 기존 구현 확인** (중복 구현이 이 프로젝트 주된 부채)
+- 커밋 로컬만, **push 금지**. author `dudguq@gmail.com`
 
-?꾩껜 洹쒓꺽쨌洹쇨굅쨌?꾨즺 湲곗? ??`docs/RENMAN-WORK-ORDER.md` 짠0, 짠5
-
----
-
-## 4. ?묒뾽 洹쒖튃 (Cursor ??Claude)
-
-1. **?숈떆 ?묒뾽 ????** ??踰덉뿉 ??履쎈쭔 ?몄쭛?쒕떎
-2. **?섍만 ?뚮뒗 諛섎뱶??`tsc EXIT 0` ?곹깭濡?** 源⑥쭊 梨??섍린吏 ?딅뒗??
-3. **諛붽씔 寃???以??④린湲?* ???꾨옒 짠5 ?몃뱶?ㅽ봽 濡쒓렇??瓦썼쮼
-4. **怨듭슜 ?먯옄瑜??덈줈 留뚮뱾?덉쑝硫?* WORK-ORDER 짠3(怨듭슜 ?먯옄 ?????깅줉 ???ㅼ쓬 ?щ엺????留뚮뱾吏 ?딄쾶
-5. ?곷?媛 留뚮뱺 ?먯옄? **??븷??寃뱀튂硫??밴꺽/?듯빀**, 蹂묐젹 ?좎꽕 湲덉?
-   (?? ?먭툑 ?꾩슜 `useCashLedgerLists` ??踰붿슜 `useEntityLists`濡??밴꺽??寃?
+전체 규격·근거·완료 기준 → `docs/RENMAN-WORK-ORDER.md` §0, §5
 
 ---
 
-## 5. ?몃뱶?ㅽ봽 濡쒓렇 (理쒖떊????
+## 4. 협업 규칙 (Cursor ↔ Claude)
 
-> **???ㅻⅨ PC濡???만 ??(git?쇰줈 ???곕씪?ㅻ뒗 寃?2媛吏):**
-> 1. **?ㅼ쐞移섑뵆???ㅻ뜲?댄꽣** = `C:\dev\jpkerp6-留덉씠洹몃젅?댁뀡\switchplan_?ㅼ쐞移섑뵆??` (由ы룷 諛뼿텾II??gitignore). ?놁쑝硫?`MIGRATE_MODE=auto`媛 frozen/demo濡??대갚. ?뚯씪 2媛?`[?ㅼ쐞移섑뵆?? ?ъ뾽?꾪솴.xlsx`쨌`26???ㅼ쐞移섑뵆???먭툑?쇰낫.xlsx`)瑜?洹?寃쎈줈??蹂듭궗?댁빞 ?ㅻ뜲?댄꽣 諛섏쁺?? 寃쎈줈 諛붽씀?ㅻ㈃ `MIGRATE_ROOT` env.
-> 2. **`.env.local`** = gitignore. ?대쾲??`NEXT_PUBLIC_MIGRATE_MODE=frozen`??*`auto`**濡?諛붽퓞. ??PC?먯꽑 `.env.local.example` 李멸퀬???ㅼ떆 留뚮뱾 寃?Firebase ?ㅒ?auto` 紐⑤뱶).
-> ?쇰┛ ?쒕뱶 ?ъ깮???꾧뎄: `npx tsx tools/rebuild-switchplan-frozen.ts <?ъ뾽?꾪솴.xlsx>` (?쒕씪?대윴 湲곕낯, `--write`濡?諛섏쁺).
+1. **동시 작업 안 함.** 한 번에 한 쪽만 편집한다
+2. **넘길 때는 반드시 `tsc EXIT 0` 상태로.** 깨진 채 넘기지 않는다
+3. **바꾼 것 한 줄 남기기** → 아래 §5 핸드오프 로그에 追記
+4. **공용 원자를 새로 만들었으면** WORK-ORDER §3(공용 원자 표)에 등록 — 다음 사람이 또 만들지 않게
+5. 상대가 만든 원자와 **역할이 겹치면 승격/통합**, 병렬 신설 금지
+   (예: 자금 전용 `useCashLedgerLists` → 범용 `useEntityLists`로 승격한 것)
 
-| ?좎쭨 | ?묒뾽??| ?댁슜 | ?곹깭 |
+---
+
+## 5. 핸드오프 로그 (최신이 위)
+
+> **⚠ 다른 PC로 옮길 때 (git으로 안 따라오는 것 2가지):**
+> 1. **스위치플랜 실데이터** = `C:\dev\jpkerp6-마이그레이션\switchplan_스위치플랜\` (리포 밖·PII라 gitignore). 없으면 `MIGRATE_MODE=auto`가 frozen/demo로 폴백. 파일 2개(`[스위치플랜] 사업현황.xlsx`·`26년_스위치플랜_자금일보.xlsx`)를 그 경로에 복사해야 실데이터 반영됨. 경로 바꾸려면 `MIGRATE_ROOT` env.
+> 2. **`.env.local`** = gitignore. 이번에 `NEXT_PUBLIC_MIGRATE_MODE=frozen`→**`auto`**로 바꿈. 새 PC에선 `.env.local.example` 참고해 다시 만들 것(Firebase 키·`auto` 모드).
+> 얼린 시드 재생성 도구: `npx tsx tools/rebuild-switchplan-frozen.ts <사업현황.xlsx>` (드라이런 기본, `--write`로 반영).
+
+| 날짜 | 작업자 | 내용 | 상태 |
 |---|---|---|---|
-| 2026-07-29 | Cursor | 怨꾩빟 rentalType(??꽷룸낫?샕룹썡?뚰듃쨌?κ린쨌?낅Т?㈑룰린?) ?뚯씠?꾨씪?맞룻뤌쨌?먯옣?는룻듭묩 | tsc0 |
-| 2026-07-29 | Cursor | nav IA理쒖쥌: ?곷떒쨌泥섎━(由ъ뒪??룹뾽臾는룸뜲?댄꽣愿由?쨌?먯옣쨌?쒖뒪??쨌 PAGE_IA/ERP/NAV ?숆린 | tsc0 |
-| 2026-07-29 | Cursor | /desk硫붾돱?쒓굅??risk redirect 쨌 risk-ledger??agenda?닿?쨌?꾨컯?⑸쪟 쨌 ??쒕낫??riskAgendaFocus | tsc0 |
-| 2026-07-28 | Cursor | ??쒕낫??/dev/erp-design HomeView ?댁떇(KPI4+?ㅻ뒛?낅Т+援먯감寃利? 쨌 aging/踰뺤씤蹂꾪몴 ?쒓굅 | tsc0 |
-| 2026-07-28 | Cursor | Sec collapsible={false} 異붽? 쨌 ??쒕낫??3援ы쉷 ?묎린/?곕툕濡??쒓굅 | tsc0 |
-| 2026-07-28 | Cursor | ????젣쨌??쒕낫???좉퇋(LedgerFrame쨌KPI+aging+踰뺤씤蹂? 쨌 home-kpi ?먭린 쨌 computeKPI/kpiByCompany SSOT | tsc0 |
-| 2026-07-28 | Cursor | ?댿넂??쒕낫??愿?쒖퐬??: nav LayoutDashboard 쨌 KPI???踰뺤씤蹂?ExcelSheet 쨌 home-kpi/kpi SSOT 쨌 異붿씠?앸왂 | tsc0 |
-| 2026-07-28 | Cursor | /risk filters ?쒖꽌=寃?됤넂移⒱넂PeriodBar(洹쒓꺽) 쨌 asset쨌contract쨌cash쨌work쨌status???대? ?숈씪 | tsc0 |
-| 2026-07-28 | Cursor | ??愿???щ같移? ?쒕ぉ=愿??쨌 ?쒕늿(Metric?ㅽ듃由? 쨌 ?쇱젙蹂몄껜 쨌 Message寃쎄퀬 쨌 ??Sec?먭린 | tsc0 |
-| 2026-07-28 | Cursor | ????젣쨌愿????쒕낫???ъ옉???⑤?쨌?ㅻ뒛?앸궪?셋룰퀎?띻?由? 쨌 lib/home-kpi 쨌 soft-fill 쨌 ?묒?湲덉? | tsc0 |
-| 2026-07-28 | Cursor | Gate hydration(inset?뭪op/right/?? ?쒓굅 쨌 ?덉텧=setPhase(signed-out) 쨌 loadProfile ID?좏겙/?꾨줈??6s timeout | tsc0쨌釉뚮씪?곗? Issue諛곗??뚮㈇ |
-| 2026-07-28 | Cursor | ???ㅽ뵾?덇툑吏 soft-fill(?? 쨌 Gate 4珥덊썑 ?덉텧踰꾪듉 쨌 Auth boot 6s | tsc0 |
-| 2026-07-28 | Cursor | ?ㅽ뵾?덇퀬李? session boot 二쎌?肄쒕갚 clearTimeout湲덉? 쨌 store.list/useEntityLists 15s timeout 쨌 Auth援щ룆?ㅽ뙣?뭩igned-out | tsc0 |
-| 2026-07-28 | Cursor | ????젣???ъ옉?? KPI?덈툕(?⑤?쨌?ㅻ뒛?앸궪?셋룰퀎?띻?由? 쨌 useEntityLists soft-load 쨌 ?ㅻ뜑?곸떆 | tsc0 |
-| 2026-07-28 | Cursor | ??KPI?덈툕(?⑤?쨌?ㅻ뒛?앸궪?셋룰퀎?띻?由? 쨌 selectPendingWork 쨌 agenda誘몃━蹂닿린5 쨌 ?곗씠?곗꽱??tools媛뺣벑 | tsc0 |
-| 2026-07-28 | Cursor | ?댟?m??LedgerFrame?щ＼ ?쒕뵫(寃?됀텽bjRow諛붾줈媛湲? 쨌 ?덉쇅洹몃━?쒖뾾??쨌 tools=ingest icon | tsc0 |
-| 2026-07-28 | Cursor | ?댟?m??寃??諛붾줈媛湲곕쭔(吏?쑣룹삁?멸렇由щ뱶?쒓굅) 쨌 home-briefing?먭린 쨌 SSOT=risk-ledger | tsc0 |
-| 2026-07-28 | Cursor | ?뉯???쒕뵫(寃?됀룸━?ㅽ겕?붿빟쨌諛붾줈媛湲? 쨌 home-briefing/cols?먭린 쨌 ?덉쇅SSOT=risk-ledger留?| tsc0 |
-| 2026-07-28 | Cursor | /risk 由ъ뒪?ш?由?LedgerFrame 쨌 risk-ledger SSOT 쨌 nav쨌/m/risk移??뺥빀 쨌 home-briefing ?섑띁 | tsc0 |
-| 2026-07-28 | Cursor | ???꾪꽣移?[?꾩껜쨌誘멸껐쨌由ъ뒪??룻쑕李? 쨌 ?꾩껜 湲곕낯 쨌 LedgerFrame ?묒? ?좎? | tsc0 |
-| 2026-07-28 | Cursor | ??LedgerFrame?묒?(誘멸껐쨌由ъ뒪??룻쑕李? 쨌 home-briefing ?쒗듃SSOT 쨌 /m由ъ뒪?몃룞??쨌 諛붾줈媛湲고븯??| tsc0 |
-| 2026-07-28 | Cursor | lucide ?붿뿬: OcrCrosscheck?졖텱rawer?묅넃 ??AlertTriangle/ChevronUp/Down | tsc0 |
-| 2026-07-28 | Cursor | ???ㅻ뒛釉뚮━??Page+?몃━?꾩?) 쨌 home-briefing SSOT 쨌 /m怨듭슜 쨌 desk?쇱젙蹂듭썝 쨌 ?뚯쫰??룓湲?| tsc0 |
-| 2026-07-28 | Cursor | lucide ?꾩씠肄??듭씪: ?좊땲肄붾뱶?뭠ucide 쨌 Page/LedgerFrame ??댄?=nav icon 쨌 mobile-tabs=nav | tsc0 |
-| 2026-07-28 | Cursor | UIUX-SPEC ?ㅻ뜑 而⑦듃濡?議?洹쒓꺽??媛깆떊(CompanyFilter쨌solid sm쨌Select) | tsc0 |
-| 2026-07-28 | Cursor | work 援щ텇 PillTabs?뭆elect 쨌 asset/contract/work 二쇱븸??solid sm 쨌 receivables actions?뭌B 쨌 penalty sm | tsc0 |
-| 2026-07-28 | Cursor | ?뚯궗?ㅼ퐫???듭씪: ingest companySlot?묬ompanyFilter 쨌 ??meta 踰뺤씤紐?以묐났 ?쒓굅 | tsc0 |
-| 2026-07-28 | Cursor | ledger-create-panel COMPANIES[0] ?꾨━???덉쇅 二쇱꽍(???resolveWriteCompany) | tsc0 |
-| 2026-07-28 | Cursor | cash 怨꾩쥖 ?뚯깮쨌吏묎퀎 ??buildBankAccountLedger(cash-ledger.ts) 쨌 ?섏씠吏??寃곌낵留?| tsc0 |
-| 2026-07-28 | Cursor | asset/contract ?듦퀎 諛곗? ??ledger-stats SSOT 쨌 riskDebtSum=selectReceivables | tsc0 |
-| 2026-07-28 | Cursor | asset 媛?숈긽??linkFleet ownership쨌utilization(status? ?숈씪 異? | tsc0 |
-| 2026-07-28 | Cursor | ??LedgerFrame?묒?(?붿빟쨌誘멸껐쨌由ъ뒪??룻쑕李㉱룹씪?? 쨌 硫붾돱?쇱젙?쒓굅 쨌 /desk?믫솃??| tsc0 |
-| 2026-07-28 | Cursor | ??湲곗〈?묒떇 蹂듭썝(FacetPage+?쇱젙/誘멸껐/?댁쁺/由ъ뒪??Rail+Sec) 쨌 LedgerFrame???먭린 | tsc0 |
-| 2026-07-28 | Cursor | ??媛덉븘?롪린: LedgerFrame+移?誘멸껐/由ъ뒪???⑤?)+SECTION_MAP ??쨌 Facet/?뉗?KPI ?먭린 | tsc0 |
-| 2026-07-28 | Cursor | 怨꾩빟쨌?댁쁺: ?⑸?議곌굔 遺꾨━ ??寃곗젣??+ ?좊텋/?꾨텋(+?⑸?諛⑸쾿) ??| tsc0 |
-| 2026-07-28 | Cursor | ???먯옣?숈씪??Page+WB+?ъ엯?꾩씠肄?+Sec?쒕늿 쨌 ?쌙acet?뚯쫰 ?먭린 | tsc0 |
-| 2026-07-28 | Cursor | ??蹂듭썝: Facet+?쇱젙/誘멸껐/?댁쁺/由ъ뒪??Sec 쨌 Agenda쨌FacetPage rail 쨌 KPI-only ?먭린 | tsc0 |
-| 2026-07-28 | Cursor | 踰꾪듉 SSOT(tools=iconOnly) 쨌 ?먯궛/怨꾩빟 ?앹꽦?볥떞湲?쨌 work/status/desk/list 留욎땄 쨌 ???좎? | tsc0 |
-| 2026-07-28 | Cursor | Btn iconOnly+tip 쨌 ?먭툑/ingest tools ?뚯씪??쨌 ???⑤?/?ㅻ뒛?앸궪??怨꾩냽愿由?쨌 ?ъ엯?꾩씠肄?| tsc0 |
-| 2026-07-28 | Cursor | ?먯옣 ?뺤옣 洹쒓꺽: `ledger-ext` 쨌 SHEET/DETAIL/FILTER keys 쨌 ?붿껌=`?쒗듃쨌異빧?/-key` (?묒????ы븿) | tsc0 |
-| 2026-07-28 | Cursor | ?몃??꾪꽣 SSOT: `*_FILTER_DEFS`+`LedgerFilterFields` 쨌 ?붿껌=`?쒗듃쨌?꾪꽣쨌key` 쨌 ???먯옣 諛곗꽑 | tsc0 |
-| 2026-07-28 | Cursor | ?곸꽭 ?꾨뱶 異붽? SSOT: `*_DETAIL_DEFS`+`buildDetailSections` 쨌 ?붿껌=`?쒗듃쨌?뱀뀡쨌key` | tsc0 |
-| 2026-07-28 | Cursor | ?먯옣 ?곸꽭?⑤꼸 ?꾨? ?뱀뀡?묎린: work/desk/status/cash(+ASSET/CONTRACT) 쨌 FLEET/AGENDA_DETAIL_SECTIONS | tsc0 |
-| 2026-07-28 | Cursor | ?곸꽭?⑤꼸 ?묎린: open+onToggle ?좉? 쨌 cols ?좏깮 쨌 怨꾩빟?뚮??샕룹쥌猷뚣?쨌 WORK-ORDER ?쒓린 | tsc0 |
-| 2026-07-28 | Cursor | P0: FilterChips ?먯옣 鍮좊Ⅸ?꾪꽣(asset/contract/cash/desk/status) 쨌 ingest?묹edgerFrame(body/view/companySlot) 쨌 濡쒕뵫=?쒖옄由щ쭔 | tsc0 |
-| 2026-07-28 | Cursor | UI ?щ＼ 寃??罹붾쾭?? ?먯옣/Facet/ingest 怨듯넻쨌怨좎쑀쨌?먮·쨌P0(FilterChips쨌ingest Frame) | 遺꾩꽍 |
-| 2026-07-28 | Cursor | EmptyState `sheet` variant 쨌 LedgerFrame/ingest 鍮덉뭏=?⑤꼸怨??믪씠留욎땄(?곷떒 ?묒?諛뺤뒪 ?쒓굅) | tsc0 |
-| 2026-07-28 | Cursor | ?곗씠?곗꽱???꾨㈃?ш뎄?? Page frame+?꾪꽣以??쒗듃/?ъ엯?⑤꼸(?먯옣?? 쨌 Sec/Metric ?먭린 쨌 OCR쨌?묒?쨌????붿쭊 ?좎? | tsc0 |
-| 2026-07-28 | Cursor | 釉뚮씪?곗? 吏곸젒寃利?/work): ?ㅽ뵾??쨌?꾪꽣?좎?쨌?묒뾽?곸뿭以묒븰(dx0) 쨌 Playwright 濡쒓렇????痢≪젙 | ?뺤씤 |
-| 2026-07-28 | Cursor | PageLoading=?묒뾽?곸뿭 ?뺤쨷??absolute) 쨌 LedgerFrame? ?꾪꽣以??좎?+?쒖옄由??ㅽ뵾??| tsc0 |
-| 2026-07-28 | Cursor | ERP 濡쒕뵫 ?섍꼍: Page/FacetPage/LedgerFrame `loading` 쨌 ?몄쑀吏+蹂몃Ц PageLoading 쨌 soft-load?좎? 쨌 WORK-ORDER 짠0.4 | tsc0 |
-| 2026-07-28 | Cursor | PageLoading=蹂몃Ц ?먮━ 蹂듦?(??ㅽ겕由???린 泥좏쉶) 쨌 Gate留?????遺??| tsc0 |
-| 2026-07-28 | Cursor | 濡쒕뵫 ?ㅽ뵾??2以?遺꾩궛 ?섏젙 ?쒕룄(PageLoading ??ㅽ겕由? ???섏씠吏諛붽묑留뚯씠??泥좏쉶 | 泥좏쉶 |
-| 2026-07-28 | Cursor | ???묒떇 ?먭린: Agenda/MySchedule/MyDesk/home-lenses ??archive 쨌 ?ㅼ젙 mydesk ?쒓굅 쨌 tsconfig archive ?쒖쇅 | tsc0 |
-| 2026-07-28 | Cursor | ?쇱젙愿由?LedgerFrame(?닿?/?꾨컯/?덉젙) 쨌 ???댁쁺 ??쒕낫???⑤?쨌?쇱젙쨌由ъ뒪??KPI) 쨌 硫붾돱紐??쇱젙愿由?| tsc0 |
-| 2026-07-28 | Cursor | ?댟룸뜲?댄꽣?쇳꽣 ?꾨㈃?ъ옉?? ???ㅻ뒛/?덈툕/?먯옣 ListBox 쨌 ingest=?꾪꽣以?right??Β룹꽕紐?back?쒓굅 | tsc0 |
-| 2026-07-28 | Cursor | ?댁쁺?꾪솴 援먯껜: ??OpsLens/Facet ?먭린 ??LedgerFrame+FleetRow(李⑤웾1?? 쨌 desk??Page洹쒓꺽 | tsc0 |
-| 2026-07-28 | Cursor | ?먯옣 踰꾪듉 洹쒓꺽 怨좎젙: ?곗륫=stats?믩낫湲겸넂tools 쨌 ?곌린/?뚰겕?뚮줈/?꾪꽣/蹂닿린 遺꾨쪟 쨌 Frame ?쒖꽌 留욎땄 | tsc0 |
-| 2026-07-28 | Cursor | ?덈툕 蹂듦?: ?댟?/status`?댁쁺쨌`/desk`?쇱젙誘멸껐쨌ingest硫붾돱 쨌 nav/mobile 쨌 TopSearch=李얘린 쨌 `/ops`?뭗esk | tsc0 |
-| 2026-07-28 | Cursor | `/cash` ?섎（猷⑦봽 ?덈궡 Message ?쒓굅(?ㅻ챸諛곕꼫 遺덊븘?? | ?꾨즺 |
-| 2026-07-28 | Cursor | 怨꾩빟 誘몄닔?믩━?ㅽ겕: ?꾪꽣/?듦퀎/而щ읆 쨌 risk-ops(誘몄닔쨌蹂댄뿕쨌諛섎궔) 쨌 ?듯빀愿由??쇱씠??鍮좊Ⅸ?낅젰 ?꾩냽 硫붾え | tsc0 |
-| 2026-07-28 | Cursor | ?ㅽ뵾???곴뎄: hung :6006(node 1.6GB) ?ш린??쨌 store.list fetch/getIdToken??withTimeout | tsc0 |
-| 2026-07-28 | Cursor | ?먯옣 ?⑤꼸 ?щ＼ ?듭씪: ?ㅻ뜑/?섎떒諛?`--ledger-head-h`/`--ledger-foot-h` 36 쨌 FilterPanel???숈씪 footer | tsc0 |
-| 2026-07-28 | Cursor | ?먯옣 ?곸꽭?⑤꼸 ?뱀뀡?묎린: ASSET/CONTRACT_DETAIL_SECTIONS 쨌 LedgerRecordPanel details | tsc0 |
-| 2026-07-28 | Cursor | ?먯옣 ?꾪꽣以?SSOT(?뚯궗쨌寃?됀룹꽭遺?꾪꽣?꾩닔쨌踰붿쐞쨌湲곌컙) 쨌 `/work` FilterBtn+?곹깭/?대떦/?먯쿇 ?⑤꼸 | tsc0 |
-| 2026-07-28 | Cursor | `/vehicle/[plate]`=VehicleDetail 怨좎젙?ㅽ겕濡???諛곕윺蹂듦? 쨌 Sample360 ?숆린 쨌 VehiclePage(??떆?? ?쒓굅(寃쎌웳SSOT) | tsc0 |
-| 2026-07-28 | Cursor | ?뚯궗?좏깮: quick(?낅Т)=Pill移?쨌 ?뺤떇?앹꽦(?먯궛쨌怨꾩빟)=?쒕∼?ㅼ슫 ?좎?(?깃꺽蹂? | tsc0 |
-| 2026-07-28 | Cursor | ?먯옣 ?꾪꽣以??믪씠 ?듭씪: CompanyFilter/PeriodBar/FilterBtn ?꾨? sm(28) 쨌 ??Search쨌Select? 留욎땄 | tsc0 |
-| 2026-07-28 | Cursor | ?먯옣 踰꾪듉 洹쒓꺽: LedgerActions/PanelFooter 쨌 Frame.tools 쨌 right=?곌린쨌tools=猷⑦봽/OCR 쨌 zone??solid1 | tsc0 |
-| 2026-07-28 | Cursor | IA?⑥닚??怨좎젙: PAGE_IA/NAV쨌由щ떎?대젆??/sheet,/finance,/ops)쨌LedgerEditPanel쨌/cash ?섎（猷⑦봽CTA 쨌 Claude寃利앹슜 | tsc0 |
-| 2026-07-27 | Cursor | ?ㅼ쐞移섑뵆??留덉씠洹몃젅?댁뀡 踰꾪듉(`MigrateDataButton`) 쨌 `/dev/data`쨌鍮??먯옣 CTA 쨌 硫붾돱紐?蹂寃?| tsc0 |
-| 2026-07-27 | Cursor | ?먯옣 ?붾툝?대┃ ?좉??リ린(?섏씠吏 setSelected) 쨌 ?대┃/?붾툝?대┃ ??대㉧쨌user-select 蹂댁젙 쨌 thead/?⑤꼸?ㅻ뜑 12px쨌36h ?듭씪 | tsc0 |
-| 2026-07-27 | Cursor | ?먯옣: 媛숈????щ뜑釉뷀겢由??⑤꼸?リ린 쨌 thead/?⑤꼸?ㅻ뜑/Page??댄? `--ledger-head-h:36` ?듭씪 | tsc0 |
-| 2026-07-27 | Cursor | ?먯옣: ?대┃=?됱꽑??쨌 ?붾툝?대┃留??곸꽭?⑤꼸 吏꾩엯(?щ뜑釉??ㅻ뜑?붾툝=??쟾?? 쨌 Page/?⑤꼸 ?ㅻ뜑 `--ledger-head-h` ?뺣젹 | tsc0 |
-| 2026-07-25 | Cursor | 硫붾돱??怨쇳깭猷뙿룸?寃쎈?怨?`/penalty`) 蹂듦뎄 쨌 ?곗뼱 ?쇱씠??| ??|
-| 2026-07-25 | Cursor | ?ㅻ뒛留덈Т由? 硫붾돱???먭툑?쇰낫쨌誘몄닔 쨌 ?щТ?먯옣 CTA=怨꾩쥖CMS?믪옄湲덉씪蹂닳넂誘몄닔 쨌 CMS item????щ즺留ㅼ묶(?뺤궛???쒖쇅踰꾧렇 ?쒓굅) | tsc0 |
-| 2026-07-25 | Cursor | 怨꾩빟쨌?섎궔=?먯궛怨??숈씪 6횞3 쨌 誘몄닔=`schUnpaid`(?뚯감?붿븸) 쨌 ?뚯감=醫뚯뿴1횞3 | tsc OK |
-| 2026-07-25 | Cursor | 怨꾩빟쨌?섎궔=?쒖븞洹쒓꺽(議곌굔?몃씪?몄닔?빧룹쭊?됲븘?쑣룻븳??移맞룻쉶李⑥슂?쎈컮쨌蹂댁쬆?쒕룞쨌?먯씡?뚯닔?? 쨌 DeskPane ?⑤꼸?댁“移?| tsc OK |
-| 2026-07-25 | Cursor | ?섏젙=Glance ?몃씪???됯뎄議??좎?쨌?⑤꼸留??몄쭛) 쨌 EditKV ?쒓굅 쨌 ?덉씠?꾩썐 怨좎젙 | tsc OK |
-| 2026-07-25 | Cursor | ?섏젙?믫뿤?붿뿉 ??Β룹랬???リ린 ?쒓굅) 쨌 ?댁쁺쨌GPS???몄쭛?몄뀡 | ??|
-| 2026-07-25 | Cursor | 李⑤웾?곸꽭 CTA ?쇰꺼=?뚯닔?뺛랁넻???뺤젙쨌媛깆떊 ?쒓굅) 쨌 ?쒖븞???숈씪 | ??|
-| 2026-07-25 | Cursor | 蹂댄뿕?⑤꼸: 蹂댄뿕猷?珥?N?뚯감 쨌 ?댁쟾利앷텒 쨌 李⑤웾?대갚 쨌 CTA=?섏젙 | tsc OK |
-| 2026-07-25 | Cursor | `/vehicle` ?⑤꼸 ?섎떒 泥⑤?(AttFoot)=?쒖븞 ?댁떇 쨌 `_docs` ?щ’(?깅줉利씲룰껄?겶룻븷遺쨌利앷텒쨌GPS쨌怨쇳깭猷뙿룹젙鍮꽷룰퀎?승룹쁺?섏쬆) | tsc OK |
-| 2026-07-25 | Cursor | 蹂댄뿕 ?由ъ젏=?由ъ젏\|?대떦??遺꾨━(?쒖“?ъ젣?먭낵 ?숈씪) 쨌 agencyContact ?꾨뱶 | (?몃텋媛) |
-| 2026-07-25 | Cursor | 李⑤웾?곸꽭 ?깅줉利??꾨뱶=?쒖븞 ?꾪빆紐?臾몄꽌?뺤씤~異쒓퀬媛) 쨌 ?뷀떚??OCR 留ㅽ븨 蹂닿컯 쨌 痍⑤뱷?먭?쨌?붿긽?샕룸텇??| (?몃텋媛) |
-| 2026-07-25 | Cursor | `/vehicle` ?꾪룺 frame ??쨌 ?곗륫??col5濡?諛李?媛?대뜲 援щ찉 ?쒓굅) 쨌 ?щ＼=踰덊샇????| (?몃텋媛) |
-| 2026-07-25 | Cursor | `/vehicle/[plate]` ??Page frame+?꾪룺(contentMax 10000) 쨌 DetailShell 1680罹??댁젣 쨌 蹂몃Ц height 100% | (?몃텋媛) |
-| 2026-07-25 | Cursor | `/vehicle/[plate]`=car-desk ?쒖븞 IA ?댁떇(?먯궛\|怨꾩빟\|?섎궔 ??룻뙣?먭렇由щ뱶) 쨌 `vehicle-detail/desk.tsx` 쨌 ?뷀떚??痍④툒?由ъ젏쨌蹂댄뿕?由ъ젏 | (?몃텋媛) |
-| 2026-07-25 | Cursor | `/dev/car-desk` ?쒖“?ъ젣??痍④툒?由ъ젏쨌?대떦??| (?몃텋媛) |
-| 2026-07-25 | Cursor | `/dev/car-desk` 蹂댄뿕 怨꾩빟?먃룻뵾蹂댄뿕??蹂듦뎄(?뚰꽣移?以묐났 vs 援щ룆 ?꾩슂 ???쒖떆?щ? 蹂대쪟) | (?몃텋媛) |
-| 2026-07-25 | Cursor | `/dev/car-desk` 蹂댄뿕 怨꾩빟?먃룻뵾蹂댄뿕???쒓굅(?뚰꽣移??낅Т?⑹뿉 遺덊븘?? | (?몃텋媛) |
-| 2026-07-25 | Cursor | `/dev/car-desk` 蹂댄뿕 ?먮룞?댁껜?믩?由ъ젏(?곹샇쨌?곕씫) 援먯껜 | (?몃텋媛) |
-| 2026-07-25 | Cursor | `/dev/car-desk` 蹂댄뿕 ?먮룞?댁껜 ???쒓굅 | (?몃텋媛) |
-| 2026-07-25 | Cursor | `/dev/car-desk` 蹂댄뿕: ??멤뀪쨌???쒖쨪 쨌 蹂댄뿕猷?珥??⑸?N?뚯감 ?쒖쨪 | (?몃텋媛) |
-| 2026-07-25 | Cursor | `/dev/car-desk` #1?깅줉=醫뚯뿴1횞3(?됱쟾泥? 쨌 #8?섏꽑 col2??濡??쒖뭏 ?곗륫 | (?몃텋媛) |
-| 2026-07-25 | Cursor | `/dev/car-desk` Glance쨌?대젰쨌?뚯감 ??hover=`C.hover` | (?몃텋媛) |
-| 2026-07-25 | Cursor | `/dev/car-desk` ?⑤꼸?꾨뱶蹂닿컯: ?깅줉=?깅줉利앪몺~寃??룹젣??쨌 ?쒖썝=5???듭뀡쨌援щ룞 쨌 痍⑤뱷쨌蹂댄뿕쨌?댁쁺???꾨씫梨꾩? | (?몃텋媛) |
-| 2026-07-25 | Cursor | `/dev/car-desk` ?섏꽑쨌?ш퀬???쇱옄\|援щ텇\|?댁슜\|湲덉븸 移?遺꾨━(湲덉븸 蹂몃Ц ?⑹묠 ?댁젣) | (?몃텋媛) |
-| 2026-07-25 | Cursor | `/dev/car-desk`=??李⑤웾 議고쉶?꾩슜 쨌 `?new=1`쨌鍮덉뭏?깅줉硫??쒓굅 쨌 /asset?뚯떊洹쒕벑濡앪넂?쒖븞?띾쭅???뚯닔 | (?몃텋媛) |
-| 2026-07-25 | Cursor | `/dev/car-desk` #6 GPS=1횞1 쨌 #7 怨쇳깭猷?1횞2(GPS?꾨옒) 쨌 #8 ?섏꽑=5횞1(?섎떒) ??諛섎컲 ?듭?遺꾨같 ?댁젣 | (?몃텋媛) |
-| 2026-07-25 | Cursor | ?좉퇋?깅줉=/asset ?대컮(?쒖븞??dev/car-desk?new=1) 쨌 ?곸꽭?먮뒗 ?놁쓬 쨌 痍⑥냼?믩ぉ濡?| (?몃텋媛) |
-| 2026-07-25 | Cursor | `/dev/car-desk` Page ??댄?以??쒓굅 쨌 ?щ＼=踰덊샇????쭔 쨌 ?좉퇋?깅줉 踰꾪듉 ?먮━ 蹂대쪟 쨌 Page 鍮덊뿤??誘몃젋??| (?몃텋媛) |
-| 2026-07-25 | Cursor | ??TopBar=fixed+body paddingTop 쨌 Page frame=html/body overflow ?좉툑 쨌 ?곷떒諛?怨좎젙쨌李쎌뒪?щ· ?쒓굅 | (?몃텋媛) |
-| 2026-07-25 | Cursor | `/dev/car-desk` ?곗륫???댁쁺\|GPS\|怨쇳깭猷뚮쭔 ?몃줈 쨌 ?섏꽑 2횞1? 醫뚰븯??쨌 鍮덉뭏 ?좎?(?듭?諛곗튂 湲덉?) | (?몃텋媛) |
-| 2026-07-25 | Cursor | `/dev/car-desk` ?곗륫?댁뿉 #4?댁쁺쨌#6GPS쨌#7怨쇳깭猷?1횞1 ?몃줈?섏뿴 쨌 #8?섏꽑 2횞1(col4??) | (?몃텋媛) |
-| 2026-07-25 | Cursor | `/dev/car-desk` #5蹂댄뿕=1횞2 쨌 ?꾨뱶=蹂댄뿕??룹쬆沅뙿룸??멤뀪?≤룸?臾셋룹옄李㉱룸텇?⑺슏?샕룹킑蹂댄뿕猷???| (?몃텋媛) |
-| 2026-07-25 | Cursor | `/dev/car-desk` 議고쉶/?좉퇋 ???쒓굅 쨌 湲곕낯=議고쉶 쨌 ?곗륫?뚯떊洹쒕벑濡앫띾쾭?쇄넂?깅줉硫?쨌 痍⑥냼濡?蹂듦? | (?몃텋媛) |
-| 2026-07-25 | Cursor | `/dev/car-desk` #4?댁쁺쨌#6GPS쨌#7怨쇳깭猷?1횞1 쨌 #8?섏꽑=2횞1 쨌 #5蹂댄뿕=1횞2 쨌 ?섎떒 ?щ갚 ?좎? | (?몃텋媛) |
-| 2026-07-25 | Cursor | `/dev/car-desk` ?⑤꼸 蹂몃Ц 湲곕낯 overflow hidden(?ㅽ겕濡??쒓굅) 쨌 ?대젰/?뚯감?쒕쭔 scroll | (?몃텋媛) |
-| 2026-07-25 | Cursor | `/dev/car-desk` ?⑤꼸 遺덈?/媛蹂/?대젰 諭껋? ?쒓굅 | (?몃텋媛) |
-| 2026-07-25 | Cursor | `/dev/car-desk` ?먯궛 ?⑤꼸踰덊샇 #1~8 쨌 #1~3 ?깅줉\|?쒖썝\|痍⑤뱷 媛?횞2 쨌 #4~6 ?댁쁺\|蹂댄뿕\|GPS 媛?횞2 쨌 #7~8 怨쇳깭猷?|?섏꽑 媛?횞1 | (?몃텋媛) |
-| 2026-07-25 | Cursor | `/dev/car-desk` ?먯궛=?⑤꼸6 媛濡쒕같???깅줉\|?쒖썝\|痍⑤뱷\|?댁쁺\|蹂댄뿕\|GPS) | (?몃텋媛) |
-| 2026-07-25 | Cursor | `/dev/car-desk` ?먯궛=媛濡?횞6 쨌 col1???깅줉/?쒖썝/痍⑤뱷 ?몃줈 쨌 col2~6 ?댁쁺쨌蹂댄뿕쨌GPS쨌怨쇳깭猷뙿룹닔???몃줈3) | (?몃텋媛) |
-| 2026-07-25 | Cursor | `/dev/car-desk` ?먯궛=醫??몃줈?ㅽ깮 ?깅줉?믪젣?먥넂痍⑤뱷(媛?媛濡?) 쨌 以??댁쁺\|蹂댄뿕\|GPS 쨌 ??怨쇳깭猷?|?섏꽑 | (?몃텋媛) |
-| 2026-07-25 | Cursor | `/dev/car-desk` ?먯궛=6횞3 移몄쥖??怨좎젙(1?됰벑濡?|?쒖썝\|痍⑤뱷 쨌 2?됱슫??|蹂댄뿕\|GPS 쨌 3?됯낵?쒕즺\|?섏꽑) | (?몃텋媛) |
-| 2026-07-25 | Cursor | `/dev/car-desk` ?먯궛=6횞3洹몃━??1fr횞3) 쨌 1?됰벑濡?|?쒖썝\|痍⑤뱷(媛?) 쨌 2?됱슫??|蹂댄뿕\|GPS(媛?) 쨌 3?됯낵?쒕즺\|?섏꽑(媛?) | (?몃텋媛) |
-| 2026-07-25 | Cursor | `/dev/car-desk` 媛숈? ???⑤꼸 ?몃줈?믪씠 留욎땄(stretch+fill) 쨌 GPS??2??留먮떒 | (?몃텋媛) |
-| 2026-07-25 | Cursor | `/dev/car-desk` ?먯궛=6?щ’ 쨌 1??硫붿씤3+?댁쁺(2)\|蹂댄뿕 쨌 2??硫붿씤諛묎낵?쒕즺 / ?곕컩?섏꽑+GPS | (?몃텋媛) |
-| 2026-07-25 | Cursor | `/dev/car-desk` ?먯궛=媛濡??щ’ 쨌 1???댁슜?믪씠(?깅줉\|?쒖썝\|痍⑤뱷\|?댁쁺\|蹂댄뿕\|GPS) 쨌 2??怨쇳깭猷?|?섏꽑 | (?몃텋媛) |
-| 2026-07-25 | Cursor | `/dev/car-desk` ?먯궛=醫뙿?硫붿씤3???깅줉\|?쒖썝\|痍⑤뱷) + ?걔??댁쁺\|蹂댄뿕\|GPS + 怨쇳깭猷?|?섏꽑 | (?몃텋媛) |
-| 2026-07-25 | Cursor | `/dev/car-desk` 硫붿씤3=[?깅줉\|?쒖썝\|痍⑤뱷] 醫뚯륫 媛濡?0%留?쨌 ?곗륫鍮꾩? 쨌 遺媛??以묒슂?꾪룺 | (?몃텋媛) |
-| 2026-07-25 | Cursor | `/dev/car-desk` 遺媛??以묒슂?꾨퀎 ??GPS 140px)쨌?⑥? 媛濡?鍮꾩? | (?몃텋媛) |
-| 2026-07-25 | Cursor | `/dev/car-desk` ?먯궛=??硫붿씤3(?깅줉\|?쒖썝\|痍⑤뱷) + ?꾨옒 遺媛5 媛濡?| (?몃텋媛) |
-| 2026-07-25 | Cursor | `/dev/car-desk` ?먯궛=醫뙿쎌뿉 [?깅줉\|?쒖썝\|痍⑤뱷] 3?대굹???/ ?걔?遺媛 | (?몃텋媛) |
-| 2026-07-25 | Cursor | `/dev/car-desk` ?먯궛=醫뚮컲 ?깅줉쨌?쒖썝쨌痍⑤뱷 ?몃줈?ㅽ깮 / ?곕컲 ?댁쁺쨌蹂댄뿕쨌GPS쨌?대젰 | (?몃텋媛) |
-| 2026-07-25 | Cursor | `/dev/car-desk` ?먯궛=?깅줉|?쒖썝|痍⑤뱷 3?댁꽭濡쒓만寃?+ ?섎떒 ?댁쁺3쨌?대젰 | (?몃텋媛) |
-| 2026-07-25 | Cursor | `/dev/car-desk` ?먯궛=6?댁꽭濡????깅줉쨌?쒖썝쨌痍⑤뱷?좊?쨌?댁쁺쨌蹂댄뿕쨌GPS)+?섎떒怨쇳깭猷??섏꽑 쨌 ?좊??ㅼ?以꾩꺼遺쨌?붿븸?쒖떆 | (?몃텋媛) |
-| 2026-07-25 | Cursor | `/dev/car-desk` ?먯궛=遺덈?(?깅줉쨌?쒖썝쨌痍⑤뱷)/?댁쁺(?곹깭쨌蹂댄뿕쨌GPS)/?대젰 쨌 ?곹뭹?먯씡 ?쒖쇅 | (?몃텋媛) |
-| 2026-07-25 | Cursor | `/dev/car-desk` ?먯궛=5?늘???醫곴퀬 ?몃줈湲멸쾶) 쨌 KV 吏㏐쾶 쨌 怨꾩빟議곌굔 240px | (?몃텋媛) |
-| 2026-07-25 | Cursor | `/dev/car-desk` ?낆감?됰벑濡앹젙蹂는룹젣議곗궗?쒖썝=?듭떖遺덈?(?곷떒2移맞톒ero) 쨌 ?쒖썝利앸튃=寃ъ쟻/諛쒖＜/怨꾩빟?ъ떎?뺤씤 | (?몃텋媛) |
-| 2026-07-25 | Cursor | `/dev/car-desk` ?⑤꼸 媛濡쒖븬異??먯궛4?는룰퀎??00px횞2+?대젰?몃줈쨌KV max340) | (?몃텋媛) |
-| 2026-07-25 | Cursor | `/dev/car-desk` ?⑤꼸 ?섎떒 泥⑤?(蹂닿린쨌?ㅼ슫濡쒕뱶 Modal) 쨌 InfoDoc/_docs 紐⑤뜽 ?쒖븞 | (?몃텋媛) |
-| 2026-07-25 | Cursor | Page frame ?믪씠=`100vh?뭕ar?뭗ock` 쨌 `--fp-dock-h` SSOT(SessionBar) 쨌 car-desk ?섎떒諛?媛먯븞 苑됱콈?쨌?섏씠吏?ㅽ겕濡ㅼ젣嫄?| (?몃텋媛) |
-| 2026-07-25 | Cursor | `/dev/car-desk` ?먯궛??Vehicle360?뚯씠 李ⓦ띾㏊(?깅줉利씲??㉱텴PS쨌痍⑤뱷/援щℓ諛⑸쾿쨌蹂댄뿕쨌?댁쁺쨌?곹뭹?먯씡쨌怨쇳깭猷뙿룹닔?? 3횞3 | (?몃텋媛) |
-| 2026-07-25 | Cursor | `/dev/car-desk` ?⑤꼸 ??댄?쨌醫낅쪟留덊겕瑜?諛뺤뒪 ???ㅻ뜑濡?諛??띿뒪???쒓굅) | (?몃텋媛) |
-| 2026-07-25 | Cursor | `/dev/car-desk` ??퀎 遺덈?쨌媛蹂쨌?대젰 ?⑤꼸濡?苑?梨꾩?(?먯궛3+2 / 怨꾩빟2횞2 / ?섎궔2횞2) | (?몃텋媛) |
-| 2026-07-25 | Cursor | `/dev/car-desk` ???먯궛|怨꾩빟|?섎궔(援듭쭅) 쨌 ?ㅻ뜑??誘몄닔/D-day ?쒕늿 | (?몃텋媛) |
-| 2026-07-25 | Cursor | `/dev/car-desk` ?꾨찓?명븰?듬컲?????쒕늿?댁뒋쨌?꾩옱3?먯옣쨌怨꾩빟/李⑤웾?대젰遺꾨━쨌?꾨Ц?泥⑤? | (?몃텋媛) |
-| 2026-07-25 | Cursor | `/dev/car-desk` 怨꾩빟?대젰 異붽?(?꾩옱?≪븘???대젰?뚯쫰=怨꾩빟|李⑤웾遺꾨━) | (?몃텋媛) |
-| 2026-07-25 | Cursor | `/dev/car-desk` ?꾩옱=?좎감?됤몼怨꾩빟??씠???섎궔) 3異?쨌 湲곕낯?뚯쫰=?꾩옱 | (?몃텋媛) |
-| 2026-07-25 | Cursor | `/dev/car-desk` 臾몄꽌?⑤쾭???ㅻ쾭?덉씠 ?쒓굅 ??泥⑤????뱀뀡 AttChip留?蹂닿?=諛깆뿏?? | (?몃텋媛) |
-| 2026-07-25 | Cursor | `/dev/car-desk` 臾몄꽌??蹂닿?紐⑸줉?믪쟾?고솕硫댁쑝濡쒓볼???깅줉利씲룹쬆沅뙿룻븷遺쨌怨쇳깭猷? | (?몃텋媛) |
-| 2026-07-25 | Cursor | `/dev/car-desk` ?섎궔쨌?좊??쑣룻??꾨씪???뱀뀡??ScrollBody(?먯껜?ㅽ겕濡? | (?몃텋媛) |
-| 2026-07-25 | Cursor | `/dev/car-desk` ?뚯쫰3 ???쒕늿(?댁뒋)쨌?꾩옱(?먯옣)쨌?대젰(??꾨씪?? | (?몃텋媛) |
-| 2026-07-25 | Cursor | `/dev/car-desk` ?섎궔=360怨좎젙??쨌 ?꾪솴?꾪룺쨌怨꾩빟??媛濡쒖뿬???곗꽑 | (?몃텋媛) |
-| 2026-07-25 | Cursor | `/dev/car-desk` ?쒖븞 諛⑺뼢 OK(?쒕늿+臾몄꽌???꾪룺) ??誘몄꽭?섏젙 ?湲?| ??|
-| 2026-07-25 | Cursor | `/dev/car-desk` ?댁쟾(?겶룻븯?⑤럞??쨌臾몄꽌?⑥쟾??톑rid fr濡?酉고룷?멸퐠 | (?몃텋媛) |
-| 2026-07-25 | Cursor | `/dev/car-desk` 臾몄꽌???깅줉利씲룰퀎?쎌꽌쨌利앷텒쨌?좊??쑣룰낵?쒕즺쨌?섏꽑) 쨌 ?곗뒪???쒕늿留?| (?몃텋媛) |
-| 2026-07-25 | Cursor | `/dev/car-desk` ?쒕늿vs臾몄꽌 ???먯쿇(?깅줉利씲룰퀎?쎌꽌쨌利앷텒쨌?좊???? 踰꾪듉, ?곸떆?꾨뱶??理쒖냼 | (?몃텋媛) |
-| 2026-07-25 | Cursor | `/dev/car-desk` ?뱀뀡怨좎쑀踰꾪듉+?몃씪?멸린??諛섎궔/?낃툑/?쒕룞/?뺣퉬/?듯솕 ?? | (?몃텋媛) |
-| 2026-07-25 | Cursor | `/dev/car-desk` Page frame=?먯옣?쒗듃 ?숈씪?щ갚(16/24쨌?꾪룺쨌酉고룷?멸퐠) | (?몃텋媛) |
-| 2026-07-25 | Cursor | `/dev/car-desk` ?⑸룄蹂?援ъ뿭 ??醫뚯썝?μ뒪?씲룹쨷怨꾩빟/?섎궔二쇳몴쨌?고뙆?씲룻븯?대젰(?쒕룞?볤쾶) | (?몃텋媛) |
-| 2026-07-25 | Cursor | `/dev/car-desk` 踰꾪듉=?뱀뀡留??곷떒?≪뀡?쒓굅) 쨌 ?섏젙/??Β룹엯湲댟룸컲??媛?諛뺤뒪 | (?몃텋媛) |
-| 2026-07-25 | Cursor | `/dev/car-desk` ?쒖븞=諛뺤뒪?섏젙/???쨌 議고쉶?붿떊洹?鍮덉뭏) ?좉? 쨌 媛숈??섏씠吏 梨꾩슦湲?| (?몃텋媛) |
-| 2026-07-25 | Cursor | `/dev/car-desk` ?쒖븞 ?쒗넻????Num移?諛섎궔?쇱옄以??쒓굅 쨌 ?꾪솴쨌怨꾩빟쨌?먯궛쨌?섎궔쨌蹂댄뿕쨌痍⑤뱷쨌?곹뭹쨌蹂댁쬆 ?꾨? KV/??諛뺤뒪 | (?몃텋媛쨌誘멸?利? |
-| 2026-07-25 | Cursor | ?먯궛?곸꽭 ?붿옄?몄떆??`/dev/car-desk` (?쒗솕硫는룻??댄?+諛뺤뒪4移맞룹떎?곌껐X) | tsc0 |
-| 2026-07-25 | Cursor | ?먯궛?곸꽭 ?먯옄遺꾩꽍???꾩쟾?좎옉: DetailGrid쨌?뚮옯Num쨌?쑣텱isclosure 쨌 Metric/?쏇뙣?? | tsc0 |
-| 2026-07-25 | Cursor | ?먯궛?곸꽭 ?꾩쟾?ъ옉?? Metric/Sec諛뺤뒪쨌?쏇뙣?먯뒪???먭린 쨌 ?뚮옯Stat+KV+???⑥씪硫?| tsc0 |
-| 2026-07-25 | Cursor | ?먯궛?곸꽭 ?щ갚=?먯옣Page?숈씪(16/24쨌1680) 쨌 fill?ｌ?釉붾━???댁젣 | tsc0 |
-| 2026-07-25 | Cursor | ?먯궛?곸꽭 ?묒뾽???쒕늿/?댁감/?섎궔/?대젰) ?쒓굅 쨌 ?⑥씪?붾㈃ ?ㅽ겕濡???대뱶?ㅼ뿴 | tsc0 |
-| 2026-07-25 | Cursor | ?먯궛?곸꽭?뚰븳?덀??꾩닔吏??怨꾩빟/?먯궛/蹂댄뿕/?섎궔?쇳겕 쨌 洹몄옄由??낃툑쨌?섏젙 | tsc0 |
-| 2026-07-25 | Cursor | ?먯궛?곸꽭 湲곕낯=??대뱶紐⑤땲??useDeskTier) 쨌 醫곸쑝硫?1?댁뒪?щ· 쨌 吏湲덉???|怨꾩빟 2??| tsc0 |
-| 2026-07-25 | Cursor | ?먯궛?곸꽭 ??洹몃━?쒖쭨?꾩깉쨌?먮·諛뺤뒪?쒓굅(?뚮옯???쒕쭔) 쨌 ObjCard?먯옄?좎? | tsc0 |
-| 2026-07-25 | Cursor | ?먯궛?곸꽭 fill ERP諛???밸럭?ы듃梨꾩?쨌紐⑤컮??sticky?щ＼) 쨌 DetailShell fill | tsc0 |
-| 2026-07-25 | Cursor | ?먯궛?곸꽭=ERP?뚰겕踰ㅼ튂(?묒뾽?곸뿭1媛쑣룹쥖而⑦뀓?ㅽ듃/?곗쿂由? 쨌 ?ㅽ겕濡ㅻЦ?쒗룓湲?| tsc0 |
-| 2026-07-25 | Cursor | ?먯궛?곸꽭 ??먭린?뭋ehiclePage(?뱀쥖?덉씪+?곗옉?끒톐ocus?곗꽑) 쨌 useVehicleDetail?좎? | tsc0 |
-| 2026-07-25 | Cursor | Vehicle360 UI ?꾩쟾援먯껜??VehicleDetail` 怨좎젙?ㅽ겕濡?4??쨌 `useVehicleDetail` 쨌 諛곕윺 쨌 legacy?뭪ools/archive | tsc0 |
-| 2026-07-25 | Cursor | Vehicle360 濡쒖쭅??useVehicleDetail` ??異붿텧(JSX?놁쓬) 쨌 types.ts 쨌 UI??誘몄옉??| tsc0 |
-| 2026-07-25 | Cursor | Vehicle360 ?몃??ㅽ럺=吏湲??댁감/?섎궔?뺤궛/?대젰 ?먯옄諛곗뿴 쨌 SEC_DEFAULT쨌Sample360 ?숆린 쨌 罹붾쾭??detail-spec | tsc0 |
-| 2026-07-25 | Cursor | Vehicle360: 怨꾩빟議곌굔?믫쁽???섏쐞 쨌 ?좊??ㅼ?以꾟넂痍⑤뱷 Disclosure ?몃씪??쨌 Disclosure?먯옄 | tsc0 |
-| 2026-07-25 | Cursor | Vehicle360: ??젋利?泥좏쉶 쨌 SectionLabel(?댁쁺쨌?먯궛쨌怨꾩빟쨌?대젰)+Sec?ㅽ겕濡?freepass?곸꽭) 쨌 Input/異쒕젰???좎? | tsc0 |
-| 2026-07-25 | Cursor | Vehicle360: sticky ?뚯쫰(?댁쁺쨌?먯궛쨌怨꾩빟쨌?대젰)+Sec?꾪꽣 쨌 fInp?묲nput/Select 쨌 異쒕젰??쨌 ?섎궔 ?꾩옱/?댁쟾 | tsc0 |
-| 2026-07-25 | Cursor | toggleStyle ?쒖꽦=?됰쭔(fontWeight 怨좎젙) 쨌 ToggleChips?뭪oggleStyle 쨌 ?좏깮?????붾뱾由??쒓굅 | tsc0 |
-| 2026-07-25 | Cursor | 鍮좊Ⅸ?낅젰: 李??좏깮?믪엯?μ쁿 ?붿빟(?뚯궗쨌李⑤쾲쨌李⑥쥌쨌怨꾩빟?곹깭) 쨌 ?꾨옒 ?띿뒪?맞룻뙆??| tsc0 |
-| 2026-07-25 | Cursor | 鍮좊Ⅸ?낅젰 李⑤쾲?꾨낫=absolute?앹뾽 留먭퀬 ?낅젰移??꾨옒 ?몃씪??紐⑸줉(?뚯궗 Badge) | tsc0 |
-| 2026-07-25 | Cursor | 鍮좊Ⅸ?낅젰 李⑤쾲?꾨낫???뚯궗 ?쒖떆紐?Badge 쨌 matchVehicles companyId/sub | tsc0 |
-| 2026-07-25 | Cursor | 鍮좊Ⅸ?낅젰: ???쒓굅쨌??醫뚰뀓?ㅽ듃/?고뙆??쨌 紐⑤컮???곹븯 쨌 FileDrop 遺숈뿬?ｊ린 | tsc0 |
-| 2026-07-25 | Cursor | 鍮좊Ⅸ?낅젰 李⑤쾲=matchVehicles ??댄븨 ?꾨낫(?좏깮??李⑤쾲留?梨꾩?) | tsc0 |
-| 2026-07-25 | Cursor | 鍮좊Ⅸ?낅젰=QuickInput(李⑤쾲+?띿뒪??|?뚯씪) ?몃씪??쨌 inbox plate/note 쨌 QuickLogForm? 360???좎? | tsc0 |
-| 2026-07-25 | Cursor | ?댁쁺?먯옣 鍮좊Ⅸ?낅젰=?몃씪??Modal X)쨌李⑤쾲 ?좏깮?낅젰 쨌 CTA?쒖꽌 ?좎? | tsc0 |
-| 2026-07-25 | Cursor | ?댁쁺?먯옣 CTA ?쒖꽌: 鍮좊Ⅸ?낅젰 쨌 ?먯궛?깅줉 쨌 ?곗씠?곗꽱??| tsc0 |
-| 2026-07-25 | Cursor | ?댁쁺?먯옣 CTA 3媛? ?곗씠?곗꽱??쨌 ?먯궛?깅줉 쨌 鍮좊Ⅸ?낅젰(openLog) | tsc0 |
-| 2026-07-25 | Cursor | ?щТ?먯옣 CTA=?곗씠?곗꽱??openIngest) 쨌 ingest ?섎떒 ?댁쟾 | tsc0 |
-| 2026-07-25 | Cursor | ?щТ?먯옣 CTA=嫄곕옒 ?낅젰 1媛쒋넂ingest 쨌 ?곗씠?곗꽱???섎떒 ?댁쟾(Page back, WorkHubBack ?쒓굅) | tsc0 |
-| 2026-07-25 | Cursor | ?щТ?먯옣 CTA: ?닿린?믨퀎醫뙿텰MS ?낅젰 / 踰뺤씤移대뱶 ?낅젰 | tsc0 |
-| 2026-07-25 | Cursor | ?щТ?먯옣: 24쨌25 CMS誘몄뿰寃??섎갚嫄?DOM??＜?믫몴 200嫄??곹븳(?붽컙쨌寃?됱쑝濡?醫곹엳湲? | tsc0 |
-| 2026-07-25 | Cursor | ?щТ?먯옣: 寃?뎑ms濡?異쒓툑 ?④린???꾪꽣 ?먮났(寃??媛濡쒖콈湲?痍⑥냼) | tsc0 |
-| 2026-07-25 | Cursor | CMS?낅줈???먯옣 CMS誘몄뿰寃?諛섏쁺 쨌 怨꾩쥖CMS吏묎툑怨??섎룞/?먮룞 留ㅼ묶 쨌 ?낃툑?⑷퀎??怨꾩쥖留?| tsc0 |
-| 2026-07-25 | Cursor | CMS: 留ㅼ묶遺??곸떆?섏쐞???쇱묠X)쨌吏묎툑?대┃=?섎룞留ㅼ묶쨌?닿린???먮룞?뺤궛 ?좎? | tsc0 |
-| 2026-07-25 | Cursor | ?닿린 ???먮룞?뺤궛: bank_tx쨌card_tx?묬MS/移대뱶吏묎툑 high쨌medium ?먮룞遺숈엫 (`payments/auto-settle` 쨌 intake 遺?섑슚怨? | tsc0 |
-| 2026-07-25 | Cursor | CMS留ㅼ묶: ?깃났?믪쭛湲?3~5??李?~7) 쨌 吏묎툑?쇰꺼留?deposit 쨌 ?뺤궛?묒? 672嫄??ъ엯 쨌 ?뺤궛 deposit13/item29 | tsc0 |
-| 2026-07-25 | Cursor | Search X=移???absolute(width??wrap) 쨌 ?낅젰?대룄 寃?됱뭏 ??而ㅼ쭚 | tsc0 |
-| 2026-07-25 | Cursor | Search ?낅젰媛??덉쑝硫?X 吏?곌린 쨌 ?щТ?먯옣 CMS?뺤궛 deposit ?쇱묠?믨뎄?깃굔(item) ?섏뿴 쨌 deposit異쒖쿂=CMS | tsc0 |
-| 2026-07-25 | Cursor | ?щТ?먯옣 ?쇱묠=踰뺤씤移대뱶쨌CMS쨌移대뱶留ㅼ텧쨌誘몃텇瑜섎쭔 쨌 移대뱶?뭖ard_tx?닿린 쨌 CMS?믩ℓ移??닿린 CTA | tsc0 |
-| 2026-07-25 | Cursor | `/dev/sample` ERP 3異??쒖븞: ?먯옣(?곷떒?꾪꽣쨌湲곕낯/?꾩껜쨌?됤넂360) 쨌 怨좎쑀 ??ObjCard) 쨌 ?덈궡. FacetRail/酉고넗湲 ?놁쓬 | tsc0 |
-| 2026-07-24 | Cursor | 紐⑤컮??硫붾돱=ERP4: ?대━硫?TopBar ?곹깭媛?뚢삹 硫붾돱???곗륫 X 쨌 ?⑤꼸 bar ?꾨옒 ?쇱묠 | tsc0 |
-| 2026-07-24 | Cursor | 紐⑤컮??硫붾돱=ERP4: TopBar z80 ?좎?쨌?꾨쾭嫄겸넄X 쨌 ?⑤꼸/?ㅽ겕由쇱? bar ?꾨옒留?| tsc0 |
-| 2026-07-24 | Cursor | BottomSheet ?명꽣=ERP4 std/filter/commit: 寃??吏?곌린쨌?リ린] 쨌 ?꾪꽣[?댁젣쨌?좏깮N쨌?リ린] 쨌 ?뚯궗/蹂닿린[?リ린] 쨌 SCRIM | tsc0 |
-| 2026-07-24 | Cursor | 紐⑤컮??2???щ＼ ?뺥빀: TopBar?밣ageToolBar 諛李??곷떒 ?뚯닔留덉쭊쨌pad ?쒓굅) 쨌 ??tools?щ’ 쨌 --topbar-h=56 | tsc0(?섎룞?뺤씤沅뚯옣) |
-| 2026-07-24 | Cursor | 紐⑤컮??TopBar 蹂듦뎄(ERP4): ?덈툕쨌?곸뒪 怨듯넻 ?곷떒 ?쒕ぉ+硫붾돱 쨌 硫붾돱??TopBar 쨌 PageToolBar?먯꽌 硫붾돱???쒓굅 쨌 sticky top=bar-h | tsc0 |
-| 2026-07-24 | Cursor | 紐⑤컮???대컮=ERP4 PageToolBar ?댁떇: 洹좊벑 寃?됀룻븘?걔룸낫湲걔룻쉶??룸찓?????쒗듃. ?뚯궗移??ш컖?꾩씠肄????먭린 | tsc0 |
-| 2026-07-24 | Cursor | 紐⑤컮?쇄넄ERP4 ?⑤━?? ?곸뒪 ?곷떒?쒕ぉ 쨌 TabBar ?좏겙 쨌 bar56 쨌 ObjCard56 쨌 WorkbenchBar ctrlH/PillTabs md 쨌 ActionBar SH | tsc0 |
-| 2026-07-24 | Cursor | UIUX ?붿뿬 3嫄? WizPanel(Delivery/Return ?몃씪?? 쨌 `/penalty/docs` ?꾩슜 쨌 payments `useSecOrder` | tsc0 쨌 UIUX 泥댄겕由ъ뒪???꾨즺 |
-| 2026-07-23 | Cursor | UIUX-SPEC ?꾨컲 1李??댄뻾: ExcelSheet/IconSeg(a쨌f) 쨌 DetailShell(contract) 쨌 ObjCard??penalty) 쨌 FacetRail ?곗씠?고븘??payments/repair) 쨌 useSecOrder(recv/dispatch/repair/penalty) 쨌 吏?쒓퀎??FacetPage 쨌 confirm/prompt??湲곕컲??| tsc0 쨌 ?붿뿬=Wizard/Docs ?몃씪??|
-| 2026-07-23 | Cursor | frozen ?쒕뱶 `--write` ?ъ깮???ㅻ깄 H1~H3 諛섏쁺): 163/177 쨌 carry ??42,315,000 쨌 C?묰LC 0 쨌 ?쒕꽕?쒖뒪?믫쁽? 0 쨌 洹몃옖? IG=?묒??좎? | tsc0 쨌 媛紐낇솕 湲곕줉 |
-| 2026-07-23 | Cursor | 李⑥쥌?ㅻ깄 H2?묱3?묱1: `has`/catalogSubModel 吏㏃?肄붾뱶?귢릿猷⑦듃 李⑤떒(C?묰LC) 쨌 釉뚮옖?쒗뿤???쒕꽕?쒖뒪?좏쁽?DH) 쨌 `vehicleRecord`??confidence=`high`留???뼱?(review=?묒??좎?) | tsc0 쨌 ?꾨줈釉?OK 쨌 frozen 誘몄옱?앹꽦(紐낆떆 ?붿껌 ??`--write`) |
-| 2026-07-23 | Claude | **UI/UX ?듭씪 洹쒓꺽**(?꾩닔寃??24p): `docs/UIUX-SPEC.md` ???좏삎6醫??꾪솴議고쉶쨌?듯빀?쒗듃쨌?낅Т쨌?곸꽭쨌?낅젰?먃룹??? 蹂닿린쨌?꾪꽣쨌?뺣젹쨌?뱀뀡쨌?앹뾽쨌紐⑤컮??SSOT + ?꾨컲 15p 泥댄겕由ъ뒪?? 怨듯넻: window.confirm/prompt 湲덉?쨌DataTable?묮xcelSheet쨌Sec??id쨌FacetRail=?곗씠?고븘?걔룻뙘??理쒖냼??| 洹쒓꺽 ?뺤젙(?섏젙 ?湲? |
-| 2026-07-23 | Claude | **?댁쁺?쒗듃=李⑤웾1?=1???듯빀 留덉뒪??*(?묒??꾩슜): `buildFleetRows` SSOT(?먯궛+怨꾩빟/?먮떂+誘몄닔+蹂댄뿕議곗씤+?꾩쐞移? 쨌 湲곕낯/?꾩껜 ?댄넗湲(?꾩껜=湲곕낯+遺媛 ?곗륫) 쨌 FacetRail ?댁쁺?쒗듃?뚯쫰(湲곕낯'蹂댁쑀') 쨌 ?ㅻ뜑?꾪꽣/?뺣젹 쨌 ?됲겢由?60 쨌 怨좎븘怨꾩빟 ?몄텧(誘몄닔 ?덉닲源) 쨌 ?곹깭諭껋?=?곹깭?ㅒ룻쁽?꾩튂 ?쒖뭏?섎굹 쨌 硫붾돱 理쒖긽???밴꺽 | 165?됀룸낫??13쨌誘몄닔1.42?돠톞sc0쨌/sheet200 |
-| 2026-07-23 | Claude | **'?ㅻ뒛' KST ?듭씪**(`todayKST`): UTC toISOString ??KST 00~09???섎（ ?대Ⅴ??寃???誘몄닔?꾨옒쨌D-day쨌湲곕줉??14怨?寃쎌쑀. ??꾩뒪?ы봽??UTC ?좎? | tsc0쨌test35 |
-| 2026-07-23 | Claude | **SM-1(P1) 遺덈쾿?꾩씠 諛깆뒪??*: 踰붿슜 ?몄쭛湲?`/list/[entity]/[id]` 媛 `canTransition` ?놁씠 怨꾩빟 status 瑜?洹몃?濡??????醫낅즺怨꾩빟 遺???댁??믪슫?? 媛?ν븯??寃? `canSetStatus`(status SSOT) ?좎꽕 + `commitUpdate` 而ㅻ㎤?쒖링?먯꽌 媛뺤젣(rec.status ?곗꽑쨌?놁쑝硫?議고쉶). 醫낅즺?믪슫???湲?遺?쒕쭔 李⑤떒, ?꾩쭊쨌梨꾧텒?붋톘o-op ?덉슜 | tsc 0 / test 35 |
-| 2026-07-23 | Claude | **?쇰┛ ?쒕뱶 媛紐낇솕**(PII): `tools/mask-switchplan-pii.ts` ?좎꽕 ???ㅻ챸?믨퀬媛쒷NN쨌?꾪솕쨌踰덊샇?먃톅IN쨌?꾩감??counterparty 寃곗젙??移섑솚(李몄“臾닿껐?굿톍arry 蹂댁〈). `rebuild-switchplan-frozen`??湲곕줉 吏곸쟾 ?먮룞 留덉뒪?????ъ깮?깊빐???짶II ???ㅼ뼱媛? ?쒕뱶???뺤쟻 import(踰덈뱾)??gitignore 遺덇? ??媛紐낇솕媛 ?뺣떟 | ?짶II 0쨌carry 142,315,000쨌163/177쨌tsc 0쨌test 32/32 |
-| 2026-07-22 | Cursor | frozen ?쒕뱶 live ?ъ깮??`rebuild-switchplan-frozen --write`): 李⑤웾 118??63 쨌 怨꾩빟 147??77 쨌 asOf 07-22 쨌 carry?죒et ??.42?돠룸??섏쑉34% 쨌 DocIssueDialog 誘몃━蹂닿린 `C.head` 쨌 짠2 B吏꾪뻾??媛깆떊 | tsc 0 / audit OK |
-| 2026-07-22 | Cursor | UI ?듭씪 ?⑥뒪: `TextLink` ?먯옄 쨌 Vehicle360/mobile-tabs 諛곕윺 ?≪닔 쨌 payments `Modal`+`TOUCH` 쨌 留곹겕 ?먮·(怨꾩빟/怨쇳깭猷??먭툑/紐⑸줉/?대젰) 쨌 globals.css 二쎌? ??~24KB ?쒓굅(Phase4 ?쇰?). ?팛orkbenchBar???쒗솚 ?뚮Ц??ui ?섏쐞寃쎈줈 ?좎? | tsc 0 / :6007 200 |
-| 2026-07-21 | Claude | **?댁쁺?꾪솴 = ?⑤? ?먮쫫**: ?붿빟?꾪솴 ?뱀뀡 ??젣(吏??10媛쒓? ?뱀뀡 ?ㅻ뜑? 以묐났쨌誘몄닔??由ъ뒪?ы꺆) ??KPI(蹂댁쑀쨌媛?숇쪧)???대컮 stat ??以?쨌 ?뱀뀡 ?쒖꽌=?몃룄?湲겸넂諛섎궔吏?ⓥ넂?댁감?믩쭔湲곗엫諛뺚넂?댄뻾以묅넂硫덉텣李?`useSecOrder ops-v2`) 쨌 ?뚭낍鍮꾨뒗李ⓦ띾? 吏???꾨컯 2?뱀뀡?쇰줈 遺꾨━ | tsc 0 / ??200 |
-| 2026-07-21 | Claude | **遺꾨쪟 SSOT 踰꾧렇**: ?댁쁺?꾪솴 ?댄뻾102쨌?좏쑕 紐⑸줉???붿빟怨???留욌뜕 寃???`buildAssetDerived`媛 `v.status`濡??ㅼ떆 媛덈옄?붾뜲 吏?쒕뒗 怨꾩빟湲곗?(`D.running`). ?댁젣 `D.running/idleCars/soldRows` ?ъ궗?? 洹몃컰=李⑥쭛??쨌 `a-running` 40? 議곗슜???덈떒 ?쒓굅 | tsc 0 |
-| 2026-07-21 | Claude | **蹂닿린?꾪솚(移대뱶?붿뿊?)**: `IconSeg` ?먯옄 ?좎꽕 쨌 `WorkbenchBar view` ?щ’(寃?됱갹 ?곗륫 怨좎젙) 쨌 `ExcelSheet mode` ??媛숈? cols濡???移대뱶 쨌 CLAUDE.md 湲덉???ぉ "蹂닿린?꾪솚 ?먮·"濡??뺤젙(?먯옄???덉슜) 쨌 ?ㅻ뜑?꾪꽣(ERP4 ?ㅽ넗?꾪꽣)쨌?됲샇踰?pin ?섏젙쨌?怨좎젙 ?쒓굅 | tsc 0 / sheet 200 |
-| 2026-07-21 | Claude | **?덉씪 ?덉씠?꾩썐 ?붾뱾由?*: FacetPage媛 `rail={null}`(濡쒕뵫以??????먮━瑜????≪븘 ?꾨즺 ??蹂몃Ц??履쇨렇?쇰뱾??寃???200px ?먮━ ?덉빟 쨌 `rail` undefined(?덉?)/null(濡쒕뵫以? 援щ텇 怨꾩빟??| tsc 0 / 8p 200 |
-| 2026-07-21 | Claude | **??諭껋?**: `PillTabs badge` ??誘멸껐쨌由ъ뒪????뿉 ?볦씤 嫄댁닔(0?대㈃ ?④?) 쨌 `WorkbenchTab.badge` | tsc 0 |
-| 2026-07-21 | Claude | **?낅줈??UI ?듭씪**: `FileDrop` ?ㅼ쨷(`onFiles`)쨌吏꾪뻾?쒖떆 吏??쨌 `DocUpload` 議곕┰ ?먯옄 ?좎꽕 쨌 PenaltyUpload쨌InfoDoc ?먮· ?쒕∼議닳넂`FileDrop`(怨쇳깭猷?怨좎???李쎌씠 ?곗씠?곗꽱?곗? 媛숈? 紐⑥뼇). ?몃씪?몃쾭?셋룹뭅硫붾씪(WorkForm쨌?섏쭛???????댄룷?섏뒪 ?щ씪 ?좎? | tsc 0 |
-| 2026-07-21 | Claude | **硫붾돱 ?ш뎄??*: ?낅Т=怨좎쑀?낅Т留?諛곗감쨌李⑤웾?섏꽑쨌誘몄닔쨌?먭툑?쇰낫쨌怨쇳깭猷뙿룹쬆鍮숈닔吏? 쨌 `?먮즺?깅줉`??*?곗씠?곗꽱??*(理쒖긽?? ?좏깮湲곕? ?곗씠??痢?optgroup?쇰줈 ???대깽?몃룄 ?ъ엯 媛?ν븿???몄텧) 쨌 `?뺣퉬愿由???李⑤웾?섏꽑` 쨌 `/work`??硫붾돱 ?쒖쇅(?섏씠吏??紐⑤컮?쇳꺆쨌WorkHubBack ?뚮Ц???좎?) | tsc 0 / 6p 200 |
-| 2026-07-21 | Claude | **?쒕룞?붽퀎??留ㅼ묶 踰꾧렇**: `lib/activity-match` ?좎꽕(contractNo?믩쾲?명뙋+湲곌컙?믪씠由?3?? 쨌 Customer360??踰덊샇?먯쑝濡쒕쭔 嫄몃윭 ?먮컮??李⑥뿉?????꾩감???듯솕媛 ?ㅼ쓬 ?꾩감?몄뿉寃??몄텧?섎뜕 寃??섏젙 쨌 Vehicle360 QuickLog媛 contractNo ???섍린??寃??먯씤) ?섏젙 + ?대젰???뚯긽????쒓린 | tsc 0 / 5p 200 |
-| 2026-07-21 | Claude | **?뱀뀡 IA 湲곗? ?뺣┰**: ?뚯삤???앸궪 ???덈뒗媛?띾줈 ??諛곗튂 ??誘몄닔 `s-unpaid`??r-unpaid` ?듯빀(誘멸껐???먮㈃ ?먭? ??鍮꾩썙吏? 쨌 ?뺣퉬?ш퀬 `s-repair`?믪옄??洹몃９ 쨌 `由ъ뒪?ы쁽????由ъ뒪?ш?由? 쨌 誘멸껐 9???뱀뀡 쨌 `cockpit-v3` ???밴꺽 쨌 CLAUDE.md 湲곗???| tsc 0 / 5p 200 |
-| 2026-07-21 | Claude | ?댁쁺?쒗듃 ??4醫??먯궛쨌怨꾩빟쨌梨꾧텒쨌諛섎궔) = ?ъ뾽?꾪솴 ?쒗듃 援ъ꽦 쨌 `buildContractRows` ?좎꽕(怨꾩빟 1?? | tsc 0 / 1p 200 |
-| 2026-07-21 | Claude | ?ㅼ쐞移섑뵆???먰겢由?留덉씠洹몃젅?댁뀡 諛곗꽑: `MIGRATE_ROOT` ?대뜑 ?앹꽦+?ъ뾽?꾪솴쨌?먭툑?쇰낫 諛곗튂 쨌 `MIGRATE_MODE=auto` 쨌 `tools/rebuild-switchplan-frozen.ts`(?쇰┛?쒕뱶 ?ъ깮?? ?쒕씪?대윴 湲곕낯) | 李⑤웾 118??63 쨌 怨꾩빟 147??77 |
-| 2026-07-21 | Claude | **?먯옄 ?뚮쭏???꾧껐**: `components/ui/**` hex 0(`SCRIM_FG` ?덉쇅 1) ???쒕㈃`#fff`??C.card` 쨌 釉뚮옖?쒖쐞 湲?먥넂`C.inverse` 쨌 `Message`/`Badge` ?붾젅???듭㎏濡?`--{tone}-bg/text/border`濡?쨌 globals.css `--teal-*` ?쇱쥌 ?좎꽕(?쇱씠???ㅽ겕) | tsc 0 / 10p 200 |
-| 2026-07-21 | Claude | ?ㅽ겕由?SSOT: `SCRIM`/`SCRIM_FG`(tokens) ??5媛吏 媛믪쑝濡??⑹뼱???덈뜕 7怨?Drawer쨌Modal쨌SessionBar쨌payments쨌CommandPalette쨌UploadSection쨌LoadingOverlay) ?듭씪 | tsc 0 / 11p 200 |
-| 2026-07-21 | Claude | `.cursor/rules/renman.mdc` ?좎꽕(Cursor ?먮룞濡쒕뵫) 쨌 **PenaltyDocs 臾몄꽌硫??섎룎由?*: A4 醫낆씠???좏겙 湲덉?(`PAPER/INK/INK_SUB/RULE?? 怨좎젙) ???ㅽ겕?뚮쭏?먯꽌 醫낆씠媛 寃?댁?怨??몄뇙 ???곗쥌???곌??먮줈 ?먮룆遺덇?媛 ?? ?붾㈃ ?щ＼留??좏겙 | tsc 0 / 9p 200 |
-| 2026-07-21 | Cursor | tokenize-2: ?붿뿬 `#fff`??C.card`(Agenda/SearchBox/InfoDoc ?? 쨌 dev/data th/td ?ъ궗??쨌 ?덉쇅 二쇱꽍 쨌 CommandPalette `C` import ?꾨씫 ?먯껜?섏젙 | tsc 0 |
-| 2026-07-21 | Claude | 3?④퀎: WorkForm ??댄?諛묒쨪쨌manage 諛뺤뒪?섑띁 ?쒓굅 쨌 PenaltyDocs??EmptyState` 쨌 Vehicle360 ?붿뿬 hex 5 | tsc 0 / 6p 200 |
-| 2026-07-21 | Claude | 2?④퀎: ?꾩옣 ?꾩???怨듭슜?먯옄 `components/ui/wizard.tsx`(`WizCard`/`WizField`/`WizPhotos`/`wizInput`) ??Delivery쨌Return 以묐났 40以??뚮㈇. ?팕ow???뺣젹쨌?꾨뱶??씠 ?щ씪 ?섎룄?곸쑝濡?誘명넻??| tsc 0 / 6p 200 |
-| 2026-07-21 | Cursor | ?섎뱶肄붾뵫 ???좏겙??CURSOR-TASK-tokenize): PenaltyDocs쨌manage쨌ingest쨌list쨌audit쨌360 fInp | tsc 0 |
-| 2026-07-21 | Claude | 1?④퀎 洹쇱썝: `tokens.tsx` ?섎뱶肄붾뵫 ?쒓굅(`C.lineStrong`/`inverse`/`card` 異붽?) ??`toggleStyle` ?쒖꽦移⑹씠 ?ㅽ겕?먯꽌 ??蹂댁씠??踰꾧렇 ?숇컲 ?섏젙 쨌 PenaltyUpload 蹂듬텤 th??...th` | tsc 0 |
-| 2026-07-21 | Cursor | B-2 ?붿뿬: contract/receivables/inbox/penalty/list?곸꽭/IngestDialog/DocIssueDialog/inbox-upload ??`commit*` | tsc 0 |
-| 2026-07-21 | Cursor | B-2 ?뺤옣: `commitSave/Remove/All` 쨌 Vehicle360 ???곌린 쨌 payments 留ㅼ묶/CMS/?댁젣 | tsc 0 |
-| 2026-07-21 | Cursor | B-3: 二쎌? lifecycle/risk-issues ??젣 쨌 `domain/status` SSOT 쨌 B-2: `commitUpdate`+Delivery/ReturnWizard | tsc 0 / audit OK |
-| 2026-07-21 | Cursor | ?뚯씠???쒖꽌: 誘몄닔 audit OK(蹂멸꺽 B-1 蹂대쪟) 쨌 B-5 360/Ingest/ingest??useEntityLists`(+opts.companyId) 쨌 API/Rules??login쨌Vercel link ?꾩슂(?댁쁺) | tsc 0 / audit OK |
-| 2026-07-21 | Cursor | ?뚯씠?꾨씪???ш?利?canvas) 쨌 `/sheet` ?댁쁺?쒗듃(?꾨━?⑥뒪 ?묒?酉??댁떇 쨌 `ExcelSheet`+`buildSheetRows`) 쨌 ?꾪솴 硫붾돱 | tsc 0 |
-| 2026-07-21 | Cursor | 紐⑤컮??媛먯궗 ?섏젙: KV/QuickLog/WorkForm/Ingest ?낅젰 `ctrlH`쨌16 쨌 DataTable?뭀bjCard 쨌 company `WorkbenchBar.actions`+Sec 쨌 error btn40/16 쨌 SessionBar pad=54 | tsc 0 |
-| 2026-07-21 | Cursor | ?ㅽ뵂寃뚯씠?? B-1?꾪솕(carry遺꾨같?묯IFO?섎궔)쨌API Bearer(`api-headers`+NEXT_PUBLIC_API_SHARED_SECRET)쨌?⑸낯?곌린 scope(payments쨌360쨌receivables쨌contract쨌inbox) 쨌 Rules諛고룷??firebase login ?꾩슂 | tsc 0 / audit OK |
-| 2026-07-21 | Cursor | `main` ?몄떆 `89682ff` ??GitHub `freepass-creator/renman` (Vercel ?곕룞 諛고룷?? | pushed |
-| 2026-07-21 | Cursor | B-5 2李? integrity쨌inbox쨌penalty쨌manage쨌pnl쨌PenaltyDocs ??`useEntityLists` 쨌 ?붿뿬=ingest/IngestDialog/360 | tsc 0 / 5p 200 |
-| 2026-07-21 | Cursor | B-5 李⑹닔: `useEntityLists` ?댄뻾 ??receivables쨌dispatch쨌asset쨌contract쨌contract-history쨌financials쨌payments쨌docs쨌audit쨌list/[entity] 쨌 짠2 A?꾨즺쨌B-5?ㅼ쓬?쇰줈 ?뺣━ | tsc 0 / 11p 200 |
-| 2026-07-21 | Cursor | `C:\dev\jpkerp6-app` ?묒뾽 諛곗튂쨌`npm run dev` 쨌 ?몃? distDir/?뺤뀡? Turbopack 紐⑤뱢?댁꽍 ?ㅽ뙣 ??`.next` ?꾨줈?앺듃 ???좎?쨌諛깆뾽 ???쒖쇅(`docs/CACHE.md`) | :6006 Ready |
-| 2026-07-20 | Cursor | A洹몃９ ?꾨즺: A-1 `patchEngineLock`+Vehicle360 `engineDisabled` SSOT 쨌 A-3 `isCashPurchase` 쨌 A-2 `selectReceivables` 5?붾㈃ 쨌 A-0 ingest/IngestDialog/PenaltyUpload/DocIssueDialog ?⑸낯 ????뚯궗 紐낆떆 ?좏깮 | tsc 0 / 10p 200 |
-| 2026-07-18 | Claude | A-0 ?뚯궗?ㅼ퐫???ㅻ같移??섏젙(`lib/scope.ts` ?좎꽕 + finance쨌Wizard 2醫끒텿uickLog쨌WorkForm ?곸슜). `lib/use-entity-lists.ts` 踰붿슜 濡쒕뵫 ???좎꽕. 8異??꾪궎?띿쿂 媛먯궗 ??WORK-ORDER ?묒꽦 | tsc 0 / ???섏씠吏 200 |
-| 2026-07-18 | Cursor | `listsCached` + `useCashLedgerLists`(?먭툑 3?섏씠吏) 쨌 `CashHubTabs` 쨌 `dashboard-consts`(TODAY 異붿텧) 쨌 `isStaffSuspended` | tsc 0 |
-| 2026-07-18 | Claude | ?ㅽ뵂 媛먯궗 ??釉붾줈而?5 + ?섎뱶??15 ?섏젙 (誘몄닔 ?숆껐 쨌 留덉뒪???덉랬 쨌 鍮??먯뿰??쨌 ?좎쭨 ?щ옒??쨌 API ?몄쬆 쨌 rules ?섎뱶???? | tsc 0 / 17p 200 |
+| 2026-07-29 | Cursor | ②대시보드 / 백지재작성(KPI5·법인요약·6개월손익막대·Sec접기0)·①③기충족스킵 |
+| 2026-07-29 | Cursor | ④납부시기(선납/후납) 라벨통일·반납까지=dday숫자+remainSpan tooltip |
+| 2026-07-29 | Cursor | ⑤허브·원장 meta 한줄 통일(비자명·중점구분) |
+| 2026-07-29 | Cursor | ⑥리스크 미완료=대시보드pending+agenda어김 흡수(bankTx)·/desk정합 |
+| 2026-07-29 | Cursor | ⑦원장상세 VehicleDetail/SchedulePanel 패널embed·리스크조치·업무점프 |
+| 2026-07-29 | Cursor | ⑧미납내용증명 일괄→리스크(sendNoticeCert)·계약단건 내용증명 |
+| 2026-07-28 | Cursor | 대시보드=/dev/erp-design HomeView 이식(KPI4+오늘업무+교차검증) · aging/법인별표 제거 | tsc0 |
+| 2026-07-28 | Cursor | Sec collapsible={false} 추가 · 대시보드 3구획 접기/셰브론 제거 | tsc0 |
+| 2026-07-28 | Cursor | 홈 삭제·대시보드 신규(LedgerFrame·KPI+aging+법인별) · home-kpi 폐기 · computeKPI/kpiByCompany SSOT | tsc0 |
+| 2026-07-28 | Cursor | 홈→대시보드(관제콕핏): nav LayoutDashboard · KPI타일+법인별 ExcelSheet · home-kpi/kpi SSOT · 추이생략 | tsc0 |
+| 2026-07-28 | Cursor | /risk filters 순서=검색→칩→PeriodBar(규격) · asset·contract·cash·work·status는 이미 동일 | tsc0 |
+| 2026-07-28 | Cursor | 홈 관제 재배치: 제목=관제 · 한눈(Metric스트립) · 일정본체 · Message경고 · 옛3Sec폐기 | tsc0 |
+| 2026-07-28 | Cursor | 홈 삭제·관제 대시보드 재작성(함대·오늘끝낼일·계속관리) · lib/home-kpi · soft-fill · 엑셀금지 | tsc0 |
+| 2026-07-28 | Cursor | Gate hydration(inset→top/right/…) 제거 · 탈출=setPhase(signed-out) · loadProfile ID토큰/프로필 6s timeout | tsc0·브라우저 Issue배지소멸 |
+| 2026-07-28 | Cursor | 홈=스피너금지 soft-fill(…) · Gate 4초후 탈출버튼 · Auth boot 6s | tsc0 |
+| 2026-07-28 | Cursor | 스피너고착: session boot 죽은콜백 clearTimeout금지 · store.list/useEntityLists 15s timeout · Auth구독실패→signed-out | tsc0 |
+| 2026-07-28 | Cursor | 홈 삭제후 재작성: KPI허브(함대·오늘끝낼일·계속관리) · useEntityLists soft-load · 헤더상시 | tsc0 |
+| 2026-07-28 | Cursor | 홈=KPI허브(함대·오늘끝낼일·계속관리) · selectPendingWork · agenda미리보기5 · 데이터센터 tools강등 | tsc0 |
+| 2026-07-28 | Cursor | 홈·/m홈=LedgerFrame크롬 랜딩(검색·ObjRow바로가기) · 예외그리드없음 · tools=ingest icon | tsc0 |
+| 2026-07-28 | Cursor | 홈·/m홈=검색+바로가기만(지표·예외그리드제거) · home-briefing폐기 · SSOT=risk-ledger | tsc0 |
+| 2026-07-28 | Cursor | 홈A안 랜딩(검색·리스크요약·바로가기) · home-briefing/cols폐기 · 예외SSOT=risk-ledger만 | tsc0 |
+| 2026-07-28 | Cursor | /risk 리스크관리 LedgerFrame · risk-ledger SSOT · nav·/m/risk칩 정합 · home-briefing 래퍼 | tsc0 |
+| 2026-07-28 | Cursor | 홈 필터칩 [전체·미결·리스크·휴차] · 전체 기본 · LedgerFrame 엑셀 유지 | tsc0 |
+| 2026-07-28 | Cursor | 홈=LedgerFrame엑셀(미결·리스크·휴차) · home-briefing 시트SSOT · /m리스트동일 · 바로가기하단 | tsc0 |
+| 2026-07-28 | Cursor | lucide 잔여: OcrCrosscheck⚠·Drawer↑↓ → AlertTriangle/ChevronUp/Down | tsc0 |
+| 2026-07-28 | Cursor | 홈=오늘브리핑(Page+트리아지) · home-briefing SSOT · /m공용 · desk일정복원 · 렌즈탭폐기 | tsc0 |
+| 2026-07-28 | Cursor | lucide 아이콘 통일: 유니코드→lucide · Page/LedgerFrame 타이틀=nav icon · mobile-tabs=nav | tsc0 |
+| 2026-07-28 | Cursor | UIUX-SPEC 헤더 컨트롤 존 규격표 갱신(CompanyFilter·solid sm·Select) | tsc0 |
+| 2026-07-28 | Cursor | work 구분 PillTabs→Select · asset/contract/work 주액션 solid sm · receivables actions→WB · penalty sm | tsc0 |
+| 2026-07-28 | Cursor | 회사스코프 통일: ingest companySlot→CompanyFilter · 홈 meta 법인명 중복 제거 | tsc0 |
+| 2026-07-28 | Cursor | ledger-create-panel COMPANIES[0] 프리필 예외 주석(저장=resolveWriteCompany) | tsc0 |
+| 2026-07-28 | Cursor | cash 계좌 파생·집계 → buildBankAccountLedger(cash-ledger.ts) · 페이지는 결과만 | tsc0 |
+| 2026-07-28 | Cursor | asset/contract 통계 배지 → ledger-stats SSOT · riskDebtSum=selectReceivables | tsc0 |
+| 2026-07-28 | Cursor | asset 가동상태=linkFleet ownership·utilization(status와 동일 축) | tsc0 |
+| 2026-07-28 | Cursor | 홈=LedgerFrame엑셀(요약·미결·리스크·휴차·일정) · 메뉴일정제거 · /desk→홈탭 | tsc0 |
+| 2026-07-28 | Cursor | 홈=기존양식 복원(FacetPage+일정/미결/운영/리스크+Rail+Sec) · LedgerFrame홈 폐기 | tsc0 |
+| 2026-07-28 | Cursor | 홈 갈아엎기: LedgerFrame+칩(미결/리스크/함대)+SECTION_MAP 큐 · Facet/얇은KPI 폐기 | tsc0 |
+| 2026-07-28 | Cursor | 계약·운영: 납부조건 분리 → 결제일 + 선불/후불(+납부방법) 열 | tsc0 |
+| 2026-07-28 | Cursor | 홈=원장동일셸(Page+WB+투입아이콘)+Sec한눈 · 옛Facet렌즈 폐기 | tsc0 |
+| 2026-07-28 | Cursor | 홈 복원: Facet+일정/미결/운영/리스크+Sec · Agenda·FacetPage rail · KPI-only 폐기 | tsc0 |
+| 2026-07-28 | Cursor | 버튼 SSOT(tools=iconOnly) · 자산/계약 생성↓담기 · work/status/desk/list 맞춤 · 홈 유지 | tsc0 |
+| 2026-07-28 | Cursor | Btn iconOnly+tip · 자금/ingest tools 파일럿 · 홈=함대/오늘끝낼일/계속관리 · 투입아이콘 | tsc0 |
+| 2026-07-28 | Cursor | 원장 확장 규격: `ledger-ext` · SHEET/DETAIL/FILTER keys · 요청=`시트·축·+/-key` (엑셀열 포함) | tsc0 |
+| 2026-07-28 | Cursor | 세부필터 SSOT: `*_FILTER_DEFS`+`LedgerFilterFields` · 요청=`시트·필터·key` · 전 원장 배선 | tsc0 |
+| 2026-07-28 | Cursor | 상세 필드 추가 SSOT: `*_DETAIL_DEFS`+`buildDetailSections` · 요청=`시트·섹션·key` | tsc0 |
+| 2026-07-28 | Cursor | 원장 상세패널 전부 섹션접기: work/desk/status/cash(+ASSET/CONTRACT) · FLEET/AGENDA_DETAIL_SECTIONS | tsc0 |
+| 2026-07-28 | Cursor | 상세패널 접기: open+onToggle 토글 · cols 선택 · 계약「미수·종료」 · WORK-ORDER 표기 | tsc0 |
+| 2026-07-28 | Cursor | P0: FilterChips 원장 빠른필터(asset/contract/cash/desk/status) · ingest→LedgerFrame(body/view/companySlot) · 로딩=표자리만 | tsc0 |
+| 2026-07-28 | Cursor | UI 크롬 검수 캔버스: 원장/Facet/ingest 공통·고유·손롤·P0(FilterChips·ingest Frame) | 분석 |
+| 2026-07-28 | Cursor | EmptyState `sheet` variant · LedgerFrame/ingest 빈칸=패널과 높이맞춤(상단 작은박스 제거) | tsc0 |
+| 2026-07-28 | Cursor | 데이터센터 전면재구성: Page frame+필터줄+시트/투입패널(원장형) · Sec/Metric 폐기 · OCR·엑셀·저장 엔진 유지 | tsc0 |
+| 2026-07-28 | Cursor | 브라우저 직접검증(/work): 스피너1·필터유지·작업영역중앙(dx0) · Playwright 로그인 후 측정 | 확인 |
+| 2026-07-28 | Cursor | PageLoading=작업영역 정중앙(absolute) · LedgerFrame은 필터줄 유지+표자리 스피너 | tsc0 |
+| 2026-07-28 | Cursor | ERP 로딩 환경: Page/FacetPage/LedgerFrame `loading` · 셸유지+본문 PageLoading · soft-load유지 · WORK-ORDER §0.4 | tsc0 |
+| 2026-07-28 | Cursor | PageLoading=본문 자리 복귀(풀스크린 덮기 철회) · Gate만 셸 전 부트 | tsc0 |
+| 2026-07-28 | Cursor | 로딩 스피너 2중 분산 수정 시도(PageLoading 풀스크린) → 페이지바깥만이라 철회 | 철회 |
+| 2026-07-28 | Cursor | 옛 양식 폐기: Agenda/MySchedule/MyDesk/home-lenses → archive · 설정 mydesk 제거 · tsconfig archive 제외 | tsc0 |
+| 2026-07-28 | Cursor | 일정관리=LedgerFrame(어김/임박/예정) · 홈=운영 대시보드(함대·일정·리스크 KPI) · 메뉴명 일정관리 | tsc0 |
+| 2026-07-28 | Cursor | 홈·데이터센터 전면재작성: 홈=오늘/허브/원장 ListBox · ingest=필터줄+right저장·설명/back제거 | tsc0 |
+| 2026-07-28 | Cursor | 운영현황 교체: 옛 OpsLens/Facet 폐기 → LedgerFrame+FleetRow(차량1행) · desk도 Page규격 | tsc0 |
+| 2026-07-28 | Cursor | 원장 버튼 규격 고정: 우측=stats→보기→tools · 쓰기/워크플로/필터/보기 분류 · Frame 순서 맞춤 | tsc0 |
+| 2026-07-28 | Cursor | 허브 복귀: 홈·`/status`운영·`/desk`일정미결·ingest메뉴 · nav/mobile · TopSearch=찾기 · `/ops`→desk | tsc0 |
+| 2026-07-28 | Cursor | `/cash` 하루루프 안내 Message 제거(설명배너 불필요) | 완료 |
+| 2026-07-28 | Cursor | 계약 미수→리스크: 필터/통계/컬럼 · risk-ops(미수·보험·반납) · 통합관리=라이트+빠른입력 후속 메모 | tsc0 |
+| 2026-07-28 | Cursor | 스피너 영구: hung :6006(node 1.6GB) 재기동 · store.list fetch/getIdToken에 withTimeout | tsc0 |
+| 2026-07-28 | Cursor | 원장 패널 크롬 통일: 헤더/하단바 `--ledger-head-h`/`--ledger-foot-h` 36 · FilterPanel도 동일 footer | tsc0 |
+| 2026-07-28 | Cursor | 원장 상세패널 섹션접기: ASSET/CONTRACT_DETAIL_SECTIONS · LedgerRecordPanel details | tsc0 |
+| 2026-07-28 | Cursor | 원장 필터줄 SSOT(회사·검색·세부필터필수·범위·기간) · `/work` FilterBtn+상태/담당/원천 패널 | tsc0 |
+| 2026-07-28 | Cursor | `/vehicle/[plate]`=VehicleDetail 고정스크롤4장 배럴복귀 · Sample360 동기 · VehiclePage(탭시안) 제거(경쟁SSOT) | tsc0 |
+| 2026-07-28 | Cursor | 회사선택: quick(업무)=Pill칩 · 정식생성(자산·계약)=드롭다운 유지(성격별) | tsc0 |
+| 2026-07-28 | Cursor | 원장 필터줄 높이 통일: CompanyFilter/PeriodBar/FilterBtn 전부 sm(28) · 옆 Search·Select와 맞춤 | tsc0 |
+| 2026-07-28 | Cursor | 원장 버튼 규격: LedgerActions/PanelFooter · Frame.tools · right=쓰기·tools=루프/OCR · zone당 solid1 | tsc0 |
+| 2026-07-28 | Cursor | IA단순화 고정: PAGE_IA/NAV·리다이렉트(/sheet,/finance,/ops)·LedgerEditPanel·/cash 하루루프CTA · Claude검증용 | tsc0 |
+| 2026-07-27 | Cursor | 스위치플랜 마이그레이션 버튼(`MigrateDataButton`) · `/dev/data`·빈 원장 CTA · 메뉴명 변경 | tsc0 |
+| 2026-07-27 | Cursor | 원장 더블클릭 토글닫기(페이지 setSelected) · 클릭/더블클릭 타이머·user-select 보정 · thead/패널헤더 12px·36h 통일 | tsc0 |
+| 2026-07-27 | Cursor | 원장: 같은행 재더블클릭=패널닫기 · thead/패널헤더/Page타이틀 `--ledger-head-h:36` 통일 | tsc0 |
+| 2026-07-27 | Cursor | 원장: 클릭=행선택 · 더블클릭만 상세패널 진입(재더블/헤더더블=폭전환) · Page/패널 헤더 `--ledger-head-h` 정렬 | tsc0 |
+| 2026-07-25 | Cursor | 메뉴에 과태료·변경부과(`/penalty`) 복구 · 티어 라이트 | — |
+| 2026-07-25 | Cursor | 오늘마무리: 메뉴에 자금일보·미수 · 재무원장 CTA=계좌CMS→자금일보→미수 · CMS item도 대여료매칭(정산후 제외버그 제거) | tsc0 |
+| 2026-07-25 | Cursor | 계약·수납=자산과 동일 6×3 · 미수=`schUnpaid`(회차잔액) · 회차=좌열1×3 | tsc OK |
+| 2026-07-25 | Cursor | 계약·수납=시안규격(조건인라인수정·진행필드·한눈4칸·회차요약바·보증시동·손익회수율) · DeskPane 패널내조치 | tsc OK |
+| 2026-07-25 | Cursor | 수정=Glance 인라인(행구조 유지·패널만 편집) · EditKV 제거 · 레이아웃 고정 | tsc OK |
+| 2026-07-25 | Cursor | 수정→헤더에 저장·취소(닫기 제거) · 운영·GPS도 편집세션 | — |
+| 2026-07-25 | Cursor | 차량상세 CTA 라벨=「수정」통일(정정·갱신 제거) · 시안도 동일 | — |
+| 2026-07-25 | Cursor | 보험패널: 보험료=총/N회차 · 이전증권 · 차량폴백 · CTA=수정 | tsc OK |
+| 2026-07-25 | Cursor | `/vehicle` 패널 하단 첨부(AttFoot)=시안 이식 · `_docs` 슬롯(등록증·견적·할부·증권·GPS·과태료·정비·계약·영수증) | tsc OK |
+| 2026-07-25 | Cursor | 보험 대리점=대리점\|담당자 분리(제조사제원과 동일) · agencyContact 필드 | (셸불가) |
+| 2026-07-25 | Cursor | 차량상세 등록증 필드=시안 전항목(문서확인~출고가) · 엔티티 OCR 매핑 보강 · 취득원가·월상환·분납 | (셸불가) |
+| 2026-07-25 | Cursor | `/vehicle` 전폭 frame 셸 · 우측열 col5로 밀착(가운데 구멍 제거) · 크롬=번호판+탭 | (셸불가) |
+| 2026-07-25 | Cursor | `/vehicle/[plate]` 셸=Page frame+전폭(contentMax 10000) · DetailShell 1680캡 해제 · 본문 height 100% | (셸불가) |
+| 2026-07-25 | Cursor | `/vehicle/[plate]`=car-desk 시안 IA 이식(자산\|계약\|수납 탭·패널그리드) · `vehicle-detail/desk.tsx` · 엔티티+취급대리점·보험대리점 | (셸불가) |
+| 2026-07-25 | Cursor | `/dev/car-desk` 제조사제원+취급대리점·담당자 | (셸불가) |
+| 2026-07-25 | Cursor | `/dev/car-desk` 보험 계약자·피보험자 복구(렌터카 중복 vs 구독 필요 — 표시여부 보류) | (셸불가) |
+| 2026-07-25 | Cursor | `/dev/car-desk` 보험 계약자·피보험자 제거(렌터카 업무용에 불필요) | (셸불가) |
+| 2026-07-25 | Cursor | `/dev/car-desk` 보험 자동이체→대리점(상호·연락) 교체 | (셸불가) |
+| 2026-07-25 | Cursor | `/dev/car-desk` 보험 자동이체 행 제거 | (셸불가) |
+| 2026-07-25 | Cursor | `/dev/car-desk` 보험: 대인Ⅰ·Ⅱ 한줄 · 보험료=총/납부N회차 한줄 | (셸불가) |
+| 2026-07-25 | Cursor | `/dev/car-desk` #1등록=좌열1×3(행전체) · #8수선 col2–3로 한칸 우측 | (셸불가) |
+| 2026-07-25 | Cursor | `/dev/car-desk` Glance·이력·회차 행 hover=`C.hover` | (셸불가) |
+| 2026-07-25 | Cursor | `/dev/car-desk` 패널필드보강: 등록=등록증①~검사·제원 · 제원=5단+옵션·구동 · 취득·보험·운영도 누락채움 | (셸불가) |
+| 2026-07-25 | Cursor | `/dev/car-desk` 수선·사고표=일자\|구분\|내용\|금액 칸 분리(금액 본문 합침 해제) | (셸불가) |
+| 2026-07-25 | Cursor | `/dev/car-desk`=한 차량 조회전용 · `?new=1`·빈칸등록면 제거 · /asset「신규등록→시안」링크 회수 | (셸불가) |
+| 2026-07-25 | Cursor | `/dev/car-desk` #6 GPS=1×1 · #7 과태료=1×2(GPS아래) · #8 수선=5×1(하단) — 반반 억지분배 해제 | (셸불가) |
+| 2026-07-25 | Cursor | 신규등록=/asset 툴바(시안→/dev/car-desk?new=1) · 상세에는 없음 · 취소→목록 | (셸불가) |
+| 2026-07-25 | Cursor | `/dev/car-desk` Page 타이틀줄 제거 · 크롬=번호판+탭만 · 신규등록 버튼 자리 보류 · Page 빈헤더 미렌더 | (셸불가) |
+| 2026-07-25 | Cursor | 웹 TopBar=fixed+body paddingTop · Page frame=html/body overflow 잠금 · 상단바 고정·창스크롤 제거 | (셸불가) |
+| 2026-07-25 | Cursor | `/dev/car-desk` 우측열 운영\|GPS\|과태료만 세로 · 수선 2×1은 좌하단 · 빈칸 유지(억지배치 금지) | (셸불가) |
+| 2026-07-25 | Cursor | `/dev/car-desk` 우측열에 #4운영·#6GPS·#7과태료 1×1 세로나열 · #8수선 2×1(col4–5) | (셸불가) |
+| 2026-07-25 | Cursor | `/dev/car-desk` #5보험=1×2 · 필드=보험사·증권·대인ⅠⅡ·대물·자차·분납횟수·총보험료 등 | (셸불가) |
+| 2026-07-25 | Cursor | `/dev/car-desk` 조회/신규 탭 제거 · 기본=조회 · 우측「신규등록」버튼→등록면 · 취소로 복귀 | (셸불가) |
+| 2026-07-25 | Cursor | `/dev/car-desk` #4운영·#6GPS·#7과태료=1×1 · #8수선=2×1 · #5보험=1×2 · 하단 여백 유지 | (셸불가) |
+| 2026-07-25 | Cursor | `/dev/car-desk` 패널 본문 기본 overflow hidden(스크롤 제거) · 이력/회차표만 scroll | (셸불가) |
+| 2026-07-25 | Cursor | `/dev/car-desk` 패널 불변/가변/이력 뱃지 제거 | (셸불가) |
+| 2026-07-25 | Cursor | `/dev/car-desk` 자산 패널번호 #1~8 · #1~3 등록\|제원\|취득 각1×2 · #4~6 운영\|보험\|GPS 각1×2 · #7~8 과태료\|수선 각3×1 | (셸불가) |
+| 2026-07-25 | Cursor | `/dev/car-desk` 자산=패널6 가로배열(등록\|제원\|취득\|운영\|보험\|GPS) | (셸불가) |
+| 2026-07-25 | Cursor | `/dev/car-desk` 자산=가로1×6 · col1에 등록/제원/취득 세로 · col2~6 운영·보험·GPS·과태료·수선(세로3) | (셸불가) |
+| 2026-07-25 | Cursor | `/dev/car-desk` 자산=좌 세로스택 등록→제원→취득(각 가로2) · 중 운영\|보험\|GPS · 우 과태료\|수선 | (셸불가) |
+| 2026-07-25 | Cursor | `/dev/car-desk` 자산=6×3 칸좌표 고정(1행등록\|제원\|취득 · 2행운영\|보험\|GPS · 3행과태료\|수선) | (셸불가) |
+| 2026-07-25 | Cursor | `/dev/car-desk` 자산=6×3그리드(1fr×3) · 1행등록\|제원\|취득(각2) · 2행운영\|보험\|GPS(각2) · 3행과태료\|수선(각3) | (셸불가) |
+| 2026-07-25 | Cursor | `/dev/car-desk` 같은 행 패널 세로높이 맞춤(stretch+fill) · GPS는 2행 말단 | (셸불가) |
+| 2026-07-25 | Cursor | `/dev/car-desk` 자산=6슬롯 · 1행 메인3+운영(2)\|보험 · 2행 메인밑과태료 / 우밑수선+GPS | (셸불가) |
+| 2026-07-25 | Cursor | `/dev/car-desk` 자산=가로6슬롯 · 1행 내용높이(등록\|제원\|취득\|운영\|보험\|GPS) · 2행 과태료\|수선 | (셸불가) |
+| 2026-07-25 | Cursor | `/dev/car-desk` 자산=좌½ 메인3열(등록\|제원\|취득) + 우½ 운영\|보험\|GPS + 과태료\|수선 | (셸불가) |
+| 2026-07-25 | Cursor | `/dev/car-desk` 메인3=[등록\|제원\|취득] 좌측 가로50%만 · 우측비움 · 부가행 중요도폭 | (셸불가) |
+| 2026-07-25 | Cursor | `/dev/car-desk` 부가행=중요도별 폭(GPS 140px)·남은 가로 비움 | (셸불가) |
+| 2026-07-25 | Cursor | `/dev/car-desk` 자산=위 메인3(등록\|제원\|취득) + 아래 부가5 가로 | (셸불가) |
+| 2026-07-25 | Cursor | `/dev/car-desk` 자산=좌½에 [등록\|제원\|취득] 3열나란히 / 우½ 부가 | (셸불가) |
+| 2026-07-25 | Cursor | `/dev/car-desk` 자산=좌반 등록·제원·취득 세로스택 / 우반 운영·보험·GPS·이력 | (셸불가) |
+| 2026-07-25 | Cursor | `/dev/car-desk` 자산=등록|제원|취득 3열세로길게 + 하단 운영3·이력 | (셸불가) |
+| 2026-07-25 | Cursor | `/dev/car-desk` 자산=6열세로1행(등록·제원·취득할부·운영·보험·GPS)+하단과태료/수선 · 할부스케줄첨부·잔액표시 | (셸불가) |
+| 2026-07-25 | Cursor | `/dev/car-desk` 자산=불변(등록·제원·취득)/운영(상태·보험·GPS)/이력 · 상품손익 제외 | (셸불가) |
+| 2026-07-25 | Cursor | `/dev/car-desk` 자산=5열×2행(좁고 세로길게) · KV 짧게 · 계약조건 240px | (셸불가) |
+| 2026-07-25 | Cursor | `/dev/car-desk` ★차량등록정보·제조사제원=핵심불변(상단2칸·hero) · 제원증빙=견적/발주/계약사실확인 | (셸불가) |
+| 2026-07-25 | Cursor | `/dev/car-desk` 패널 가로압축(자산4열·계약300px×2+이력세로·KV max340) | (셸불가) |
+| 2026-07-25 | Cursor | `/dev/car-desk` 패널 하단 첨부(보기·다운로드 Modal) · InfoDoc/_docs 모델 시안 | (셸불가) |
+| 2026-07-25 | Cursor | Page frame 높이=`100vh−bar−dock` · `--fp-dock-h` SSOT(SessionBar) · car-desk 하단바 감안 꽉채움·페이지스크롤제거 | (셸불가) |
+| 2026-07-25 | Cursor | `/dev/car-desk` 자산탭=Vehicle360「이 차」맵(등록증·5단·GPS·취득/구매방법·보험·운영·상품손익·과태료·수선) 3×3 | (셸불가) |
+| 2026-07-25 | Cursor | `/dev/car-desk` 패널 타이틀·종류마크를 박스 안 헤더로(밖 텍스트 제거) | (셸불가) |
+| 2026-07-25 | Cursor | `/dev/car-desk` 탭별 불변·가변·이력 패널로 꽉 채움(자산3+2 / 계약2×2 / 수납2×2) | (셸불가) |
+| 2026-07-25 | Cursor | `/dev/car-desk` 탭=자산|계약|수납(굵직) · 헤더에 미수/D-day 한눈 | (셸불가) |
+| 2026-07-25 | Cursor | `/dev/car-desk` 도메인학습반영 — 한눈이슈·현재3원장·계약/차량이력분리·전문은첨부 | (셸불가) |
+| 2026-07-25 | Cursor | `/dev/car-desk` 계약이력 추가(현재②아래+이력렌즈=계약|차량분리) | (셸불가) |
+| 2026-07-25 | Cursor | `/dev/car-desk` 현재=①차량②계약③이행(수납) 3축 · 기본렌즈=현재 | (셸불가) |
+| 2026-07-25 | Cursor | `/dev/car-desk` 문서함버튼/오버레이 제거 — 첨부는 섹션 AttChip만(보관=백엔드) | (셸불가) |
+| 2026-07-25 | Cursor | `/dev/car-desk` 문서함=보관목록→전산화면으로꺼냄(등록증·증권·할부·과태료) | (셸불가) |
+| 2026-07-25 | Cursor | `/dev/car-desk` 수납·할부표·타임라인=섹션내 ScrollBody(자체스크롤) | (셸불가) |
+| 2026-07-25 | Cursor | `/dev/car-desk` 렌즈3 — 한눈(이슈)·현재(원장)·이력(타임라인) | (셸불가) |
+| 2026-07-25 | Cursor | `/dev/car-desk` 수납=360고정폭 · 현황전폭·계약이 가로여유 우선 | (셸불가) |
+| 2026-07-25 | Cursor | `/dev/car-desk` 시안 방향 OK(한눈+문서함+전폭) — 미세수정 대기 | — |
+| 2026-07-25 | Cursor | `/dev/car-desk` 이전(상·하단뎁스)·문서함전폭·grid fr로 뷰포트꽉 | (셸불가) |
+| 2026-07-25 | Cursor | `/dev/car-desk` 문서함(등록증·계약서·증권·할부표·과태료·수선) · 데스크=한눈만 | (셸불가) |
+| 2026-07-25 | Cursor | `/dev/car-desk` 한눈vs문서 — 원천(등록증·계약서·증권·할부표)은 버튼, 상시필드는 최소 | (셸불가) |
+| 2026-07-25 | Cursor | `/dev/car-desk` 섹션고유버튼+인라인기능(반납/입금/시동/정비/통화 등) | (셸불가) |
+| 2026-07-25 | Cursor | `/dev/car-desk` Page frame=원장시트 동일여백(16/24·전폭·뷰포트꽉) | (셸불가) |
+| 2026-07-25 | Cursor | `/dev/car-desk` 용도별 구역 — 좌원장스택·중계약/수납주표·우파생·하이력(활동넓게) | (셸불가) |
+| 2026-07-25 | Cursor | `/dev/car-desk` 버튼=섹션만(상단액션제거) · 수정/저장·입금·반납 각 박스 | (셸불가) |
+| 2026-07-25 | Cursor | `/dev/car-desk` 시안=박스수정/저장 · 조회↔신규(빈칸) 토글 · 같은페이지 채우기 | (셸불가) |
+| 2026-07-25 | Cursor | `/dev/car-desk` 시안 표통일 — Num칩/반납일자줄 제거 · 현황·계약·자산·수납·보험·취득·상품·보증 전부 KV/표 박스 | (셸불가·미검증) |
+| 2026-07-25 | Cursor | 자산상세 디자인시안 `/dev/car-desk` (한화면·타이틀+박스4칸·실연결X) | tsc0 |
+| 2026-07-25 | Cursor | 자산상세 원자분석후 완전신작: DetailGrid·플랫Num·표·Disclosure · Metric/옛패널0 | tsc0 |
+| 2026-07-25 | Cursor | 자산상세 완전재작성: Metric/Sec박스·옛패널스택 폐기 · 플랫Stat+KV+표 단일면 | tsc0 |
+| 2026-07-25 | Cursor | 자산상세 여백=원장Page동일(16/24·1680) · fill엣지블리드 해제 | tsc0 |
+| 2026-07-25 | Cursor | 자산상세 작업탭(한눈/이차/수납/이력) 제거 · 단일화면 스크롤+와이드다열 | tsc0 |
+| 2026-07-25 | Cursor | 자산상세「한눈」=필수지표+계약/자산/보험/수납피크 · 그자리 입금·수정 | tsc0 |
+| 2026-07-25 | Cursor | 자산상세 기본=와이드모니터(useDeskTier) · 좁으면 1열스크롤 · 지금지표\|계약 2열 | tsc0 |
+| 2026-07-25 | Cursor | 자산상세 웹=그리드짜임새·손롤박스제거(플랫행/표만) · ObjCard원자유지 | tsc0 |
+| 2026-07-25 | Cursor | 자산상세 fill ERP밀도(웹뷰포트채움·모바일 sticky크롬) · DetailShell fill | tsc0 |
+| 2026-07-25 | Cursor | 자산상세=ERP워크벤치(작업영역1개·좌컨텍스트/우처리) · 스크롤문서폐기 | tsc0 |
+| 2026-07-25 | Cursor | 자산상세 틀폐기→VehiclePage(웹좌레일+우작업·focus우선) · useVehicleDetail유지 | tsc0 |
+| 2026-07-25 | Cursor | Vehicle360 UI 완전교체→`VehicleDetail` 고정스크롤 4장 · `useVehicleDetail` · 배럴 · legacy→tools/archive | tsc0 |
+| 2026-07-25 | Cursor | Vehicle360 로직→`useVehicleDetail` 훅 추출(JSX없음) · types.ts · UI는 미작성 | tsc0 |
+| 2026-07-25 | Cursor | Vehicle360 세부스펙=지금/이차/수납정산/이력 원자배열 · SEC_DEFAULT·Sample360 동기 · 캔버스 detail-spec | tsc0 |
+| 2026-07-25 | Cursor | Vehicle360: 계약조건→현황 하위 · 할부스케줄→취득 Disclosure 인라인 · Disclosure원자 | tsc0 |
+| 2026-07-25 | Cursor | Vehicle360: 탭렌즈 철회 · SectionLabel(운영·자산·계약·이력)+Sec스크롤(freepass상세) · Input/출력▾ 유지 | tsc0 |
+| 2026-07-25 | Cursor | Vehicle360: sticky 렌즈(운영·자산·계약·이력)+Sec필터 · fInp→Input/Select · 출력▾ · 수납 현재/이전 | tsc0 |
+| 2026-07-25 | Cursor | toggleStyle 활성=색만(fontWeight 고정) · ToggleChips→toggleStyle · 선택시 폭 흔들림 제거 | tsc0 |
+| 2026-07-25 | Cursor | 빠른입력: 차 선택→입력옆 요약(회사·차번·차종·계약상태) · 아래 텍스트·파일 | tsc0 |
+| 2026-07-25 | Cursor | 빠른입력 차번후보=absolute팝업 말고 입력칸 아래 인라인 목록(회사 Badge) | tsc0 |
+| 2026-07-25 | Cursor | 빠른입력 차번후보에 회사 표시명 Badge · matchVehicles companyId/sub | tsc0 |
+| 2026-07-25 | Cursor | 빠른입력: 탭 제거·웹 좌텍스트/우파일 · 모바일 상하 · FileDrop 붙여넣기 | tsc0 |
+| 2026-07-25 | Cursor | 빠른입력 차번=matchVehicles 타이핑 후보(선택시 차번만 채움) | tsc0 |
+| 2026-07-25 | Cursor | 빠른입력=QuickInput(차번+텍스트\|파일) 인라인 · inbox plate/note · QuickLogForm은 360용 유지 | tsc0 |
+| 2026-07-25 | Cursor | 운영원장 빠른입력=인라인(Modal X)·차번 선택입력 · CTA순서 유지 | tsc0 |
+| 2026-07-25 | Cursor | 운영원장 CTA 순서: 빠른입력 · 자산등록 · 데이터센터 | tsc0 |
+| 2026-07-25 | Cursor | 운영원장 CTA 3개: 데이터센터 · 자산등록 · 빠른입력(openLog) | tsc0 |
+| 2026-07-25 | Cursor | 재무원장 CTA=데이터센터(openIngest) · ingest 하단 이전 | tsc0 |
+| 2026-07-25 | Cursor | 재무원장 CTA=거래 입력 1개→ingest · 데이터센터 하단 이전(Page back, WorkHubBack 제거) | tsc0 |
+| 2026-07-25 | Cursor | 재무원장 CTA: 담기→계좌·CMS 입력 / 법인카드 입력 | tsc0 |
+| 2026-07-25 | Cursor | 재무원장: 24·25 CMS미연결 수백건 DOM폭주→표 200건 상한(월간·검색으로 좁히기) | tsc0 |
+| 2026-07-25 | Cursor | 재무원장: 검색cms로 출금 숨기던 필터 원복(검색 가로채기 취소) | tsc0 |
+| 2026-07-25 | Cursor | CMS업로드=원장 CMS미연결 반영 · 계좌CMS집금과 수동/자동 매칭 · 입금합계는 계좌만 | tsc0 |
+| 2026-07-25 | Cursor | CMS: 매칭분 상시하위행(펼침X)·집금클릭=수동매칭·담기시 자동정산 유지 | tsc0 |
+| 2026-07-25 | Cursor | 담기 후 자동정산: bank_tx·card_tx→CMS/카드집금 high·medium 자동붙임 (`payments/auto-settle` · intake 부수효과) | tsc0 |
+| 2026-07-25 | Cursor | CMS매칭: 성공→집금 3~5일(창1~7) · 집금라벨만 deposit · 정산엑셀 672건 투입 · 정산 deposit13/item29 | tsc0 |
+| 2026-07-25 | Cursor | Search X=칸 안 absolute(width는 wrap) · 입력해도 검색칸 안 커짐 | tsc0 |
+| 2026-07-25 | Cursor | Search 입력값 있으면 X 지우기 · 재무원장 CMS정산 deposit 펼침→구성건(item) 나열 · deposit출처=CMS | tsc0 |
+| 2026-07-25 | Cursor | 재무원장 펼침=법인카드·CMS·카드매출·미분류만 · 카드→card_tx담기 · CMS→매칭/담기 CTA | tsc0 |
+| 2026-07-25 | Cursor | `/dev/sample` ERP 3축 시안: 원장(상단필터·기본/전체·행→360) · 고유 큐(ObjCard) · 안내. FacetRail/뷰토글 없음 | tsc0 |
+| 2026-07-24 | Cursor | 모바일 메뉴=ERP4: 열리면 TopBar 상태가「☰ 메뉴」+우측 X · 패널 bar 아래 펼침 | tsc0 |
+| 2026-07-24 | Cursor | 모바일 메뉴=ERP4: TopBar z80 유지·햄버거↔X · 패널/스크림은 bar 아래만 | tsc0 |
+| 2026-07-24 | Cursor | BottomSheet 푸터=ERP4 std/filter/commit: 검색[지우기·닫기] · 필터[해제·선택N·닫기] · 회사/보기[닫기] · SCRIM | tsc0 |
+| 2026-07-24 | Cursor | 모바일 2단 크롬 정합: TopBar↓PageToolBar 밀착(상단 음수마진·pad 제거) · 홈 tools슬롯 · --topbar-h=56 | tsc0(수동확인권장) |
+| 2026-07-24 | Cursor | 모바일 TopBar 복구(ERP4): 허브·뎁스 공통 상단 제목+메뉴 · 메뉴는 TopBar · PageToolBar에서 메뉴툴 제거 · sticky top=bar-h | tsc0 |
+| 2026-07-24 | Cursor | 모바일 툴바=ERP4 PageToolBar 이식: 균등 검색·필터·보기·회사·메뉴 → 시트. 회사칩+사각아이콘 행 폐기 | tsc0 |
+| 2026-07-24 | Cursor | 모바일↔ERP4 패리티: 뎁스 상단제목 · TabBar 토큰 · bar56 · ObjCard56 · WorkbenchBar ctrlH/PillTabs md · ActionBar SH | tsc0 |
+| 2026-07-24 | Cursor | UIUX 잔여 3건: WizPanel(Delivery/Return 인라인) · `/penalty/docs` 전용 · payments `useSecOrder` | tsc0 · UIUX 체크리스트 완료 |
+| 2026-07-23 | Cursor | UIUX-SPEC 위반 1차 이행: ExcelSheet/IconSeg(a·f) · DetailShell(contract) · ObjCard큐(penalty) · FacetRail 데이터필터(payments/repair) · useSecOrder(recv/dispatch/repair/penalty) · 지난계약 FacetPage · confirm/prompt는 기반영 | tsc0 · 잔여=Wizard/Docs 인라인 |
+| 2026-07-23 | Cursor | frozen 시드 `--write` 재생성(스냅 H1~H3 반영): 163/177 · carry ₩142,315,000 · C→GLC 0 · 제네시스→현대 0 · 그랜저 IG=엑셀유지 | tsc0 · 가명화 기록 |
+| 2026-07-23 | Cursor | 차종스냅 H2→H3→H1: `has`/catalogSubModel 짧은코드⊂긴루트 차단(C→GLC) · 브랜드헤드(제네시스≠현대DH) · `vehicleRecord`는 confidence=`high`만 덮어씀(review=엑셀유지) | tsc0 · 프로브 OK · frozen 미재생성(명시 요청 시 `--write`) |
+| 2026-07-23 | Claude | **UI/UX 통일 규격**(전수검사 24p): `docs/UIUX-SPEC.md` — 유형6종(현황조회·통합시트·업무·상세·입력큐·지표) 보기·필터·정렬·섹션·팝업·모바일 SSOT + 위반 15p 체크리스트. 공통: window.confirm/prompt 금지·DataTable→ExcelSheet·Sec에 id·FacetRail=데이터필터·팝업 최소화 | 규격 확정(수정 대기) |
+| 2026-07-23 | Claude | **운영시트=차량1대=1행 통합 마스터**(엑셀전용): `buildFleetRows` SSOT(자산+계약/손님+미수+보험조인+현위치) · 기본/전체 열토글(전체=기본+부가 우측) · FacetRail 운영시트렌즈(기본'보유') · 헤더필터/정렬 · 행클릭360 · 고아계약 노출(미수 안숨김) · 상태뱃지=상태톤·현위치 한칸하나 · 메뉴 최상단 승격 | 165행·보유113·미수1.42억·tsc0·/sheet200 |
+| 2026-07-23 | Claude | **'오늘' KST 통일**(`todayKST`): UTC toISOString 이 KST 00~09시 하루 이르던 것 — 미수도래·D-day·기록일 14곳 경유. 타임스탬프는 UTC 유지 | tsc0·test35 |
+| 2026-07-23 | Claude | **SM-1(P1) 불법전이 백스톱**: 범용 편집기 `/list/[entity]/[id]` 가 `canTransition` 없이 계약 status 를 그대로 저장 → 종료계약 부활(해지→운행) 가능하던 것. `canSetStatus`(status SSOT) 신설 + `commitUpdate` 커맨드층에서 강제(rec.status 우선·없으면 조회). 종료→운행/대기 부활만 차단, 전진·채권화·no-op 허용 | tsc 0 / test 35 |
+| 2026-07-23 | Claude | **얼린 시드 가명화**(PII): `tools/mask-switchplan-pii.ts` 신설 — 실명→고객NNN·전화·번호판·VIN·임차인 counterparty 결정적 치환(참조무결성·carry 보존). `rebuild-switchplan-frozen`이 기록 직전 자동 마스킹 → 재생성해도 실PII 안 들어감. 시드는 정적 import(번들)라 gitignore 불가 → 가명화가 정답 | 실PII 0·carry 142,315,000·163/177·tsc 0·test 32/32 |
+| 2026-07-22 | Cursor | frozen 시드 live 재생성(`rebuild-switchplan-frozen --write`): 차량 118→163 · 계약 147→177 · asOf 07-22 · carry≡net ₩1.42억·미수율34% · DocIssueDialog 미리보기 `C.head` · §2 B진행표 갱신 | tsc 0 / audit OK |
+| 2026-07-22 | Cursor | UI 통일 패스: `TextLink` 원자 · Vehicle360/mobile-tabs 배럴 흡수 · payments `Modal`+`TOUCH` · 링크 손롤(계약/과태료/자금/목록/이력) · globals.css 죽은 셸 ~24KB 제거(Phase4 일부). ※WorkbenchBar는 순환 때문에 ui 하위경로 유지 | tsc 0 / :6007 200 |
+| 2026-07-21 | Claude | **운영현황 = 함대 흐름**: 요약현황 섹션 삭제(지표 10개가 섹션 헤더와 중복·미수는 리스크탭) → KPI(보유·가동률)는 툴바 stat 한 줄 · 섹션 순서=인도대기→반납지남→휴차→만기임박→운행중→멈춘차(`useSecOrder ops-v2`) · 「곧비는차」를 지남/임박 2섹션으로 분리 | tsc 0 / 홈 200 |
+| 2026-07-21 | Claude | **분류 SSOT 버그**: 운영현황 운행102·유휴 목록이 요약과 안 맞던 것 — `buildAssetDerived`가 `v.status`로 다시 갈랐는데 지표는 계약기준(`D.running`). 이제 `D.running/idleCars/soldRows` 재사용, 그밖=차집합 · `a-running` 40대 조용한 절단 제거 | tsc 0 |
+| 2026-07-21 | Claude | **보기전환(카드↔엑셀)**: `IconSeg` 원자 신설 · `WorkbenchBar view` 슬롯(검색창 우측 고정) · `ExcelSheet mode` — 같은 cols로 표/카드 · CLAUDE.md 금지항목 "보기전환 손롤"로 정정(원자는 허용) · 헤더필터(ERP4 오토필터)·행호버 pin 수정·틀고정 제거 | tsc 0 / sheet 200 |
+| 2026-07-21 | Claude | **레일 레이아웃 흔들림**: FacetPage가 `rail={null}`(로딩중)일 때 자리를 안 잡아 완료 시 본문이 쪼그라들던 것 — 200px 자리 예약 · `rail` undefined(안씀)/null(로딩중) 구분 계약화 | tsc 0 / 8p 200 |
+| 2026-07-21 | Claude | **탭 뱃지**: `PillTabs badge` — 미결·리스크 탭에 쌓인 건수(0이면 숨김) · `WorkbenchTab.badge` | tsc 0 |
+| 2026-07-21 | Claude | **업로드 UI 통일**: `FileDrop` 다중(`onFiles`)·진행표시 지원 · `DocUpload` 조립 원자 신설 · PenaltyUpload·InfoDoc 손롤 드롭존→`FileDrop`(과태료 고지서 창이 데이터센터와 같은 모양). 인라인버튼·카메라(WorkForm·수집함 등)는 어포던스 달라 유지 | tsc 0 |
+| 2026-07-21 | Claude | **메뉴 재구성**: 업무=고유업무만(배차·차량수선·미수·자금일보·과태료·증빙수집) · `자료등록`→**데이터센터**(최상단, 선택기를 데이터3층 optgroup으로 — 이벤트도 투입 가능함을 노출) · `정비관리`→`차량수선` · `/work`는 메뉴 제외(페이지는 모바일탭·WorkHubBack 때문에 유지) | tsc 0 / 6p 200 |
+| 2026-07-21 | Claude | **활동↔계약 매칭 버그**: `lib/activity-match` 신설(contractNo→번호판+기간→이름 3단) · Customer360이 번호판으로만 걸러 손바뀜 차에서 앞 임차인 통화가 다음 임차인에게 노출되던 것 수정 · Vehicle360 QuickLog가 contractNo 안 넘기던 것(원인) 수정 + 이력에 「상대」 표기 | tsc 0 / 5p 200 |
+| 2026-07-21 | Claude | **섹션 IA 기준 확립**: 「오늘 끝낼 수 있는가」로 탭 배치 — 미수 `s-unpaid`→`r-unpaid` 통합(미결에 두면 큐가 안 비워짐) · 정비사고 `s-repair`→자산 그룹 · `리스크현황`→`리스크관리` · 미결 9→8섹션 · `cockpit-v3` 키 승격 · CLAUDE.md 기준표 | tsc 0 / 5p 200 |
+| 2026-07-21 | Claude | 운영시트 탭 4종(자산·계약·채권·반납) = 사업현황 시트 구성 · `buildContractRows` 신설(계약 1행) | tsc 0 / 1p 200 |
+| 2026-07-21 | Claude | 스위치플랜 원클릭 마이그레이션 배선: `MIGRATE_ROOT` 폴더 생성+사업현황·자금일보 배치 · `MIGRATE_MODE=auto` · `tools/rebuild-switchplan-frozen.ts`(얼린시드 재생성, 드라이런 기본) | 차량 118→163 · 계약 147→177 |
+| 2026-07-21 | Claude | **원자 테마화 완결**: `components/ui/**` hex 0(`SCRIM_FG` 예외 1) — 표면`#fff`→`C.card` · 브랜드위 글자→`C.inverse` · `Message`/`Badge` 팔레트 통째로 `--{tone}-bg/text/border`로 · globals.css `--teal-*` 삼종 신설(라이트+다크) | tsc 0 / 10p 200 |
+| 2026-07-21 | Claude | 스크림 SSOT: `SCRIM`/`SCRIM_FG`(tokens) — 5가지 값으로 흩어져 있던 7곳(Drawer·Modal·SessionBar·payments·CommandPalette·UploadSection·LoadingOverlay) 통일 | tsc 0 / 11p 200 |
+| 2026-07-21 | Claude | `.cursor/rules/renman.mdc` 신설(Cursor 자동로딩) · **PenaltyDocs 문서면 되돌림**: A4 종이는 토큰 금지(`PAPER/INK/INK_SUB/RULE…` 고정) — 다크테마에서 종이가 검어지고 인쇄 시 흰종이+흰글자로 판독불가가 됨. 화면 크롬만 토큰 | tsc 0 / 9p 200 |
+| 2026-07-21 | Cursor | tokenize-2: 잔여 `#fff`→`C.card`(Agenda/SearchBox/InfoDoc 등) · dev/data th/td 재사용 · 예외 주석 · CommandPalette `C` import 누락 자체수정 | tsc 0 |
+| 2026-07-21 | Claude | 3단계: WorkForm 타이틀밑줄·manage 박스래퍼 제거 · PenaltyDocs→`EmptyState` · Vehicle360 잔여 hex 5 | tsc 0 / 6p 200 |
+| 2026-07-21 | Claude | 2단계: 현장 위저드 공용원자 `components/ui/wizard.tsx`(`WizCard`/`WizField`/`WizPhotos`/`wizInput`) — Delivery·Return 중복 40줄 소멸. ※Row는 정렬·필드폭이 달라 의도적으로 미통합 | tsc 0 / 6p 200 |
+| 2026-07-21 | Cursor | 하드코딩 색 토큰화(CURSOR-TASK-tokenize): PenaltyDocs·manage·ingest·list·audit·360 fInp | tsc 0 |
+| 2026-07-21 | Claude | 1단계 근원: `tokens.tsx` 하드코딩 제거(`C.lineStrong`/`inverse`/`card` 추가) — `toggleStyle` 활성칩이 다크에서 안 보이던 버그 동반 수정 · PenaltyUpload 복붙 th→`...th` | tsc 0 |
+| 2026-07-21 | Cursor | B-2 잔여: contract/receivables/inbox/penalty/list상세/IngestDialog/DocIssueDialog/inbox-upload → `commit*` | tsc 0 |
+| 2026-07-21 | Cursor | B-2 확장: `commitSave/Remove/All` · Vehicle360 전 쓰기 · payments 매칭/CMS/해제 | tsc 0 |
+| 2026-07-21 | Cursor | B-3: 죽은 lifecycle/risk-issues 삭제 · `domain/status` SSOT · B-2: `commitUpdate`+Delivery/ReturnWizard | tsc 0 / audit OK |
+| 2026-07-21 | Cursor | 파이프 순서: 미수 audit OK(본격 B-1 보류) · B-5 360/Ingest/ingest→`useEntityLists`(+opts.companyId) · API/Rules는 login·Vercel link 필요(운영) | tsc 0 / audit OK |
+| 2026-07-21 | Cursor | 파이프라인 재검증(canvas) · `/sheet` 운영시트(프리패스 엑셀뷰 이식 · `ExcelSheet`+`buildSheetRows`) · 현황 메뉴 | tsc 0 |
+| 2026-07-21 | Cursor | 모바일 감사 수정: KV/QuickLog/WorkForm/Ingest 입력 `ctrlH`·16 · DataTable→ObjCard · company `WorkbenchBar.actions`+Sec · error btn40/16 · SessionBar pad=54 | tsc 0 |
+| 2026-07-21 | Cursor | 오픈게이트: B-1완화(carry분배→FIFO수납)·API Bearer(`api-headers`+NEXT_PUBLIC_API_SHARED_SECRET)·합본쓰기 scope(payments·360·receivables·contract·inbox) · Rules배포는 firebase login 필요 | tsc 0 / audit OK |
+| 2026-07-21 | Cursor | `main` 푸시 `89682ff` → GitHub `freepass-creator/renman` (Vercel 연동 배포용) | pushed |
+| 2026-07-21 | Cursor | B-5 2차: integrity·inbox·penalty·manage·pnl·PenaltyDocs → `useEntityLists` · 잔여=ingest/IngestDialog/360 | tsc 0 / 5p 200 |
+| 2026-07-21 | Cursor | B-5 착수: `useEntityLists` 이행 — receivables·dispatch·asset·contract·contract-history·financials·payments·docs·audit·list/[entity] · §2 A완료·B-5다음으로 정리 | tsc 0 / 11p 200 |
+| 2026-07-21 | Cursor | `C:\dev\jpkerp6-app` 작업 배치·`npm run dev` · 외부 distDir/정션은 Turbopack 모듈해석 실패 → `.next` 프로젝트 안 유지·백업 시 제외(`docs/CACHE.md`) | :6006 Ready |
+| 2026-07-20 | Cursor | A그룹 완료: A-1 `patchEngineLock`+Vehicle360 `engineDisabled` SSOT · A-3 `isCashPurchase` · A-2 `selectReceivables` 5화면 · A-0 ingest/IngestDialog/PenaltyUpload/DocIssueDialog 합본 저장 회사 명시 선택 | tsc 0 / 10p 200 |
+| 2026-07-18 | Claude | A-0 회사스코프 오배치 수정(`lib/scope.ts` 신설 + finance·Wizard 2종·QuickLog·WorkForm 적용). `lib/use-entity-lists.ts` 범용 로딩 훅 신설. 8축 아키텍처 감사 → WORK-ORDER 작성 | tsc 0 / 전 페이지 200 |
+| 2026-07-18 | Cursor | `listsCached` + `useCashLedgerLists`(자금 3페이지) · `CashHubTabs` · `dashboard-consts`(TODAY 추출) · `isStaffSuspended` | tsc 0 |
+| 2026-07-18 | Claude | 오픈 감사 → 블로커 5 + 하드닝 15 수정 (미수 동결 · 마스터 탈취 · 빈 자연키 · 날짜 크래시 · API 인증 · rules 하드닝 등) | tsc 0 / 17p 200 |
 
 ---
 
-## 6. ?섏? 留?寃?(?ㅼ젣濡?寃れ? 寃껊뱾)
+## 6. 하지 말 것 (실제로 겪은 것들)
 
-- ??湲곗〈 援ы쁽 ?뺤씤 ?놁씠 ?덈줈 留뚮뱾湲???媛숈? 湲곕뒫 2踰?
-- ???섏씠吏?먯꽌 吏묎퀎 ?먮· ???붾㈃留덈떎 ?レ옄 ?ㅻ쫫
-- ?????????뚯궗 ?꾩쓽 ?대갚 ??? 踰뺤씤 ?ㅻ같移??뚯궗寃⑸━ ?꾨컲)
-- ??二쎌? 肄붾뱶 "?뱀떆 紐곕씪" ?④린湲???寃쎌웳 SSOT媛 ?섏뼱 ?ㅼ쓬 ?щ엺???띿엫
-- ??????좎뼵???ㅼ젣 ??κ컪怨??ㅻⅨ 梨?諛⑹튂 ??而댄뙆?쇰윭媛 嫄곗쭞 ?덉쟾媛먮쭔 以?
-- ????援ъ“ 蹂寃쎌쓣 寃利??レ옄 ???톞sc쨌?뚮뜑) ?놁씠 諛섏쁺
+- ❌ 기존 구현 확인 없이 새로 만들기 → 같은 기능 2벌
+- ❌ 페이지에서 집계 손롤 → 화면마다 숫자 다름
+- ❌ 저장 대상 회사 임의 폴백 → 타 법인 오배치(회사격리 위반)
+- ❌ 죽은 코드 "혹시 몰라" 남기기 → 경쟁 SSOT가 되어 다음 사람을 속임
+- ❌ 타입 선언이 실제 저장값과 다른 채 방치 → 컴파일러가 거짓 안전감만 줌
+- ❌ 큰 구조 변경을 검증(숫자 대사·tsc·렌더) 없이 반영
