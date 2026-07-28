@@ -65,7 +65,7 @@ export function rentalTypeOf(rec: { rentalType?: unknown } | null | undefined): 
   return (RENTAL_TYPES as readonly string[]).includes(v) ? v : '';
 }
 
-/** 선후납 표시값 — 레거시 선불/후불 → 선납/후납. */
+/** 납부시기 표시값 — 레거시 선불/후불 → 선납/후납. */
 export const PAYMENT_TIMINGS = ['선납', '후납'] as const;
 export type PaymentTiming = (typeof PAYMENT_TIMINGS)[number];
 

@@ -224,7 +224,7 @@ export function VehicleDetail({ plate, focus, embed }: { plate: string; focus?: 
                 ['주행거리(출고→반납)', null, (active.mileageOut || active.returnMileage) ? `${active.mileageOut || '?'} → ${active.returnMileage || '?'} km` : ''],
               ] as [string, string | null, ReactNode][]} />
               <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, flexWrap: 'wrap' }}>
-                <span style={{ color: C.mute }}>선후납</span>
+                <span style={{ color: C.mute }}>납부시기</span>
                 {(['선납', '후납'] as const).map((tm) => {
                   const on = paymentTimingOf(active.paymentTiming) === tm;
                   return (

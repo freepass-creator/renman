@@ -208,14 +208,14 @@ const FL = {
     },
     text: (r) => r.warnings.map((w) => w.label).join(' · '),
   },
-  // 결제일 · 선후납 — 한 셀에 합치지 않음(각각 열).
+  // 결제일 · 납부시기 — 한 셀에 합치지 않음(각각 열).
   paymentDay: {
     key: 'paymentDay', label: '결제일', align: 'c',
     render: (r) => (r.paymentDay ? `${r.paymentDay}일` : '—'),
     text: (r) => (r.paymentDay ? `${r.paymentDay}일` : ''),
   },
   paymentTiming: {
-    key: 'paymentTiming', label: '선후납', align: 'c',
+    key: 'paymentTiming', label: '납부시기', align: 'c',
     render: (r) => {
       if (!r.paymentDay && !r.paymentTiming) return '—';
       const t = paymentTimingOf(r.paymentTiming);
