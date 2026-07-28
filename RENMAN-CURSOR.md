@@ -70,6 +70,7 @@ curl -s -o /dev/null -w "%{http_code}" http://localhost:6006/<route>   # 200
 
 | 날짜 | 작업자 | 내용 | 상태 |
 |---|---|---|---|
+| 2026-07-28 | Cursor | lucide 잔여: OcrCrosscheck⚠·Drawer↑↓ → AlertTriangle/ChevronUp/Down | tsc0 |
 | 2026-07-28 | Cursor | 홈=오늘브리핑(Page+트리아지) · home-briefing SSOT · /m공용 · desk일정복원 · 렌즈탭폐기 | tsc0 |
 | 2026-07-28 | Cursor | lucide 아이콘 통일: 유니코드→lucide · Page/LedgerFrame 타이틀=nav icon · mobile-tabs=nav | tsc0 |
 | 2026-07-28 | Cursor | UIUX-SPEC 헤더 컨트롤 존 규격표 갱신(CompanyFilter·solid sm·Select) | tsc0 |

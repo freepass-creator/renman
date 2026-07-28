@@ -1,5 +1,6 @@
 'use client';
 import React from 'react';
+import { ChevronDown, ChevronUp } from 'lucide-react';
 import { useIsMobile } from '@/lib/use-mobile';
 import { haptic } from '@/lib/haptics';
 import { C, R, SCRIM } from './tokens';
@@ -18,7 +19,7 @@ export function Drawer({ title, meta, onClose, children, footer, width = 560, si
     return () => window.removeEventListener('keydown', onKey);
   }, [onClose, onPrev, onNext]);
   const mobile = useIsMobile();
-  const navBtn: React.CSSProperties = { border: `1px solid ${C.line}`, background: C.card, borderRadius: R, width: mobile ? 44 : 26, height: mobile ? 44 : 26, cursor: 'pointer', color: C.mute, fontSize: mobile ? 18 : 13, lineHeight: 1 };
+  const navBtn: React.CSSProperties = { border: `1px solid ${C.line}`, background: C.card, borderRadius: R, width: mobile ? 44 : 26, height: mobile ? 44 : 26, cursor: 'pointer', color: C.mute, fontSize: mobile ? 18 : 13, lineHeight: 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', padding: 0 };
   // 모바일 = 하단 바텀시트. z=70 > MobileTabBar(56).
   return (
     <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: SCRIM, zIndex: 70, display: 'flex', justifyContent: mobile ? 'stretch' : (side === 'left' ? 'flex-start' : 'flex-end'), alignItems: mobile ? 'flex-end' : 'stretch' }}>
@@ -30,9 +31,9 @@ export function Drawer({ title, meta, onClose, children, footer, width = 560, si
             {meta && <span style={{ fontSize: 12, color: C.mute }}>{meta}</span>}
           </div>
           <span style={{ flex: 1 }} />
-          {(onPrev || onNext) && !mobile && <div style={{ display: 'flex', gap: 4 }} title="↑/↓ 이전·다음">
-            <button onClick={onPrev} disabled={!onPrev} style={navBtn}>↑</button>
-            <button onClick={onNext} disabled={!onNext} style={navBtn}>↓</button>
+          {(onPrev || onNext) && !mobile && <div style={{ display: 'flex', gap: 4 }} title="이전·다음">
+            <button type="button" onClick={onPrev} disabled={!onPrev} aria-label="이전" style={navBtn}><ChevronUp size={14} strokeWidth={2.2} aria-hidden /></button>
+            <button type="button" onClick={onNext} disabled={!onNext} aria-label="다음" style={navBtn}><ChevronDown size={14} strokeWidth={2.2} aria-hidden /></button>
           </div>}
           {expandHref && !mobile && <a href={expandHref} title="전체화면" style={{ ...navBtn, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', textDecoration: 'none' }}>↗</a>}
           <button onClick={() => { haptic.tap(); onClose(); }} aria-label="닫기" style={{ ...navBtn, fontSize: mobile ? 22 : 18, border: 'none', background: 'none', WebkitTapHighlightColor: 'transparent' }}>×</button>

@@ -1,6 +1,6 @@
 'use client';
 import React from 'react';
-import { Check } from 'lucide-react';
+import { Check, AlertTriangle } from 'lucide-react';
 import { companyTone, companyShort } from '@/lib/companies';
 import { type CrosscheckResult } from '@/lib/ocr-crosscheck';
 import { useIsMobile } from '@/lib/use-mobile';
@@ -184,7 +184,9 @@ export function OcrCrosscheck({ result }: { result?: CrosscheckResult | null }) 
   const color = result.level === 'error' ? C.danger : C.warn;
   return (
     <div style={{ marginTop: 8, padding: '9px 11px', border: `1px solid ${color}`, borderRadius: R, background: 'var(--bg-card)' }}>
-      <div style={{ fontSize: 12, fontWeight: 700, color, marginBottom: 5 }}>⚠ OCR 재확인 권장 · 신뢰도 {result.confidence}%</div>
+      <div style={{ fontSize: 12, fontWeight: 700, color, marginBottom: 5, display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+        <AlertTriangle size={13} strokeWidth={2.2} aria-hidden /> OCR 재확인 권장 · 신뢰도 {result.confidence}%
+      </div>
       <ul style={{ margin: 0, paddingLeft: 17 }}>
         {result.issues.map((it, i) => <li key={i} style={{ fontSize: 11.5, color: C.mute, lineHeight: 1.55 }}>{it.message}</li>)}
       </ul>
