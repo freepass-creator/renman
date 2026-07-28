@@ -206,9 +206,10 @@ export function buildRiskSheet(
   };
 }
 
-/** 홈 랜딩 원장 바로가기 (예외 그리드 아님 — /risk 포함). */
+/** 홈 랜딩 원장 바로가기 — 시스템·홈 제외, NAV_GROUPS 순서. */
 export function homeLedgerShortcuts(): NavItem[] {
-  const byHref = new Map(NAV_GROUPS.flatMap((g) => g.items).map((it) => [it.href, it]));
-  const order = ['/status', '/risk', '/desk', '/cash', '/work'] as const;
-  return order.map((href) => byHref.get(href)).filter((it): it is NavItem => !!it);
+  return NAV_GROUPS
+    .filter((g) => g.title !== '시스템')
+    .flatMap((g) => g.items)
+    .filter((it) => it.href !== '/');
 }

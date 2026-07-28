@@ -1,10 +1,17 @@
 'use client';
-/** /m 홈 — 가벼운 랜딩(검색·바로가기). 예외는 /m/risk. */
+/** /m 홈 — 웹과 동일 방향: 검색 + 원장 바로가기. 예외=/m/risk. */
 import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { homeLedgerShortcuts } from '@/lib/risk-ledger';
-import { Btn, C, Search, SPACE_M, SPACE_GROUP_M } from '@/components/ui';
+import { C, ObjRow, Rows, Search, SPACE_GROUP_M } from '@/components/ui';
 import { MHead } from '@/components/m/MHead';
+
+function mHref(href: string): string {
+  if (href === '/risk') return '/m/risk';
+  if (href === '/status') return '/m/ops';
+  if (href === '/ingest') return '/m/entry';
+  return href;
+}
 
 export default function MHome() {
   const router = useRouter();
@@ -21,28 +28,31 @@ export default function MHome() {
       <MHead title="홈" sub="검색 · 원장 바로가기" color={C.ok} />
       <div style={{ padding: '12px 14px 24px', display: 'flex', flexDirection: 'column', gap: SPACE_GROUP_M }}>
         <Search
+          size="sm"
           placeholder="차번 · 계약자 검색"
           value={q}
           onChange={(e) => setQ(e.target.value)}
           onKeyDown={(e) => { if (e.key === 'Enter') goSearch(); }}
           style={{ width: '100%' }}
         />
-        <div>
-          <div style={{ fontSize: 12.5, fontWeight: 800, color: C.mute, marginBottom: SPACE_M }}>원장 바로가기</div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-            {shortcuts.map((it) => {
-              const Icon = it.icon;
-              const target = it.href === '/risk' ? '/m/risk'
-                : it.href === '/status' ? '/m/ops'
-                : it.href;
-              return (
-                <Btn key={it.href} size="sm" variant="ghost" onClick={() => router.push(target)}>
-                  <Icon size={14} strokeWidth={2.2} aria-hidden /> {it.label}
-                </Btn>
-              );
-            })}
-          </div>
-        </div>
+        <Rows title="원장 바로가기" tone="gray" n={shortcuts.length} id="m-home-shortcuts">
+          {shortcuts.map((it) => {
+            const Icon = it.icon;
+            return (
+              <ObjRow
+                key={it.href}
+                rail="brand"
+                name={(
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                    <Icon size={14} strokeWidth={2.2} aria-hidden />
+                    {it.label}
+                  </span>
+                )}
+                onClick={() => router.push(mHref(it.href))}
+              />
+            );
+          })}
+        </Rows>
       </div>
     </>
   );

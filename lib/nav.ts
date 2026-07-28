@@ -6,7 +6,7 @@
  * 2026-07 IA:
  *   허브 = 홈 · 운영현황 · 리스크관리 · 데이터센터
  *   원장 = 자산 · 계약 · 자금 · 업무
- *   홈 = 랜딩(검색·요약·바로가기). 예외 그리드=/risk(risk-ledger). 일정=/desk.
+ *   홈 = KPI 허브(함대·오늘끝낼일·계속관리). 예외 엑셀=/risk(risk-ledger). 일정=/desk.
  *   원장 = 마스터 표 + 더블클릭 우측 상세패널 (별도 상세페이지 축소 수순)
  */
 import {
@@ -42,7 +42,7 @@ export type PageIA = {
  */
 export const PAGE_IA: PageIA[] = [
   // ── 허브 ──
-  { href: '/', label: '홈', role: 'hub', layer: 'mixed', tier: '라이트', view: '랜딩 · 검색·원장바로가기', grab: 'none', grabHow: '—' },
+  { href: '/', label: '홈', role: 'hub', layer: 'mixed', tier: '라이트', view: 'KPI 허브 · 함대·오늘끝낼일·계속관리', grab: 'none', grabHow: '—' },
   { href: '/status', label: '운영현황', role: 'view', layer: 'mixed', tier: '라이트', view: '차량 1대=1행 통합원장 · LedgerFrame', grab: 'none', grabHow: '—' },
   { href: '/desk', label: '일정관리', role: 'view', layer: 'event', tier: '라이트', view: 'buildAgenda · LedgerFrame', grab: 'none', grabHow: '—' },
   { href: '/risk', label: '리스크관리', role: 'hub', layer: 'mixed', tier: '라이트', view: 'risk-ledger · LedgerFrame · 미완료·미납·만기·휴차', grab: 'none', grabHow: '—' },

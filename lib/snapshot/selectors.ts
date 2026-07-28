@@ -1,6 +1,8 @@
-/** 운영 스냅샷 셀렉터 — 미수 집계 SSOT. 페이지 reduce/filter 손롤 금지. */
+/** 운영 스냅샷 셀렉터 — 미수·미결 집계 SSOT. 페이지 reduce/filter 손롤 금지. */
 import { type EntityRecord } from '../intake/entities';
 import { computeContractView } from '../contract-ops';
+import type { Dashboard } from '../operating-snapshot';
+import { buildHomePendingRows, type HomeQueueRow } from '../home-rows';
 
 export type ReceivablesSnapshot = {
   /** 운행중+반납 미수 합(max(0,net)) */
@@ -52,4 +54,18 @@ export function selectReceivables(contracts: EntityRecord[], today: string): Rec
     total, misuActive, misuReturned, misuActiveCount, misuReturnedCount, unpaidCount,
     activeContractCount, rate, over30, over90, overpayTotal,
   };
+}
+
+export type PendingWorkSnapshot = {
+  count: number;
+  rows: HomeQueueRow[];
+};
+
+/**
+ * 미결 큐 SSOT — buildHomePendingRows(반납지남·배차충돌·과태료·todo·서류·자금미분류).
+ * 홈 Metric·필요 시 desk 연동은 이 숫자만. 페이지에서 returnFlow+penalty 손합 금지.
+ */
+export function selectPendingWork(D: Dashboard): PendingWorkSnapshot {
+  const rows = buildHomePendingRows(D);
+  return { count: rows.length, rows };
 }

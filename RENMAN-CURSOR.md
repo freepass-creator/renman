@@ -70,6 +70,8 @@ curl -s -o /dev/null -w "%{http_code}" http://localhost:6006/<route>   # 200
 
 | 날짜 | 작업자 | 내용 | 상태 |
 |---|---|---|---|
+| 2026-07-28 | Cursor | 홈=KPI허브(함대·오늘끝낼일·계속관리) · selectPendingWork · agenda미리보기5 · 데이터센터 tools강등 | tsc0 |
+| 2026-07-28 | Cursor | 홈·/m홈=LedgerFrame크롬 랜딩(검색·ObjRow바로가기) · 예외그리드없음 · tools=ingest icon | tsc0 |
 | 2026-07-28 | Cursor | 홈·/m홈=검색+바로가기만(지표·예외그리드제거) · home-briefing폐기 · SSOT=risk-ledger | tsc0 |
 | 2026-07-28 | Cursor | 홈A안 랜딩(검색·리스크요약·바로가기) · home-briefing/cols폐기 · 예외SSOT=risk-ledger만 | tsc0 |
 | 2026-07-28 | Cursor | /risk 리스크관리 LedgerFrame · risk-ledger SSOT · nav·/m/risk칩 정합 · home-briefing 래퍼 | tsc0 |
