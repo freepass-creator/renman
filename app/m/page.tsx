@@ -1,45 +1,64 @@
 'use client';
-/** /m 홈 — 오늘 브리핑. 데이터 = lib/home-briefing SSOT (웹과 동일). */
-import { useMemo } from 'react';
+/** /m 홈 — 주의 리스트. 데이터 = lib/home-briefing SSOT (웹 엑셀과 동일). */
+import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { TODAY } from '@/lib/dashboard-consts';
 import { useEntityLists } from '@/lib/use-entity-lists';
-import { buildHomeBriefing, homeLedgerShortcuts } from '@/lib/home-briefing';
-import { Rows, ObjRow, EmptyState, PageLoading, Btn, C, SPACE_M } from '@/components/ui';
+import { buildHomeSheetRows, homeLedgerShortcuts, type HomeSheetGroup } from '@/lib/home-briefing';
+import { Rows, ObjRow, EmptyState, PageLoading, Btn, FilterChips, C, SPACE_M } from '@/components/ui';
 import { MHead } from '@/components/m/MHead';
+
+const GROUPS: HomeSheetGroup[] = ['미결', '리스크', '휴차'];
 
 export default function MHome() {
   const router = useRouter();
   const { data: [vs = [], cs = [], ins = [], hs = [], pens = []], loading } = useEntityLists([
     'vehicle', 'contract', 'insurance', 'history', 'penalty',
   ]);
-  const briefing = useMemo(
-    () => buildHomeBriefing(vs, cs, ins, pens, hs, TODAY),
+  const [group, setGroup] = useState<HomeSheetGroup | null>(null);
+  const rows = useMemo(
+    () => buildHomeSheetRows(vs, cs, ins, pens, hs, TODAY),
     [vs, cs, ins, pens, hs],
   );
+  const shown = useMemo(
+    () => (group ? rows.filter((r) => r.group === group) : rows),
+    [rows, group],
+  );
   const shortcuts = useMemo(() => homeLedgerShortcuts(), []);
+  const counts = useMemo(() => ({
+    미결: rows.filter((r) => r.group === '미결').length,
+    리스크: rows.filter((r) => r.group === '리스크').length,
+    휴차: rows.filter((r) => r.group === '휴차').length,
+  }), [rows]);
 
   return (
     <>
-      <MHead title="홈" sub="오늘 브리핑" color={C.ok} />
+      <MHead title="홈" sub="미결 · 리스크 · 휴차" color={C.ok} />
       {loading ? <PageLoading />
         : (
           <div style={{ padding: '12px 14px 24px', display: 'flex', flexDirection: 'column', gap: 16 }}>
-            {briefing.items.length === 0 ? (
+            <FilterChips
+              allowOff
+              value={group}
+              onChange={setGroup}
+              options={GROUPS.map((key) => ({ key, label: key, count: counts[key] || undefined }))}
+            />
+            {shown.length === 0 ? (
               <EmptyState variant="ok">오늘 급한 것 없음</EmptyState>
             ) : (
-              <Rows title="오늘 챙길 것" tone="red" n={briefing.items.length} collapsible id="m-briefing">
-                {briefing.items.map((item) => (
+              <Rows title={group || '주의'} tone="red" n={shown.length} collapsible id="m-home-sheet">
+                {shown.map((item) => (
                   <ObjRow
                     key={item.id}
-                    rail={item.tone === 'danger' ? 'danger' : item.tone === 'warn' ? 'warn' : item.tone === 'brand' ? 'brand' : 'none'}
-                    badge={item.category}
+                    rail={item.tone === 'danger' ? 'danger' : item.tone === 'warn' ? 'warn' : item.tone === 'brand' ? 'brand' : 'mute'}
+                    badge={item.group}
                     badgeTone={item.badgeTone}
                     plate={item.plate || undefined}
-                    name={!item.plate ? item.ref : undefined}
-                    meta={item.customer}
-                    right={item.detail}
-                    rightTone={item.tone === 'danger' ? 'danger' : item.tone === 'warn' ? 'warn' : 'ink'}
+                    name={!item.plate ? item.kind : undefined}
+                    meta={`${item.customer}${item.carName && item.carName !== '—' ? ` · ${item.carName}` : ''}`}
+                    sub={item.due}
+                    right={item.amount > 0 ? `${item.amount.toLocaleString('ko-KR')}원` : item.status}
+                    rightTone={item.amount > 0 ? 'danger' : item.tone === 'warn' ? 'warn' : 'ink'}
                     onClick={() => item.plate && router.push(`/m/vehicle/${encodeURIComponent(item.plate)}`)}
                   />
                 ))}

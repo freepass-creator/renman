@@ -1,86 +1,123 @@
 'use client';
 /**
- * 홈 — «오늘 브리핑».
- * LedgerFrame/렌즈 탭 폐기. Page + 트리아지 리스트 + 원장 바로가기.
- * 데이터 = lib/home-briefing SSOT (웹·/m 공용).
+ * 홈 — 주의원장 LedgerFrame (미결·리스크·휴차).
+ * 데이터 = lib/home-briefing SSOT. 하단 원장 바로가기 유지.
  */
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { UploadCloud } from 'lucide-react';
-import {
-  Page, Sec, Btn, Badge, EmptyState, PageLoading, C, SPACE_M, SPACE_GROUP_M,
-} from '@/components/ui';
+import { TODAY } from '@/lib/dashboard-consts';
 import { useDashboardData } from '@/lib/use-dashboard-data';
+import { textMatch } from '@/lib/search-match';
 import { openCar, openIngest } from '@/lib/ui-bus';
-import { buildHomeBriefing, homeLedgerShortcuts, type HomeBriefingItem } from '@/lib/home-briefing';
+import { buildHomeSheetRows, homeLedgerShortcuts, type HomeSheetGroup } from '@/lib/home-briefing';
+import { HOME_BASIC_COLS, HOME_EXPANDED_COLS } from '@/lib/home-cols';
+import {
+  Btn, C, FilterChips, LedgerActions, LedgerFrame, PeriodBar, Search,
+  type LedgerColView,
+} from '@/components/ui';
+import { useIsMobile } from '@/lib/use-mobile';
 
-function BriefingRow({ item, onOpen }: { item: HomeBriefingItem; onOpen: (plate: string) => void }) {
-  return (
-    <button
-      type="button"
-      onClick={() => item.plate && onOpen(item.plate)}
-      style={{
-        display: 'flex', alignItems: 'center', gap: 10, width: '100%', textAlign: 'left',
-        padding: '10px 12px', border: `1px solid ${C.line}`, borderRadius: 'var(--radius)',
-        background: C.card, cursor: item.plate ? 'pointer' : 'default',
-        WebkitTapHighlightColor: 'transparent',
-      }}
-    >
-      <Badge tone={item.badgeTone}>{item.category}</Badge>
-      <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, fontSize: 13, color: C.ink, flexShrink: 0 }}>{item.ref || item.plate || '—'}</span>
-      <span style={{ flex: 1, minWidth: 0, fontSize: 13, color: C.mute, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.customer}</span>
-      <span style={{
-        fontSize: 12.5, fontWeight: 700, flexShrink: 0, fontVariantNumeric: 'tabular-nums',
-        color: item.tone === 'danger' ? C.danger : item.tone === 'warn' ? C.warn : item.tone === 'brand' ? C.brand : C.ink,
-      }}>{item.detail}</span>
-    </button>
-  );
-}
+const GROUPS: HomeSheetGroup[] = ['미결', '리스크', '휴차'];
 
 export default function HomePage() {
   const router = useRouter();
+  const mobile = useIsMobile();
   const { contracts, vehicles, insurances, penalties, history, loading } = useDashboardData();
-  const briefing = useMemo(
-    () => buildHomeBriefing(vehicles, contracts, insurances, penalties, history),
+  const [q, setQ] = useState('');
+  const [group, setGroup] = useState<HomeSheetGroup | null>(null);
+  const [range, setRange] = useState({ from: '', to: '' });
+  const [colView, setColView] = useState<LedgerColView>('기본');
+
+  const allRows = useMemo(
+    () => buildHomeSheetRows(vehicles, contracts, insurances, penalties, history),
     [vehicles, contracts, insurances, penalties, history],
   );
+  const searched = useMemo(() => allRows.filter((r) =>
+    textMatch(q, r.group, r.kind, r.plate, r.customer, r.carName, r.status, r.due),
+  ), [allRows, q]);
+  const rows = useMemo(() => searched.filter((r) => {
+    if (group && r.group !== group) return false;
+    if (range.from || range.to) {
+      if (!r.dueDate) return false;
+      if (range.from && r.dueDate < range.from) return false;
+      if (range.to && r.dueDate > range.to) return false;
+    }
+    return true;
+  }), [searched, group, range.from, range.to]);
+
+  const latest = useMemo(() => allRows.reduce((acc, r) => (r.dueDate > acc ? r.dueDate : acc), TODAY), [allRows]);
   const shortcuts = useMemo(() => homeLedgerShortcuts(), []);
+  const counts = useMemo(() => ({
+    미결: searched.filter((r) => r.group === '미결').length,
+    리스크: searched.filter((r) => r.group === '리스크').length,
+    휴차: searched.filter((r) => r.group === '휴차').length,
+  }), [searched]);
+
+  const shortcutBar = (
+    <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8, padding: '8px 4px' }}>
+      <span style={{ fontSize: 12, fontWeight: 800, color: C.mute, marginRight: 4 }}>원장 바로가기</span>
+      {shortcuts.map((it) => {
+        const Icon = it.icon;
+        return (
+          <Btn key={it.href} size="sm" variant="ghost" onClick={() => router.push(it.href)}>
+            <Icon size={14} strokeWidth={2.2} aria-hidden /> {it.label}
+          </Btn>
+        );
+      })}
+    </div>
+  );
 
   return (
-    <Page
+    <LedgerFrame
       title="홈"
+      filters={(
+        <>
+          <Search
+            size="sm"
+            placeholder="구분·차번·대상·차명·상태"
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            style={{ width: mobile ? '100%' : 240 }}
+          />
+          <FilterChips
+            allowOff
+            value={group}
+            onChange={setGroup}
+            options={GROUPS.map((key) => ({ key, label: key, count: counts[key] || undefined }))}
+          />
+          <PeriodBar latest={latest || TODAY} initial="전체" size="sm" onRange={setRange} />
+        </>
+      )}
+      stats={(
+        <span style={{ fontSize: 12.5, color: C.mute, whiteSpace: 'nowrap' }}>
+          미결 <b style={{ color: counts.미결 ? C.danger : C.ok }}>{counts.미결}</b>
+          {' · '}리스크 <b style={{ color: counts.리스크 ? C.warn : C.ink }}>{counts.리스크}</b>
+          {' · '}휴차 <b>{counts.휴차}</b>
+        </span>
+      )}
+      colView={colView}
+      onColView={setColView}
       tools={(
-        <Btn size="sm" variant="ghost" iconOnly tip="데이터센터 — OCR·엑셀 투입" onClick={() => openIngest()}>
-          <UploadCloud size={14} />
-        </Btn>
+        <LedgerActions aria-label="워크플로">
+          <Btn size="sm" variant="ghost" iconOnly tip="데이터센터" onClick={() => openIngest()}>
+            <UploadCloud size={14} />
+          </Btn>
+        </LedgerActions>
       )}
       loading={loading}
-    >
-      <Sec title="오늘 챙길 것" desc="만기경과 → 임박 → 미수 → 인도예정 → 일정 어김 · 상위 10">
-        {briefing.items.length === 0 ? (
-          <EmptyState variant="ok">오늘 급한 것 없음</EmptyState>
-        ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: SPACE_M }}>
-            {briefing.items.map((item) => (
-              <BriefingRow key={item.id} item={item} onOpen={(plate) => openCar(plate)} />
-            ))}
-          </div>
-        )}
-      </Sec>
-
-      <div style={{ marginTop: SPACE_GROUP_M }}>
-        <div style={{ fontSize: 13.5, fontWeight: 800, color: C.ink, marginBottom: SPACE_M }}>원장 바로가기</div>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-          {shortcuts.map((it) => {
-            const Icon = it.icon;
-            return (
-              <Btn key={it.href} size="sm" variant="ghost" onClick={() => router.push(it.href)}>
-                <Icon size={14} strokeWidth={2.2} aria-hidden /> {it.label}
-              </Btn>
-            );
-          })}
+      empty={(
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16 }}>
+          <span>{group ? `${group} 없음` : '오늘 급한 것 없음'}</span>
+          {shortcutBar}
         </div>
-      </div>
-    </Page>
+      )}
+      cols={colView === '기본' ? HOME_BASIC_COLS : HOME_EXPANDED_COLS}
+      rows={rows}
+      rowKey={(r) => r.id}
+      onRow={(r) => { if (r.plate) openCar(r.plate); }}
+      onRowDoubleClick={(r) => { if (r.plate) openCar(r.plate); }}
+      detail={shortcutBar}
+    />
   );
 }
