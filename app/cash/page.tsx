@@ -14,6 +14,7 @@ import {
   ACCOUNT_ALL_COLS, ACCOUNT_BASIC_COLS, ACCOUNT_DETAIL_SECTIONS,
 } from '@/lib/finance/account-cols';
 import { isUnclassified } from '@/lib/payments/ledger-subjects';
+import { summarizeAccountLedgerStats, summarizeCashTxStats } from '@/lib/ledger-stats';
 import { useCashLedgerLists } from '@/lib/use-cash-ledger-lists';
 import { useEntityList } from '@/lib/use-entity-lists';
 import { textMatch } from '@/lib/search-match';
@@ -400,14 +401,11 @@ export default function CashLedgerPage() {
     ? countActiveFilters(accountFilters, CASH_ACCOUNT_FILTER_DEFS)
     : countActiveFilters(txFilters, CASH_TX_FILTER_DEFS);
 
-  /** 통장 현금흐름만(입금·출금 합계). CMS미연결은 별도. */
-  const bankRows = rows.filter((r) => r.nest !== 'cms-item' && r.nest !== 'cms-pending');
-  const pendingCms = rows.filter((r) => r.nest === 'cms-pending');
-  const inSum = bankRows.reduce((s, r) => s + r.inAmt, 0);
-  const outSum = bankRows.reduce((s, r) => s + r.outAmt, 0);
-  const cmsPendingSum = pendingCms.reduce((s, r) => s + r.inAmt, 0);
-  const alertN = rows.filter((r) => r.raw.dataAlert || r.nest === 'cms-pending').length;
-  const unclN = bankRows.filter((r) => isUnclassified(r.category)).length;
+  /** 통장 현금흐름·CMS·알람 — ledger-stats SSOT. */
+  const { inSum, outSum, cmsPendingCount, cmsPendingSum, alertN, unclN } = useMemo(
+    () => summarizeCashTxStats(rows),
+    [rows],
+  );
   const rowMore = Math.max(0, rows.length - ROW_DISPLAY_CAP);
   const displayRows = rowMore > 0 ? rows.slice(0, ROW_DISPLAY_CAP) : rows;
   const cols = colView === '기본' ? CASH_BASIC_COLS : CASH_EXPANDED_COLS;
@@ -596,7 +594,7 @@ export default function CashLedgerPage() {
   ) : null;
 
   if (ledgerKind === '계좌관리') {
-    const activeAccounts = accountRows.filter((row) => row.status === '사용중').length;
+    const { total: accountTotal, active: activeAccounts } = summarizeAccountLedgerStats(accountRows);
     return (
       <LedgerFrame
         title="자금관리"
@@ -618,7 +616,7 @@ export default function CashLedgerPage() {
           {ledgerQuickFilters}
           <PeriodBar latest={latest} initial="월간" size="sm" onRange={onRange} />
         </>}
-        stats={<span style={{ fontSize: 12.5, color: C.mute }}>전체 <b>{accountRows.length}</b> · 사용중 <b style={{ color: C.ok }}>{activeAccounts}</b></span>}
+        stats={<span style={{ fontSize: 12.5, color: C.mute }}>전체 <b>{accountTotal}</b> · 사용중 <b style={{ color: C.ok }}>{activeAccounts}</b></span>}
         loading={accountLoading}
         empty="등록된 계좌가 없습니다. 「신규 계좌」에서 등록하세요."
         cols={colView === '기본' ? ACCOUNT_BASIC_COLS : ACCOUNT_ALL_COLS}
@@ -729,8 +727,8 @@ export default function CashLedgerPage() {
           <span>{ledgerKind === 'CMS 원천내역' ? 'CMS' : ledgerKind === '법인카드 원천내역' ? '카드' : '계좌'} <b>{rows.length}</b></span>
           {ledgerKind === '입출금내역' && <span>입금 <b style={{ color: C.ok }}>{amt(inSum)}</b></span>}
           {ledgerKind === '입출금내역' && <span>출금 <b>{amt(outSum)}</b></span>}
-          {ledgerKind === 'CMS 원천내역' && pendingCms.length > 0 && (
-            <span>CMS미연결 <b style={{ color: C.brand }}>{pendingCms.length}</b>·<b style={{ color: C.brand }}>{amt(cmsPendingSum)}</b></span>
+          {ledgerKind === 'CMS 원천내역' && cmsPendingCount > 0 && (
+            <span>CMS미연결 <b style={{ color: C.brand }}>{cmsPendingCount}</b>·<b style={{ color: C.brand }}>{amt(cmsPendingSum)}</b></span>
           )}
           {alertN > 0 && <span>데이터알람 <b style={{ color: C.warn }}>{alertN}</b></span>}
         </span>

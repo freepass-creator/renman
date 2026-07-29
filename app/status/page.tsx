@@ -5,10 +5,11 @@
  */
 import { useMemo, useState } from 'react';
 import { Car, CalendarClock, FileText } from 'lucide-react';
-import { TODAY, dday } from '@/lib/dashboard-consts';
+import { TODAY } from '@/lib/dashboard-consts';
 import { linkFleet } from '@/lib/domain/model';
 import { buildFleetRows, statusRank, type FleetRow } from '@/lib/sheet-rows';
 import { FLEET_BASIC_COLS, FLEET_DETAIL_SECTIONS, FLEET_EXPANDED_COLS } from '@/lib/sheet-cols';
+import { summarizeFleetStatusStats } from '@/lib/ledger-stats';
 import { useEntityLists } from '@/lib/use-entity-lists';
 import { textMatch } from '@/lib/search-match';
 import {
@@ -95,11 +96,10 @@ export default function StatusPage() {
   }), [searched, own, utilChip, riskOnly, rentalChip, detailFilters, fleetFilterMatchers, range.from, range.to]);
 
   const detailFilterCount = countActiveFilters(detailFilters, FLEET_FILTER_DEFS);
-  const heldN = searched.filter((r) => r.ownership !== '처분완료').length;
-  const runN = searched.filter((r) => r.ownership !== '처분완료' && r.util === '운행').length;
-  const utilPct = heldN ? Math.round((runN / heldN) * 100) : 0;
-  const netSum = rows.reduce((s, r) => s + Math.max(0, r.net), 0);
-  const inspSoon = rows.filter((r) => { const d = dday(r.inspectionTo); return d != null && d <= 30; }).length;
+  const { heldN, utilPct, netSum, inspSoon } = useMemo(
+    () => summarizeFleetStatusStats(searched, rows),
+    [searched, rows],
+  );
 
   return (
     <LedgerFrame

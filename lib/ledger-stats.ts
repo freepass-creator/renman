@@ -3,6 +3,10 @@ import { type Fleet } from '@/lib/domain/model';
 import { type AssetMasterRow, type ContractMasterRow } from '@/lib/master-ledgers';
 import { normPlate } from '@/lib/plate';
 import { selectReceivables } from '@/lib/snapshot/selectors';
+import { dday } from '@/lib/dashboard-consts';
+import type { FleetRow } from '@/lib/sheet-rows';
+import type { BankAccountRow, CashRow } from '@/lib/finance/cash-ledger';
+import { isUnclassified } from '@/lib/payments/ledger-subjects';
 
 export type AssetLedgerStats = {
   held: number;
@@ -51,4 +55,78 @@ export function summarizeContractLedgerStats(rows: ContractMasterRow[], today: s
     endedRiskCount,
     endedRiskDebtSum: recv.misuReturned,
   };
+}
+
+export type FleetStatusStats = {
+  heldN: number;
+  runN: number;
+  utilPct: number;
+  netSum: number;
+  inspSoon: number;
+};
+
+/**
+ * 운영현황 배지.
+ *   held/run = 검색 스코프(`searched`) · 미수합·검사임박 = 표에 보이는 행(`rows`).
+ */
+export function summarizeFleetStatusStats(searched: FleetRow[], rows: FleetRow[]): FleetStatusStats {
+  let heldN = 0, runN = 0;
+  for (const r of searched) {
+    if (r.ownership === '처분완료') continue;
+    heldN++;
+    if (r.util === '운행') runN++;
+  }
+  let netSum = 0, inspSoon = 0;
+  for (const r of rows) {
+    netSum += Math.max(0, r.net);
+    const d = dday(r.inspectionTo);
+    if (d != null && d <= 30) inspSoon++;
+  }
+  return {
+    heldN,
+    runN,
+    utilPct: heldN ? Math.round((runN / heldN) * 100) : 0,
+    netSum,
+    inspSoon,
+  };
+}
+
+export type CashTxStats = {
+  inSum: number;
+  outSum: number;
+  cmsPendingCount: number;
+  cmsPendingSum: number;
+  alertN: number;
+  unclN: number;
+};
+
+/** 자금 입출금/CMS/카드 표 배지 — nest 규칙 포함. */
+export function summarizeCashTxStats(rows: CashRow[]): CashTxStats {
+  let inSum = 0, outSum = 0, cmsPendingCount = 0, cmsPendingSum = 0, alertN = 0, unclN = 0;
+  for (const r of rows) {
+    if (r.raw.dataAlert || r.nest === 'cms-pending') alertN++;
+    if (r.nest === 'cms-pending') {
+      cmsPendingCount++;
+      cmsPendingSum += r.inAmt;
+      continue;
+    }
+    if (r.nest === 'cms-item') continue;
+    inSum += r.inAmt;
+    outSum += r.outAmt;
+    if (isUnclassified(r.category)) unclN++;
+  }
+  return { inSum, outSum, cmsPendingCount, cmsPendingSum, alertN, unclN };
+}
+
+export type AccountLedgerStats = {
+  total: number;
+  active: number;
+};
+
+export function summarizeAccountLedgerStats(rows: BankAccountRow[]): AccountLedgerStats {
+  let active = 0;
+  for (const r of rows) {
+    if (r.status === '사용중') active++;
+  }
+  return { total: rows.length, active };
 }
