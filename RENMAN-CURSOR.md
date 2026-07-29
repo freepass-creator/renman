@@ -70,6 +70,7 @@ curl -s -o /dev/null -w "%{http_code}" http://localhost:6006/<route>   # 200
 
 | 날짜 | 작업자 | 내용 | 상태 |
 |---|---|---|---|
+| 2026-07-29 | Cursor | 규격통일2차 A잔여+P2(B1~B7): IconCount·TwoLineCell·status필터·기본뷰승격·danger틴트 | tsc0 · 7면200 · a738994…9bc8f4e |
 | 2026-07-29 | Cursor | P1 그릇: money/TwoLineCell/INDENT/ROW_H44/bg-selected + redesign박제 | tsc0 · 7면200 |
 | 2026-07-29 | Cursor | rail 시각=RailDot(6px)·틴트/세로선 폐기 | tsc0 · /risk·/work·/status 200 |
 | 2026-07-29 | Cursor | `/status` 보유=`isVehicleHeld`(매각·처분예정·구매예정 제외) SSOT | tsc0 · /status·/sheet 200 |
