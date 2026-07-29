@@ -8,7 +8,7 @@ import { useCashHubNav } from '@/components/CashHubTabs';
 import { companyLabel } from '@/lib/companies';
 import { buildCashLedger, aggregateBySubject, type SubjectAgg } from '@/lib/finance/cash-ledger';
 import { operatingProfit, operatingProfitTrend } from '@/lib/finance/operating-profit';
-import { groupOfLabel } from '@/lib/payments/ledger-subjects';
+import { summarizePnlSubjects } from '@/lib/finance/subject-summary';
 import { loanTotalsInRange } from '@/lib/finance/loan-schedule';
 import { useCashLedgerLists } from '@/lib/use-cash-ledger-lists';
 import { latestDateOf } from '@/lib/ledger-stats';
@@ -31,20 +31,12 @@ export default function PnlPage() {
   const loan = useMemo(() => loanTotalsInRange(veh, range.from, range.to), [veh, range]);
   const opProfit = useMemo(() => operatingProfit(inRange), [inRange]);
   const trend = useMemo(() => operatingProfitTrend(rows, 12), [rows]);
-
-  // 영업(손익) vs 자본·금융(손익 외) 분리 — 과목표. 합계는 과목 합(표시), 영업손익=SSOT.
-  const opIncome = subjects.filter((s) => s.kind === '수입' && groupOfLabel(s.label) === '영업');
-  const opExpense = subjects.filter((s) => s.kind === '지출' && groupOfLabel(s.label) === '영업');
-  const capFin = subjects.filter((s) => { const g = groupOfLabel(s.label); return g === '자본' || g === '금융'; });
-  const unclass = subjects.filter((s) => s.kind === '미분류');
-  const totalIn = opIncome.reduce((s, x) => s + x.inAmt, 0);
-  const totalOut = opExpense.reduce((s, x) => s + x.outAmt, 0);
-  const loanInterest = loan.interest;               // 할부이자(우리 계산) = 금융비용
-  const preTax = opProfit - loanInterest;           // 세전이익
+  const {
+    opIncome, opExpense, capFin, totalIn, totalOut, capFinOut, capFinIn, unclassAmt,
+  } = useMemo(() => summarizePnlSubjects(subjects), [subjects]);
+  const loanInterest = loan.interest;
+  const preTax = opProfit - loanInterest;
   const margin = totalIn > 0 ? Math.round((preTax / totalIn) * 100) : 0;
-  const capFinOut = capFin.reduce((s, x) => s + x.outAmt, 0);
-  const capFinIn = capFin.reduce((s, x) => s + x.inAmt, 0);
-  const unclassAmt = unclass.reduce((s, x) => s + x.inAmt + x.outAmt, 0);
 
   const cols = (base: number): SheetCol<SubjectAgg>[] => [
     { key: 'label', label: '계정과목', render: (s) => <b>{s.label}</b>, text: (s) => s.label },
