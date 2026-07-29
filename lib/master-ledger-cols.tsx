@@ -1,4 +1,4 @@
-import { Badge, C, money, type RailTone, type SheetCol } from '@/components/ui';
+import { Badge, Btn, C, money, type RailTone, type SheetCol } from '@/components/ui';
 import type { AssetMasterRow, ContractMasterRow } from './master-ledgers';
 import {
   buildDetailSections, buildSheetViews, type DetailSectionDef, type SheetViewKeys,
@@ -11,11 +11,16 @@ import {
   isContractEndedStatus,
 } from './domain/status';
 import { dday } from './dashboard-consts';
+import { openCar } from './ui-bus';
 
 const dash = (v: unknown) => (v === '' || v === null || v === undefined || v === 0 ? LEDGER_EMPTY.dash : String(v));
 const date = (v: string) => (v ? v.slice(0, 10) : LEDGER_EMPTY.dash);
 const moneyCell = (v: number) => (v ? money(v) : LEDGER_EMPTY.dash);
+const moneyOrNull = (v: number | null) => (v == null ? LEDGER_EMPTY.dash : moneyCell(v));
 const number = (v: number, suffix = '') => (v ? `${v.toLocaleString('ko-KR')}${suffix}` : LEDGER_EMPTY.dash);
+const numberOrNull = (v: number | null, suffix = '') => (
+  v == null ? LEDGER_EMPTY.dash : `${v.toLocaleString('ko-KR')}${suffix}`
+);
 
 /** rail 전용 보강 — domain 집합 밖 표시값(도메인 분류/집계는 건드리지 않음). */
 const RAIL_BUY = new Set(['발주', '상품', '상품대기', '상품화']);
@@ -110,13 +115,23 @@ const ASSET_COL_CATALOG: SheetCol<AssetMasterRow>[] = [
   ax('optionPrice', '옵션가', { money: true, align: 'r' }), ax('optionDiscount', '옵션할인', { money: true, align: 'r' }),
   ax('taxExempt', '과세/면세'), ax('purchasedDate', '매입완료일', { date: true }),
   ax('acquisitionDate', '취득일', { date: true, priority: 3 }), ax('supplier', '매입처'),
-  ax('loanKind', '금융구분'), ax('loanCompany', '할부/리스사', { priority: 3 }), ax('loanMonths', '할부개월', { num: '개월', align: 'r' }),
+  ax('loanKind', '금융구분'), ax('loanCashOnly', '할부없음(현금)'),
+  ax('loanCompany', '할부/리스사', { priority: 3 }), ax('loanMonths', '할부개월', { num: '개월', align: 'r' }),
   ax('loanPrincipal', '할부원금', { money: true, align: 'r' }), ax('loanRemainingPrincipal', '잔여원금', { money: true, align: 'r', priority: 2 }),
   ax('loanRate', '연이율', { num: '%', align: 'r' }), ax('loanStartDate', '할부개시일', { date: true }),
   ax('insuranceCompany', '보험사'), ax('insurancePolicyNo', '보험증권번호'), ax('insuranceExpiryDate', '보험만기', { date: true, priority: 2 }),
   ax('gpsProvider', 'GPS 공급사'), ax('gpsDeviceId', 'GPS 단말번호'), ax('gpsInstalledDate', 'GPS 설치일', { date: true }), ax('gpsControl', '시동제어'),
   ax('dealerAgency', '취급대리점'), ax('dealerContact', '딜러담당자'), ax('dealerPhone', '딜러연락처'),
   ax('optionList', '선택옵션'), ax('saleDate', '매각일', { date: true }), ax('salePrice', '매각가', { money: true, align: 'r' }),
+  ax('listRent', '매물 월대여료', { money: true, align: 'r' }), ax('listDeposit', '매물 보증금', { money: true, align: 'r' }),
+  ax('listTerm', '매물 기준기간', { num: '개월', align: 'r' }), ax('insuranceIncluded', '보험료 포함'),
+  {
+    key: 'vehicle360Link', label: '수선·과태료·업무',
+    render: (r) => (r.plate
+      ? <Btn variant="ghost" size="sm" onClick={() => openCar(r.plate)}>차량360으로</Btn>
+      : LEDGER_EMPTY.dash),
+    text: (r) => (r.plate ? '차량360으로' : ''),
+  },
   {
     key: 'maintCost', label: '정비비누계', align: 'r', priority: 1,
     render: (r) => (r.maintCost ? <b style={{ color: r.maintVsAvg >= 2 ? C.danger : r.maintVsAvg >= 1.5 ? C.warn : C.ink }}>{money(r.maintCost)}</b> : LEDGER_EMPTY.dash),
@@ -161,10 +176,11 @@ export const ASSET_SHEET_KEYS: SheetViewKeys = {
     'inspectionFrom', 'inspectionType',
     'acquisitionPrice', 'consumerPrice', 'optionPrice', 'optionDiscount', 'taxExempt',
     'purchasedDate', 'acquisitionDate', 'supplier',
-    'loanKind', 'loanCompany', 'loanMonths', 'loanPrincipal', 'loanRemainingPrincipal', 'loanRate', 'loanStartDate',
+    'loanKind', 'loanCashOnly', 'loanCompany', 'loanMonths', 'loanPrincipal', 'loanRemainingPrincipal', 'loanRate', 'loanStartDate',
     'insuranceCompany', 'insurancePolicyNo', 'insuranceExpiryDate',
     'gpsProvider', 'gpsDeviceId', 'gpsInstalledDate', 'gpsControl',
     'dealerAgency', 'dealerContact', 'dealerPhone', 'optionList', 'saleDate', 'salePrice',
+    'listRent', 'listDeposit', 'listTerm', 'insuranceIncluded',
     'maintCost', 'maintVsAvg', 'maintCount', 'maintLastDate',
   ],
 };
@@ -222,25 +238,37 @@ export const ASSET_DETAIL_DEFS: DetailSectionDef[] = [
     keys: [
       'supplier', 'purchasedDate', 'acquisitionDate', 'acquisitionPrice', 'consumerPrice',
       'optionPrice', 'optionDiscount', 'taxExempt', 'dealerAgency', 'dealerContact', 'dealerPhone',
-      'saleDate', 'salePrice',
     ],
+  },
+  {
+    title: '처분·매각',
+    keys: ['saleDate', 'salePrice'],
+  },
+  {
+    title: '매물',
+    keys: ['listRent', 'listDeposit', 'listTerm', 'insuranceIncluded'],
   },
   {
     title: '금융·할부',
     keys: [
-      'loanKind', 'loanCompany', 'loanMonths', 'loanPrincipal', 'loanRemainingPrincipal', 'loanRate', 'loanStartDate',
+      'loanKind', 'loanCashOnly', 'loanCompany', 'loanMonths', 'loanPrincipal', 'loanRemainingPrincipal', 'loanRate', 'loanStartDate',
     ],
   },
   {
-    title: '보험·GPS',
-    keys: [
-      'insuranceCompany', 'insurancePolicyNo', 'insuranceExpiryDate',
-      'gpsProvider', 'gpsDeviceId', 'gpsInstalledDate', 'gpsControl',
-    ],
+    title: '보험',
+    keys: ['insuranceCompany', 'insurancePolicyNo', 'insuranceExpiryDate'],
+  },
+  {
+    title: 'GPS',
+    keys: ['gpsProvider', 'gpsDeviceId', 'gpsInstalledDate', 'gpsControl'],
+  },
+  {
+    title: '수선·이력',
+    keys: ['vehicle360Link'],
   },
 ];
 
-export const ASSET_DETAIL_SECTIONS = buildDetailSections(ASSET_MASTER_EXPANDED_COLS, ASSET_DETAIL_DEFS);
+export const ASSET_DETAIL_SECTIONS = buildDetailSections(ASSET_COL_CATALOG, ASSET_DETAIL_DEFS);
 
 const C0 = {
   company: { key: 'company', label: '회사명', pin: true, priority: 2, render: (r) => r.company, text: (r) => r.company },
@@ -296,6 +324,46 @@ const CONTRACT_COL_CATALOG: SheetCol<ContractMasterRow>[] = [
   cx('deliveredDate', '인도일', { date: true }), cx('returnScheduledDate', '반납예정일', { date: true }),
   cx('returnedDate', '반납/해지일', { date: true }), cx('pickupPlace', '인수장소'), cx('returnPlace', '반환장소'),
   cx('reservationFee', '예약금', { money: true, align: 'r' }),
+  {
+    key: 'mileageOut', label: '출고주행', align: 'r',
+    render: (r) => numberOrNull(r.mileageOut, 'km'),
+    text: (r) => r.mileageOut ?? '',
+  },
+  {
+    key: 'returnMileage', label: '반납주행', align: 'r',
+    render: (r) => numberOrNull(r.returnMileage, 'km'),
+    text: (r) => r.returnMileage ?? '',
+  },
+  {
+    key: 'overMileageRate', label: '초과주행 단가', align: 'r',
+    render: (r) => (r.overMileageRate == null ? LEDGER_EMPTY.dash : `${money(r.overMileageRate)}/km`),
+    text: (r) => r.overMileageRate ?? '',
+  },
+  {
+    key: 'drivenKm', label: '실주행', align: 'r',
+    render: (r) => numberOrNull(r.drivenKm, 'km'),
+    text: (r) => r.drivenKm ?? '',
+  },
+  {
+    key: 'allowedKm', label: '허용주행', align: 'r',
+    render: (r) => numberOrNull(r.allowedKm, 'km'),
+    text: (r) => r.allowedKm ?? '',
+  },
+  {
+    key: 'excessKm', label: '초과km', align: 'r',
+    render: (r) => numberOrNull(r.excessKm, 'km'),
+    text: (r) => r.excessKm ?? '',
+  },
+  {
+    key: 'overMileageFee', label: '초과주행료', align: 'r',
+    render: (r) => moneyOrNull(r.overMileageFee),
+    text: (r) => r.overMileageFee ?? '',
+  },
+  {
+    key: 'overMileageBasis', label: '주행산출',
+    render: (r) => dash(r.overMileageBasis),
+    text: (r) => r.overMileageBasis,
+  },
   cx('driverAgeMin', '최소운전연령', { num: '세', align: 'r' }), cx('driverAge', '운전자연령', { num: '세', align: 'r' }),
   cx('insuranceAge', '보험허용연령', { num: '세', align: 'r' }),
   cx('lateFeeRate', '지연손해금율', { num: '%', align: 'r' }), cx('earlyTerminationRate', '중도해지율', { num: '%', align: 'r' }),
@@ -319,7 +387,9 @@ export const CONTRACT_SHEET_KEYS: SheetViewKeys = {
     'plate', 'carName', 'contractDate', 'startDate', 'endDate',
     'monthlyRent', 'deposit', 'paymentDay', 'paymentTiming', 'paymentMethod', 'riskLabel', 'net', 'alert',
     'contractorBirth', 'contractorLicenseNo', 'licenseType', 'contractorAddress',
-    'rentalMonths', 'annualMileageLimit', 'deliveredDate', 'returnScheduledDate', 'returnedDate',
+    'rentalMonths', 'annualMileageLimit', 'mileageOut', 'returnMileage', 'overMileageRate',
+    'drivenKm', 'allowedKm', 'excessKm', 'overMileageFee', 'overMileageBasis',
+    'deliveredDate', 'returnScheduledDate', 'returnedDate',
     'pickupPlace', 'returnPlace', 'reservationFee',
     'driverAgeMin', 'driverAge', 'insuranceAge', 'lateFeeRate', 'earlyTerminationRate',
     'cdw', 'deductible', 'superCover', 'additionalDrivers', 'withDriver', 'fuelOut', 'fuelIn',
@@ -353,8 +423,15 @@ export const CONTRACT_DETAIL_DEFS: DetailSectionDef[] = [
   {
     title: '기간·인도',
     keys: [
-      'rentalMonths', 'annualMileageLimit', 'deliveredDate', 'returnScheduledDate', 'returnedDate',
+      'rentalMonths', 'deliveredDate', 'returnScheduledDate', 'returnedDate',
       'pickupPlace', 'returnPlace', 'fuelOut', 'fuelIn',
+    ],
+  },
+  {
+    title: '주행',
+    keys: [
+      'annualMileageLimit', 'mileageOut', 'returnMileage',
+      'drivenKm', 'allowedKm', 'excessKm', 'overMileageRate', 'overMileageFee', 'overMileageBasis',
     ],
   },
   {
@@ -380,4 +457,4 @@ export const CONTRACT_DETAIL_DEFS: DetailSectionDef[] = [
   },
 ];
 
-export const CONTRACT_DETAIL_SECTIONS = buildDetailSections(CONTRACT_MASTER_EXPANDED_COLS, CONTRACT_DETAIL_DEFS);
+export const CONTRACT_DETAIL_SECTIONS = buildDetailSections(CONTRACT_COL_CATALOG, CONTRACT_DETAIL_DEFS);

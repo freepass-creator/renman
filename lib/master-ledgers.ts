@@ -2,11 +2,18 @@ import { companyShort } from './companies';
 import { computeContractView } from './contract-ops';
 import type { EntityRecord } from './intake/entities';
 import { OUT } from './domain/status';
+import { computeOverMileage } from './domain/over-mileage';
 import { contractRisks } from './risk-ops';
 import { rentalTypeOf, paymentTimingOf } from './schema/contract';
 
 const str = (v: unknown) => String(v ?? '').trim();
 const num = (v: unknown) => Number(v) || 0;
+/** 결측을 0으로 만들지 않음(주행거리·매물가 등). */
+const numOrNull = (v: unknown): number | null => {
+  if (v === '' || v == null) return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+};
 
 export type AssetMasterRow = {
   raw: EntityRecord;
@@ -30,6 +37,9 @@ export type AssetMasterRow = {
   gpsProvider: string; gpsDeviceId: string; gpsInstalledDate: string; gpsControl: string;
   saleDate: string; salePrice: number; optionList: string;
   dealerAgency: string; dealerContact: string; dealerPhone: string;
+  /** 금융구분 원값(예/아니오) — loanKind 파생의 소스. */
+  loanCashOnly: string;
+  listRent: number; listDeposit: number; listTerm: number; insuranceIncluded: string;
   /** 정비비 함대 랭킹 — page가 fleetMaintRanking으로 채움(원장은 0). */
   maintCost: number; maintCount: number; maintLastDate: string; maintVsAvg: number;
 };
@@ -58,6 +68,7 @@ export function assetMasterRow(raw: EntityRecord): AssetMasterRow {
     taxExempt: str(raw.taxExempt), acquisitionPrice: num(raw.acquisitionPrice),
     purchasedDate: str(raw.purchasedDate), acquisitionDate: str(raw.acquisitionDate), supplier: str(raw.supplier),
     loanKind: /예|현금|Y/i.test(str(raw.loanCashOnly)) ? '현금' : (raw.loanCompany ? '할부/리스' : ''),
+    loanCashOnly: str(raw.loanCashOnly),
     loanCompany: str(raw.loanCompany), loanMonths: num(raw.loanMonths), loanPrincipal: num(raw.loanPrincipal),
     loanRemainingPrincipal: num(raw.loanRemainingPrincipal), loanRate: num(raw.loanRate),
     loanStartDate: str(raw.loanStartDate), insuranceCompany: str(raw.insuranceCompany),
@@ -66,6 +77,8 @@ export function assetMasterRow(raw: EntityRecord): AssetMasterRow {
     gpsInstalledDate: str(raw.gpsInstalledDate), gpsControl: str(raw.gpsControl),
     saleDate: str(raw.saleDate), salePrice: num(raw.salePrice), optionList: str(raw.optionList),
     dealerAgency: str(raw.dealerAgency), dealerContact: str(raw.dealerContact), dealerPhone: str(raw.dealerPhone),
+    listRent: num(raw.listRent), listDeposit: num(raw.listDeposit), listTerm: num(raw.listTerm),
+    insuranceIncluded: str(raw.insuranceIncluded),
     maintCost: 0, maintCount: 0, maintLastDate: '', maintVsAvg: 0,
   };
 }
@@ -78,6 +91,10 @@ export type ContractMasterRow = {
   plate: string; carName: string; rentalMonths: number; startDate: string; endDate: string;
   deliveredDate: string; returnScheduledDate: string; returnedDate: string;
   pickupPlace: string; returnPlace: string; annualMileageLimit: number;
+  mileageOut: number | null; returnMileage: number | null; overMileageRate: number | null;
+  /** computeOverMileage 소비값 — 재계산 금지. 산출불가/한도없음이면 null. */
+  drivenKm: number | null; allowedKm: number | null; excessKm: number | null;
+  overMileageFee: number | null; overMileageBasis: string;
   monthlyRent: number; deposit: number; reservationFee: number;
   paymentDay: number; paymentTiming: string; paymentMethod: string;
   driverAgeMin: number; driverAge: number; insuranceAge: number;
@@ -95,6 +112,8 @@ export type ContractMasterRow = {
 export function contractMasterRow(raw: EntityRecord, today: string): ContractMasterRow {
   const view = computeContractView(raw, today);
   const risks = contractRisks(raw, today, view);
+  const om = computeOverMileage(raw, today);
+  const computable = om.basis === '반납확정';
   const companyId = str(raw.companyId);
   return {
     raw, companyId, company: companyShort(companyId), contractNo: str(raw.contractNo || raw._key),
@@ -106,7 +125,15 @@ export function contractMasterRow(raw: EntityRecord, today: string): ContractMas
     startDate: view.startDate, endDate: view.endDate, deliveredDate: str(raw.deliveredDate),
     returnScheduledDate: str(raw.returnScheduledDate), returnedDate: str(raw.returnedDate),
     pickupPlace: str(raw.pickupPlace), returnPlace: str(raw.returnPlace),
-    annualMileageLimit: num(raw.annualMileageLimit), monthlyRent: view.monthlyRent,
+    annualMileageLimit: num(raw.annualMileageLimit),
+    mileageOut: numOrNull(raw.mileageOut), returnMileage: numOrNull(raw.returnMileage),
+    overMileageRate: numOrNull(raw.overMileageRate),
+    drivenKm: computable ? om.drivenKm : null,
+    allowedKm: computable ? Math.round(om.allowedKm) : null,
+    excessKm: computable ? Math.round(om.excessKm) : null,
+    overMileageFee: computable ? om.fee : null,
+    overMileageBasis: om.basis,
+    monthlyRent: view.monthlyRent,
     deposit: num(raw.deposit), reservationFee: num(raw.reservationFee),
     paymentDay: num(raw.paymentDay), paymentTiming: paymentTimingOf(raw.paymentTiming),
     paymentMethod: str(raw.paymentMethod), driverAgeMin: num(raw.driverAgeMin),
