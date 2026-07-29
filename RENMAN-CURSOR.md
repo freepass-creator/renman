@@ -70,6 +70,10 @@ curl -s -o /dev/null -w "%{http_code}" http://localhost:6006/<route>   # 200
 
 | 날짜 | 작업자 | 내용 | 상태 |
 |---|---|---|---|
+| 2026-07-29 | Cursor | P0-0 redesign.mdc 행문법+분류→상태 SSOT | a94e320 |
+| 2026-07-29 | Cursor | P0-1 TARGET 차량·계약 피커 상시(텍스트금지) | bfabc37 |
+| 2026-07-29 | Cursor | P0-3 검색 work_item·TopSearch·/work?open= (기충족) | 139fa13 |
+
 | 2026-07-29 | Cursor | 업무 2d: 컬럼순서·상태5종·생성/최종처리·방치정렬 | tsc0 |
 
 | 2026-07-29 | Cursor | 행신원 0: redesign.mdc 6칸 문법 박제 | 480a00d |
