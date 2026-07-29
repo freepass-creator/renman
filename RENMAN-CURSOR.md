@@ -70,6 +70,7 @@ curl -s -o /dev/null -w "%{http_code}" http://localhost:6006/<route>   # 200
 
 | 날짜 | 작업자 | 내용 | 상태 |
 |---|---|---|---|
+| 2026-07-29 | Cursor | rail 정상=무색·4면 rowStyle · 리스크일괄 ghost · 자금 identity=계좌 · 패널 타이포 위계 | b775106 · 65cdc49 |
 | 2026-07-29 | Cursor | 죽은 레거시 COLS·SheetRow/ContractRow·MyDesk·archive 스크랩 삭제 | df9a880 |
 | 2026-07-29 | Cursor | PeriodBar latestDateOf SSOT (원장·손익·부가세) | aa99dda |
 | 2026-07-29 | Cursor | 리스크·업무 칩/배지 집계 SSOT (countRiskSheetGroups·work/penalty) | a6a1699 |
