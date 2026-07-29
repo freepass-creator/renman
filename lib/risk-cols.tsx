@@ -5,6 +5,7 @@ import React from 'react';
 import { Badge, won, C, type SheetCol } from '@/components/ui';
 import type { RiskSheetRow } from './risk-ledger';
 import { buildSheetViews, type SheetViewKeys } from './ledger-ext';
+import { LEDGER_EMPTY } from './ledger-empty';
 
 const toneColor = (tone: RiskSheetRow['tone']) => (
   tone === 'danger' ? C.danger : tone === 'warn' ? C.warn : tone === 'brand' ? C.brand : C.mute
@@ -13,7 +14,7 @@ const toneColor = (tone: RiskSheetRow['tone']) => (
 const CATALOG: SheetCol<RiskSheetRow>[] = [
   {
     key: 'company', label: '회사명', pin: true, priority: 2,
-    render: (r) => r.company || '—',
+    render: (r) => r.company || LEDGER_EMPTY.dash,
     text: (r) => r.company,
   },
   {
@@ -23,46 +24,51 @@ const CATALOG: SheetCol<RiskSheetRow>[] = [
   },
   {
     key: 'kind', label: '세부', priority: 2, align: 'c',
-    render: (r) => r.kind,
+    render: (r) => r.kind || LEDGER_EMPTY.dash,
     text: (r) => r.kind,
   },
   {
-    key: 'plate', label: '차번', priority: 1, pin: true,
-    render: (r) => <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 700 }}>{r.plate || '—'}</span>,
+    key: 'plate', label: '차량번호', priority: 1, pin: true,
+    render: (r) => (
+      <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 700 }}>
+        {r.plate || LEDGER_EMPTY.dash}
+      </span>
+    ),
     text: (r) => r.plate,
   },
   {
     key: 'customer', label: '대상', priority: 1,
-    render: (r) => r.customer || '—',
+    render: (r) => r.customer || LEDGER_EMPTY.none,
     text: (r) => r.customer,
   },
   {
     key: 'carName', label: '차명', priority: 2,
-    render: (r) => r.carName || '—',
+    render: (r) => r.carName || LEDGER_EMPTY.dash,
     text: (r) => r.carName,
   },
   {
     key: 'due', label: '기한', priority: 1, align: 'c',
-    render: (r) => <span style={{ fontWeight: 700, color: toneColor(r.tone) }}>{r.due}</span>,
+    render: (r) => <span style={{ fontWeight: 700, color: toneColor(r.tone) }}>{r.due || LEDGER_EMPTY.dash}</span>,
     text: (r) => r.due,
   },
   {
     key: 'amount', label: '금액', priority: 1, align: 'r', sortNum: true,
     render: (r) => (r.amount > 0
       ? <span style={{ color: C.danger, fontWeight: 700 }}>{won(r.amount)}</span>
-      : '—'),
+      : LEDGER_EMPTY.dash),
     text: (r) => r.amount,
   },
   {
     key: 'status', label: '상태', priority: 1, align: 'c',
-    render: (r) => <span style={{ fontWeight: 700, color: toneColor(r.tone) }}>{r.status}</span>,
+    render: (r) => <Badge tone={r.badgeTone}>{r.status || LEDGER_EMPTY.dash}</Badge>,
     text: (r) => r.status,
   },
 ];
 
+/** 회사 → 신원 → 내용(차명) → 분류 → 상태 → 수치 */
 export const RISK_SHEET_KEYS: SheetViewKeys = {
-  basic: ['company', 'group', 'plate', 'customer', 'carName', 'due', 'amount', 'status'],
-  all: ['company', 'group', 'kind', 'plate', 'customer', 'carName', 'due', 'amount', 'status'],
+  basic: ['company', 'plate', 'customer', 'carName', 'group', 'status', 'due', 'amount'],
+  all: ['company', 'plate', 'customer', 'carName', 'group', 'kind', 'status', 'due', 'amount'],
 };
 
 const views = buildSheetViews(CATALOG, RISK_SHEET_KEYS);

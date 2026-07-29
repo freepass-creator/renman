@@ -11,6 +11,7 @@ import { useDashboardData } from '@/lib/use-dashboard-data';
 import { textMatch } from '@/lib/search-match';
 import { buildRiskSheetRows, type RiskSheetGroup, type RiskSheetRow } from '@/lib/risk-ledger';
 import { RISK_BASIC_COLS, RISK_EXPANDED_COLS } from '@/lib/risk-cols';
+import { LEDGER_EMPTY } from '@/lib/ledger-empty';
 import { sendNoticeCert, sendNoticeCertBulk } from '@/lib/docs/send-notice';
 import { useSession } from '@/lib/session';
 import { toast } from '@/lib/toast';
@@ -155,7 +156,7 @@ export default function RiskPage() {
       sidePanel={selected ? (
         <LedgerRecordPanel
           title={selected.kind || selected.group}
-          identity={`${selected.plate || '미배정'} · ${selected.customer || '—'}`}
+          identity={`${selected.plate || LEDGER_EMPTY.unassigned} · ${selected.customer || LEDGER_EMPTY.none}`}
           statusBadge={<Badge tone={selected.badgeTone}>{selected.status}</Badge>}
           row={selected}
           cols={RISK_EXPANDED_COLS}
