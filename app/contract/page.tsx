@@ -1,7 +1,8 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { Suspense, useEffect, useMemo, useState } from 'react';
 import { CircleDollarSign, Pencil, Plus, UploadCloud } from 'lucide-react';
+import { useSearchParams } from 'next/navigation';
 import { TODAY } from '@/lib/dashboard-consts';
 import { contractMasterRow } from '@/lib/master-ledgers';
 import { CONTRACT_DETAIL_SECTIONS, CONTRACT_MASTER_BASIC_COLS, CONTRACT_MASTER_EXPANDED_COLS } from '@/lib/master-ledger-cols';
@@ -9,7 +10,7 @@ import { summarizeContractLedgerStats } from '@/lib/ledger-stats';
 import { useEntityList } from '@/lib/use-entity-lists';
 import { textMatch } from '@/lib/search-match';
 import {
-  Btn, C, FilterChips, LedgerActions, LedgerCreatePanel, LedgerEditPanel, LedgerFilterButton, LedgerFilterFields, LedgerFilterPanel, LedgerFrame, LedgerRecordPanel, PeriodBar, Search, Select, won,
+  Btn, C, FilterChips, LedgerActions, LedgerCreatePanel, LedgerEditPanel, LedgerFilterButton, LedgerFilterFields, LedgerFilterPanel, LedgerFrame, LedgerRecordPanel, PageLoading, PeriodBar, Search, Select, won,
   type LedgerColView, type LedgerFormSection,
 } from '@/components/ui';
 import { useIsMobile } from '@/lib/use-mobile';
@@ -36,8 +37,9 @@ const CONTRACT_CREATE_SECTIONS: LedgerFormSection[] = [
   { title: '보험·운전자', fields: ['driverAgeMin', 'insuranceAge', 'cdw', 'deductible', 'superCover', 'additionalDrivers', 'withDriver'] },
 ];
 
-export default function ContractLedgerPage() {
+function ContractLedgerInner() {
   const mobile = useIsMobile();
+  const searchParams = useSearchParams();
   const { rows: contracts, loading } = useEntityList('contract');
   const [q, setQ] = useState('');
   const [scope, setScope] = useState<'계약유지' | '계약종료' | '전체'>('계약유지');
@@ -54,6 +56,23 @@ export default function ContractLedgerPage() {
   const allRows = useMemo(() => contracts
     .map((record) => contractMasterRow(record, TODAY))
     .sort((a, b) => Number(a.ended) - Number(b.ended) || a.endDate.localeCompare(b.endDate)), [contracts]);
+
+  useEffect(() => {
+    const open = searchParams.get('open');
+    if (!open || !allRows.length) return;
+    const hit = allRows.find((r) =>
+      String(r.raw._key || '') === open
+      || String(r.raw.id || '') === open
+      || r.contractNo === open,
+    );
+    if (hit) {
+      setCreating(false);
+      setEditing(false);
+      setSelected(hit);
+      if (hit.ended) setScope('전체');
+    }
+  }, [searchParams, allRows]);
+
   const searchedRows = useMemo(() => allRows.filter((r) =>
     textMatch(q, r.company, r.contractNo, r.plate, r.carName, r.contractorName, r.contractorPhone, r.contractorLicenseNo, r.status, r.rentalType, r.dataAlert, r.riskLabel),
   ), [allRows, q]);
@@ -218,5 +237,13 @@ export default function ContractLedgerPage() {
         </LedgerRecordPanel>
       ) : null}
     />
+  );
+}
+
+export default function ContractLedgerPage() {
+  return (
+    <Suspense fallback={<PageLoading />}>
+      <ContractLedgerInner />
+    </Suspense>
   );
 }

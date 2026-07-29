@@ -27,6 +27,7 @@ import {
 } from '@/lib/penalty-work';
 import { WORK_SECTIONS_BY_KIND, type WorkGroup } from '@/lib/work-form-sections';
 import { PenaltyBucketPanel } from '@/components/work/PenaltyBucketPanel';
+import { workRail, workRailStyle } from '@/lib/work-rail';
 
 type WorkGroupFilter = '전체' | WorkGroup;
 type WorkSource = 'work_item' | 'history' | 'penalty' | 'inbox';
@@ -37,6 +38,7 @@ type WorkLedgerRow = {
   companyId: string;
   kind: string;
   group: WorkGroup;
+  /** 검색용 합본(표시는 plate/carName/contractNo 구조 셀) */
   target: string;
   title: string;
   workAt: string;
@@ -48,6 +50,11 @@ type WorkLedgerRow = {
   source: WorkSource;
   nest?: 'penalty-bucket';
   plate?: string;
+  carName?: string;
+  contractKey?: string;
+  contractNo?: string;
+  customerName?: string;
+  priority?: string;
   violationDate?: string;
   driverName?: string;
   penaltyKind?: PenaltyKind;
@@ -57,6 +64,39 @@ type WorkLedgerRow = {
   openCount?: number;
   raw: EntityRecord;
 };
+
+function carNameOf(plate: string, vehicles: EntityRecord[]): string {
+  if (!plate) return '';
+  const v = vehicles.find((x) => String(x.plate || '') === plate);
+  return v ? String(v.carName || v.model || '') : '';
+}
+
+/** 대상 셀 — 1줄 차번+차명 · 2줄 mute 계약/고객 · 둘 다 없으면 미배정 */
+function TargetCell({ r }: { r: WorkLedgerRow }) {
+  const plate = String(r.plate || '');
+  const contractKey = String(r.contractKey || '');
+  if (!plate && !contractKey && r.nest !== 'penalty-bucket') {
+    return <Badge tone="amber">미배정</Badge>;
+  }
+  const line1 = [plate, r.carName].filter(Boolean).join(' ');
+  const line2 = [r.contractNo, r.customerName].filter(Boolean).join(' · ')
+    || (!line1 ? String(r.target || '') : '');
+  if (!line1 && !line2) {
+    return <Badge tone="amber">미배정</Badge>;
+  }
+  return (
+    <div style={{ minWidth: 0 }}>
+      <div style={{ fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+        {line1 || '—'}
+      </div>
+      {line2 ? (
+        <div style={{ fontSize: 11, color: C.mute, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {line2}
+        </div>
+      ) : null}
+    </div>
+  );
+}
 
 const WORK_GROUPS: WorkGroupFilter[] = ['전체', '일정', '고객상담', '정비·수선', '사고', '과태료', '문서', '기타'];
 const WORK_SOURCE_LABEL: Record<WorkSource, string> = {
@@ -89,7 +129,11 @@ function statusTone(status: string): 'green' | 'amber' | 'red' | 'gray' {
 const WORK_COL_CATALOG: SheetCol<WorkLedgerRow>[] = [
   { key: 'co', label: '회사명', pin: true, priority: 2, render: (r) => r.company || '—', text: (r) => r.company },
   { key: 'kind', label: '업무구분', pin: true, priority: 1, render: (r) => r.kind, text: (r) => r.kind },
-  { key: 'target', label: '대상', priority: 1, render: (r) => r.target || '—', text: (r) => r.target },
+  {
+    key: 'target', label: '대상', priority: 1,
+    render: (r) => <TargetCell r={r} />,
+    text: (r) => [r.plate, r.carName, r.contractNo, r.customerName, r.target].filter(Boolean).join(' '),
+  },
   { key: 'title', label: '업무내용', priority: 1, render: (r) => r.title || '—', text: (r) => r.title },
   { key: 'at', label: '업무일시', priority: 1, render: (r) => r.workAt ? r.workAt.slice(0, 16).replace('T', ' ') : '—', text: (r) => r.workAt },
   { key: 'status', label: '상태', align: 'c', priority: 1, render: (r) => <Badge tone={statusTone(r.status)}>{r.status}</Badge>, text: (r) => r.status },
@@ -157,8 +201,8 @@ function WorkLedgerInner() {
   const mobile = useIsMobile();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { data: [workItems = [], history = [], penalties = [], inbox = [], contracts = []], loading, reload } =
-    useEntityLists(['work_item', 'history', 'penalty', 'inbox', 'contract']);
+  const { data: [workItems = [], history = [], penalties = [], inbox = [], contracts = [], vehicles = []], loading, reload } =
+    useEntityLists(['work_item', 'history', 'penalty', 'inbox', 'contract', 'vehicle']);
   const [q, setQ] = useState('');
   const [colView, setColView] = useState<LedgerColView>('기본');
   const [group, setGroup] = useState<WorkGroupFilter>(() => parseGroup(searchParams.get('group')));
@@ -175,8 +219,22 @@ function WorkLedgerInner() {
   }, [searchParams]);
 
   const penaltyRows = useMemo(
-    () => buildPenaltyWorkRows(penalties, contracts) as WorkLedgerRow[],
-    [penalties, contracts],
+    () => (buildPenaltyWorkRows(penalties, contracts) as WorkLedgerRow[]).map((r) => {
+      const plate = String(r.plate || '');
+      const contractKey = String(r.raw.contractKey || r.raw.contractId || '');
+      const contractNo = String(r.raw.contractNo || '');
+      const customerName = String(r.driverName || '');
+      return {
+        ...r,
+        plate,
+        carName: carNameOf(plate, vehicles),
+        contractKey,
+        contractNo,
+        customerName: customerName !== '미매칭' ? customerName : '',
+        target: [plate, contractNo, customerName].filter(Boolean).join(' '),
+      };
+    }),
+    [penalties, contracts, vehicles],
   );
   const penaltyBucket = useMemo(() => buildPenaltyBucketRow(penaltyRows as PenaltyWorkRow[]), [penaltyRows]);
   const matchedDocs = useMemo(
@@ -187,13 +245,18 @@ function WorkLedgerInner() {
   const otherRows = useMemo<WorkLedgerRow[]>(() => {
     const scheduled = workItems.map((r): WorkLedgerRow => {
       const workAt = String(r.completedAt || r.date || r.dueDate || r.updatedAt || r.createdAt || '');
+      const plate = String(r.plate || '');
+      const contractKey = String(r.contractKey || '');
+      const contractNo = String(r.contractNo || '');
+      const customerName = String(r.customerName || '');
+      const carName = String(r.carName || '') || carNameOf(plate, vehicles);
       return {
         id: `work:${String(r._key || r.id)}`,
         company: companyDisplay(String(r.companyId || '')),
         companyId: String(r.companyId || ''),
         kind: String(r.workType || r.category || (r.source === 'schedule' ? '일정' : '일반')),
         group: workGroup(r.workType || r.category || (r.source === 'schedule' ? '일정' : '일반')),
-        target: String(r.plate || r.contractNo || r.customerName || r.relatedEntity || ''),
+        target: [plate, carName, contractNo, customerName, r.relatedEntity].filter(Boolean).join(' '),
         title: String(r.title || r.memo || ''),
         workAt,
         workDate: workAt.slice(0, 10),
@@ -201,18 +264,24 @@ function WorkLedgerInner() {
         status: String(r.status === 'completed' || r.done ? '완료' : r.status || '대기'),
         assignee: String(r.assigneeName || r.assigneeId || ''),
         amount: Number(r.amount || r.cost) || 0,
-        source: 'work_item', raw: r,
+        source: 'work_item',
+        plate, carName, contractKey, contractNo, customerName,
+        priority: String(r.priority || ''),
+        raw: r,
       };
     });
     const activities = history.map((r): WorkLedgerRow => {
       const workAt = String(r.occurredAt || r.date || r.updatedAt || r.createdAt || '');
+      const plate = String(r.plate || '');
+      const contractNo = String(r.contractNo || '');
+      const carName = carNameOf(plate, vehicles);
       return {
         id: `history:${String(r._key || r.id)}`,
         company: companyDisplay(String(r.companyId || '')),
         companyId: String(r.companyId || ''),
         kind: String(r.category || (r._kind === 'work' ? '정비' : '업무')),
         group: workGroup(r.category || (r._kind === 'work' ? '정비' : '업무')),
-        target: String(r.plate || r.contractNo || ''),
+        target: [plate, carName, contractNo].filter(Boolean).join(' '),
         title: String(r.title || r.memo || r.vendor || ''),
         workAt,
         workDate: workAt.slice(0, 10),
@@ -220,18 +289,23 @@ function WorkLedgerInner() {
         status: String(r.work_status || r.status || '접수'),
         assignee: String(r.author || r.assignee || ''),
         amount: Number(r.cost || r.amount) || 0,
-        source: 'history', raw: r,
+        source: 'history',
+        plate, carName, contractKey: '', contractNo, customerName: '',
+        raw: r,
       };
     });
     const documents = inbox.map((r): WorkLedgerRow => {
       const workAt = String(r.matchedAt || r.uploadedAt || r.updatedAt || r.createdAt || '');
+      const plate = String(r.plate || '');
+      const contractNo = String(r.contractNo || '');
+      const carName = carNameOf(plate, vehicles);
       return {
         id: `inbox:${String(r._key || r.id)}`,
         company: companyDisplay(String(r.companyId || '')),
         companyId: String(r.companyId || ''),
         kind: String(r.workType || '문서검토'),
         group: '문서',
-        target: String(r.plate || r.contractNo || r.matchedEntity || ''),
+        target: [plate, carName, contractNo, r.matchedEntity].filter(Boolean).join(' '),
         title: String(r.title || r.fileName || r.memo || r.kind || '수집 문서 확인'),
         workAt,
         workDate: workAt.slice(0, 10),
@@ -239,12 +313,14 @@ function WorkLedgerInner() {
         status: String(r.status || (r.matchedAt ? '완료' : '대기')),
         assignee: String(r.assignee || r.uploadedBy || ''),
         amount: Number(r.amount) || 0,
-        source: 'inbox', raw: r,
+        source: 'inbox',
+        plate, carName, contractKey: String(r.contractKey || ''), contractNo, customerName: '',
+        raw: r,
       };
     });
     return [...scheduled, ...activities, ...documents]
       .sort((a, b) => b.workAt.localeCompare(a.workAt) || a.kind.localeCompare(b.kind, 'ko'));
-  }, [workItems, history, inbox]);
+  }, [workItems, history, inbox, vehicles]);
 
   const penaltyMode = group === '과태료';
 
@@ -283,7 +359,8 @@ function WorkLedgerInner() {
     return textMatch(
       q,
       r.company, r.kind, r.target, r.title, r.status, r.assignee, r.workAt,
-      r.plate, r.driverName, r.violationDate, r.penaltyKind,
+      r.plate, r.carName, r.contractKey, r.contractNo, r.customerName,
+      r.driverName, r.violationDate, r.penaltyKind,
     );
   }), [allRows, penaltyMode, penProcess, penKind, group, detailFilters, workFilterMatchers, range.from, range.to, q]);
 
@@ -382,7 +459,13 @@ function WorkLedgerInner() {
       rows={rows}
       rowKey={(r) => r.id}
       selectedRowKey={selected?.id}
-      rowStyle={(r) => (r.nest === 'penalty-bucket' ? { background: PENALTY_ROW_BG } : undefined)}
+      rowStyle={(r) => {
+        const rail = workRailStyle(workRail(r));
+        if (r.nest === 'penalty-bucket') {
+          return { ...rail, background: PENALTY_ROW_BG };
+        }
+        return rail;
+      }}
       onRowDoubleClick={(row) => {
         setCreating(false);
         setSelected(row);
@@ -442,7 +525,7 @@ function WorkLedgerInner() {
           title={selected.title || selected.kind}
           subtitle={selected.source === 'penalty'
             ? `${selected.plate || '차번 없음'} · ${selected.driverName || '미매칭'}`
-            : `${selected.kind} · ${selected.target || '대상 없음'}`}
+            : `${selected.kind} · ${[selected.plate, selected.carName, selected.contractNo, selected.customerName].filter(Boolean).join(' · ') || '미배정'}`}
           row={selected}
           cols={selected.source === 'penalty' ? PEN_ALL : ALL_COLS}
           sections={selected.source === 'penalty' ? PENALTY_DETAIL_SECTIONS : WORK_DETAIL_SECTIONS}
@@ -459,8 +542,15 @@ function WorkLedgerInner() {
                   <FileText size={14} /> 변경부과 공문
                 </Btn>
               ) : null}
-              {String(selected.raw.contractNo || '') ? (
-                <Btn size="sm" variant="ghost" onClick={() => router.push('/contract')}>
+              {(selected.contractKey || String(selected.raw.contractKey || '') || String(selected.raw.contractNo || selected.contractNo || '')) ? (
+                <Btn
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => {
+                    const key = String(selected.contractKey || selected.raw.contractKey || '');
+                    router.push(key ? `/contract?open=${encodeURIComponent(key)}` : '/contract');
+                  }}
+                >
                   <FileText size={14} /> 계약
                 </Btn>
               ) : null}
