@@ -94,7 +94,7 @@ const ax = (key: keyof AssetMasterRow, label: string, opts?: { date?: boolean; m
 /** 자산 열 카탈로그 — 새 항목은 여기 정의 후 SHEET_KEYS / DETAIL_DEFS에 key만. */
 const ASSET_COL_CATALOG: SheetCol<AssetMasterRow>[] = [
   A.company, A.assetCode, A.plate, A.status, A.carName, A.maker, A.modelLine,
-  A.subModel, A.trim, A.modelYear, A.vin, A.ownerName, A.firstReg, A.inspectionTo, A.mileage,
+  A.subModel, A.trim, A.modelYear, A.yearMonth, A.vin, A.ownerName, A.firstReg, A.inspectionTo, A.mileage,
   ax('documentNo', '문서확인번호'), ax('certIssueDate', '등록증발급일', { date: true }),
   ax('vehicleType', '차종'), ax('usage', '용도'), ax('typeNumber', '형식'), ax('engineType', '원동기형식'),
   ax('ownerBizNo', '법인번호/생년월일'), ax('useAddress', '사용본거지'), ax('approvalNumber', '제원관리번호'),
@@ -124,11 +124,14 @@ const ASSET_COL_CATALOG: SheetCol<AssetMasterRow>[] = [
  * @see lib/ledger-ext.ts
  */
 export const ASSET_SHEET_KEYS: SheetViewKeys = {
-  // 회사 → 신원 → 내용 → 상태 → 보조·기한
-  basic: ['company', 'plate', 'carName', 'status', 'maker', 'modelLine', 'inspectionTo'],
+  // 회사·차번·차명·상태·제조사·모델·연식·주행거리·취득가·잔여할부·보험만기·검사만료
+  basic: [
+    'company', 'plate', 'carName', 'status', 'maker', 'modelLine', 'modelYear',
+    'mileage', 'acquisitionPrice', 'loanRemainingPrincipal', 'insuranceExpiryDate', 'inspectionTo',
+  ],
   all: [
     'company', 'assetCode', 'plate', 'status', 'carName', 'maker', 'modelLine',
-    'subModel', 'trim', 'modelYear', 'vin', 'ownerName', 'firstReg', 'inspectionTo', 'mileage',
+    'subModel', 'trim', 'modelYear', 'yearMonth', 'vin', 'ownerName', 'firstReg', 'inspectionTo', 'mileage',
     'documentNo', 'certIssueDate', 'vehicleType', 'usage', 'typeNumber', 'engineType',
     'ownerBizNo', 'useAddress', 'approvalNumber',
     'fuel', 'displacement', 'ratedOutput', 'cylinders', 'driveType', 'transmission',
@@ -267,10 +270,10 @@ const CONTRACT_COL_CATALOG: SheetCol<ContractMasterRow>[] = [
 
 /** 계약 엑셀 열 — `계약 · 엑셀기본|엑셀전체 · +|-key` @see lib/ledger-ext.ts */
 export const CONTRACT_SHEET_KEYS: SheetViewKeys = {
-  // 회사 → 신원(계약자·차) → 내용(계약번호) → 분류 → 상태 → 수치/기한
+  // 회사 → 신원(계약자·차) → 내용(계약번호) → 분류 → 상태 → 수치/기한 (+연락처·반납예정·연체)
   basic: [
-    'company', 'contractorName', 'plate', 'contractNo', 'rentalType', 'status',
-    'endDate', 'monthlyRent', 'paymentDay', 'paymentTiming', 'riskLabel', 'net', 'alert',
+    'company', 'contractorName', 'contractorPhone', 'plate', 'contractNo', 'rentalType', 'status',
+    'endDate', 'returnScheduledDate', 'monthlyRent', 'paymentDay', 'paymentTiming', 'riskLabel', 'net', 'overdueDays', 'alert',
   ],
   all: [
     'company', 'contractNo', 'status', 'rentalType', 'contractorName', 'contractorPhone',
