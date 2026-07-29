@@ -70,6 +70,11 @@ curl -s -o /dev/null -w "%{http_code}" http://localhost:6006/<route>   # 200
 
 | 날짜 | 작업자 | 내용 | 상태 |
 |---|---|---|---|
+| 2026-07-29 | Cursor | 원장 열통일 0: 슬롯문서 + ledger-empty | b240b45 |
+| 2026-07-29 | Cursor | 원장 열통일 1: work 엑셀기본 순서 | 5e94cd8 |
+| 2026-07-29 | Cursor | 원장 열통일 2: risk Badge+순서 | 65ae7ed |
+| 2026-07-29 | Cursor | 원장 열통일 3: asset·contract·status 순서 | 8b91a0f |
+| 2026-07-29 | Cursor | 원장 열통일 4: cash buildSheetViews+순서 | d7f9686 |
 | 2026-07-29 | Cursor | FormGrid note 기본표시 회귀 · Create/Edit만 숨김 | 5bc2f65 |
 | 2026-07-29 | Cursor | FormGrid·패널 세로 리듬(갭14·라벨6·패딩) | 74dbe8d |
 | 2026-07-29 | Cursor | 상세패널 정합 1: FormGrid cols=1(Create/Edit) | 7f8e961 |
