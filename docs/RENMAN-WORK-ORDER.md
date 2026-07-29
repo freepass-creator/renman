@@ -188,6 +188,7 @@ const { data: [cs, hs], loading } = useEntityLists(['contract', 'history']);
 | `lib/receivables-ledger` | 미수관리 행·조치·Facet 칩 집계 SSOT (`buildReceivablesWorkbench`) · 금액 헤드라인=`selectReceivables` |
 | `lib/finance/subject-summary` | 손익·부가세 과목표 분해 (`summarizePnlSubjects`/`summarizeVatSubjects`) · 영업손익 헤드라인=`operatingProfit` |
 | `components/MigrateDataButton` | 스위치플랜 마이그레이션(본사) |
+| `components/ui` `workRailStyle` / `RailTone` | 행 긴급 판정→**danger만** `--danger-tint` 배경. 좌측 세로선·도트 금지. |
 | `components/ui` `SectionLabel` | 상세 그룹 소제목(무박스) — freepass ERP4 동기. 360 운영·자산·계약·이력 |
 | `components/ui` `Disclosure` | 접이식(할부스케줄 등) — Sec와 별개 · 제목 줄 눌러 표 인라인 펼침 |
 

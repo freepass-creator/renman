@@ -118,14 +118,18 @@ export function Metric({ label, value, hint, tone, onClick }: { label: React.Rea
 }
 // 객체 카드 = 목록의 단일 원자(2행 신원카드). 웹·모바일 높이 56(= freepass ERP4 ObjCard).
 //  1행 신원: [회사][상태배지][차량번호(모노·무잘림) 또는 이름][차종(축소가능)] …[우측 핵심수치]
-//  2행 원자: fields(라벨-값, 우선순위 상위 3 + ＋n) 또는 sub(자유문). 좌측 2px 레일=위험 신호.
+//  2행 원자: fields(라벨-값, 우선순위 상위 3 + ＋n) 또는 sub(자유문). danger=옅은 배경 틴트(좌측선 금지).
 //  호출부는 "필요한 원자만" 넘긴다. 차번=plate, 비차량 주체(자금 상대방·고객)=name, 부가식별=carType.
-// 레일 톤 SSOT — ObjCard(2px 유령레일 포함)·ObjRow(3px 솔리드) 공용. brand·violet은 ObjRow 상태축용.
+// 레일 톤 SSOT — 판정용 RailTone. 시각=danger 틴트만(ExcelSheet workRailStyle과 동일). brand·violet은 상태축용.
 export type RailTone = 'none' | 'brand' | 'danger' | 'warn' | 'violet' | 'ok' | 'mute';
-const RAIL: Record<RailTone, { c: string; o: number }> = {
-  none: { c: C.faint, o: 0.28 }, mute: { c: C.faint, o: 0.5 },
-  brand: { c: C.brand, o: 1 }, danger: { c: C.danger, o: 1 }, warn: { c: C.warn, o: 1 }, violet: { c: C.violet, o: 1 }, ok: { c: C.ok, o: 1 },
-};
+export function railToneColor(tone: Exclude<RailTone, 'none'>): string {
+  return tone === 'brand' ? C.brand
+    : tone === 'danger' ? C.danger
+    : tone === 'warn' ? C.warn
+    : tone === 'violet' ? C.violet
+    : tone === 'ok' ? C.ok
+    : C.faint;
+}
 const ATOM_CAP = 3; // 2행 원자 표시 상한 — 넘으면 ＋n(우선순위 상위만 생존, 픽셀측정 대신 count-cap)
 export function ObjCard({ badge, badgeTone = 'gray', co, rail = 'none', plate, name, carType, title, sub, right, fields, onClick }: {
   badge?: React.ReactNode; badgeTone?: BadgeTone; co?: string; rail?: RailTone;
@@ -135,7 +139,6 @@ export function ObjCard({ badge, badgeTone = 'gray', co, rail = 'none', plate, n
   const mobile = useIsMobile();
   const { h, on } = useHover();
   const grouped = React.useContext(CardGroupContext);   // 그룹 박스 안 → 개별 테두리·그림자 제거
-  const rl = RAIL[rail];
   const usingFields = sub == null && !!fields && fields.length > 0;
   const shown = usingFields ? fields!.slice(0, ATOM_CAP) : [];
   const moreN = usingFields ? fields!.length - shown.length : 0;
@@ -151,15 +154,17 @@ export function ObjCard({ badge, badgeTone = 'gray', co, rail = 'none', plate, n
   return (
     <div onClick={onClick} {...on} style={{
       ...(grouped
-        ? { background: h && !!onClick ? C.hover : 'transparent', cursor: onClick ? 'pointer' : 'default', transition: 'background .12s ease' }
-        : cardStyle(h, !!onClick)),
+        ? { background: h && !!onClick ? C.hover : (rail === 'danger' ? 'var(--danger-tint)' : 'transparent'), cursor: onClick ? 'pointer' : 'default', transition: 'background .12s ease' }
+        : {
+            ...cardStyle(h, !!onClick),
+            ...(rail === 'danger' && !h ? { background: 'var(--danger-tint)' } : {}),
+          }),
       position: 'relative', overflow: 'hidden',
       height: mobile ? 'auto' : 56, minHeight: mobile ? 60 : 56,
       padding: mobile ? '10px 14px' : '0 12px 0 14px',
       display: 'flex', alignItems: 'center', minWidth: 0,
       WebkitTapHighlightColor: 'transparent',
     }}>
-      <span style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 2, background: rl.c, opacity: rl.o }} />
       <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 3 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 7, minWidth: 0, overflow: 'hidden' }}>
           {co ? <span style={{ flex: '0 0 auto' }}><CompanyBadge co={co} /></span> : null}
@@ -329,13 +334,13 @@ const BADGE: Record<BadgeTone, [string, string, string]> = {
 export function Badge({ children, tone = 'gray' }: { children: React.ReactNode; tone?: BadgeTone }) {
   const mobile = useIsMobile();
   const m = BADGE[tone] || BADGE.gray;
-  return <span style={{ display: 'inline-flex', alignItems: 'center', height: mobile ? 22 : 18, boxSizing: 'border-box', fontSize: mobile ? 11.5 : 10.5, fontWeight: 700, padding: mobile ? '0 8px' : '0 6px', borderRadius: R, color: m[0], background: m[1], border: `1px solid ${m[2]}`, whiteSpace: 'nowrap', letterSpacing: '.01em', lineHeight: 1 }}>{children}</span>;
+  return <span style={{ display: 'inline-flex', alignItems: 'center', height: mobile ? 22 : 18, boxSizing: 'border-box', fontSize: mobile ? 11.5 : 10.5, fontWeight: 700, padding: mobile ? '0 8px' : '0 6px', borderRadius: 'var(--radius-badge)', color: m[0], background: m[1], border: `1px solid ${m[2]}`, whiteSpace: 'nowrap', letterSpacing: '.01em', lineHeight: 1 }}>{children}</span>;
 }
 // 회사(법인) 뱃지 = 아웃라인 + 색점. 상태 뱃지(채움형)와 스타일로 확실히 구분 — 색이 겹쳐도 정체성 vs 상태 안 헷갈림.
 export function CompanyBadge({ co }: { co: string }) {
   const mobile = useIsMobile();
   const m = BADGE[companyTone(co)] || BADGE.gray;
-  return <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, height: mobile ? 22 : 18, boxSizing: 'border-box', padding: mobile ? '0 8px 0 6px' : '0 6px 0 5px', borderRadius: R, border: `1px solid ${m[2]}`, background: C.card, color: m[0], fontSize: mobile ? 11.5 : 10.5, fontWeight: 700, whiteSpace: 'nowrap', lineHeight: 1 }}>
+  return <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, height: mobile ? 22 : 18, boxSizing: 'border-box', padding: mobile ? '0 8px 0 6px' : '0 6px 0 5px', borderRadius: 'var(--radius-badge)', border: `1px solid ${m[2]}`, background: C.card, color: m[0], fontSize: mobile ? 11.5 : 10.5, fontWeight: 700, whiteSpace: 'nowrap', lineHeight: 1 }}>
     <span style={{ width: 6, height: 6, borderRadius: '50%', background: m[0], flex: '0 0 auto' }} />{companyShort(co)}
   </span>;
 }

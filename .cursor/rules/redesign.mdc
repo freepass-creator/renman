@@ -15,7 +15,7 @@ alwaysApply: true
 ## 모바일 = `/m` 전문 트리 (웹 축소본 아님 ★)
 - **/m은 반응형 웹 축소가 아니라 «폰 전용 전문 페이지»다.** 데스크톱 표+더블클릭패널을 폰에 욱여넣지 말 것.
 - 하단 **5탭 고정**(홈·운영·리스크·입력·설정). 햄버거 없음. 셸=`components/m/{MTabBar,MHead,MBackBar}`. 상단=MHead(제목+3px 탭색).
-- 목록 = `ObjRow`+`Rows`(`components/ui/obj-row.tsx`): 행마다 박스 금지(테두리는 Rows), 레일 3px, 행 안 버튼 금지(선택 체크박스만). 섹션 접기 가능.
+- 목록 = `ObjRow`+`Rows`(`components/ui/obj-row.tsx`): 행마다 박스 금지(테두리는 Rows), **좌측 rail 세로선 금지** · danger=옅은 틴트(`--danger-tint`), 행 안 버튼 금지(선택 체크박스만). 섹션 접기 가능.
 - 드릴인 = `/m/vehicle/[plate]`(Vehicle360 재사용). 탭루트=MTabBar / 스택=MBackBar(`app/m/layout.tsx`).
 - **데이터는 웹과 동일 도메인 SSOT**(`linkFleet`/`buildFleetRows`, 이후 master-ledgers) — /m 전용 데이터 로직 신설 금지.
 - SessionBar는 `/m`·`/dev/preview`에서 `null`(웹 크롬 숨김) — 유지.
@@ -30,7 +30,7 @@ alwaysApply: true
 
 | 슬롯 | 역할 |
 |---|---|
-| rail색 | 상태/생사·긴급. **전원장 공용 의미:** 회색=끝/비활성 · 빨강=급함 · 주황=주의 · **정상=무색(`none`)**. `ok`(초록)을 정상 표시로 쓰지 말 것(예외·강조만). 원자=`RailTone`(`misc.tsx`). 함대 `fleetRail`/`statusRank`를 업무·리스크에 재사용 금지. |
+| rail색 | 상태/생사·긴급. **전원장 공용 의미:** 회색=끝/비활성 · 빨강=급함 · 주황=주의 · **정상=무색(`none`)**. `ok`(초록)을 정상 표시로 쓰지 말 것. **시각:** 좌측 세로선·도트 금지 · **danger만** `--danger-tint` 행 배경. warn/mute=배지만. 원자=`RailTone` + `workRailStyle`. 함대 `fleetRail`/`statusRank`를 업무·리스크에 재사용 금지. |
 | 회사 | 다회사 뷰만(단일 회사면 ExcelSheet가 `company` 열 숨김 — 페이지 손롤 금지) |
 | 신원 | 대상·관통·검색의 열쇠. **역할은 공용, 이름·강조는 페이지별** — 계약=계약자 · 자산=차량 · 자금=거래처 · 업무=차량번호+계약자. 없으면 `미배정`. |
 | 내용 | 의도 한 줄(제목·위반내용·메모) |
