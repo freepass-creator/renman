@@ -1,7 +1,8 @@
 'use client';
 /**
  * 원장 우측 상세 — 그자리 수정.
- *   LedgerCreatePanel과 같은 섹션 스키마. 저장은 getStore().update.
+ *   LedgerCreatePanel과 같은 섹션 스키마 · FormGrid(cols=1) 공유.
+ *   저장은 getStore().update.
  */
 import { useMemo, useState } from 'react';
 import { ChevronRight, Save, X } from 'lucide-react';
@@ -10,7 +11,8 @@ import { getStore } from '@/lib/store';
 import { resolveWriteCompany, NEED_COMPANY } from '@/lib/scope';
 import { useSession } from '@/lib/session';
 import { toast } from '@/lib/toast';
-import { Btn, Input, Select } from './controls';
+import { Btn } from './controls';
+import { FormGrid } from './detail';
 import { LedgerPanelFooter } from './ledger-actions';
 import type { LedgerFormSection } from './ledger-create-panel';
 
@@ -68,6 +70,7 @@ export function LedgerEditPanel({
   }
 
   const change = (key: string, value: string) => setForm((current) => ({ ...current, [key]: value }));
+  const patch = (next: Record<string, string>) => setForm((current) => ({ ...current, ...next }));
 
   async function save() {
     const targetCompany = resolveWriteCompany(companyId, { companyId: form.companyId || record.companyId });
@@ -83,15 +86,15 @@ export function LedgerEditPanel({
 
     setBusy(true);
     try {
-      const patch = normalizedForm(selectedFields, {
+      const next = normalizedForm(selectedFields, {
         ...form,
         companyId: targetCompany,
         updatedAt: new Date().toISOString(),
         updatedBy: user.email || user.name,
       });
-      await getStore().update(entityKey, targetCompany, docKey, patch);
+      await getStore().update(entityKey, targetCompany, docKey, next);
       toast(`${title} 저장`, 'success');
-      onSaved?.({ ...record, ...patch, _key: docKey, companyId: targetCompany });
+      onSaved?.({ ...record, ...next, _key: docKey, companyId: targetCompany });
       onClose();
     } catch (error) {
       toast(error instanceof Error ? error.message : '저장하지 못했습니다', 'error');
@@ -113,36 +116,18 @@ export function LedgerEditPanel({
       </header>
 
       <div className="ledger-create-panel__body">
-        {sections.map((section, sectionIndex) => (
-          <details className="ledger-create-panel__section" open={section.open ?? sectionIndex === 0} key={section.title}>
-            <summary><ChevronRight className="ledger-create-panel__chevron" size={14} aria-hidden="true" />{section.title}</summary>
-            <div className="ledger-create-panel__grid">
-              {section.fields.map((key) => {
-                const field = fieldByKey.get(key);
-                if (!field) return null;
-                const value = String(form[field.key] ?? '');
-                return (
-                  <label key={field.key} className="ledger-create-panel__field">
-                    <span>{field.label}{field.required && <b> *</b>}</span>
-                    {field.type === 'select' ? (
-                      <Select value={value} onChange={(event) => change(field.key, event.target.value)} disabled={busy}>
-                        <option value="">선택</option>
-                        {(field.options || []).map((option) => <option value={option} key={option}>{option}</option>)}
-                      </Select>
-                    ) : (
-                      <Input
-                        type={field.type === 'date' ? 'date' : field.type === 'number' ? 'number' : 'text'}
-                        value={value}
-                        onChange={(event) => change(field.key, event.target.value)}
-                        disabled={busy}
-                      />
-                    )}
-                  </label>
-                );
-              })}
-            </div>
-          </details>
-        ))}
+        {sections.map((section, sectionIndex) => {
+          const sectionFields = section.fields
+            .map((key) => fieldByKey.get(key))
+            .filter((field): field is Field => !!field);
+          if (!sectionFields.length) return null;
+          return (
+            <details className="ledger-create-panel__section" open={section.open ?? sectionIndex === 0} key={section.title}>
+              <summary><ChevronRight className="ledger-create-panel__chevron" size={14} aria-hidden="true" />{section.title}</summary>
+              <FormGrid fields={sectionFields} form={form} onChange={change} onPatch={patch} cols={1} />
+            </details>
+          );
+        })}
       </div>
 
       <LedgerPanelFooter hint="저장 시 원장 목록이 바로 갱신됩니다.">
