@@ -4,6 +4,7 @@ import React from 'react';
 import { ChevronRight, X } from 'lucide-react';
 import type { SheetCol } from './excel-sheet';
 import { LedgerPanelFooter } from './ledger-actions';
+import { C } from './tokens';
 
 export type LedgerRecordSection<T> = {
   title: React.ReactNode;
@@ -11,6 +12,13 @@ export type LedgerRecordSection<T> = {
   /** 기본 펼침. 없으면 첫 섹션만 연다. */
   open?: boolean;
 };
+
+/** 빈 값 → '—'. 0·false는 유지(금액 0·불리언). */
+function displayCell(node: React.ReactNode): React.ReactNode {
+  if (node == null || node === false) return <span style={{ color: C.faint }}>—</span>;
+  if (typeof node === 'string' && !node.trim()) return <span style={{ color: C.faint }}>—</span>;
+  return node;
+}
 
 function RecordSection<T>({
   title,
@@ -72,7 +80,7 @@ export function LedgerRecordPanel<T>({
       {fieldCols.map((col) => (
         <div className="ledger-record-panel__field" key={col.key}>
           <dt>{col.label}</dt>
-          <dd>{col.render(row)}</dd>
+          <dd>{displayCell(col.render(row))}</dd>
         </div>
       ))}
     </dl>

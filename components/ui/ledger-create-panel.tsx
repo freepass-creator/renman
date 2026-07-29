@@ -193,7 +193,7 @@ export function LedgerCreatePanel({
         {quick && (
           <div>
             <label className="ledger-create-panel__field">
-              <span>업무 내용 <b>*</b></span>
+              <span>업무 내용 <span style={{ color: C.danger }}>*</span></span>
               <Input
                 autoFocus={!scopeAll || !!String(form.companyId || '').trim()}
                 value={String(form.title || '')}
