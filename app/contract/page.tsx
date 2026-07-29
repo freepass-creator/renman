@@ -21,7 +21,6 @@ import {
   CONTRACT_FILTER_DEFS, countActiveFilters, emptyFilterValues, eqFilter, matchLedgerFilters,
 } from '@/lib/ledger-filter-defs';
 import { RENTAL_TYPES } from '@/lib/schema/contract';
-import { ContractScheduleEmbed } from '@/components/ledger/ContractScheduleEmbed';
 import { LEDGER_EMPTY } from '@/lib/ledger-empty';
 
 const RENTAL_CHIP_OPTS = [
@@ -234,9 +233,7 @@ function ContractLedgerInner() {
               </>
             )}
           </>}
-        >
-          {selected.plate ? <ContractScheduleEmbed plate={selected.plate} /> : null}
-        </LedgerRecordPanel>
+        />
       ) : null}
     />
   );
