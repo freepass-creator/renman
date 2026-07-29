@@ -34,6 +34,7 @@ export type RiskSheetRow = {
   company: string;
   plate: string;
   customer: string;
+  phone: string;
   carName: string;
   due: string;
   dueDate: string;
@@ -75,12 +76,16 @@ function companyOf(fr?: Pick<FleetRow, 'companyId' | 'company'>, rec?: EntityRec
   return { companyId, company: fr?.company || companyShort(companyId) };
 }
 
+function phoneOf(fr?: Pick<FleetRow, 'phone'>, fallback = ''): string {
+  return String(fr?.phone || fallback || '').trim();
+}
+
 function rowOf(
   group: RiskSheetGroup,
-  partial: Omit<RiskSheetRow, 'group' | 'tone' | 'badgeTone'>,
+  partial: Omit<RiskSheetRow, 'group' | 'tone' | 'badgeTone' | 'phone'> & { phone?: string },
 ): RiskSheetRow {
   const t = GROUP_TONE[group];
-  return { ...partial, group, tone: t.tone, badgeTone: t.badgeTone };
+  return { ...partial, phone: partial.phone || '', group, tone: t.tone, badgeTone: t.badgeTone };
 }
 
 /** 대시보드「오늘 집중」·리스크 일정 합류 공용 — buildAgenda 어김·임박만. cap 없으면 전체. */
@@ -132,6 +137,7 @@ export function buildRiskSheetRows(
       ...companyOf(r),
       plate: r.plate,
       customer: r.customer || LEDGER_EMPTY.none,
+      phone: r.phone,
       carName: carNameOf(r),
       due: `${ddayLabel(r.dday)} · ${r.end || LEDGER_EMPTY.dash}`,
       dueDate: (r.end || '').slice(0, 10),
@@ -146,6 +152,7 @@ export function buildRiskSheetRows(
       ...companyOf(r),
       plate: r.plate,
       customer: r.customer || LEDGER_EMPTY.none,
+      phone: r.phone,
       carName: carNameOf(r),
       due: r.status || r.ownership,
       dueDate: (r.acqDate || r.start || '').slice(0, 10),
@@ -163,6 +170,7 @@ export function buildRiskSheetRows(
       ...companyOf(fr),
       plate: a.plate,
       customer: a.title || LEDGER_EMPTY.none,
+      phone: phoneOf(fr),
       carName: fr ? carNameOf(fr) : LEDGER_EMPTY.dash,
       due: `${ddayLabel(a.dday)} · ${a.date}`,
       dueDate: a.date,
@@ -184,6 +192,7 @@ export function buildRiskSheetRows(
       ...companyOf(fr, v.rec),
       plate,
       customer: String(v.rec.contractorName || LEDGER_EMPTY.none),
+      phone: phoneOf(fr, String(v.rec.contractorPhone || '')),
       carName: fr ? carNameOf(fr) : String(v.rec.carName || LEDGER_EMPTY.dash),
       due: v.overdueDays ? `${v.overdueDays}일 연체` : ddayLabel(v.dday),
       dueDate: String(v.rec.endDate || '').slice(0, 10),
@@ -203,6 +212,7 @@ export function buildRiskSheetRows(
       ...companyOf(r),
       plate: r.plate,
       customer: r.customer || LEDGER_EMPTY.none,
+      phone: r.phone,
       carName: carNameOf(r),
       due: `${ddayLabel(r.dday)} · ${r.end || LEDGER_EMPTY.dash}`,
       dueDate: (r.end || '').slice(0, 10),
@@ -222,6 +232,7 @@ export function buildRiskSheetRows(
       ...companyOf(fr),
       plate: a.plate,
       customer: a.title || LEDGER_EMPTY.none,
+      phone: phoneOf(fr),
       carName: fr ? carNameOf(fr) : LEDGER_EMPTY.dash,
       due: `${ddayLabel(a.dday)} · ${a.date}`,
       dueDate: a.date,
@@ -241,6 +252,7 @@ export function buildRiskSheetRows(
       ...companyOf(fr),
       plate: p.plate,
       customer: p.title || LEDGER_EMPTY.none,
+      phone: phoneOf(fr),
       carName: fr ? carNameOf(fr) : LEDGER_EMPTY.dash,
       due: p.detail || LEDGER_EMPTY.dash,
       dueDate: '',
@@ -257,6 +269,7 @@ export function buildRiskSheetRows(
       ...companyOf(r),
       plate: r.plate,
       customer: r.customer || LEDGER_EMPTY.none,
+      phone: r.phone,
       carName: carNameOf(r),
       due: LEDGER_EMPTY.dash,
       dueDate: '',
@@ -282,7 +295,7 @@ export function countRiskSheetGroups(rows: RiskSheetRow[]): RiskGroupCounts {
 
 /**
  * 리스크 행 rail — row.tone 재활용(틴트 판정).
- * 시각은 workRailStyle→ExcelSheet/ObjRow RailDot(6px). 세로선·행 틴트 없음.
+ * 시각은 workRailStyle→ExcelSheet/ObjRow danger 틴트만. 좌측 점·세로선 없음.
  */
 export function riskRail(r: Pick<RiskSheetRow, 'tone'>): RailTone {
   return r.tone;

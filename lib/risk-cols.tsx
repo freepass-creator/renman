@@ -1,5 +1,5 @@
 /**
- * 리스크관리 엑셀 열 — 구분 · 차번 · 대상 · 차명 · 기한 · 금액 · 상태
+ * 리스크관리 엑셀 열 — 구분 · 세부 · 차번 · 대상 · 연락처 · 차명 · 기한 · 금액 · 상태
  */
 import React from 'react';
 import { Badge, money, C, type SheetCol } from '@/components/ui';
@@ -23,7 +23,7 @@ const CATALOG: SheetCol<RiskSheetRow>[] = [
     text: (r) => r.group,
   },
   {
-    key: 'kind', label: '세부', priority: 2, align: 'c',
+    key: 'kind', label: '세부', priority: 1, align: 'c',
     render: (r) => r.kind || LEDGER_EMPTY.dash,
     text: (r) => r.kind,
   },
@@ -40,6 +40,11 @@ const CATALOG: SheetCol<RiskSheetRow>[] = [
     key: 'customer', label: '대상', priority: 1,
     render: (r) => r.customer || LEDGER_EMPTY.none,
     text: (r) => r.customer,
+  },
+  {
+    key: 'phone', label: '연락처', priority: 1,
+    render: (r) => r.phone || LEDGER_EMPTY.dash,
+    text: (r) => r.phone,
   },
   {
     key: 'carName', label: '차명', priority: 2,
@@ -65,10 +70,10 @@ const CATALOG: SheetCol<RiskSheetRow>[] = [
   },
 ];
 
-/** 회사 → 신원 → 내용(차명) → 분류 → 상태 → 수치 */
+/** 회사 → 신원 → 분류(kind) → 상태 → 수치 (+연락처) */
 export const RISK_SHEET_KEYS: SheetViewKeys = {
-  basic: ['company', 'plate', 'customer', 'carName', 'group', 'status', 'due', 'amount'],
-  all: ['company', 'plate', 'customer', 'carName', 'group', 'kind', 'status', 'due', 'amount'],
+  basic: ['company', 'plate', 'customer', 'phone', 'kind', 'status', 'due', 'amount'],
+  all: ['company', 'plate', 'customer', 'phone', 'carName', 'group', 'kind', 'status', 'due', 'amount'],
 };
 
 const views = buildSheetViews(CATALOG, RISK_SHEET_KEYS);
@@ -80,7 +85,7 @@ export const RISK_DETAIL_DEFS: DetailSectionDef[] = [
   {
     title: '신원·분류',
     open: true,
-    keys: ['company', 'plate', 'customer', 'group', 'kind', 'status'],
+    keys: ['company', 'plate', 'customer', 'phone', 'group', 'kind', 'status'],
   },
   {
     title: '기한·금액',
