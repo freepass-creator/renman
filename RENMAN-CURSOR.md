@@ -70,6 +70,11 @@ curl -s -o /dev/null -w "%{http_code}" http://localhost:6006/<route>   # 200
 
 | 날짜 | 작업자 | 내용 | 상태 |
 |---|---|---|---|
+| 2026-07-29 | Cursor | 상세패널 정합 1: FormGrid cols=1(Create/Edit) | 7f8e961 |
+| 2026-07-29 | Cursor | 상세패널 정합 2: 업무 CLASSIFY title 중복 제거 | 6dd0120 |
+| 2026-07-29 | Cursor | 상세패널 정합 3–4: note 기본숨김 + Select backgroundColor | a940dde |
+| 2026-07-29 | Cursor | 상세패널 정합 5: RecordPanel 헤더=신원+상태배지(전원장) | 78db019 |
+| 2026-07-29 | Cursor | 상세패널 정합 6: 빈값 — · 필수* danger 통일 | 0432c33 |
 | 2026-07-29 | Cursor | P0-0 redesign.mdc 행문법+분류→상태 SSOT | a94e320 |
 | 2026-07-29 | Cursor | P0-1 TARGET 차량·계약 피커 상시(텍스트금지) | bfabc37 |
 | 2026-07-29 | Cursor | P0-2 차량번호·계약자 2컬·클릭=패널·상태/시간 | 10263da |
