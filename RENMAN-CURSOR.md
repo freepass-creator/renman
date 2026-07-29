@@ -70,6 +70,10 @@ curl -s -o /dev/null -w "%{http_code}" http://localhost:6006/<route>   # 200
 
 | 날짜 | 작업자 | 내용 | 상태 |
 |---|---|---|---|
+| 2026-07-29 | Cursor | 원장 열통일 5: 자산·계약 생성=상세 섹션명 | 95c8071 |
+| 2026-07-29 | Cursor | 원장 열통일 6: risk 상세 섹션 | a12b2f0 |
+| 2026-07-29 | Cursor | 원장 열통일 7: 운영 basic 11열 | c9c3a6f |
+| 2026-07-29 | Cursor | 원장 열통일 8: 계좌 account-cols 승격 | bda460c |
 | 2026-07-29 | Cursor | 원장 열통일 0: 슬롯문서 + ledger-empty | b240b45 |
 | 2026-07-29 | Cursor | 원장 열통일 1: work 엑셀기본 순서 | 5e94cd8 |
 | 2026-07-29 | Cursor | 원장 열통일 2: risk Badge+순서 | 65ae7ed |
