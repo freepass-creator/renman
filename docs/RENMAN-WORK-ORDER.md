@@ -183,6 +183,7 @@ const { data: [cs, hs], loading } = useEntityLists(['contract', 'history']);
 | `components/ui` `Btn` `iconOnly`+`tip` | **tools=전부 iconOnly+tip** · right 쓰기=라벨 solid≤1(보조 ghost icon) · 자산/계약 탄생=`openIngest` · 홈 투입 아이콘 · `IconBtn` 겹치면 Btn 우선 |
 | `components/ui` `LedgerActions` / `LedgerPanelFooter` | 쓰기/워크플로/패널 버튼 무리 (zone당 solid 1 · tools=ghost icon · Btn sm) — 표=CLAUDE「버튼 자리·hierarchy」 |
 | `components/ui` `LedgerCreatePanel` / `LedgerEditPanel` / `LedgerRecordPanel` | 원장 생성·그자리수정·조회 패널 · 조회=`sections`→`<details>` 접기(첫 섹션만 기본 펼침) |
+| `components/ui` `LedgerFilterSelects` | 세부필터 상단 흡수(Select 줄) — 필드 적은 원장. 다수 필드=좌측 `LedgerFilterPanel` |
 | `lib/ledger-ext` · `*_SHEET_KEYS` · `*_DETAIL_DEFS` · `*_FILTER_DEFS` | **원장 항목 추가·삭제 규격(틀)** — 요청 ``시트 · 축 · +\|-key`` · 축=`엑셀기본`/`엑셀전체`/`섹션명`/`필터` · 언제든 push/splice |
 | `components/MigrateDataButton` | 스위치플랜 마이그레이션(본사) |
 | `components/ui` `SectionLabel` | 상세 그룹 소제목(무박스) — freepass ERP4 동기. 360 운영·자산·계약·이력 |
