@@ -2,8 +2,7 @@
 import { useMemo, useState } from 'react';
 import { useSession } from '@/lib/session';
 import { type EntityRecord } from '@/lib/intake/entities';
-import { computeContractView, patchEngineLock } from '@/lib/contract-ops';
-import { collectionStage } from '@/lib/collection';
+import { patchEngineLock } from '@/lib/contract-ops';
 import { openCar, openCustomer } from '@/lib/ui-bus';
 import { customerKey } from '@/lib/customers';
 import { sendNoticeCert, sendNoticeCertBulk } from '@/lib/docs/send-notice';
@@ -20,11 +19,14 @@ import { NotifyDialog, type NotifyRecipient } from '@/components/NotifyDialog';
 import { companyLabel } from '@/lib/companies';
 import { toast } from '@/lib/toast';
 import { TODAY } from '@/lib/dashboard-consts';
-import { selectReceivables } from '@/lib/snapshot/selectors';
 import { useEntityLists } from '@/lib/use-entity-lists';
 import { commitUpdate } from '@/lib/commit';
 import { resolveWriteCompany, NEED_COMPANY } from '@/lib/scope';
 import { useSecOrder } from '@/lib/use-sec-order';
+import {
+  buildReceivablesWorkbench, countReceivableFacets, noticeTodoRows,
+  type ReceivableRow,
+} from '@/lib/receivables-ledger';
 import { Check } from 'lucide-react';
 
 const RECV_SECS = ['recv-status', 'recv-list'] as const;
@@ -32,15 +34,14 @@ const RECV_SECS = ['recv-status', 'recv-list'] as const;
 // 미수 워크벤치 = 회수 파트의 "딱 여기만" 메인. 미수율이 핵심축. 자금(수납)과 연동돼 자동 갱신.
 // 담당자가 어떻게 관리했는지(내용증명 발송·시동제어 여부·최근 연락)가 보이고, 그 자리에서 조치.
 const STONE: Record<string, 'gray' | 'amber' | 'orange' | 'red' | 'purple'> = { 정상: 'gray', 경고: 'amber', 시동제어: 'orange', 내용증명: 'red', 채권화: 'purple' };
-const CONTACT_KINDS = ['통화', '문자', '방문', '독촉'];
 
 export default function ReceivablesPage() {
   const { companyId, scopeAll, user } = useSession();
   const { data: [cs = [], hs = []], loading, reload } = useEntityLists(['contract', 'history']);
   const [facets, setFacets] = useState<Set<string>>(new Set());
   const [q, setQ] = useState('');
-  const [logKey, setLogKey] = useState<string | null>(null); // 연락 기록 펼친 행. 그 자리에서 인라인(팝업 X)
-  const [notify, setNotify] = useState(false); // 문자 발송 다이얼로그
+  const [logKey, setLogKey] = useState<string | null>(null);
+  const [notify, setNotify] = useState(false);
   const [noticeSel, setNoticeSel] = useState<Set<string>>(new Set());
   const [, runBusy] = useBusyAction();
   const confirm = useConfirm();
@@ -48,43 +49,12 @@ export default function ReceivablesPage() {
   const toggleFacet = (label: string) => setFacets((s) => { const n = new Set(s); n.has(label) ? n.delete(label) : n.add(label); return n; });
   const resetFacets = () => setFacets(new Set());
 
-  const D = useMemo(() => {
-    const lastContact = new Map<string, EntityRecord>();
-    for (const h of hs) { if (!CONTACT_KINDS.includes(String(h.category))) continue; const p = String(h.plate || ''); const cur = lastContact.get(p); if (!cur || String(h.date || '') > String(cur.date || '')) lastContact.set(p, h); }
-    const rows = cs.map((c) => { const v = computeContractView(c, TODAY); return { rec: c, v, st: collectionStage(v.overdueDays), contact: lastContact.get(String(c.plate || '')) || null }; })
-      .filter((r) => r.v.net > 0)
-      .sort((a, b) => b.v.net - a.v.net);
-    const recv = selectReceivables(cs, TODAY);
-    return {
-      rows, totalUnpaid: recv.total, count: recv.unpaidCount,
-      misuActive: recv.misuActive, misuActiveCount: recv.misuActiveCount,
-      misuReturned: recv.misuReturned, misuReturnedCount: recv.misuReturnedCount,
-      rate: recv.rate,
-      over30: recv.over30,
-      over90: recv.over90,
-      noticeTodo: rows.filter((r) => (r.st.stage === '내용증명' || r.st.stage === '채권화') && !r.rec.noticeSentDate).length,
-      immob: rows.filter((r) => r.rec.engineDisabled).length,
-      lockTodo: rows.filter((r) => !r.v.ended && !r.rec.engineDisabled && (r.st.stage === '시동제어' || r.st.stage === '내용증명' || r.st.stage === '채권화')).length,
-    };
-  }, [cs, hs]);
+  const D = useMemo(() => buildReceivablesWorkbench(cs, hs, TODAY), [cs, hs]);
+  const counts = useMemo(() => countReceivableFacets(D.rows), [D.rows]);
 
   const stageSel = selectedInDim('미수', '연체단계', facets);
   const overdueSel = selectedInDim('미수', '연체기간', facets);
   const actionSel = selectedInDim('미수', '조치', facets);
-  // 칩별 매칭 건수(erp3식 '라벨(N)') — 전체 미수 정적 집계. 필터 술어와 동일 기준.
-  const counts = useMemo(() => {
-    const c: Record<string, number> = { 정상: 0, 경고: 0, 시동제어: 0, 내용증명: 0, 채권화: 0, '1~29일': 0, '30~89일': 0, '90일+': 0, 미조치: 0, 내용증명발송: 0, 시동제어중: 0 };
-    for (const r of D.rows) {
-      if (c[r.st.stage] != null) c[r.st.stage]++;
-      const d = r.v.overdueDays;
-      if (d >= 1 && d <= 29) c['1~29일']++; else if (d >= 30 && d <= 89) c['30~89일']++; else if (d >= 90) c['90일+']++;
-      const notice = !!r.rec.noticeSentDate, immob = !!r.rec.engineDisabled;
-      if (!notice && !immob) c['미조치']++;
-      if (notice) c['내용증명발송']++;
-      if (immob) c['시동제어중']++;
-    }
-    return c;
-  }, [D.rows]);
   const filtered = D.rows.filter((r) => {
     if (stageSel.length && !stageSel.includes(r.st.stage)) return false;
     if (overdueSel.length) {
@@ -104,9 +74,7 @@ export default function ReceivablesPage() {
     }
     return textMatch(q, r.rec.contractorName, r.rec.plate, r.rec.contractNo, r.rec.contractorPhone, r.st.stage);
   });
-  // 좌측 FacetRail — LENS_FILTERS['미수'] SSOT (연체단계 × 연체기간 × 조치)
-
-  // 문자 발송 대상 — 현재 필터된 미수 계약(연락처 보유)
+  const noticeTodoFiltered = noticeTodoRows(filtered);
   const recipients: NotifyRecipient[] = filtered.map((r) => ({
     contractKey: String(r.rec._key || ''), companyId: String(r.rec.companyId || ''),
     name: String(r.rec.contractorName || ''), plate: String(r.rec.plate || ''),
@@ -136,7 +104,6 @@ export default function ReceivablesPage() {
   };
   const toggleNoticeSel = (key: string) => setNoticeSel((s) => { const n = new Set(s); n.has(key) ? n.delete(key) : n.add(key); return n; });
   const noticeTargets = filtered.filter((r) => noticeSel.has(String(r.rec._key || '')));
-  const noticeTodoFiltered = filtered.filter((r) => (r.st.stage === '내용증명' || r.st.stage === '채권화') && !r.rec.noticeSentDate);
   const sendNoticeBulk = async (recs: EntityRecord[]) => {
     if (recs.length === 0) return;
     if (!(await confirm({ message: `내용증명 ${recs.length}건을 일괄 발송(인쇄)·기록합니까?` }))) return;
@@ -153,8 +120,7 @@ export default function ReceivablesPage() {
       reload();
     });
   };
-  // 시동제어 전환 — "물어보고"(확인) 걸고, engineDisabled 원자(patchEngineLock SSOT)에 사유·시각·담당 기록.
-  const toggleEngine = async (r: { rec: EntityRecord; v: { net: number; overdueDays: number } }) => {
+  const toggleEngine = async (r: ReceivableRow) => {
     const rec = r.rec;
     const who = String(rec.contractorName || '—'), plate = String(rec.plate || '');
     const actor = user?.email || user?.name || '';
@@ -174,8 +140,18 @@ export default function ReceivablesPage() {
       title="미수관리"
       meta={`${scopeAll ? '전체 회사' : companyLabel(companyId)} · 미수 ${D.count}건`}
       tools={<WorkbenchBar mid={<WorkHubBack />} search={{ value: q, onChange: setQ, placeholder: '손님·차량·계약' }} stat={<span style={{ fontSize: 13, fontWeight: 800, color: D.totalUnpaid > 0 ? C.danger : C.ok, whiteSpace: 'nowrap' }}>미수 {won(D.totalUnpaid)}</span>} actions={<>
-        <Btn size="sm" variant="ghost" onClick={() => setNoticeSel(new Set(noticeTodoFiltered.map((r) => String(r.rec._key || ''))))} disabled={noticeTodoFiltered.length === 0}>대상 선택 ({noticeTodoFiltered.length})</Btn>
-        <Btn size="sm" variant="danger" onClick={() => sendNoticeBulk(noticeTargets.map((r) => r.rec))} disabled={noticeTargets.length === 0}>내용증명 일괄{noticeTargets.length ? ` (${noticeTargets.length})` : ''}</Btn>
+        <Btn
+          size="sm"
+          variant="ghost"
+          onClick={() => setNoticeSel(new Set(noticeTodoFiltered.map((r) => String(r.rec._key || ''))))}
+          disabled={noticeTodoFiltered.length === 0}
+        >대상 선택 ({noticeTodoFiltered.length})</Btn>
+        <Btn
+          size="sm"
+          variant="ghost"
+          onClick={() => sendNoticeBulk(noticeTargets.map((r) => r.rec))}
+          disabled={noticeTargets.length === 0}
+        >내용증명 일괄{noticeTargets.length ? ` (${noticeTargets.length})` : ''}</Btn>
         <Btn size="sm" onClick={() => setNotify(true)} disabled={smsCount === 0}>문자 발송{smsCount ? ` (${smsCount})` : ''}</Btn>
       </>} />}
       rail={!loading ? <FacetRail lensKey="미수" facets={facets} onToggle={toggleFacet} onReset={resetFacets} counts={counts} /> : null}
@@ -202,7 +178,14 @@ export default function ReceivablesPage() {
           <Sec key={id} id={id} title="미수 목록" n={filtered.length} desc="금액 큰 순 · 체크 후 내용증명 일괄 · 자리에서 단건·시동제어·연락" onReorder={reorder}>
             {loading ? <PageLoading /> : filtered.length === 0 ? <EmptyState variant="sec">해당 미수 없음</EmptyState> :
               <div style={{ display: 'flex', flexDirection: 'column', gap: SPACE_M }}>
-                {filtered.map((r, i) => { const rec = r.rec; const immob = !!rec.engineDisabled; const needLock = !r.v.ended && !immob && (r.st.stage === '시동제어' || r.st.stage === '내용증명' || r.st.stage === '채권화'); const rowId = String(rec._key ?? `row-${i}`); const logOn = logKey === rowId; const checked = noticeSel.has(rowId); return (
+                {filtered.map((r, i) => {
+                  const rec = r.rec;
+                  const immob = !!rec.engineDisabled;
+                  const needLock = !r.v.ended && !immob && (r.st.stage === '시동제어' || r.st.stage === '내용증명' || r.st.stage === '채권화');
+                  const rowId = String(rec._key ?? `row-${i}`);
+                  const logOn = logKey === rowId;
+                  const checked = noticeSel.has(rowId);
+                  return (
                   <div key={i} style={{ display: 'flex', flexDirection: 'column', gap: SPACE_M }}>
                     <div style={{ display: 'flex', gap: SPACE_M, alignItems: 'flex-start' }}>
                       <label style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: TOUCH, height: TOUCH, flexShrink: 0, marginTop: 4, cursor: 'pointer' }}>
