@@ -28,6 +28,7 @@ import {
   buildPenaltyBucketRow, buildPenaltyWorkRows,
   type PenaltyKind, type PenaltyProcess, type PenaltyWorkRow,
 } from '@/lib/penalty-work';
+import { LEDGER_EMPTY } from '@/lib/ledger-empty';
 import { WORK_SECTIONS_BY_KIND, type WorkGroup } from '@/lib/work-form-sections';
 import { PenaltyBucketPanel } from '@/components/work/PenaltyBucketPanel';
 import { workRail, workRailStyle } from '@/lib/work-rail';
@@ -126,10 +127,10 @@ function workStatusTone(status: string): 'green' | 'amber' | 'red' | 'gray' | 'b
   return 'gray';
 }
 
-/** 차량번호 — 1줄 차번 · 2줄 mute 차명. 없으면 상태 미배정(컬럼은 —). */
+/** 차량번호 — 1줄 차번 · 2줄 mute 차명. 없으면 미배정(셀은 대시). */
 function PlateCell({ r }: { r: WorkLedgerRow }) {
   if (!r.plate) {
-    return <span style={{ color: C.mute }}>—</span>;
+    return <span style={{ color: C.mute }}>{LEDGER_EMPTY.dash}</span>;
   }
   return (
     <div style={{ minWidth: 0 }}>
@@ -145,11 +146,11 @@ function PlateCell({ r }: { r: WorkLedgerRow }) {
   );
 }
 
-/** 계약자 — 없으면 '없음'. sub=대여형태. */
+/** 계약자 — 없으면 LEDGER_EMPTY.none. sub=대여형태. */
 function ContractorCell({ r }: { r: WorkLedgerRow }) {
   const name = String(r.customerName || '').trim();
   if (!name) {
-    return <span style={{ color: C.mute }}>없음</span>;
+    return <span style={{ color: C.mute }}>{LEDGER_EMPTY.none}</span>;
   }
   return (
     <div style={{ minWidth: 0 }}>
@@ -198,7 +199,7 @@ function workGroup(kind: unknown): WorkGroup {
 }
 
 const WORK_COL_CATALOG: SheetCol<WorkLedgerRow>[] = [
-  { key: 'co', label: '회사명', pin: true, priority: 2, render: (r) => r.company || '—', text: (r) => r.company },
+  { key: 'co', label: '회사명', pin: true, priority: 2, render: (r) => r.company || LEDGER_EMPTY.dash, text: (r) => r.company },
   {
     key: 'kind', label: '업무구분', pin: true, priority: 1,
     render: (r) => <KindCell kind={r.kind} />,
@@ -217,9 +218,9 @@ const WORK_COL_CATALOG: SheetCol<WorkLedgerRow>[] = [
   {
     key: 'contractor', label: '계약자', priority: 1,
     render: (r) => <ContractorCell r={r} />,
-    text: (r) => r.customerName || '없음',
+    text: (r) => r.customerName || LEDGER_EMPTY.none,
   },
-  { key: 'title', label: '업무내용', priority: 1, render: (r) => r.title || '—', text: (r) => r.title },
+  { key: 'title', label: '업무내용', priority: 1, render: (r) => r.title || LEDGER_EMPTY.dash, text: (r) => r.title },
   {
     key: 'assignee', label: '담당자', priority: 1,
     render: (r) => <AssigneeCell name={r.assignee} />,
@@ -235,39 +236,41 @@ const WORK_COL_CATALOG: SheetCol<WorkLedgerRow>[] = [
     render: (r) => fmtStamp(r.updatedAt),
     text: (r) => r.updatedAt,
   },
-  { key: 'due', label: '기한', render: (r) => r.dueDate || '—', text: (r) => r.dueDate },
-  { key: 'amount', label: '금액', align: 'r', render: (r) => r.amount ? won(r.amount) : '—', text: (r) => r.amount || '' },
+  { key: 'due', label: '기한', render: (r) => r.dueDate || LEDGER_EMPTY.dash, text: (r) => r.dueDate },
+  { key: 'amount', label: '금액', align: 'r', render: (r) => r.amount ? won(r.amount) : LEDGER_EMPTY.dash, text: (r) => r.amount || '' },
   { key: 'source', label: '원천', render: (r) => WORK_SOURCE_LABEL[r.source], text: (r) => r.source },
 ];
 
 /** 과태료 전용 열 — 1건=1행: 위반일·차번·금액·실운전자·처리상태 */
 const PENALTY_COL_CATALOG: SheetCol<WorkLedgerRow>[] = [
-  { key: 'violationDate', label: '위반일', pin: true, priority: 1, render: (r) => r.violationDate || '—', text: (r) => r.violationDate || '' },
-  { key: 'plate', label: '차번', pin: true, priority: 1, render: (r) => r.plate || '—', text: (r) => r.plate || '' },
+  { key: 'violationDate', label: '위반일', pin: true, priority: 1, render: (r) => r.violationDate || LEDGER_EMPTY.dash, text: (r) => r.violationDate || '' },
+  { key: 'plate', label: '차번', pin: true, priority: 1, render: (r) => r.plate || LEDGER_EMPTY.dash, text: (r) => r.plate || '' },
   {
     key: 'amount', label: '금액', align: 'r', priority: 1,
-    render: (r) => r.amount ? <span style={{ color: C.warn, fontWeight: 700 }}>{won(r.amount)}</span> : '—',
+    render: (r) => r.amount ? <span style={{ color: C.warn, fontWeight: 700 }}>{won(r.amount)}</span> : LEDGER_EMPTY.dash,
     text: (r) => r.amount || '',
   },
-  { key: 'driver', label: '실운전자', priority: 1, render: (r) => r.driverName || '미매칭', text: (r) => r.driverName || '' },
+  { key: 'driver', label: '실운전자', priority: 1, render: (r) => r.driverName || LEDGER_EMPTY.unmatched, text: (r) => r.driverName || '' },
   {
     key: 'status', label: '처리상태', align: 'c', priority: 1,
     render: (r) => <Badge tone={workStatusTone(r.status)}>{r.status}</Badge>,
     text: (r) => r.status,
   },
-  { key: 'ptype', label: '유형', priority: 2, render: (r) => r.penaltyKind || '—', text: (r) => r.penaltyKind || '' },
-  { key: 'title', label: '위반내용', priority: 2, render: (r) => r.title || '—', text: (r) => r.title },
-  { key: 'co', label: '회사명', priority: 2, render: (r) => r.company || '—', text: (r) => r.company },
-  { key: 'due', label: '납기', priority: 2, render: (r) => r.dueDate || '—', text: (r) => r.dueDate },
+  { key: 'ptype', label: '유형', priority: 2, render: (r) => r.penaltyKind || LEDGER_EMPTY.dash, text: (r) => r.penaltyKind || '' },
+  { key: 'title', label: '위반내용', priority: 2, render: (r) => r.title || LEDGER_EMPTY.dash, text: (r) => r.title },
+  { key: 'co', label: '회사명', priority: 2, render: (r) => r.company || LEDGER_EMPTY.dash, text: (r) => r.company },
+  { key: 'due', label: '납기', priority: 2, render: (r) => r.dueDate || LEDGER_EMPTY.dash, text: (r) => r.dueDate },
 ];
 
 const WORK_SHEET_KEYS: SheetViewKeys = {
-  basic: ['co', 'kind', 'status', 'plate', 'contractor', 'title', 'assignee', 'created', 'updated'],
-  all: ['co', 'kind', 'status', 'plate', 'contractor', 'title', 'assignee', 'created', 'updated', 'due', 'amount'],
+  // 회사 → 신원 → 내용 → 분류 → 상태 → 수치/담당·시각
+  basic: ['co', 'plate', 'contractor', 'title', 'kind', 'status', 'assignee', 'created', 'updated'],
+  all: ['co', 'plate', 'contractor', 'title', 'kind', 'status', 'assignee', 'created', 'updated', 'due', 'amount', 'source'],
 };
 const PENALTY_SHEET_KEYS: SheetViewKeys = {
-  basic: ['violationDate', 'plate', 'amount', 'driver', 'status'],
-  all: ['violationDate', 'plate', 'amount', 'driver', 'status', 'ptype', 'title', 'co', 'due'],
+  // 신원(차)·수치 → 신원(운전자) → 상태 → 내용·보조
+  basic: ['co', 'plate', 'driver', 'title', 'status', 'violationDate', 'amount'],
+  all: ['co', 'plate', 'driver', 'title', 'status', 'violationDate', 'amount', 'ptype', 'due'],
 };
 
 const _workViews = buildSheetViews(WORK_COL_CATALOG, WORK_SHEET_KEYS);
@@ -687,8 +690,8 @@ function WorkLedgerInner() {
         <LedgerRecordPanel
           title={selected.title || selected.kind}
           identity={selected.source === 'penalty'
-            ? `${selected.plate || '미배정'} · ${selected.driverName || '미매칭'}`
-            : `${selected.plate || '미배정'} · ${selected.customerName || '없음'}`}
+            ? `${selected.plate || LEDGER_EMPTY.unassigned} · ${selected.driverName || LEDGER_EMPTY.unmatched}`
+            : `${selected.plate || LEDGER_EMPTY.unassigned} · ${selected.customerName || LEDGER_EMPTY.none}`}
           statusBadge={<Badge tone={workStatusTone(selected.status)}>{selected.status}</Badge>}
           row={selected}
           cols={selected.source === 'penalty' ? PEN_ALL : ALL_COLS}
