@@ -38,42 +38,43 @@
   --bg-sunken:   #f4f4f5;
   --bg-hover:    #e9e9eb;  /* tr:hover */
   --bg-selected: #eff6ff;
-  --bg-stripe:   #f9f9fa;  /* tr:nth-child(even) */
+  --bg-stripe:   #f7f8fa;  /* zebra — 옅게 */
   --bg-elevated: #ffffff;
   --bg-disabled: #f4f4f5;
 
-  /* Text hierarchy */
-  --text-main:    #18181b;   /* zinc-900 */
-  --text-sub:     #52525b;   /* zinc-600 */
-  --text-weak:    #a1a1aa;   /* zinc-400 */
-  --text-muted:   #d4d4d8;   /* zinc-300 */
+  /* Text hierarchy — 대비↑ · 맹함 제거 */
+  --text-main:    #1e2733;
+  --text-sub:     #586274;   /* 라벨 */
+  --text-weak:    #939db0;   /* 빈값 */
+  --text-muted:   #c6cdd8;
   --text-inverse: #ffffff;
-  --text-link:    #2563eb;
+  --text-link:    #2b56c6;
 
-  /* Borders — soft */
-  --border:        #e4e4e7;  /* zinc-200 */
-  --border-soft:   #f4f4f5;  /* zinc-100 */
-  --border-strong: #d4d4d8;  /* zinc-300 */
-  --border-focus:  #18181b;
+  /* Borders — 경계·강조경계 */
+  --border:        #dde2ea;
+  --border-soft:   #e8ecf2;
+  --border-strong: #c6cdd8;
+  --border-focus:  #1e2733;
 
-  /* Brand — JPK navy */
-  --brand:    #1B2A4A;
-  --brand-h:  #0F1B35;
-  --brand-bg: #eef2f7;
-  --brand-soft: #f8fafc;
+  /* Brand — 액센트 네이비 */
+  --brand:    #2b56c6;
+  --brand-h:  #1f429e;
+  --brand-bg: #eef2fb;
+  --brand-soft: #f7f9fd;
 
-  --focus-ring: rgba(27, 42, 74, 0.18);
+  --focus-ring: rgba(43, 86, 198, 0.18);
 
-  /* Accent palette (soft pastel bg + saturated text — Linear/Notion style) */
-  --red-bg:    #fef2f2;  --red-text:    #b91c1c;  --red-border:    #fecaca;
-  --orange-bg: #fff7ed;  --orange-text: #c2410c;  --orange-border: #fed7aa;
-  --amber-bg:  #fefce8;  --amber-text:  #a16207;  --amber-border:  #fef08a;
-  --green-bg:  #f0fdf4;  --green-text:  #15803d;  --green-border:  #bbf7d0;
-  --blue-bg:   #eff6ff;  --blue-text:   #1d4ed8;  --blue-border:   #bfdbfe;
+  /* Accent palette — 저채도 상태색 · 대비↑ */
+  --red-bg:    #fdf5f4;  --red-text:    #cf3b38;  --red-border:    #f0c9c7;
+  --danger-tint: #fdf5f4; /* 긴급 행 배경 틴트 (미납·사고·만기경과) */
+  --orange-bg: #fbf6ee;  --orange-text: #c07d1c;  --orange-border: #efd9b0;
+  --amber-bg:  #fbf8e8;  --amber-text:  #c07d1c;  --amber-border:  #efe4b0;
+  --green-bg:  #f0f6f2;  --green-text:  #3f7d54;  --green-border:  #c5dccb;
+  --blue-bg:   #eef2fb;  --blue-text:   #2b56c6;  --blue-border:   #c9d5f0;
   --indigo-bg: #eef2ff;  --indigo-text: #4338ca;  --indigo-border: #c7d2fe;
-  --purple-bg: #faf5ff;  --purple-text: #7e22ce;  --purple-border: #e9d5ff;
-  --zinc-bg:   #f4f4f5;  --zinc-text:   #52525b;  --zinc-border:   #e4e4e7;
-  --teal-bg:   #d0eef5;  --teal-text:   #0e7490;  --teal-border:   #93cfdf;
+  --purple-bg: #f7f3fb;  --purple-text: #7e22ce;  --purple-border: #e4d5f0;
+  --zinc-bg:   #f4f5f7;  --zinc-text:   #8b95a5;  --zinc-border:   #dde2ea;
+  --teal-bg:   #eef6f7;  --teal-text:   #0e7490;  --teal-border:   #b8d4da;
 
   /* Alert aliases — backwards compat */
   --alert-red-bg:    var(--red-bg);    --alert-red-text:    var(--red-text);    --alert-red-border:    var(--red-border);
@@ -82,9 +83,10 @@
   --alert-blue-bg:   var(--blue-bg);   --alert-blue-text:   var(--blue-text);   --alert-blue-border:   var(--blue-border);
 
   /* Sizing — 4px 표준 미세 라운드 (B 정책).
-     모든 카드/버튼/입력/배지 통일. 원형(.50%)·필(99px)·icon-only 등은 별도. */
+     모든 카드/버튼/입력 통일. 배지·카운트 = --radius-badge. */
   --radius-sm: 3px;
   --radius:    4px;
+  --radius-badge: 5px;
   --radius-md: 6px;
   --radius-lg: 8px;
   --radius-pill: 999px;
@@ -223,6 +225,7 @@
   --focus-ring: #475569;
 
   --red-bg:    #450a0a;  --red-text:    #fca5a5;  --red-border:    #7f1d1d;
+  --danger-tint: color-mix(in srgb, var(--red-text) 14%, var(--bg-card));
   --orange-bg: #451a03;  --orange-text: #fcd34d;  --orange-border: #78350f;
   --amber-bg:  #422006;  --amber-text:  #fcd34d;  --amber-border:  #78350f;
   --green-bg:  #052e1f;  --green-text:  #6ee7b7;  --green-border:  #14532d;
@@ -2306,7 +2309,7 @@ kbd {
   font-size: 10px;
   font-weight: 600;
   border: 1px solid var(--border);
-  border-radius: 2px;
+  border-radius: var(--radius-badge);
   white-space: nowrap;
   line-height: 1.5;
   background: var(--bg-sunken);
@@ -2545,10 +2548,10 @@ kbd {
   gap: 6px;
   list-style: none;
   padding: 10px 12px;
-  color: var(--text-muted);
+  color: var(--text-sub);
   font-size: 11.5px;
   font-weight: 600;
-  background: var(--bg-header);
+  background: transparent;
   cursor: pointer;
   user-select: none;
 }
@@ -2613,7 +2616,7 @@ kbd {
   overflow: hidden;
   color: var(--text-main);
   font-size: 13.5px;
-  font-weight: 700;
+  font-weight: 800;
   line-height: 1.2;
   text-overflow: ellipsis;
   white-space: nowrap;
