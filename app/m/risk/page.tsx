@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { TODAY } from '@/lib/dashboard-consts';
 import { useEntityLists } from '@/lib/use-entity-lists';
-import { buildRiskSheetRows, type RiskSheetGroup } from '@/lib/risk-ledger';
+import { buildRiskSheetRows, countRiskSheetGroups, type RiskSheetGroup } from '@/lib/risk-ledger';
 import { LEDGER_EMPTY } from '@/lib/ledger-empty';
 import { Rows, ObjRow, EmptyState, PageLoading, FilterChips, C } from '@/components/ui';
 import { MHead } from '@/components/m/MHead';
@@ -26,13 +26,7 @@ export default function MRisk() {
     () => (group === '전체' ? rows : rows.filter((r) => r.group === group)),
     [rows, group],
   );
-  const counts = useMemo(() => ({
-    전체: rows.length,
-    미완료: rows.filter((r) => r.group === '미완료').length,
-    미납: rows.filter((r) => r.group === '미납').length,
-    만기: rows.filter((r) => r.group === '만기').length,
-    휴차: rows.filter((r) => r.group === '휴차').length,
-  }), [rows]);
+  const counts = useMemo(() => countRiskSheetGroups(rows), [rows]);
 
   return (
     <>

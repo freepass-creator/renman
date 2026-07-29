@@ -126,3 +126,17 @@ export function parseWorkGroup(raw: string | null): WorkGroupFilter {
   if (raw && (WORK_GROUPS as string[]).includes(raw)) return raw as WorkGroupFilter;
   return '전체';
 }
+
+/** 업무/과태료 표 배지 — 페이지 `.filter().length` 손롤 금지. */
+export function summarizeWorkLedgerRows(rows: WorkLedgerRow[]): {
+  total: number;
+  inProgress: number;
+  unmatched: number;
+} {
+  let inProgress = 0, unmatched = 0;
+  for (const r of rows) {
+    if (!/완료|종결/.test(r.status)) inProgress++;
+    if (r.process === '미매칭') unmatched++;
+  }
+  return { total: rows.length, inProgress, unmatched };
+}

@@ -14,6 +14,25 @@ export type PenaltyProcess = '미매칭' | '진행' | '종결';
 export const PENALTY_KINDS: PenaltyKind[] = ['주정차위반', '경찰서건', '기타'];
 export const PENALTY_PROCESSES: PenaltyProcess[] = ['미매칭', '진행', '종결'];
 
+/** 칩 건수 — 페이지 `.filter().length` 손롤 금지. */
+export function countPenaltyByProcess(rows: PenaltyWorkRow[]): Record<PenaltyProcess, number> {
+  const out: Record<PenaltyProcess, number> = { 미매칭: 0, 진행: 0, 종결: 0 };
+  for (const r of rows) out[r.process]++;
+  return out;
+}
+
+export function countPenaltyByKind(rows: PenaltyWorkRow[]): Record<PenaltyKind, number> {
+  const out: Record<PenaltyKind, number> = { 주정차위반: 0, 경찰서건: 0, 기타: 0 };
+  for (const r of rows) out[r.penaltyKind]++;
+  return out;
+}
+
+export function countMatchedPenalties(rows: PenaltyWorkRow[]): number {
+  let n = 0;
+  for (const r of rows) if (r.matched) n++;
+  return n;
+}
+
 /** 고지서 유형 — 내용·발급기관·docType 휴리스틱(분류값만, 청구분기 X). */
 export function penaltyKindOf(p: EntityRecord): PenaltyKind {
   const blob = `${p.docType || ''} ${p.description || ''} ${p.issuer || ''}`;

@@ -269,6 +269,15 @@ export function buildRiskSheetRows(
     || a.plate.localeCompare(b.plate, 'ko'));
 }
 
+/** 칩·배지용 그룹 건수 — 페이지 `.filter().length` 손롤 금지. */
+export type RiskGroupCounts = Record<'전체' | RiskSheetGroup, number>;
+
+export function countRiskSheetGroups(rows: RiskSheetRow[]): RiskGroupCounts {
+  const counts: RiskGroupCounts = { 전체: rows.length, 미완료: 0, 미납: 0, 만기: 0, 휴차: 0 };
+  for (const r of rows) counts[r.group]++;
+  return counts;
+}
+
 export function buildRiskSheet(
   vehicles: EntityRecord[],
   contracts: EntityRecord[],

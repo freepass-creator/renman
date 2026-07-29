@@ -23,6 +23,7 @@ import {
 import {
   PENALTY_KINDS, PENALTY_PROCESSES,
   buildPenaltyBucketRow, buildPenaltyWorkRows,
+  countMatchedPenalties, countPenaltyByKind, countPenaltyByProcess,
   type PenaltyKind, type PenaltyProcess, type PenaltyWorkRow,
 } from '@/lib/penalty-work';
 import { LEDGER_EMPTY } from '@/lib/ledger-empty';
@@ -31,7 +32,7 @@ import { PenaltyBucketPanel } from '@/components/work/PenaltyBucketPanel';
 import { workRail, workRailStyle } from '@/lib/work-rail';
 import {
   WORK_GROUPS, WORK_SOURCE_LABEL,
-  carNameOf, contractMeta, normalizeWorkStatus, parseWorkGroup, workGroup,
+  carNameOf, contractMeta, normalizeWorkStatus, parseWorkGroup, summarizeWorkLedgerRows, workGroup,
   type WorkGroupFilter, type WorkLedgerRow, type WorkSource, type WorkStatus,
 } from '@/lib/work-ledger';
 import {
@@ -96,7 +97,15 @@ function WorkLedgerInner() {
   );
   const penaltyBucket = useMemo(() => buildPenaltyBucketRow(penaltyRows as PenaltyWorkRow[]), [penaltyRows]);
   const matchedDocs = useMemo(
-    () => (penaltyRows as PenaltyWorkRow[]).filter((r) => r.matched).length,
+    () => countMatchedPenalties(penaltyRows as PenaltyWorkRow[]),
+    [penaltyRows],
+  );
+  const processCounts = useMemo(
+    () => countPenaltyByProcess(penaltyRows as PenaltyWorkRow[]),
+    [penaltyRows],
+  );
+  const kindCounts = useMemo(
+    () => countPenaltyByKind(penaltyRows as PenaltyWorkRow[]),
     [penaltyRows],
   );
 
@@ -270,7 +279,10 @@ function WorkLedgerInner() {
     );
   }), [allRows, penaltyMode, penProcess, penKind, group, detailFilters, workFilterMatchers, range.from, range.to, q]);
 
-  const inProgress = rows.filter((r) => !/완료|종결/.test(r.status)).length;
+  const { total: rowTotal, inProgress, unmatched: unmatchedPenalty } = useMemo(
+    () => summarizeWorkLedgerRows(rows),
+    [rows],
+  );
 
   const setGroupAndUrl = (next: WorkGroupFilter) => {
     setGroup(next);
@@ -333,7 +345,7 @@ function WorkLedgerInner() {
               options={PENALTY_PROCESSES.map((k) => ({
                 key: k,
                 label: k,
-                count: penaltyRows.filter((r) => r.process === k).length,
+                count: processCounts[k],
               }))}
             />
             <FilterChips
@@ -343,7 +355,7 @@ function WorkLedgerInner() {
               options={PENALTY_KINDS.map((k) => ({
                 key: k,
                 label: k,
-                count: penaltyRows.filter((r) => r.penaltyKind === k).length,
+                count: kindCounts[k],
               }))}
             />
           </>
@@ -352,8 +364,8 @@ function WorkLedgerInner() {
       </>}
       stats={<span style={{ fontSize: 12.5, color: C.mute }}>
         {penaltyMode
-          ? <>과태료 <b>{rows.length}</b> · 미매칭 <b style={{ color: C.danger }}>{rows.filter((r) => r.process === '미매칭').length}</b></>
-          : <>전체 <b>{rows.length}</b> · 진행 <b style={{ color: C.warn }}>{inProgress}</b></>}
+          ? <>과태료 <b>{rowTotal}</b> · 미매칭 <b style={{ color: C.danger }}>{unmatchedPenalty}</b></>
+          : <>전체 <b>{rowTotal}</b> · 진행 <b style={{ color: C.warn }}>{inProgress}</b></>}
       </span>}
       colView={colView}
       onColView={setColView}
