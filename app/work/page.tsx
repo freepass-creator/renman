@@ -8,7 +8,7 @@ import { companyDisplay } from '@/lib/companies';
 import type { EntityRecord } from '@/lib/intake/entities';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
-  Badge, Btn, C, FilterChips, LedgerActions, LedgerCreatePanel, LedgerFilterButton, LedgerFilterFields, LedgerFilterPanel, LedgerFrame, LedgerRecordPanel, PageLoading, Search, won,
+  Badge, Btn, C, FilterChips, LedgerActions, LedgerCreatePanel, LedgerFilterSelects, LedgerFrame, LedgerRecordPanel, PageLoading, Search, won,
   PeriodBar, Select, useConfirm, type LedgerColView,
 } from '@/components/ui';
 import { useSession } from '@/lib/session';
@@ -18,7 +18,7 @@ import { toast } from '@/lib/toast';
 import { useIsMobile } from '@/lib/use-mobile';
 import { todayKST } from '@/lib/contracts/dates';
 import {
-  WORK_FILTER_DEFS, countActiveFilters, emptyFilterValues, eqFilter, matchLedgerFilters,
+  WORK_FILTER_DEFS, emptyFilterValues, eqFilter, matchLedgerFilters,
 } from '@/lib/ledger-filter-defs';
 import {
   PENALTY_KINDS, PENALTY_PROCESSES,
@@ -57,7 +57,6 @@ function WorkLedgerInner() {
   const [colView, setColView] = useState<LedgerColView>('기본');
   const [group, setGroup] = useState<WorkGroupFilter>(() => parseWorkGroup(searchParams.get('group')));
   const [detailFilters, setDetailFilters] = useState(() => emptyFilterValues(WORK_FILTER_DEFS));
-  const [filterOpen, setFilterOpen] = useState(false);
   const [range, setRange] = useState({ from: '', to: '' });
   const [selected, setSelected] = useState<WorkLedgerRow | null>(null);
   const [creating, setCreating] = useState(false);
@@ -255,7 +254,6 @@ function WorkLedgerInner() {
     assignee: eqFilter<WorkLedgerRow>((r) => r.assignee),
     source: eqFilter<WorkLedgerRow>((r) => r.source),
   }), []);
-  const detailFilterCount = countActiveFilters(detailFilters, WORK_FILTER_DEFS);
   const latest = useMemo(
     () => latestDateOf(allRows, (r) => r.workDate, TODAY),
     [allRows],
@@ -362,7 +360,16 @@ function WorkLedgerInner() {
           style={{ width: mobile ? '100%' : 250 }}
         />
         {!penaltyMode && (
-          <LedgerFilterButton open={filterOpen} count={detailFilterCount} onClick={() => setFilterOpen((open) => !open)} />
+          <LedgerFilterSelects
+            defs={WORK_FILTER_DEFS}
+            values={detailFilters}
+            onChange={(key, value) => setDetailFilters((prev) => ({ ...prev, [key]: value }))}
+            options={{
+              status: statuses,
+              assignee: assignees,
+              source: sources.map((value) => ({ value, label: WORK_SOURCE_LABEL[value] })),
+            }}
+          />
         )}
         <Select size="sm" aria-label="업무 구분" value={group} onChange={(e) => setGroupAndUrl(e.target.value as WorkGroupFilter)}>
           {WORK_GROUPS.map((key) => <option key={key} value={key}>{key}</option>)}
@@ -425,24 +432,6 @@ function WorkLedgerInner() {
         setSelected(row);
       }}
       onCloseDetail={() => setSelected(null)}
-      filterPanel={!penaltyMode && filterOpen ? (
-        <LedgerFilterPanel
-          title="업무 세부 필터"
-          onClose={() => setFilterOpen(false)}
-          onReset={() => setDetailFilters(emptyFilterValues(WORK_FILTER_DEFS))}
-        >
-          <LedgerFilterFields
-            defs={WORK_FILTER_DEFS}
-            values={detailFilters}
-            onChange={(key, value) => setDetailFilters((prev) => ({ ...prev, [key]: value }))}
-            options={{
-              status: statuses,
-              assignee: assignees,
-              source: sources.map((value) => ({ value, label: WORK_SOURCE_LABEL[value] })),
-            }}
-          />
-        </LedgerFilterPanel>
-      ) : null}
       sidePanel={creating ? (
         <LedgerCreatePanel
           key="new-work"

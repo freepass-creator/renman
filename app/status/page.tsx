@@ -14,13 +14,13 @@ import { workRailStyle } from '@/lib/work-rail';
 import { useEntityLists } from '@/lib/use-entity-lists';
 import { textMatch } from '@/lib/search-match';
 import {
-  Btn, C, FilterChips, LedgerActions, LedgerFilterButton, LedgerFilterFields, LedgerFilterPanel, LedgerFrame, LedgerRecordPanel,
+  Btn, C, FilterChips, LedgerActions, LedgerFilterSelects, LedgerFrame, LedgerRecordPanel,
   PeriodBar, Search, Select, won,
   type LedgerColView,
 } from '@/components/ui';
 import { useIsMobile } from '@/lib/use-mobile';
 import {
-  FLEET_FILTER_DEFS, countActiveFilters, emptyFilterValues, matchLedgerFilters,
+  FLEET_FILTER_DEFS, emptyFilterValues, matchLedgerFilters,
 } from '@/lib/ledger-filter-defs';
 import { RENTAL_TYPES } from '@/lib/schema/contract';
 import { LEDGER_EMPTY } from '@/lib/ledger-empty';
@@ -43,7 +43,6 @@ export default function StatusPage() {
   const [riskOnly, setRiskOnly] = useState(false);
   const [rentalChip, setRentalChip] = useState<RentalChip>('전체');
   const [range, setRange] = useState({ from: '', to: '' });
-  const [filterOpen, setFilterOpen] = useState(false);
   const [detailFilters, setDetailFilters] = useState(() => emptyFilterValues(FLEET_FILTER_DEFS));
   const [colView, setColView] = useState<LedgerColView>('기본');
   const [selected, setSelected] = useState<FleetRow | null>(null);
@@ -96,7 +95,6 @@ export default function StatusPage() {
     return true;
   }), [searched, own, utilChip, riskOnly, rentalChip, detailFilters, fleetFilterMatchers, range.from, range.to]);
 
-  const detailFilterCount = countActiveFilters(detailFilters, FLEET_FILTER_DEFS);
   const { heldN, utilPct, netSum, inspSoon } = useMemo(
     () => summarizeFleetStatusStats(searched, rows),
     [searched, rows],
@@ -119,7 +117,15 @@ export default function StatusPage() {
           onChange={(e) => setQ(e.target.value)}
           style={{ width: mobile ? '100%' : 280 }}
         />
-        <LedgerFilterButton open={filterOpen} count={detailFilterCount} onClick={() => setFilterOpen((o) => !o)} />
+        <LedgerFilterSelects
+          defs={FLEET_FILTER_DEFS}
+          values={detailFilters}
+          onChange={(key, value) => setDetailFilters((prev) => ({ ...prev, [key]: value }))}
+          options={{
+            contract: ['만기임박', '반납지남', '계약없음'],
+            warn: ['경고있음', '위험만'],
+          }}
+        />
         <Select size="sm" aria-label="보유 범위" value={own} onChange={(e) => setOwn(e.target.value as OwnScope)}>
           <option value="보유">보유</option>
           <option value="전체">전체</option>
@@ -167,23 +173,6 @@ export default function StatusPage() {
       rowStyle={(r) => workRailStyle(fleetRail(r))}
       onRowDoubleClick={(row) => setSelected(row)}
       onCloseDetail={() => setSelected(null)}
-      filterPanel={filterOpen ? (
-        <LedgerFilterPanel
-          title="운영 세부 필터"
-          onClose={() => setFilterOpen(false)}
-          onReset={() => setDetailFilters(emptyFilterValues(FLEET_FILTER_DEFS))}
-        >
-          <LedgerFilterFields
-            defs={FLEET_FILTER_DEFS}
-            values={detailFilters}
-            onChange={(key, value) => setDetailFilters((prev) => ({ ...prev, [key]: value }))}
-            options={{
-              contract: ['만기임박', '반납지남', '계약없음'],
-              warn: ['경고있음', '위험만'],
-            }}
-          />
-        </LedgerFilterPanel>
-      ) : null}
       sidePanel={selected ? (
         <LedgerRecordPanel
           title={selected.carName || selected.status || '차량'}

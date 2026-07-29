@@ -10,7 +10,7 @@ import { latestDateOf, summarizeContractLedgerStats } from '@/lib/ledger-stats';
 import { useEntityList } from '@/lib/use-entity-lists';
 import { textMatch } from '@/lib/search-match';
 import {
-  Badge, Btn, C, FilterChips, LedgerActions, LedgerCreatePanel, LedgerEditPanel, LedgerFilterButton, LedgerFilterFields, LedgerFilterPanel, LedgerFrame, LedgerRecordPanel, PageLoading, PeriodBar, Search, Select, won,
+  Badge, Btn, C, FilterChips, LedgerActions, LedgerCreatePanel, LedgerEditPanel, LedgerFilterSelects, LedgerFrame, LedgerRecordPanel, PageLoading, PeriodBar, Search, Select, won,
   type LedgerColView, type LedgerFormSection,
 } from '@/components/ui';
 import { useIsMobile } from '@/lib/use-mobile';
@@ -18,7 +18,7 @@ import { MigrateDataButton } from '@/components/MigrateDataButton';
 import { openIngest, openReceivables } from '@/lib/ui-bus';
 import { sendNoticeCert } from '@/lib/docs/send-notice';
 import {
-  CONTRACT_FILTER_DEFS, countActiveFilters, emptyFilterValues, eqFilter, matchLedgerFilters,
+  CONTRACT_FILTER_DEFS, emptyFilterValues, eqFilter, matchLedgerFilters,
 } from '@/lib/ledger-filter-defs';
 import { RENTAL_TYPES } from '@/lib/schema/contract';
 import { LEDGER_EMPTY } from '@/lib/ledger-empty';
@@ -47,7 +47,6 @@ function ContractLedgerInner() {
   const [riskOnly, setRiskOnly] = useState(false);
   const [rentalChip, setRentalChip] = useState<RentalChip>('전체');
   const [range, setRange] = useState({ from: '', to: '' });
-  const [filterOpen, setFilterOpen] = useState(false);
   const [detailFilters, setDetailFilters] = useState(() => emptyFilterValues(CONTRACT_FILTER_DEFS));
   const [colView, setColView] = useState<LedgerColView>('기본');
   const [selected, setSelected] = useState<ReturnType<typeof contractMasterRow> | null>(null);
@@ -100,7 +99,6 @@ function ContractLedgerInner() {
   }), [searchedRows, scope, riskOnly, rentalChip, detailFilters, contractFilterMatchers, dateBasis, range.from, range.to]);
   const contractStatuses = useMemo(() => [...new Set(allRows.map((r) => r.status).filter(Boolean))].sort(), [allRows]);
   const endReasons = useMemo(() => [...new Set(allRows.map((r) => r.endReason).filter(Boolean))].sort(), [allRows]);
-  const detailFilterCount = countActiveFilters(detailFilters, CONTRACT_FILTER_DEFS);
   const { active, riskCount, riskDebtSum, endedRiskCount, endedRiskDebtSum } = useMemo(
     () => summarizeContractLedgerStats(searchedRows, TODAY),
     [searchedRows],
@@ -132,7 +130,12 @@ function ContractLedgerInner() {
       </LedgerActions>}
       filters={<>
         <Search size="sm" placeholder="회사·계약번호·차량·계약자·상태·리스크·알람" value={q} onChange={(e) => setQ(e.target.value)} style={{ width: mobile ? '100%' : 300 }} />
-        <LedgerFilterButton open={filterOpen} count={detailFilterCount} onClick={() => setFilterOpen((open) => !open)} />
+        <LedgerFilterSelects
+          defs={CONTRACT_FILTER_DEFS}
+          values={detailFilters}
+          onChange={(key, value) => setDetailFilters((prev) => ({ ...prev, [key]: value }))}
+          options={{ status: contractStatuses, endReason: endReasons }}
+        />
         <Select size="sm" aria-label="계약 원장 선택" value={scope} onChange={(event) => setScope(event.target.value as typeof scope)}>
           <option value="계약유지">유지계약 원장</option>
           <option value="계약종료">종료계약 원장</option>
@@ -177,20 +180,6 @@ function ContractLedgerInner() {
         setSelected(row);
       }}
       onCloseDetail={() => { setSelected(null); setEditing(false); }}
-      filterPanel={filterOpen ? (
-        <LedgerFilterPanel
-          title="계약 세부 필터"
-          onClose={() => setFilterOpen(false)}
-          onReset={() => setDetailFilters(emptyFilterValues(CONTRACT_FILTER_DEFS))}
-        >
-          <LedgerFilterFields
-            defs={CONTRACT_FILTER_DEFS}
-            values={detailFilters}
-            onChange={(key, value) => setDetailFilters((prev) => ({ ...prev, [key]: value }))}
-            options={{ status: contractStatuses, endReason: endReasons }}
-          />
-        </LedgerFilterPanel>
-      ) : null}
       sidePanel={creating ? (
         <LedgerCreatePanel
           key="new-contract"

@@ -33,13 +33,13 @@ import { useSession } from '@/lib/session';
 import { resolveWriteCompany, NEED_COMPANY } from '@/lib/scope';
 import { toast } from '@/lib/toast';
 import {
-  LedgerActions, LedgerCreatePanel, LedgerFilterButton, LedgerFilterFields, LedgerFilterPanel, LedgerFrame, LedgerPanelFooter, LedgerRecordPanel, Btn, Input, Select, Search, PillTabs, PeriodBar, Badge, Message, ListBox, ListRow, FilterChips,
+  LedgerActions, LedgerCreatePanel, LedgerFilterSelects, LedgerFrame, LedgerPanelFooter, LedgerRecordPanel, Btn, Input, Select, Search, PillTabs, PeriodBar, Badge, Message, ListBox, ListRow, FilterChips,
   C, won, type LedgerColView, type LedgerFormSection,
 } from '@/components/ui';
 import { useIsMobile } from '@/lib/use-mobile';
 import FileDrop from '@/components/FileDrop';
 import {
-  CASH_ACCOUNT_FILTER_DEFS, CASH_TX_FILTER_DEFS, countActiveFilters, emptyFilterValues, eqFilter, matchLedgerFilters,
+  CASH_ACCOUNT_FILTER_DEFS, CASH_TX_FILTER_DEFS, emptyFilterValues, eqFilter, matchLedgerFilters,
 } from '@/lib/ledger-filter-defs';
 import { LEDGER_EMPTY } from '@/lib/ledger-empty';
 
@@ -308,7 +308,6 @@ export default function CashLedgerPage() {
   const [sourceQuickFilter, setSourceQuickFilter] = useState<SourceQuickFilter>(null);
   const [accountStatusFilter, setAccountStatusFilter] = useState<AccountStatusFilter>('사용중');
   const [q, setQ] = useState('');
-  const [filterOpen, setFilterOpen] = useState(false);
   const [accountFilters, setAccountFilters] = useState(() => emptyFilterValues(CASH_ACCOUNT_FILTER_DEFS));
   const [txFilters, setTxFilters] = useState(() => emptyFilterValues(CASH_TX_FILTER_DEFS));
   // PeriodBar의 effect를 기다리면 첫 프레임이 전체 기간으로 계산되어 행 제한 경고가 번쩍인다.
@@ -397,9 +396,6 @@ export default function CashLedgerPage() {
   const cashCategories = useMemo(() => [...new Set(allRows.map((r) => r.category).filter(Boolean))].sort(), [allRows]);
   const matchStatuses = useMemo(() => [...new Set(allRows.map((r) => String(r.raw.reconciliationStatus || '')).filter(Boolean))].sort(), [allRows]);
   const accountTypes = useMemo(() => [...new Set(accountRows.map((r) => r.accountType).filter(Boolean))].sort(), [accountRows]);
-  const detailFilterCount = ledgerKind === '계좌관리'
-    ? countActiveFilters(accountFilters, CASH_ACCOUNT_FILTER_DEFS)
-    : countActiveFilters(txFilters, CASH_TX_FILTER_DEFS);
 
   /** 통장 현금흐름·CMS·알람 — ledger-stats SSOT. */
   const { inSum, outSum, cmsPendingCount, cmsPendingSum, alertN, unclN } = useMemo(
@@ -566,32 +562,21 @@ export default function CashLedgerPage() {
       </Btn>
     </LedgerActions>
   );
-  const cashFilterPanel = filterOpen ? (
-    <LedgerFilterPanel
-      title="자금 세부 필터"
-      onClose={() => setFilterOpen(false)}
-      onReset={() => {
-        setAccountFilters(emptyFilterValues(CASH_ACCOUNT_FILTER_DEFS));
-        setTxFilters(emptyFilterValues(CASH_TX_FILTER_DEFS));
-      }}
-    >
-      {ledgerKind === '계좌관리' ? (
-        <LedgerFilterFields
-          defs={CASH_ACCOUNT_FILTER_DEFS}
-          values={accountFilters}
-          onChange={(key, value) => setAccountFilters((prev) => ({ ...prev, [key]: value }))}
-          options={{ accountType: accountTypes }}
-        />
-      ) : (
-        <LedgerFilterFields
-          defs={CASH_TX_FILTER_DEFS}
-          values={txFilters}
-          onChange={(key, value) => setTxFilters((prev) => ({ ...prev, [key]: value }))}
-          options={{ category: cashCategories, match: matchStatuses }}
-        />
-      )}
-    </LedgerFilterPanel>
-  ) : null;
+  const cashFilterSelects = ledgerKind === '계좌관리' ? (
+    <LedgerFilterSelects
+      defs={CASH_ACCOUNT_FILTER_DEFS}
+      values={accountFilters}
+      onChange={(key, value) => setAccountFilters((prev) => ({ ...prev, [key]: value }))}
+      options={{ accountType: accountTypes }}
+    />
+  ) : (
+    <LedgerFilterSelects
+      defs={CASH_TX_FILTER_DEFS}
+      values={txFilters}
+      onChange={(key, value) => setTxFilters((prev) => ({ ...prev, [key]: value }))}
+      options={{ category: cashCategories, match: matchStatuses }}
+    />
+  );
 
   if (ledgerKind === '계좌관리') {
     const { total: accountTotal, active: activeAccounts } = summarizeAccountLedgerStats(accountRows);
@@ -611,7 +596,12 @@ export default function CashLedgerPage() {
             onChange={(event) => setQ(event.target.value)}
             style={{ width: mobile ? '100%' : CASH_SEARCH_WIDTH }}
           />
-          <LedgerFilterButton open={filterOpen} count={detailFilterCount} onClick={() => setFilterOpen((open) => !open)} />
+          <LedgerFilterSelects
+            defs={CASH_ACCOUNT_FILTER_DEFS}
+            values={accountFilters}
+            onChange={(key, value) => setAccountFilters((prev) => ({ ...prev, [key]: value }))}
+            options={{ accountType: accountTypes }}
+          />
           {ledgerKindControl}
           {ledgerQuickFilters}
           <PeriodBar latest={latest} initial="월간" size="sm" onRange={onRange} />
@@ -628,7 +618,6 @@ export default function CashLedgerPage() {
           setSelectedAccount(row);
         }}
         onCloseDetail={() => setSelectedAccount(null)}
-        filterPanel={cashFilterPanel}
         sidePanel={creating === 'bulk' ? (
           <CashBulkInputPanel onClose={() => setCreating(null)} />
         ) : creating === 'account' ? (
@@ -709,7 +698,7 @@ export default function CashLedgerPage() {
             onChange={(e) => setQ(e.target.value)}
             style={{ width: mobile ? '100%' : CASH_SEARCH_WIDTH }}
           />
-          <LedgerFilterButton open={filterOpen} count={detailFilterCount} onClick={() => setFilterOpen((open) => !open)} />
+          {cashFilterSelects}
           {ledgerKindControl}
           {ledgerQuickFilters}
           <PeriodBar latest={latest} initial="월간" size="sm" onRange={onRange} />
@@ -752,7 +741,6 @@ export default function CashLedgerPage() {
         setSelected(row);
       }}
       onCloseDetail={() => setSelected(null)}
-      filterPanel={cashFilterPanel}
       sidePanel={creating === 'bulk' ? (
         <CashBulkInputPanel onClose={() => setCreating(null)} />
       ) : creating === 'transaction' ? (
