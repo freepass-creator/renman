@@ -5,8 +5,8 @@ import { ENTITIES } from './intake/entities';
 import { normPlate, vehicleMatchesPlate } from './plate';
 import { companyDisplay } from './companies';
 
-/** 통합 검색 핵심 — 차·계약·손님·보험·과태료·이력 (전 엔티티 fan-out 금지). */
-export const SEARCH_CORE_KEYS = ['vehicle', 'contract', 'customer', 'insurance', 'penalty', 'history'] as const;
+/** 통합 검색 핵심 — 차·계약·손님·보험·과태료·이력·업무 (전 엔티티 fan-out 금지). */
+export const SEARCH_CORE_KEYS = ['vehicle', 'contract', 'customer', 'insurance', 'penalty', 'history', 'work_item'] as const;
 /** 통합 검색 확장 — 쿼리 3자 이상일 때만(자금·수신함은 대량). */
 export const SEARCH_EXTRA_KEYS = ['bank_tx', 'card_tx', 'inbox'] as const;
 
@@ -113,6 +113,49 @@ export function matchContracts(
       label: `${contractNo || '(번호없음)'}${customer ? ` · ${customer}` : ''}`,
       sub: [co, plate, String(c.status || '')].filter(Boolean).join(' · '),
       rec: c,
+    });
+    if (out.length >= limit) break;
+  }
+  return out;
+}
+
+/** q로 업무 title·plate·계약·고객·구분·상태 매칭. */
+export type WorkSearchHit = {
+  key: string;
+  label: string;
+  sub: string;
+  href: string;
+  rec: EntityRecord;
+  companyId: string;
+};
+
+export function matchWorkItems(
+  q: string,
+  items: EntityRecord[],
+  limit = 8,
+): WorkSearchHit[] {
+  const s = q.trim();
+  if (!s) return [];
+  const out: WorkSearchHit[] = [];
+  for (const r of items) {
+    const key = String(r._key || r.id || '');
+    if (!key) continue;
+    const title = String(r.title || r.memo || '');
+    const plate = String(r.plate || '');
+    const contractNo = String(r.contractNo || '');
+    const customer = String(r.customerName || '');
+    const category = String(r.category || r.workType || '');
+    const status = String(r.status || '');
+    if (!textMatch(s, title, plate, contractNo, customer, category, status)) continue;
+    const companyId = String(r.companyId || '');
+    const co = companyDisplay(companyId);
+    out.push({
+      key,
+      companyId,
+      label: title || '(제목 없음)',
+      sub: [co, category, plate || contractNo || customer, status].filter(Boolean).join(' · '),
+      href: `/work?open=${encodeURIComponent(key)}`,
+      rec: r,
     });
     if (out.length >= limit) break;
   }

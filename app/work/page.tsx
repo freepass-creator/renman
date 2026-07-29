@@ -330,6 +330,20 @@ function WorkLedgerInner() {
     return penaltyBucket ? [...base, penaltyBucket] : base;
   }, [penaltyMode, penaltyRows, otherRows, penaltyBucket]);
 
+  useEffect(() => {
+    const open = searchParams.get('open');
+    if (!open || !allRows.length) return;
+    const hit = allRows.find((r) => {
+      const key = String(r.raw._key || r.raw.id || '');
+      return key === open || r.id === open || r.id === `work:${open}` || r.id.endsWith(`:${open}`);
+    });
+    if (hit) {
+      setCreating(false);
+      if (hit.group === '과태료' || hit.source === 'penalty') setGroup('과태료');
+      setSelected(hit);
+    }
+  }, [searchParams, allRows]);
+
   const assignees = useMemo(() => [...new Set(allRows.map((r) => r.assignee).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'ko')), [allRows]);
   const statuses = useMemo(() => [...new Set(allRows.map((r) => r.status).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'ko')), [allRows]);
   const sources = useMemo(() => [...new Set(allRows.map((r) => r.source))], [allRows]);

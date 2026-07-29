@@ -17,10 +17,12 @@ function hrefFor(entityKey: string, rec: EntityRecord): string {
   const plate = String(rec.plate || '');
   if (entityKey === 'vehicle') return `/vehicle/${encodeURIComponent(plate || String(rec._key || ''))}`;
   if (entityKey === 'customer') return `/customer/${key}`;
+  if (entityKey === 'work_item') return `/work?open=${key}`;
   // 세계관: 차·계약·보험·과태료는 360으로. 일반 CRUD /list 우회 최소화.
   if (plate && (entityKey === 'contract' || entityKey === 'insurance' || entityKey === 'penalty' || entityKey === 'history')) {
     return `/vehicle/${encodeURIComponent(plate)}`;
   }
+  if (entityKey === 'contract' && rec._key) return `/contract?open=${key}`;
   if (entityKey === 'bank_tx' || entityKey === 'card_tx') return '/payments';
   return `/list/${entityKey}/${key}`;
 }
