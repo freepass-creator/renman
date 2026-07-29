@@ -1,18 +1,73 @@
-/** 종료 정산 — 반납 보증금 정산 + 중도해지 위약금. 정산서·반납폼·해지 공용 SSOT. */
+/** 종료 정산 — 반납 보증금 정산 + 중도해지 위약금 + 초과주행. 정산서·반납폼·해지 공용 SSOT. */
 import type { EntityRecord } from '../intake/entities';
 import { ymd, addMonthsIso, monthsBetweenIso } from './dates';
+import { computeOverMileage, type OverMileageBasis } from '@/lib/domain/over-mileage';
 
-/** 반납 정산 — view = computeContractView(반납일 what-if). 미납(net)을 보증금으로 충당 → 반환액/추가청구 산출. */
-export type ReturnSettlement = { deposit: number; unpaid: number; offset: number; refund: number; addCharge: number; proRefund: number };
-export function computeReturnSettlement(deposit: number, view: { net: number; refund: number }): ReturnSettlement {
-  const unpaid = Math.max(0, view.net);           // 미납 대여료(일할정산 반영)
+/** 반납 정산 — view = computeContractView(반납일 what-if). 미납+초과주행을 보증금으로 충당 → 반환액/추가청구. */
+export type ReturnSettlement = {
+  deposit: number;
+  unpaid: number;
+  offset: number;
+  refund: number;
+  addCharge: number;
+  proRefund: number;
+  /** 초과주행 과금(원). basis≠반납확정이면 0. */
+  overMileageFee: number;
+  excessKm: number;
+  overMileageRate: number;
+  mileageBasis: OverMileageBasis;
+};
+
+export type ReturnSettlementOpts = {
+  /** 계약(주행·한도·단가). 없으면 초과주행=0·산출불가. */
+  contract?: EntityRecord;
+  /** 반납일/조회일. 기본=계약 returnedDate. */
+  asOf?: string;
+  /** 위저드 입력 중 반납 계기판(아직 계약에 안 씀). */
+  returnMileage?: number | string | null;
+};
+
+/**
+ * 반납 정산.
+ *   청구합 = unpaid + overMileageFee
+ *   refund = max(0, deposit − 청구합)
+ *   addCharge = max(0, 청구합 − deposit)
+ */
+export function computeReturnSettlement(
+  deposit: number,
+  view: { net: number; refund: number },
+  opts?: ReturnSettlementOpts,
+): ReturnSettlement {
+  const unpaid = Math.max(0, view.net);
+  let overMileageFee = 0;
+  let excessKm = 0;
+  let overMileageRate = 0;
+  let mileageBasis: OverMileageBasis = '산출불가';
+
+  if (opts?.contract) {
+    const asOf = ymd(opts.asOf) || ymd(opts.contract.returnedDate) || '';
+    const draft = opts.returnMileage != null && opts.returnMileage !== ''
+      ? { ...opts.contract, returnMileage: opts.returnMileage }
+      : opts.contract;
+    const om = computeOverMileage(draft, asOf);
+    overMileageFee = om.fee;
+    excessKm = om.excessKm;
+    overMileageRate = om.rate;
+    mileageBasis = om.basis;
+  }
+
+  const charge = unpaid + overMileageFee;
   return {
     deposit,
     unpaid,
-    offset: Math.min(deposit, unpaid),            // 보증금 충당
-    refund: Math.max(0, deposit - unpaid),        // 보증금 반환액(임차인 환급)
-    addCharge: Math.max(0, unpaid - deposit),     // 추가 청구액
-    proRefund: view.refund,                       // 반납 일할 환불(정보)
+    offset: Math.min(deposit, charge),
+    refund: Math.max(0, deposit - charge),
+    addCharge: Math.max(0, charge - deposit),
+    proRefund: view.refund,
+    overMileageFee,
+    excessKm,
+    overMileageRate,
+    mileageBasis,
   };
 }
 

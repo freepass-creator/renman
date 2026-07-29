@@ -19,7 +19,7 @@ export function depositView(c: EntityRecord, today: string): DepositView {
   const deposit = Number(c.deposit) || 0;
   const v = computeContractView(c, today);
   // 정산 4값 = 공용 SSOT(정산서·현장 반납폼과 동일). 손롤 금지.
-  const { unpaid, offset, refund, addCharge } = computeReturnSettlement(deposit, v);
+  const { unpaid, offset, refund, addCharge } = computeReturnSettlement(deposit, v, { contract: c, asOf: today });
   const ended = !!c.returnedDate;
   const settled = !!c.depositSettledDate;
   return { deposit, unpaid, offset, refund, addCharge, ended, settled, pendingRefund: ended && deposit > 0 && !settled };
