@@ -70,3 +70,51 @@ export function matchVehicles(
   }
   return out;
 }
+
+/** q로 계약번호·고객·차번 매칭. 최대 limit건. */
+export type ContractSearchHit = {
+  key: string;
+  contractNo: string;
+  plate: string;
+  customer: string;
+  label: string;
+  sub: string;
+  rec: EntityRecord;
+  companyId: string;
+};
+
+export function matchContracts(
+  q: string,
+  contracts: EntityRecord[],
+  limit = 8,
+): ContractSearchHit[] {
+  const s = q.trim();
+  if (!s) return [];
+  const nq = normPlate(s);
+  const out: ContractSearchHit[] = [];
+  for (const c of contracts) {
+    const key = String(c._key || '');
+    if (!key) continue;
+    const contractNo = String(c.contractNo || '');
+    const plate = String(c.plate || '');
+    const customer = String(c.contractorName || '');
+    const companyId = String(c.companyId || '');
+    const co = companyDisplay(companyId);
+    const hit =
+      textMatch(s, contractNo, customer, plate, c.status)
+      || !!(nq && normPlate(plate).includes(nq));
+    if (!hit) continue;
+    out.push({
+      key,
+      contractNo,
+      plate,
+      customer,
+      companyId,
+      label: `${contractNo || '(번호없음)'}${customer ? ` · ${customer}` : ''}`,
+      sub: [co, plate, String(c.status || '')].filter(Boolean).join(' · '),
+      rec: c,
+    });
+    if (out.length >= limit) break;
+  }
+  return out;
+}

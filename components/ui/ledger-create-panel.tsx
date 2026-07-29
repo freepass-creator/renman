@@ -95,6 +95,7 @@ export function LedgerCreatePanel({
     if (key === 'category') next.workType = value;
     return next;
   });
+  const patch = (next: Record<string, string>) => setForm((current) => ({ ...current, ...next }));
 
   async function save() {
     const targetCompany = resolveWriteCompany(companyId, { companyId: form.companyId });
@@ -217,7 +218,7 @@ export function LedgerCreatePanel({
           return (
             <details className="ledger-create-panel__section" open={section.open ?? sectionIndex === 0} key={section.title}>
               <summary><ChevronRight className="ledger-create-panel__chevron" size={14} aria-hidden="true" />{section.title}</summary>
-              <FormGrid fields={sectionFields} form={form} onChange={change} cols={2} />
+              <FormGrid fields={sectionFields} form={form} onChange={change} onPatch={patch} cols={2} />
             </details>
           );
         })}

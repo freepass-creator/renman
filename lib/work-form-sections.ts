@@ -22,7 +22,8 @@ const CLASSIFY: WorkFormSection = {
 
 const TARGET: WorkFormSection = {
   title: '대상·연결정보',
-  fields: ['targetType', 'plate', 'contractNo', 'customerName'],
+  // targetType에 따라 FormGrid가 vehicle/contract picker·텍스트를 분기 노출
+  fields: ['targetType', 'plate', 'contractKey', 'contractNo', 'customerName'],
 };
 
 function secs(...extra: WorkFormSection[]): WorkFormSection[] {

@@ -11,7 +11,7 @@ import type { DataLayer } from '@/lib/domain/layers';
 import { ENTITY_LAYER } from '@/lib/domain/layers';
 import { RENTAL_TYPES } from '@/lib/schema/contract';
 
-export type FieldType = 'text' | 'number' | 'date' | 'select';
+export type FieldType = 'text' | 'number' | 'date' | 'select' | 'vehicle-picker' | 'contract-picker';
 
 export type Field = {
   key: string;          // 표준(canonical) 필드명
@@ -153,7 +153,8 @@ export const ENTITIES: Record<string, Entity> = {
       { key: 'priority', label: '우선순위', type: 'select', options: ['긴급', '높음', '보통', '낮음'] },
       { key: 'title', label: '업무내용', type: 'text', required: true },
       { key: 'targetType', label: '대상구분', type: 'select', options: ['자산', '계약', '고객', '자금', '회사', '기타'] },
-      { key: 'plate', label: '차량번호', type: 'text' },
+      { key: 'plate', label: '차량번호', type: 'vehicle-picker', note: '대상=자산일 때 피커 · 그 외 텍스트' },
+      { key: 'contractKey', label: '계약키', type: 'contract-picker', manual: true, note: 'FK=contract._key · 대상=계약일 때 피커' },
       { key: 'contractNo', label: '계약번호', type: 'text' },
       { key: 'customerName', label: '고객명', type: 'text' },
       { key: 'dueDate', label: '기한', type: 'date' },
