@@ -22,6 +22,7 @@ import {
 } from '@/lib/ledger-filter-defs';
 import { RENTAL_TYPES } from '@/lib/schema/contract';
 import { ContractScheduleEmbed } from '@/components/ledger/ContractScheduleEmbed';
+import { LEDGER_EMPTY } from '@/lib/ledger-empty';
 
 const RENTAL_CHIP_OPTS = [
   { key: '전체' as const, label: '전체' },
@@ -208,7 +209,7 @@ function ContractLedgerInner() {
       ) : selected ? (
         <LedgerRecordPanel
           title={selected.contractNo || selected.contractorName || '계약'}
-          identity={`${selected.contractorName || '계약자 미입력'}${selected.plate ? ` · ${selected.plate}` : ''}`}
+          identity={`${selected.contractorName || LEDGER_EMPTY.none}${selected.plate ? ` · ${selected.plate}` : ''}`}
           statusBadge={<Badge tone={selected.ended ? 'gray' : 'green'}>{selected.status}</Badge>}
           row={selected}
           cols={CONTRACT_MASTER_EXPANDED_COLS}

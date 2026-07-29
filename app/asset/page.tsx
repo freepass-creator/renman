@@ -21,6 +21,7 @@ import {
   ASSET_FILTER_DEFS, countActiveFilters, emptyFilterValues, eqFilter, matchLedgerFilters,
 } from '@/lib/ledger-filter-defs';
 import { VehicleSideEmbed } from '@/components/ledger/VehicleSideEmbed';
+import { LEDGER_EMPTY } from '@/lib/ledger-empty';
 type AssetOwnershipScope = '보유자산' | '처분자산' | '전체자산';
 type AssetQuickFilter = '계약중' | '휴차' | '매각대기';
 type AllAssetQuickFilter = '보유' | '처분';
@@ -229,7 +230,7 @@ export default function AssetLedgerPage() {
       ) : selected ? (
         <LedgerRecordPanel
           title={selected.carName || '차명 미입력'}
-          identity={selected.plate || '미배정'}
+          identity={selected.plate || LEDGER_EMPTY.unassigned}
           statusBadge={ASSET_MASTER_EXPANDED_COLS.find((c) => c.key === 'status')?.render(selected)}
           row={selected}
           cols={ASSET_MASTER_EXPANDED_COLS}

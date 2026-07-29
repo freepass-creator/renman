@@ -22,6 +22,7 @@ import {
 } from '@/lib/ledger-filter-defs';
 import { RENTAL_TYPES } from '@/lib/schema/contract';
 import { VehicleSideEmbed } from '@/components/ledger/VehicleSideEmbed';
+import { LEDGER_EMPTY } from '@/lib/ledger-empty';
 
 const RENTAL_CHIP_OPTS = [
   { key: '전체' as const, label: '전체' },
@@ -185,7 +186,7 @@ export default function StatusPage() {
       sidePanel={selected ? (
         <LedgerRecordPanel
           title={selected.carName || selected.status || '차량'}
-          identity={`${selected.plate || '미배정'} · ${selected.customer || '계약 없음'}`}
+          identity={`${selected.plate || LEDGER_EMPTY.unassigned} · ${selected.customer || LEDGER_EMPTY.noContract}`}
           statusBadge={FLEET_EXPANDED_COLS.find((c) => c.key === 'status')?.render(selected)}
           row={selected}
           cols={FLEET_EXPANDED_COLS}

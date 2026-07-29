@@ -95,7 +95,8 @@ const ASSET_COL_CATALOG: SheetCol<AssetMasterRow>[] = [
  * @see lib/ledger-ext.ts
  */
 export const ASSET_SHEET_KEYS: SheetViewKeys = {
-  basic: ['company', 'plate', 'status', 'carName', 'maker', 'modelLine', 'inspectionTo'],
+  // 회사 → 신원 → 내용 → 상태 → 보조·기한
+  basic: ['company', 'plate', 'carName', 'status', 'maker', 'modelLine', 'inspectionTo'],
   all: [
     'company', 'assetCode', 'plate', 'status', 'carName', 'maker', 'modelLine',
     'subModel', 'trim', 'modelYear', 'vin', 'ownerName', 'firstReg', 'inspectionTo', 'mileage',
@@ -237,8 +238,9 @@ const CONTRACT_COL_CATALOG: SheetCol<ContractMasterRow>[] = [
 
 /** 계약 엑셀 열 — `계약 · 엑셀기본|엑셀전체 · +|-key` @see lib/ledger-ext.ts */
 export const CONTRACT_SHEET_KEYS: SheetViewKeys = {
+  // 회사 → 신원(계약자·차) → 내용(계약번호) → 분류 → 상태 → 수치/기한
   basic: [
-    'company', 'contractNo', 'status', 'rentalType', 'contractorName', 'plate',
+    'company', 'contractorName', 'plate', 'contractNo', 'rentalType', 'status',
     'endDate', 'monthlyRent', 'paymentDay', 'paymentTiming', 'riskLabel', 'net', 'alert',
   ],
   all: [
