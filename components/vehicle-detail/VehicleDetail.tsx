@@ -433,6 +433,7 @@ export function VehicleDetail({ plate, focus, embed }: { plate: string; focus?: 
             ['감가', '', won(econ.depreciation)],
             ['보험료', '', won(econ.insuranceCost)],
             ['정비·수리', '', won(econ.maintCost)],
+            ['할부이자', '', won(econ.loanInterest)],
             ['손익', '', won(econ.profit)],
             ...(econ.acquisition ? ([['회수율', '', `${Math.round(econ.recoveryRate * 100)}%`]] as KVRow[]) : []),
             ...(econ.bookValue != null ? ([['장부가', '', won(econ.bookValue)]] as KVRow[]) : []),
