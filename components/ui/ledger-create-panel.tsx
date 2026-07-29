@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ChevronRight, Plus, Save, X } from 'lucide-react';
 import { COMPANIES, companyLabel, companyShort } from '@/lib/companies';
 import { ENTITIES, type EntityRecord, type Field } from '@/lib/intake/entities';
@@ -81,6 +81,21 @@ export function LedgerCreatePanel({
     const wanted = new Set(activeSections.flatMap((section) => section.fields));
     return entity?.fields.filter((field) => wanted.has(field.key)) || [];
   }, [entity, activeSections]);
+
+  useEffect(() => {
+    if (process.env.NODE_ENV === 'production' || !entity) return;
+    const known = new Set(entity.fields.map((field) => field.key));
+    // 생성 패널 공통 메타(엔티티 fields 밖) — silent-drop 경고 제외.
+    const allow = new Set(['companyId', 'title', 'workType', 'createdBy', 'createdAt', 'inputSource']);
+    for (const section of activeSections) {
+      for (const key of section.fields) {
+        if (!known.has(key) && !allow.has(key)) {
+          console.warn(`[LedgerCreatePanel] entity "${entityKey}"에 없는 필드: "${key}" (섹션 silent-drop)`);
+        }
+      }
+    }
+  }, [entity, activeSections, entityKey]);
+
   const fieldByKey = useMemo(() => new Map(selectedFields.map((field) => [field.key, field])), [selectedFields]);
 
   if (!entity) return null;

@@ -47,7 +47,26 @@ export type DetailSectionDef = {
 
 export function pickCols<T>(catalog: SheetCol<T>[], keys: readonly string[]): SheetCol<T>[] {
   const map = new Map(catalog.map((col) => [col.key, col]));
+  if (process.env.NODE_ENV !== 'production') {
+    for (const key of keys) {
+      if (!map.has(key)) {
+        console.warn(`[ledger-ext] 카탈로그에 없는 키: "${key}" (섹션/KEYS에서 silent-drop됨 — 카탈로그에 먼저 등록)`);
+      }
+    }
+  }
   return keys.map((key) => map.get(key)).filter((col): col is SheetCol<T> => !!col);
+}
+
+/** 상세 섹션이 참조하는 키가 카탈로그에 있는지 검증. 누락 키 목록 반환(빈=OK). */
+export function missingCatalogKeys<T>(catalog: SheetCol<T>[], defs: readonly DetailSectionDef[]): string[] {
+  const map = new Set(catalog.map((c) => c.key));
+  const missing: string[] = [];
+  for (const def of defs) {
+    for (const key of def.keys) {
+      if (!map.has(key) && !missing.includes(key)) missing.push(key);
+    }
+  }
+  return missing;
 }
 
 export function buildSheetViews<T>(catalog: SheetCol<T>[], keys: SheetViewKeys): {
@@ -64,6 +83,12 @@ export function buildDetailSections<T>(
   catalog: SheetCol<T>[],
   defs: readonly DetailSectionDef[],
 ): Array<{ title: string; open?: boolean; cols: SheetCol<T>[] }> {
+  if (process.env.NODE_ENV !== 'production') {
+    const missing = missingCatalogKeys(catalog, defs);
+    if (missing.length) {
+      console.warn(`[ledger-ext] DETAIL 섹션 missing keys: ${missing.join(', ')}`);
+    }
+  }
   return defs.map((def, index) => ({
     title: def.title,
     open: def.open ?? index === 0,
