@@ -21,8 +21,25 @@ alwaysApply: true
 - SessionBar는 `/m`·`/dev/preview`에서 `null`(웹 크롬 숨김) — 유지.
 
 ## 공유 원자 SSOT
-- `RailTone`(7톤: none·brand·danger·violet·warn·ok·mute) = `components/ui/misc.tsx`. `statusRank`·`fleetRail` = `lib/sheet-rows.ts`. 상태색·정렬은 이것만.
+- `RailTone`(7톤: none·brand·danger·violet·warn·ok·mute) = `components/ui/misc.tsx`. `statusRank`·`fleetRail` = `lib/sheet-rows.ts`(함대 전용 랭크). 상태색·정렬은 이것만.
 - 데이터형태→원자 1:1: 집계=Metric · 라벨값=KV · 훑는목록=ObjRow(모바일)/ExcelSheet(웹 표) · 태그=Badge · 구획=Sec.
+
+## 원장 행 문법 (6칸 — 즉흥 컬럼 금지)
+모든 원장 행은 이 슬롯만 지킨다:
+
+| # | 슬롯 | 역할 |
+|---|---|---|
+| 0 | rail | 분류톤(`RailTone`) — 상태축 신호 |
+| 1 | 회사 | 다회사 뷰만(단일 회사면 숨김·priority로 접기) |
+| 2 | 대상 | **신원·관통·검색의 열쇠**(차번·계약키·고객 등) |
+| 3 | 내용 | 의도 한 줄(제목·위반내용·메모) |
+| 4 | 상태 | 공용 `Badge` 1종 |
+| 5 | 수치/기한 | 금액·D-day·예정일 |
+
+원칙:
+- **(a)** 대상 없는 행 없음 → 못 물면 상태 `미배정`(warn).
+- **(b)** 상태배지·`RailTone`은 전 원장 공용 원자(`misc.tsx`). 함대 `fleetRail`/`statusRank`를 업무·리스크에 재사용 금지(도메인별 rail 함수).
+- **(c)** 슬롯2 = 클릭 관통·전역검색 딥링크의 열쇠(`openCar` · `/contract?open=` · `/work?open=`).
 
 ## 지금 지켜야 (검수 2026-07 지적)
 - **페이지 손롤 집계 금지** — `app/{asset,contract,cash}/page.tsx`가 `.filter/.reduce`로 상태·통계 직접 계산 중 → 도메인 SSOT(`linkFleet`·`selectReceivables`·`lib/finance/*`)로 위임. 형제 `status/page.tsx`가 정답 패턴.
