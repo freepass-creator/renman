@@ -70,6 +70,8 @@ curl -s -o /dev/null -w "%{http_code}" http://localhost:6006/<route>   # 200
 
 | 날짜 | 작업자 | 내용 | 상태 |
 |---|---|---|---|
+| 2026-07-29 | Cursor | 원장 열통일 9: work-ledger/cols lib 승격 · company 키 | a722fd8 |
+| 2026-07-29 | Cursor | 원장 열통일 10: co=회사명 · 레거시 COLS deprecated | 53c568c |
 | 2026-07-29 | Cursor | 원장 열통일 5: 자산·계약 생성=상세 섹션명 | 95c8071 |
 | 2026-07-29 | Cursor | 원장 열통일 6: risk 상세 섹션 | a12b2f0 |
 | 2026-07-29 | Cursor | 원장 열통일 7: 운영 basic 11열 | c9c3a6f |
