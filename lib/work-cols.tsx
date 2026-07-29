@@ -58,6 +58,26 @@ const WORK_COL_CATALOG: SheetCol<WorkLedgerRow>[] = [
   },
   { key: 'title', label: '업무내용', priority: 1, render: (r) => r.title || LEDGER_EMPTY.dash, text: (r) => r.title },
   {
+    key: 'contractNo', label: '계약번호', priority: 1,
+    render: (r) => r.contractNo || LEDGER_EMPTY.dash,
+    text: (r) => r.contractNo || '',
+  },
+  {
+    key: 'priority', label: '우선순위', align: 'c', priority: 1,
+    render: (r) => {
+      const p = String(r.priority || '').trim();
+      if (!p) return <span style={{ color: C.mute }}>{LEDGER_EMPTY.dash}</span>;
+      const tone = /긴급/.test(p) ? 'red' as const : /높음/.test(p) ? 'amber' as const : 'gray' as const;
+      return <Badge tone={tone}>{p}</Badge>;
+    },
+    text: (r) => r.priority || '',
+  },
+  {
+    key: 'workDate', label: '발생일', priority: 1,
+    render: (r) => r.workDate || LEDGER_EMPTY.dash,
+    text: (r) => r.workDate,
+  },
+  {
     key: 'assignee', label: '담당자', priority: 1,
     render: (r) => <AssigneeCell name={r.assignee} />,
     text: (r) => r.assignee,
@@ -98,8 +118,11 @@ const PENALTY_COL_CATALOG: SheetCol<WorkLedgerRow>[] = [
 ];
 
 export const WORK_SHEET_KEYS: SheetViewKeys = {
-  basic: ['company', 'plate', 'contractor', 'title', 'kind', 'status', 'assignee', 'created', 'updated'],
-  all: ['company', 'plate', 'contractor', 'title', 'kind', 'status', 'assignee', 'created', 'updated', 'due', 'amount', 'source'],
+  basic: ['company', 'plate', 'contractor', 'title', 'kind', 'priority', 'status', 'contractNo', 'workDate', 'assignee'],
+  all: [
+    'company', 'plate', 'contractor', 'title', 'kind', 'priority', 'status', 'contractNo', 'workDate',
+    'assignee', 'created', 'updated', 'due', 'amount', 'source',
+  ],
 };
 
 export const PENALTY_SHEET_KEYS: SheetViewKeys = {
@@ -116,9 +139,9 @@ export const PENALTY_BASIC_COLS = _penViews.basic;
 export const PENALTY_ALL_COLS = _penViews.expanded;
 
 export const WORK_DETAIL_DEFS: DetailSectionDef[] = [
-  { title: '업무 분류', open: true, keys: ['company', 'kind', 'status', 'source'] },
-  { title: '신원·내용', keys: ['plate', 'contractor', 'title'] },
-  { title: '처리정보', keys: ['created', 'updated', 'due', 'assignee', 'amount'] },
+  { title: '업무 분류', open: true, keys: ['company', 'kind', 'priority', 'status', 'source'] },
+  { title: '신원·내용', keys: ['plate', 'contractor', 'contractNo', 'title'] },
+  { title: '처리정보', keys: ['workDate', 'created', 'updated', 'due', 'assignee', 'amount'] },
 ];
 
 export const PENALTY_DETAIL_DEFS: DetailSectionDef[] = [
