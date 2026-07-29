@@ -70,6 +70,8 @@ curl -s -o /dev/null -w "%{http_code}" http://localhost:6006/<route>   # 200
 
 | 날짜 | 작업자 | 내용 | 상태 |
 |---|---|---|---|
+| 2026-07-29 | Cursor | 업무 2d: 컬럼순서·상태5종·생성/최종처리·방치정렬 | tsc0 |
+
 | 2026-07-29 | Cursor | 행신원 0: redesign.mdc 6칸 문법 박제 | 480a00d |
 | 2026-07-29 | Cursor | 행신원 1: work contractKey+vehicle/contract picker | 63de933 |
 | 2026-07-29 | Cursor | 행신원 2: 대상셀 분해·workRail·/contract?open= | 9ea11de |
