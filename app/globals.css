@@ -56,9 +56,9 @@
   --border-strong: #c6cdd8;
   --border-focus:  #1e2733;
 
-  /* Brand — 액센트 네이비 */
-  --brand:    #2b56c6;
-  --brand-h:  #1f429e;
+  /* Brand — 액센트 남색(원복: 시안이 오버슛한 #2b56c6 → 앱 원래 남색) */
+  --brand:    #1B2A4A;
+  --brand-h:  #0F1B35;
   --brand-bg: #eef2fb;
   --brand-soft: #f7f9fd;
 
