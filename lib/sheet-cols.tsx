@@ -257,11 +257,9 @@ const FLEET_COL_CATALOG: SheetCol<FleetRow>[] = alignCols([
 
 /** 운영 엑셀 열 — `운영 · 엑셀기본|엑셀전체 · +|-key` @see lib/ledger-ext.ts */
 export const FLEET_SHEET_KEYS: SheetViewKeys = {
-  // 회사 → 신원(차·계약자) → 상태 → 내용·계약조건 → 수치
+  // 기본=스캔 핵심만 · 제조/납부조건/비고는 전체
   basic: [
-    'co', 'plate', 'cust', 'status', 'maker', 'sub', 'year',
-    'phone', 'rentalType', 'term', 'start', 'end', 'dep', 'rent', 'paymentDay', 'paymentTiming', 'round', 'dday',
-    'net', 'od', 'stage', 'warn', 'note',
+    'co', 'plate', 'cust', 'status', 'rentalType', 'end', 'dday', 'rent', 'net', 'od', 'warn',
   ],
   all: [
     'co', 'plate', 'cust', 'status', 'maker', 'sub', 'year',
