@@ -117,11 +117,11 @@ export function KV({ rows, editing, form, onChange }: { rows: KVRow[]; editing?:
 
 /* 공용 입력 폼 — 직접입력·상세수정 공용. vehicle/contract-picker = 목록에서만 선택(순수 텍스트 금지).
  * 사이드패널 cols=1 · 넓은 ingest/표 편집은 cols=2.
- * note 기본 비표시(개발 주석 누출 방지) — showNotes로만 켬.
+ * note 기본 표시(ingest·상세 안내). 사이드패널만 showNotes={false}.
  * Select background 통째 override 금지(캐럿 깨짐) → backgroundColor만.
  */
 export function FormGrid({
-  fields, form, onChange, onPatch, cols = 2, showNotes = false,
+  fields, form, onChange, onPatch, cols = 2, showNotes = true,
 }: {
   fields: Field[];
   form: EntityRecord;
@@ -129,7 +129,7 @@ export function FormGrid({
   /** 피커 선택 시 plate+contractKey 등 동반 세팅 */
   onPatch?: (patch: Record<string, string>) => void;
   cols?: number;
-  /** true면 field.note 헬프 노출(ingest OCR 등). 패널 기본 false. */
+  /** false면 field.note 숨김(ledger create/edit 패널). 기본 true. */
   showNotes?: boolean;
 }) {
   const mobile = useIsMobile();
