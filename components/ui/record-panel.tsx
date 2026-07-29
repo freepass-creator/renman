@@ -20,6 +20,18 @@ function displayCell(node: React.ReactNode): React.ReactNode {
   return node;
 }
 
+/** text() 기준 비어 있으면 섹션 숨김(구분별 원자 빈 섹션 렌더 금지). */
+function sectionHasValue<T>(cols: SheetCol<T>[], row: T): boolean {
+  if (!cols.length) return false;
+  return cols.some((col) => {
+    if (!col.text) return true;
+    const t = col.text(row);
+    if (t == null) return false;
+    if (typeof t === 'string' && !t.trim()) return false;
+    return true;
+  });
+}
+
 function RecordSection<T>({
   title,
   cols,
@@ -86,7 +98,11 @@ export function LedgerRecordPanel<T>({
     </dl>
   );
 
-  const hasSections = !!sections?.length;
+  const visibleSections = React.useMemo(
+    () => (sections || []).filter((section) => sectionHasValue(section.cols, row)),
+    [sections, row],
+  );
+  const hasSections = visibleSections.length > 0;
   const meta = identity != null || statusBadge != null
     ? (
       <div className="ledger-record-panel__meta">
@@ -111,7 +127,7 @@ export function LedgerRecordPanel<T>({
       <div className="ledger-record-panel__body">
         {hasSections ? (
           <div className="ledger-record-panel__sections">
-            {sections!.map((section, index) => {
+            {visibleSections.map((section, index) => {
               const key = typeof section.title === 'string' ? section.title : `sec-${index}`;
               return (
                 <RecordSection

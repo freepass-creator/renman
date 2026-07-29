@@ -2,6 +2,7 @@
  * 업무·과태료 엑셀 열 SSOT.
  * 추가/삭제: `업무 · 엑셀기본|엑셀전체 · ±key` / `과태료 · …` @see lib/ledger-ext.ts
  * 회사 열 key = `company` (전 원장 통일).
+ * 구분별 원자(사고·상담 등) = CARD_DETAIL 패턴 — 표 basic에 넣지 않고 상세 전용.
  */
 'use client';
 
@@ -26,6 +27,43 @@ function KindCell({ kind }: { kind: string }) {
 function AssigneeCell({ name }: { name: string }) {
   if (!name) return <Badge tone="amber">미지정</Badge>;
   return <>{name}</>;
+}
+
+const rawStr = (r: WorkLedgerRow, key: string) => String(r.raw?.[key] ?? '').trim();
+const rawNum = (r: WorkLedgerRow, key: string) => {
+  const v = r.raw?.[key];
+  if (v === '' || v == null) return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+};
+
+/** 상세 전용 — raw camelCase (work_item). 표 basic에 넣지 않음. */
+function detailStr(key: string, label: string): SheetCol<WorkLedgerRow> {
+  return {
+    key, label,
+    render: (r) => rawStr(r, key) || LEDGER_EMPTY.dash,
+    text: (r) => rawStr(r, key),
+  };
+}
+function detailMoney(key: string, label: string): SheetCol<WorkLedgerRow> {
+  return {
+    key, label, align: 'r',
+    render: (r) => {
+      const n = rawNum(r, key);
+      return n == null || n === 0 ? LEDGER_EMPTY.dash : money(n);
+    },
+    text: (r) => rawNum(r, key) ?? '',
+  };
+}
+function detailNum(key: string, label: string, suffix = ''): SheetCol<WorkLedgerRow> {
+  return {
+    key, label, align: 'r',
+    render: (r) => {
+      const n = rawNum(r, key);
+      return n == null ? LEDGER_EMPTY.dash : `${n.toLocaleString('ko-KR')}${suffix}`;
+    },
+    text: (r) => rawNum(r, key) ?? '',
+  };
 }
 
 const WORK_COL_CATALOG: SheetCol<WorkLedgerRow>[] = [
@@ -97,6 +135,44 @@ const WORK_COL_CATALOG: SheetCol<WorkLedgerRow>[] = [
   { key: 'source', label: '원천', render: (r) => WORK_SOURCE_LABEL[r.source], text: (r) => r.source },
 ];
 
+/** 상세 전용 25필드 — 사고14·상담4·정비2·문서2·일정2 (표 basic 비포함). */
+const WORK_KIND_DETAIL_COLS: SheetCol<WorkLedgerRow>[] = [
+  // 사고 14
+  detailStr('accRole', '가해/피해'),
+  detailNum('faultPct', '내 과실', '%'),
+  detailStr('damageArea', '사고부위'),
+  detailStr('damageFrame', '골격손상'),
+  detailMoney('insuranceAmount', '보험처리금'),
+  detailMoney('selfPay', '자기부담금'),
+  detailStr('repairInDate', '입고일'),
+  detailStr('repairOutDate', '출고예정일'),
+  detailStr('rentalCar', '대차'),
+  detailStr('insuranceCompany', '보험사'),
+  detailStr('insuranceNo', '접수번호'),
+  detailStr('otherCar', '상대 차량번호'),
+  detailStr('otherInsurance', '상대 보험사'),
+  detailStr('otherInsuranceNo', '상대 접수번호'),
+  // 상담 4
+  detailStr('callChannel', '채널'),
+  detailStr('callDirection', '방향'),
+  detailStr('callResult', '상담결과'),
+  detailStr('nextActionDate', '다음조치일'),
+  // 정비 2
+  detailStr('maintType', '정비유형'),
+  detailStr('nextMaintDate', '다음정비예정'),
+  // 문서 2
+  detailStr('docKind', '서류종류'),
+  detailStr('docStatus', '서류상태'),
+  // 일정 2
+  detailStr('endDate', '종료일'),
+  detailStr('location', '장소'),
+];
+
+const WORK_DETAIL_CATALOG: SheetCol<WorkLedgerRow>[] = [
+  ...WORK_COL_CATALOG,
+  ...WORK_KIND_DETAIL_COLS,
+];
+
 const PENALTY_COL_CATALOG: SheetCol<WorkLedgerRow>[] = [
   { key: 'violationDate', label: '위반일', pin: true, priority: 1, render: (r) => r.violationDate || LEDGER_EMPTY.dash, text: (r) => r.violationDate || '' },
   { key: 'plate', label: '차량번호', pin: true, priority: 1, render: (r) => r.plate || LEDGER_EMPTY.dash, text: (r) => r.plate || '' },
@@ -142,6 +218,30 @@ export const WORK_DETAIL_DEFS: DetailSectionDef[] = [
   { title: '업무 분류', open: true, keys: ['company', 'kind', 'priority', 'status', 'source'] },
   { title: '신원·내용', keys: ['plate', 'contractor', 'contractNo', 'title'] },
   { title: '처리정보', keys: ['workDate', 'created', 'updated', 'due', 'assignee', 'amount'] },
+  {
+    title: '사고',
+    keys: [
+      'accRole', 'faultPct', 'damageArea', 'damageFrame',
+      'insuranceAmount', 'selfPay', 'repairInDate', 'repairOutDate', 'rentalCar',
+      'insuranceCompany', 'insuranceNo', 'otherCar', 'otherInsurance', 'otherInsuranceNo',
+    ],
+  },
+  {
+    title: '상담',
+    keys: ['callChannel', 'callDirection', 'callResult', 'nextActionDate'],
+  },
+  {
+    title: '정비',
+    keys: ['maintType', 'nextMaintDate'],
+  },
+  {
+    title: '문서',
+    keys: ['docKind', 'docStatus'],
+  },
+  {
+    title: '일정',
+    keys: ['endDate', 'location'],
+  },
 ];
 
 export const PENALTY_DETAIL_DEFS: DetailSectionDef[] = [
@@ -149,7 +249,7 @@ export const PENALTY_DETAIL_DEFS: DetailSectionDef[] = [
   { title: '부가', keys: ['ptype', 'title', 'company', 'due'] },
 ];
 
-export const WORK_DETAIL_SECTIONS = buildDetailSections(WORK_ALL_COLS, WORK_DETAIL_DEFS);
+export const WORK_DETAIL_SECTIONS = buildDetailSections(WORK_DETAIL_CATALOG, WORK_DETAIL_DEFS);
 export const PENALTY_DETAIL_SECTIONS = buildDetailSections(PENALTY_ALL_COLS, PENALTY_DETAIL_DEFS);
 
 export { workStatusTone };
