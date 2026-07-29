@@ -1,7 +1,7 @@
 'use client';
 /**
  * 고지서 등록(신규 입력) — 별도 페이지. 과태료·통행료 고지서 다중 드롭 → OCR → 위반일시로 계약(임차인) 자동매칭 → 검토 → 저장.
- *   신규 입력/등록은 팝업이 아니라 전용 페이지(UIUX-SPEC). 저장 후 /penalty 복귀. /ingest/bulk와 동형.
+ *   신규 입력/등록은 팝업이 아니라 전용 페이지(UIUX-SPEC). 저장 후 /work?group=과태료 복귀. /ingest/bulk와 동형.
  *   GEMINI_API_KEY 없으면 자동추출 실패 → 각 행 수기입력으로 진행(플로우 동일).
  */
 import { useState, useEffect, useCallback } from 'react';
@@ -106,7 +106,7 @@ export default function PenaltyUploadPage() {
       }));
       await saveIntake('penalty', target, records as EntityRecord[]);
       toast(`과태료 ${records.length}건 등록 · ${companyLabel(target)}`, 'success');
-      router.push('/penalty');
+      router.push('/work?group=%EA%B3%BC%ED%83%9C%EB%A3%8C');
     } finally { setSaving(false); }
   }
 
@@ -122,7 +122,7 @@ export default function PenaltyUploadPage() {
         <WorkbenchBar
           mid={<span style={{ fontSize: 12, color: C.faint, whiteSpace: 'nowrap' }}>{`${rows.length}건 · 분석완료 ${okCount} · 매칭 ${matchCount}${co ? ' · ' + companyLabel(co) : ''}`}</span>}
           actions={<>
-            <Btn variant="ghost" href="/penalty">← 과태료관리</Btn>
+            <Btn variant="ghost" href="/work?group=%EA%B3%BC%ED%83%9C%EB%A3%8C">← 과태료관리</Btn>
             <Btn onClick={save} disabled={saving || !ready.length}>{saving ? '저장 중…' : `${ready.length}건 등록`}</Btn>
           </>}
         />
