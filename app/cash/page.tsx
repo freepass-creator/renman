@@ -10,6 +10,9 @@ import { useRouter } from 'next/navigation';
 import { Plus, X, Link2, Unlink, UploadCloud, Landmark, GitMerge, CircleDollarSign } from 'lucide-react';
 import { buildCashLedger, withCmsItemRows, buildBankAccountLedger, type CashRow, type BankAccountRow } from '@/lib/finance/cash-ledger';
 import { CASH_BASIC_COLS, CASH_EXPANDED_COLS } from '@/lib/finance/cash-cols';
+import {
+  ACCOUNT_ALL_COLS, ACCOUNT_BASIC_COLS, ACCOUNT_DETAIL_SECTIONS,
+} from '@/lib/finance/account-cols';
 import { isUnclassified } from '@/lib/payments/ledger-subjects';
 import { useCashLedgerLists } from '@/lib/use-cash-ledger-lists';
 import { useEntityList } from '@/lib/use-entity-lists';
@@ -34,7 +37,6 @@ import {
 } from '@/components/ui';
 import { useIsMobile } from '@/lib/use-mobile';
 import FileDrop from '@/components/FileDrop';
-import { buildDetailSections, type DetailSectionDef } from '@/lib/ledger-detail-sections';
 import {
   CASH_ACCOUNT_FILTER_DEFS, CASH_TX_FILTER_DEFS, countActiveFilters, emptyFilterValues, eqFilter, matchLedgerFilters,
 } from '@/lib/ledger-filter-defs';
@@ -53,43 +55,10 @@ const CASH_SEARCH_WIDTH = 280;
 
 const CMS_DEP_BG = 'color-mix(in srgb, var(--brand) 10%, var(--bg-card))';
 
-const ACCOUNT_BASIC_COLS: SheetCol<BankAccountRow>[] = [
-  { key: 'company', label: '회사명', priority: 1, render: (r) => r.company, text: (r) => r.company },
-  { key: 'bank', label: '은행명', priority: 1, render: (r) => r.bankName || '—', text: (r) => r.bankName },
-  { key: 'account', label: '계좌번호', priority: 1, render: (r) => r.accountNumber, text: (r) => r.accountNumber },
-  { key: 'alias', label: '계좌명', priority: 1, render: (r) => r.accountAlias || '—', text: (r) => r.accountAlias },
-  { key: 'holder', label: '예금주', priority: 2, render: (r) => r.accountHolder || '—', text: (r) => r.accountHolder },
-  { key: 'type', label: '계좌구분', priority: 2, render: (r) => r.accountType || '—', text: (r) => r.accountType },
-  { key: 'status', label: '상태', priority: 1, align: 'c', render: (r) => <Badge tone={r.status === '사용중' ? 'green' : 'gray'}>{r.status}</Badge>, text: (r) => r.status },
-  { key: 'totalIn', label: '누적입금', priority: 1, align: 'r', render: (r) => r.totalIn ? <b style={{ color: C.ok }}>{won(r.totalIn)}</b> : '—', text: (r) => r.totalIn },
-  { key: 'totalOut', label: '누적출금', priority: 1, align: 'r', render: (r) => r.totalOut ? <b>{won(r.totalOut)}</b> : '—', text: (r) => r.totalOut },
-  { key: 'currentBalance', label: '최종잔액', priority: 1, align: 'r', render: (r) => won(r.currentBalance), text: (r) => r.currentBalance },
-  { key: 'createdAt', label: '등록일', priority: 2, render: (r) => r.createdAt ? r.createdAt.slice(0, 10) : '—', text: (r) => r.createdAt },
-  { key: 'createdBy', label: '등록자', priority: 2, render: (r) => r.createdBy || '—', text: (r) => r.createdBy },
-];
-
-const ACCOUNT_ALL_COLS: SheetCol<BankAccountRow>[] = [
-  ...ACCOUNT_BASIC_COLS,
-  { key: 'opened', label: '개설일', render: (r) => r.openedDate || '—', text: (r) => r.openedDate },
-  { key: 'closed', label: '해지일', render: (r) => r.closedDate || '—', text: (r) => r.closedDate },
-  { key: 'balance', label: '등록시점 잔액', align: 'r', render: (r) => r.openingBalance ? won(r.openingBalance) : '—', text: (r) => r.openingBalance },
-  { key: 'method', label: '수집방법', render: (r) => r.importMethod || '—', text: (r) => r.importMethod },
-  { key: 'memo', label: '메모', render: (r) => r.memo || '—', text: (r) => r.memo },
-  { key: 'updated', label: '최종수정일', render: (r) => r.updatedAt ? r.updatedAt.slice(0, 16).replace('T', ' ') : '—', text: (r) => r.updatedAt },
-];
-
 const ACCOUNT_CREATE_SECTIONS: LedgerFormSection[] = [
-  { title: '계좌 기본정보', open: true, fields: ['bankName', 'accountNumber', 'accountAlias', 'accountHolder', 'accountType', 'status'] },
-  { title: '개설·수집정보', fields: ['openedDate', 'closedDate', 'openingBalance', 'importMethod', 'memo'] },
+  { title: '계좌 기본', open: true, fields: ['bankName', 'accountNumber', 'accountAlias', 'accountHolder', 'accountType', 'status'] },
+  { title: '개설·수집', fields: ['openedDate', 'closedDate', 'openingBalance', 'importMethod', 'memo'] },
 ];
-
-/** 계좌 상세 — 필드 추가 요청: `자금·계좌 · 계좌 기본 · newKey` */
-const ACCOUNT_DETAIL_DEFS: DetailSectionDef[] = [
-  { title: '계좌 기본', open: true, keys: ['company', 'bank', 'account', 'alias', 'holder', 'type', 'status'] },
-  { title: '잔액·등록', keys: ['totalIn', 'totalOut', 'currentBalance', 'createdAt', 'createdBy'] },
-  { title: '개설·수집', keys: ['opened', 'closed', 'balance', 'method', 'memo', 'updated'] },
-];
-const ACCOUNT_DETAIL_SECTIONS = buildDetailSections(ACCOUNT_ALL_COLS, ACCOUNT_DETAIL_DEFS);
 
 const CASH_TX_CREATE_SECTIONS: LedgerFormSection[] = [
   { title: '거래 기본정보', open: true, fields: ['account', 'txDate', 'amount', 'withdraw'] },
