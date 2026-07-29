@@ -2,7 +2,7 @@
  * 재무원장 열 SSOT — 계좌 입·출금 스트림(CashRow).
  * 엑셀 추가/삭제: `자금 · 엑셀기본|엑셀전체 · +|-key` @see lib/ledger-ext.ts
  */
-import { Badge, C, money, CELL_SUB_FS, INDENT_UNIT, type RailTone, type SheetCol } from '@/components/ui';
+import { Badge, C, money, TwoLineCell, TreeIndent, type RailTone, type SheetCol } from '@/components/ui';
 import { companyDisplay } from '@/lib/companies';
 import { groupOfLabel, isUnclassified, kindOfLabel } from '@/lib/payments/ledger-subjects';
 import type { CashRow } from '@/lib/finance/cash-ledger';
@@ -42,22 +42,22 @@ const CASH_COL_CATALOG: SheetCol<CashRow>[] = [
   {
     key: 'company', label: '회사명', pin: true, priority: 1,
     render: (r) => (r.nest === 'cms-item'
-      ? <span style={{ color: C.mute, paddingLeft: INDENT_UNIT }}>↳ CMS</span>
+      ? <TreeIndent>↳ CMS</TreeIndent>
       : coName(r)),
     text: (r) => (r.nest === 'cms-item' ? 'CMS연결' : coName(r)),
   },
   {
     key: 'acctName', label: '계좌명', pin: true, priority: 1,
-    render: (r) => r.accountName || (r.nest === 'cms-pending' ? 'CMS 명세' : LEDGER_EMPTY.dash),
-    text: (r) => r.accountName || (r.nest === 'cms-pending' ? 'CMS 명세' : ''),
+    render: (r) => {
+      if (r.nest === 'cms-pending') return <TwoLineCell main="CMS 명세" />;
+      if (r.nest === 'cms-item') return <TwoLineCell main="CMS연결" sub={r.account || undefined} />;
+      return <TwoLineCell main={r.accountName || LEDGER_EMPTY.dash} sub={r.account || undefined} />;
+    },
+    text: (r) => r.accountName || (r.nest === 'cms-pending' ? 'CMS 명세' : r.account || ''),
   },
   {
     key: 'acct', label: '계좌번호', priority: 2,
-    render: (r) => {
-      if (r.nest === 'cms-item') return <span style={{ color: C.mute, fontSize: CELL_SUB_FS }}>{r.account || LEDGER_EMPTY.dash}</span>;
-      if (r.nest === 'cms-pending') return <span style={{ color: C.mute }}>CMS명세</span>;
-      return r.account || LEDGER_EMPTY.dash;
-    },
+    render: (r) => r.account || (r.nest === 'cms-pending' ? 'CMS명세' : LEDGER_EMPTY.dash),
     text: (r) => r.account || (r.nest === 'cms-pending' ? 'CMS명세' : ''),
   },
   {
@@ -108,6 +108,16 @@ const CASH_COL_CATALOG: SheetCol<CashRow>[] = [
     text: (r) => r.outAmt,
   },
   {
+    key: 'balance', label: '잔액', align: 'r', priority: 1,
+    render: (r) => {
+      const bal = r.raw.balance;
+      if (bal === '' || bal == null) return LEDGER_EMPTY.dash;
+      const n = Number(bal);
+      return Number.isFinite(n) ? money(n) : LEDGER_EMPTY.dash;
+    },
+    text: (r) => (r.raw.balance === '' || r.raw.balance == null ? '' : Number(r.raw.balance) || 0),
+  },
+  {
     key: 'alert', label: '데이터알람', priority: 3,
     render: (r) => {
       const alert = String(r.raw.dataAlert || '');
@@ -150,9 +160,9 @@ const CASH_COL_CATALOG: SheetCol<CashRow>[] = [
 
 /** 회사 → 신원(계좌) → 내용 → 분류 → 상태(매칭) → 수치 */
 export const CASH_SHEET_KEYS: SheetViewKeys = {
-  basic: ['company', 'acctName', 'acct', 'content', 'cat', 'match', 'date', 'in', 'out', 'alert'],
+  basic: ['company', 'acctName', 'content', 'cat', 'flowNature', 'match', 'date', 'in', 'out', 'balance'],
   all: [
-    'company', 'acctName', 'acct', 'content', 'cat', 'match', 'date', 'in', 'out', 'alert',
+    'company', 'acctName', 'acct', 'content', 'cat', 'match', 'date', 'in', 'out', 'balance', 'alert',
     'flowNature', 'fundNature', 'matchedContract', 'matchedSchedule', 'src', 'ent', 'key',
   ],
 };
@@ -166,7 +176,7 @@ export const CASH_TX_DETAIL_DEFS: DetailSectionDef[] = [
   {
     title: '거래 기본',
     open: true,
-    keys: ['company', 'acctName', 'acct', 'date', 'content', 'in', 'out'],
+    keys: ['company', 'acctName', 'acct', 'date', 'content', 'in', 'out', 'balance'],
   },
   {
     title: '분류·수납정보',

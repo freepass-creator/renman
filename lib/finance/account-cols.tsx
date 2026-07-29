@@ -2,15 +2,24 @@
  * 자금·계좌 열 SSOT — BankAccountRow.
  * 엑셀: `자금·계좌 · 엑셀기본|엑셀전체 · ±key` @see lib/ledger-ext.ts
  */
-import { Badge, C, money, type SheetCol } from '@/components/ui';
+import { Badge, C, money, TwoLineCell, type SheetCol } from '@/components/ui';
 import type { BankAccountRow } from '@/lib/finance/cash-ledger';
 import { buildDetailSections, buildSheetViews, type DetailSectionDef, type SheetViewKeys } from '@/lib/ledger-ext';
 import { LEDGER_EMPTY } from '@/lib/ledger-empty';
 
 const ACCOUNT_COL_CATALOG: SheetCol<BankAccountRow>[] = [
   { key: 'company', label: '회사명', priority: 1, render: (r) => r.company || LEDGER_EMPTY.dash, text: (r) => r.company },
-  { key: 'bank', label: '은행명', priority: 1, render: (r) => r.bankName || LEDGER_EMPTY.dash, text: (r) => r.bankName },
-  { key: 'account', label: '계좌번호', priority: 1, render: (r) => r.accountNumber || LEDGER_EMPTY.dash, text: (r) => r.accountNumber },
+  {
+    key: 'bank', label: '은행·계좌', priority: 1,
+    render: (r) => (
+      <TwoLineCell
+        main={r.bankName || r.accountAlias || LEDGER_EMPTY.dash}
+        sub={r.accountNumber || undefined}
+      />
+    ),
+    text: (r) => [r.bankName, r.accountNumber].filter(Boolean).join(' '),
+  },
+  { key: 'account', label: '계좌번호', priority: 2, render: (r) => r.accountNumber || LEDGER_EMPTY.dash, text: (r) => r.accountNumber },
   { key: 'alias', label: '계좌명', priority: 1, render: (r) => r.accountAlias || LEDGER_EMPTY.dash, text: (r) => r.accountAlias },
   { key: 'holder', label: '예금주', priority: 2, render: (r) => r.accountHolder || LEDGER_EMPTY.dash, text: (r) => r.accountHolder },
   { key: 'type', label: '계좌구분', priority: 2, render: (r) => r.accountType || LEDGER_EMPTY.dash, text: (r) => r.accountType },
@@ -62,7 +71,7 @@ const ACCOUNT_COL_CATALOG: SheetCol<BankAccountRow>[] = [
 
 /** 회사 → 신원(은행·계좌) → 상태 → 수치 */
 export const ACCOUNT_SHEET_KEYS: SheetViewKeys = {
-  basic: ['company', 'bank', 'account', 'alias', 'status', 'totalIn', 'totalOut', 'currentBalance'],
+  basic: ['company', 'bank', 'alias', 'status', 'totalIn', 'totalOut', 'currentBalance'],
   all: [
     'company', 'bank', 'account', 'alias', 'holder', 'type', 'status',
     'totalIn', 'totalOut', 'currentBalance', 'createdAt', 'createdBy',
