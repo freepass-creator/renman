@@ -711,7 +711,7 @@ export default function CashLedgerPage() {
             sections={ACCOUNT_DETAIL_SECTIONS}
             onClose={() => setSelectedAccount(null)}
           >
-            <div style={{ borderTop: `1px solid ${C.line}`, padding: '10px 14px 14px' }}>
+            <div style={{ borderTop: `1px solid ${C.line}`, marginTop: 12, paddingTop: 12 }}>
               <div style={{ fontSize: 12, fontWeight: 800, color: C.ink, marginBottom: 8 }}>거래·수납정보</div>
               <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', fontSize: 12.5, marginBottom: 8 }}>
                 <span>전체 거래 <b>{selectedAccount.transactionCount}</b>건</span>

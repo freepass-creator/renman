@@ -99,7 +99,7 @@ export function LedgerFilterPanel({
           <X size={14} />
         </button>
       </header>
-      <div className="ledger-record-panel__body" style={{ padding: 12, display: 'grid', gap: 14, alignContent: 'start' }}>
+      <div className="ledger-record-panel__body" style={{ display: 'grid', gap: 14, alignContent: 'start' }}>
         {children}
       </div>
       <LedgerPanelFooter>

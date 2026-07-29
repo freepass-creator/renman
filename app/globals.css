@@ -2524,11 +2524,13 @@ kbd {
   flex: 1 1 auto;
   min-height: 0;
   overflow: auto;
+  padding: 12px;
+  box-sizing: border-box;
 }
 .ledger-record-panel__sections {
   display: grid;
-  gap: 8px;
-  padding: 8px;
+  gap: 14px;
+  padding: 0;
   align-content: start;
 }
 .ledger-record-panel__section {
@@ -2542,7 +2544,7 @@ kbd {
   align-items: center;
   gap: 6px;
   list-style: none;
-  padding: 8px 10px;
+  padding: 10px 12px;
   color: var(--text-main);
   font-size: 12px;
   font-weight: 800;
@@ -2706,19 +2708,20 @@ kbd {
   overflow: auto;
   display: grid;
   align-content: start;
-  gap: 8px;
-  padding: 8px;
+  gap: 14px;
+  padding: 12px;
+  box-sizing: border-box;
 }
 .ledger-create-panel__company {
   display: grid;
   gap: 8px;
-  padding: 8px;
+  padding: 12px;
   border: 1px solid var(--border);
   background: var(--bg-header);
 }
 .ledger-create-panel__company-label {
   color: var(--text-sub);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
 }
 .ledger-create-panel__company-label > span {
@@ -2727,9 +2730,9 @@ kbd {
 .ledger-create-panel__company label,
 .ledger-create-panel__field {
   display: grid;
-  gap: 4px;
+  gap: 6px;
   color: var(--text-sub);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
 }
 .ledger-create-panel__company label {
@@ -2737,7 +2740,7 @@ kbd {
 }
 .ledger-create-panel__company label > select {
   display: block;
-  margin-top: 4px;
+  margin-top: 6px;
 }
 .ledger-create-panel__company label > span,
 .ledger-create-panel__field b {
@@ -2757,7 +2760,7 @@ kbd {
   align-items: center;
   gap: 6px;
   list-style: none;
-  padding: 8px 10px;
+  padding: 10px 12px;
   color: var(--text-main);
   font-size: 12px;
   font-weight: 800;
@@ -2776,6 +2779,11 @@ kbd {
 }
 .ledger-create-panel__section[open] > summary .ledger-create-panel__chevron {
   transform: rotate(90deg);
+}
+/* FormGrid 등 summary 아래 본문 — 테두리·제목에 붙지 않게 */
+.ledger-create-panel__section > :not(summary) {
+  padding: 12px 14px 14px;
+  border-top: 1px solid var(--border-soft);
 }
 .ledger-create-panel__grid {
   display: grid;

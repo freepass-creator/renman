@@ -136,37 +136,37 @@ export function FormGrid({
   const c = mobile ? 1 : cols;
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: `repeat(${c},1fr)`, gap: 9 }}>
+    <div style={{ display: 'grid', gridTemplateColumns: `repeat(${c},1fr)`, gap: 14 }}>
       {fields.map((f) => {
         if (f.type === 'vehicle-picker') {
           return (
-            <label key={f.key} style={{ fontSize: 11.5, color: C.mute, gridColumn: c > 1 && !mobile ? '1 / -1' : undefined }}>
+            <label key={f.key} style={{ fontSize: 12, color: C.mute, gridColumn: c > 1 && !mobile ? '1 / -1' : undefined }}>
               {f.label}{f.required && <span style={{ color: C.danger }}> *</span>}
-              <div style={{ marginTop: 3 }}>
+              <div style={{ marginTop: 6 }}>
                 <VehicleFieldPicker
                   value={String(form.plate || '')}
                   onChange={(plate) => onChange('plate', plate)}
                   onPatch={onPatch}
                 />
               </div>
-              {showNotes && f.note ? <small style={{ display: 'block', marginTop: 3, color: C.faint }}>{f.note}</small> : null}
+              {showNotes && f.note ? <small style={{ display: 'block', marginTop: 6, color: C.faint }}>{f.note}</small> : null}
             </label>
           );
         }
         if (f.type === 'contract-picker') {
           return (
-            <label key={f.key} style={{ fontSize: 11.5, color: C.mute, gridColumn: c > 1 && !mobile ? '1 / -1' : undefined }}>
+            <label key={f.key} style={{ fontSize: 12, color: C.mute, gridColumn: c > 1 && !mobile ? '1 / -1' : undefined }}>
               {f.label}{f.required && <span style={{ color: C.danger }}> *</span>}
-              <div style={{ marginTop: 3 }}>
+              <div style={{ marginTop: 6 }}>
                 <ContractFieldPicker
                   value={String(form.contractKey || '')}
                   onChange={(key) => onChange('contractKey', key)}
                   onPatch={onPatch}
                 />
               </div>
-              {showNotes && f.note ? <small style={{ display: 'block', marginTop: 3, color: C.faint }}>{f.note}</small> : null}
+              {showNotes && f.note ? <small style={{ display: 'block', marginTop: 6, color: C.faint }}>{f.note}</small> : null}
               {(form.contractNo || form.customerName || form.plate) && String(form.contractKey || '') ? (
-                <small style={{ display: 'block', marginTop: 4, color: C.mute }}>
+                <small style={{ display: 'block', marginTop: 6, color: C.mute }}>
                   {[form.customerName, form.contractNo, form.plate].filter(Boolean).map(String).join(' · ')}
                 </small>
               ) : null}
@@ -179,18 +179,18 @@ export function FormGrid({
         // 직접입력 빈칸 강조 — background 통째 덮지 않음(Select 캐럿·appearance 유지)
         const emptyHint = f.manual && empty ? { backgroundColor: 'var(--orange-bg)' } as const : undefined;
         return (
-          <label key={f.key} style={{ fontSize: 11.5, color: C.mute }}>
+          <label key={f.key} style={{ fontSize: 12, color: C.mute }}>
             {f.label}{f.required && <span style={{ color: C.danger }}> *</span>}{f.manual && <span style={{ color: 'var(--orange-text)' }}> ·직접</span>}
             {f.type === 'select' ? (
-              <Select value={val} onChange={(e) => onChange(f.key, e.target.value)} style={{ width: '100%', marginTop: 3, ...emptyHint }}>
+              <Select value={val} onChange={(e) => onChange(f.key, e.target.value)} style={{ width: '100%', marginTop: 6, ...emptyHint }}>
                 <option value="">—</option>
                 {(f.options || []).map((o) => <option key={o} value={o}>{o}</option>)}
               </Select>
             ) : (
               <Input type={f.type === 'number' ? 'number' : f.type === 'date' ? 'date' : 'text'} value={val}
-                onChange={(e) => onChange(f.key, e.target.value)} style={{ width: '100%', marginTop: 3, ...emptyHint }} />
+                onChange={(e) => onChange(f.key, e.target.value)} style={{ width: '100%', marginTop: 6, ...emptyHint }} />
             )}
-            {showNotes && f.note ? <small style={{ display: 'block', marginTop: 3, color: C.faint }}>{f.note}</small> : null}
+            {showNotes && f.note ? <small style={{ display: 'block', marginTop: 6, color: C.faint }}>{f.note}</small> : null}
           </label>
         );
       })}

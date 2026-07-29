@@ -293,7 +293,7 @@ function IngestInner() {
         </button>
       </header>
 
-      <div className="ledger-record-panel__body" style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: 12 }}>
+      <div className="ledger-record-panel__body" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
         {tab === 'ocr' && (
           <>
             <FileDrop
