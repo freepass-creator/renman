@@ -70,6 +70,7 @@ curl -s -o /dev/null -w "%{http_code}" http://localhost:6006/<route>   # 200
 
 | 날짜 | 작업자 | 내용 | 상태 |
 |---|---|---|---|
+| 2026-07-30 | Cursor | 전원자수용: 계약주행·자산섹션·자금method·업무25·수선스키마조사·pickCols경고 | (검증 중) |
 | 2026-07-29 | Cursor | 초과주행 과금(반납정산 라인아이템) | tsc0 · 7면200 |
 | 2026-07-29 | Cursor | 파생3: 할부이자(B)·정비비랭킹(C)·연체이력(D) | tsc0 · 0c20d99…92ff726 · push |
 | 2026-07-29 | Cursor | 기본뷰2차: status18·asset16·contract19·cash14·work+due · fit priority | tsc0 · 6면200 |
