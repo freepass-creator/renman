@@ -47,8 +47,12 @@ export function ReturnWizard({ contract, vehicle, onClose, onDone }: {
   // 정산 미리보기 = 반납일 what-if(computeContractView) → 공용 computeReturnSettlement(정산서와 동일).
   const settle = useMemo(() => {
     const v = computeContractView({ ...contract, returnedDate: date, status: '반납' }, date);
-    return computeReturnSettlement(Number(contract.deposit) || 0, v);
-  }, [contract, date]);
+    return computeReturnSettlement(Number(contract.deposit) || 0, v, {
+      contract: { ...contract, returnedDate: date },
+      asOf: date,
+      returnMileage: mileage || null,
+    });
+  }, [contract, date, mileage]);
   const drove = mileage ? Number(mileage) - baseMileage : null;
 
   async function commit() {
@@ -151,6 +155,7 @@ export function ReturnWizard({ contract, vehicle, onClose, onDone }: {
             <WizField label={<>반납 주행거리 (계기판 km) {baseMileage ? <span style={{ color: C.faint, fontWeight: 400 }}>· 출고 {baseMileage.toLocaleString()}km</span> : null}</>}>
               <input inputMode="numeric" value={mileage} onChange={(e) => setMileage(e.target.value.replace(/[^\d]/g, ''))} placeholder={baseMileage ? `${baseMileage} 이상` : '예: 47250'} style={{ ...wizInput, fontFamily: 'var(--font-mono)' }} />
               {drove != null && <div style={{ marginTop: 6, fontSize: 12.5, color: drove < 0 ? C.danger : C.mute }}>{drove < 0 ? '출고보다 작음 — 확인 필요' : `주행 ${drove.toLocaleString()}km`}</div>}
+              {!mileage && <div style={{ marginTop: 6 }}><Message variant="warning">주행거리 미입력 — 초과주행 산출 불가(반납은 가능)</Message></div>}
             </WizField>
             <WizField label={<>반납 연료량 {baseFuel ? <span style={{ color: C.faint, fontWeight: 400 }}>· 출고 {baseFuel}</span> : null}</>}>
               <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap' }}>
@@ -165,8 +170,24 @@ export function ReturnWizard({ contract, vehicle, onClose, onDone }: {
         {/* 2. 정산 */}
         {step === 2 && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            {settle.mileageBasis === '산출불가' && (
+              <Message variant="warning">주행거리 미입력 — 초과주행 산출 불가</Message>
+            )}
             <WizCard gap={9}>
               <Row k="미납 대여료 (일할정산 반영)" v={won(settle.unpaid)} strong={settle.unpaid > 0} />
+              {settle.mileageBasis === '산출불가' ? (
+                <Row k="초과주행" v="산출 불가" muted />
+              ) : settle.mileageBasis === '한도없음' ? (
+                <Row k="초과주행" v="한도 없음(무제한)" muted />
+              ) : settle.overMileageFee > 0 ? (
+                <Row
+                  k="초과주행"
+                  v={`${settle.excessKm.toLocaleString('ko-KR')}km × ${settle.overMileageRate.toLocaleString('ko-KR')}원 = ${won(settle.overMileageFee)}`}
+                  strong
+                />
+              ) : (
+                <Row k="초과주행" v="과금 없음" muted />
+              )}
               <Row k="예치 보증금" v={won(settle.deposit)} />
               <Row k="보증금 충당" v={settle.offset ? `−${won(settle.offset)}` : won(0)} muted />
               <div style={{ borderTop: `2px solid ${C.ink}`, margin: '2px 0' }} />
@@ -205,6 +226,9 @@ export function ReturnWizard({ contract, vehicle, onClose, onDone }: {
               <Row k="반납 주행거리" v={mileage ? `${Number(mileage).toLocaleString()} km${drove != null && drove >= 0 ? ` (주행 ${drove.toLocaleString()})` : ''}` : '미입력'} />
               <Row k="반납 연료" v={fuel} />
               <div style={{ borderTop: `1px solid ${C.line}`, margin: '2px 0' }} />
+              {settle.mileageBasis === '반납확정' && settle.overMileageFee > 0 && (
+                <Row k="초과주행" v={`${settle.excessKm.toLocaleString('ko-KR')}km × ${settle.overMileageRate.toLocaleString('ko-KR')}원 = ${won(settle.overMileageFee)}`} />
+              )}
               {settle.addCharge > 0
                 ? <Row k="추가 청구액" v={won(settle.addCharge)} strong danger />
                 : <Row k="보증금 반환액" v={won(settle.refund)} strong />}

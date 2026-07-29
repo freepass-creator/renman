@@ -149,7 +149,8 @@ function SettlementDoc({ c, companyId }: { c: EntityRecord; companyId: string })
   const v = computeContractView(c, TODAY);
   const returned = String(c.returnedDate || '');
   // 정산 계산 = 공용 SSOT(현장 반납폼과 동일). 손롤 금지.
-  const { deposit, unpaid, offset, refund, addCharge } = computeReturnSettlement(Number(c.deposit) || 0, v);
+  const { deposit, unpaid, offset, refund, addCharge, overMileageFee, excessKm, overMileageRate, mileageBasis } =
+    computeReturnSettlement(Number(c.deposit) || 0, v, { contract: c, asOf: TODAY });
   const t = new Date();
   const dateStr = `${t.getFullYear()}년 ${t.getMonth() + 1}월 ${t.getDate()}일`;
   const line = (l: string, val: React.ReactNode, strong?: boolean, minus?: boolean) => (
@@ -167,6 +168,13 @@ function SettlementDoc({ c, companyId }: { c: EntityRecord; companyId: string })
       <div style={secTitle}>정산 내역</div>
       <table style={{ ...tbl, fontSize: 13.5 }}><tbody>
         {line('미납 대여료 (일할정산 반영)', won(unpaid))}
+        {mileageBasis === '산출불가'
+          ? line('초과주행', '주행거리 미입력 — 산출 불가')
+          : mileageBasis === '한도없음'
+            ? line('초과주행', '연주행한도 없음(무제한)')
+            : overMileageFee > 0
+              ? line(`초과주행 (${excessKm.toLocaleString('ko-KR')}km × ${overMileageRate.toLocaleString('ko-KR')}원)`, won(overMileageFee), false, true)
+              : line('초과주행', '과금 없음')}
         {line('예치 보증금', won(deposit))}
         {line('보증금 충당액', '-' + won(offset), false, true)}
         <tr><td colSpan={2} style={{ borderTop: '2px solid #0f172a', padding: 0 }} /></tr>
