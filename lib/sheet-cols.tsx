@@ -1,7 +1,7 @@
 /**
  * 원장·현황 표 열 SSOT.
- *   표식(선두·pin): 운영 = 회사명(key `co`) → 차량번호 · 재무 거래 = 회사명(key `co`) → 계좌.
- *   key `co` = 회사 열 단축키(역할=company). 자산·계약·업무·리스크는 key `company`.
+ *   표식(선두·pin): 운영 = 회사명(key `company`) → 차량번호 · 재무 거래 = 회사명(key `company`) → 계좌.
+ *   회사 열 key = `company` (전 원장 통일).
  *   회사명(풀)=companyLabel 은 공문·설정용 · 표의 회사열은 companyDisplay/short.
  *   컬럼을 페이지마다 손롤하지 말 것 — 여기서 따다 씀.
  *
@@ -23,7 +23,7 @@ const toneBadge = (t: SheetRow['tone']): 'green' | 'amber' | 'red' | 'gray' =>
 
 /** @deprecated 웹 /asset는 master-ledger-cols. 레거시 SheetRow 전용 — 신규 사용 금지. */
 export const ASSET_COLS: SheetCol<SheetRow>[] = [
-  { key: 'co', label: '회사명', pin: true, render: (r) => r.company || LEDGER_EMPTY.dash, text: (r) => r.company },
+  { key: 'company', label: '회사명', pin: true, render: (r) => r.company || LEDGER_EMPTY.dash, text: (r) => r.company },
   { key: 'plate', label: '차량번호', pin: true, render: (r) => r.plate || LEDGER_EMPTY.dash, text: (r) => r.plate },
   // 생애단계 = 카드뷰 섹션(구매예정·등록예정·보유중·처분예정·처분완료)이 엑셀에선 이 분류 열로. align center.
   { key: 'own', label: '생애단계', align: 'c', render: (r) => <Badge tone={r.ownership === '보유중' ? 'green' : r.ownership === '처분완료' ? 'gray' : 'amber'}>{r.ownership}</Badge>, text: (r) => r.ownership },
@@ -53,7 +53,7 @@ const misu = (r: ContractRow) =>
   r.net > 0 ? <span style={{ color: C.danger, fontWeight: 700 }}>{won(r.net)}</span> : LEDGER_EMPTY.dash;
 
 const CT = {
-  co: { key: 'co', label: '회사명', pin: true, render: (r) => r.company || LEDGER_EMPTY.dash, text: (r) => r.company },
+  company: { key: 'company', label: '회사명', pin: true, render: (r) => r.company || LEDGER_EMPTY.dash, text: (r) => r.company },
   plate: { key: 'plate', label: '차량번호', pin: true, render: (r) => r.plate || LEDGER_EMPTY.dash, text: (r) => r.plate },
   car: { key: 'car', label: '차명', render: (r) => r.carName || LEDGER_EMPTY.dash, text: (r) => r.carName },
   cust: { key: 'cust', label: '계약자', render: (r) => r.customer || LEDGER_EMPTY.none, text: (r) => r.customer },
@@ -89,7 +89,7 @@ const CT = {
 
 /** @deprecated 웹 /contract는 master-ledger-cols. 레거시 ContractRow 전용 — 신규 사용 금지. */
 export const CONTRACT_COLS: SheetCol<ContractRow>[] = [
-  CT.co, CT.plate, CT.car, CT.cust,
+  CT.company, CT.plate, CT.car, CT.cust,
   CT.rent, CT.dep, CT.net,
   CT.start, CT.end, CT.dday,
   CT.st, CT.alert,
@@ -98,7 +98,7 @@ export const CONTRACT_COLS: SheetCol<ContractRow>[] = [
 
 /** @deprecated 미수 전용 레거시 열 — 웹 /risk·/contract 미사용. 신규 사용 금지. */
 export const DEBT_COLS: SheetCol<ContractRow>[] = [
-  CT.co, CT.plate, CT.car, CT.cust,
+  CT.company, CT.plate, CT.car, CT.cust,
   CT.rent, CT.dep, CT.net,
   CT.start, CT.end, CT.dday,
   CT.st, CT.od, CT.cnt, CT.alert,
@@ -136,7 +136,7 @@ export function remainSpanLabel(d: number | null): string {
 }
 const FL = {
   plate: { key: 'plate', label: '차량번호', pin: true, render: (r) => r.plate || LEDGER_EMPTY.dash, text: (r) => r.plate },
-  co: { key: 'co', label: '회사명', pin: true, render: (r) => r.company || LEDGER_EMPTY.dash, text: (r) => r.company },
+  company: { key: 'company', label: '회사명', pin: true, render: (r) => r.company || LEDGER_EMPTY.dash, text: (r) => r.company },
   status: { key: 'status', label: '차량상태', render: (r) => <Badge tone={toneBadge(r.tone)}>{r.status}</Badge>, text: (r) => r.status },
   loc: { key: 'loc', label: '현위치', render: (r) => r.location || LEDGER_EMPTY.dash, text: (r) => r.location },
   car: { key: 'car', label: '차명', render: (r) => r.carName || LEDGER_EMPTY.dash, text: (r) => r.carName },
@@ -245,13 +245,13 @@ const FL = {
 
 /** 기본 = 자산기본(차번·법인·상태·차명·연식) + 계약조건 + 수납/리스크. 한 셀 한 값 · 자리 고정.
  *  정렬 배정 — 가운데(짧은값·날짜·배지)=CENTER · 금액은 FL align'r' 유지. */
-const CENTER_ALIGN = new Set(['co', 'status', 'year', 'term', 'start', 'end', 'dday', 'od', 'stage', 'warn', 'own', 'util', 'phone', 'gps', 'acqDate', 'loanMon', 'loanStart', 'insurer', 'insEnd', 'loanCo', 'inspect', 'paymentDay', 'paymentTiming', 'round', 'rentalType']);
+const CENTER_ALIGN = new Set(['company', 'status', 'year', 'term', 'start', 'end', 'dday', 'od', 'stage', 'warn', 'own', 'util', 'phone', 'gps', 'acqDate', 'loanMon', 'loanStart', 'insurer', 'insEnd', 'loanCo', 'inspect', 'paymentDay', 'paymentTiming', 'round', 'rentalType']);
 const alignCols = (cols: SheetCol<FleetRow>[]): SheetCol<FleetRow>[] =>
   cols.map((c) => (CENTER_ALIGN.has(c.key) ? { ...c, align: 'c' as const } : c));
 
 /** 운영 열 카탈로그 — 새 항목은 FL에 정의 후 SHEET_KEYS에 key만. */
 const FLEET_COL_CATALOG: SheetCol<FleetRow>[] = alignCols([
-  FL.co, FL.plate, FL.status, FL.maker, FL.sub, FL.year,
+  FL.company, FL.plate, FL.status, FL.maker, FL.sub, FL.year,
   FL.cust, FL.phone, FL.rentalType, FL.term, FL.start, FL.end, FL.dep, FL.rent, FL.paymentDay, FL.paymentTiming, FL.round, FL.dday,
   FL.net, FL.od, FL.stage, FL.warn, FL.note,
   FL.car, FL.loc, FL.own, FL.util,
@@ -264,10 +264,10 @@ const FLEET_COL_CATALOG: SheetCol<FleetRow>[] = alignCols([
 export const FLEET_SHEET_KEYS: SheetViewKeys = {
   // 기본=스캔 핵심만 · 제조/납부조건/비고는 전체
   basic: [
-    'co', 'plate', 'cust', 'status', 'rentalType', 'end', 'dday', 'rent', 'net', 'od', 'warn',
+    'company', 'plate', 'cust', 'status', 'rentalType', 'end', 'dday', 'rent', 'net', 'od', 'warn',
   ],
   all: [
-    'co', 'plate', 'cust', 'status', 'maker', 'sub', 'year',
+    'company', 'plate', 'cust', 'status', 'maker', 'sub', 'year',
     'phone', 'rentalType', 'term', 'start', 'end', 'dep', 'rent', 'paymentDay', 'paymentTiming', 'round', 'dday',
     'net', 'od', 'stage', 'warn', 'note',
     'car', 'loc', 'own', 'util',
@@ -285,7 +285,7 @@ export const FLEET_DETAIL_DEFS: DetailSectionDef[] = [
   {
     title: '차량·상태',
     open: true,
-    keys: ['co', 'plate', 'status', 'maker', 'sub', 'year', 'car', 'loc', 'own', 'util'],
+    keys: ['company', 'plate', 'status', 'maker', 'sub', 'year', 'car', 'loc', 'own', 'util'],
   },
   {
     title: '계약',

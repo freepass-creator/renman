@@ -1,7 +1,7 @@
 /**
  * 업무·과태료 엑셀 열 SSOT.
  * 추가/삭제: `업무 · 엑셀기본|엑셀전체 · ±key` / `과태료 · …` @see lib/ledger-ext.ts
- * 회사 열 key = `company` (fleet/cash의 단축키 `co`와 역할 동일).
+ * 회사 열 key = `company` (전 원장 통일).
  */
 'use client';
 

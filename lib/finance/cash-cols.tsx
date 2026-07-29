@@ -33,7 +33,7 @@ const matchStatus = (r: CashRow) => {
 
 const CASH_COL_CATALOG: SheetCol<CashRow>[] = [
   {
-    key: 'co', label: '회사명', pin: true, priority: 1,
+    key: 'company', label: '회사명', pin: true, priority: 1,
     render: (r) => (r.nest === 'cms-item'
       ? <span style={{ color: C.mute, paddingLeft: 14 }}>↳ CMS</span>
       : coName(r)),
@@ -143,9 +143,9 @@ const CASH_COL_CATALOG: SheetCol<CashRow>[] = [
 
 /** 회사 → 신원(계좌) → 내용 → 분류 → 상태(매칭) → 수치 */
 export const CASH_SHEET_KEYS: SheetViewKeys = {
-  basic: ['co', 'acctName', 'acct', 'content', 'cat', 'match', 'date', 'in', 'out', 'alert'],
+  basic: ['company', 'acctName', 'acct', 'content', 'cat', 'match', 'date', 'in', 'out', 'alert'],
   all: [
-    'co', 'acctName', 'acct', 'content', 'cat', 'match', 'date', 'in', 'out', 'alert',
+    'company', 'acctName', 'acct', 'content', 'cat', 'match', 'date', 'in', 'out', 'alert',
     'flowNature', 'fundNature', 'matchedContract', 'matchedSchedule', 'src', 'ent', 'key',
   ],
 };
@@ -159,7 +159,7 @@ export const CASH_TX_DETAIL_DEFS: DetailSectionDef[] = [
   {
     title: '거래 기본',
     open: true,
-    keys: ['co', 'acctName', 'acct', 'date', 'content', 'in', 'out'],
+    keys: ['company', 'acctName', 'acct', 'date', 'content', 'in', 'out'],
   },
   {
     title: '분류·수납정보',
@@ -185,7 +185,7 @@ export const CASH_CARD_DETAIL_DEFS: DetailSectionDef[] = [
   {
     title: '거래 기본',
     open: true,
-    keys: ['co', 'date', 'content', 'out', 'cat'],
+    keys: ['company', 'date', 'content', 'out', 'cat'],
   },
   {
     title: '카드 승인정보',
