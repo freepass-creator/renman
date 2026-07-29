@@ -296,6 +296,35 @@ function WorkLedgerInner() {
     router.replace(url, { scroll: false });
   };
 
+  /** 과태료 개별 소프트삭제 — 상세·버킷 행 공용. */
+  const removePenalty = async (row: Pick<WorkLedgerRow, 'raw' | 'plate' | 'amount' | 'nest'>) => {
+    if (row.nest === 'penalty-bucket') return;
+    const key = String(row.raw._key || row.raw.id || '');
+    if (!key) {
+      toast('삭제 키를 찾을 수 없습니다', 'error');
+      return;
+    }
+    const ok = await confirm({
+      message: `이 과태료를 삭제할까요? (휴지통에서 복구 가능)\n${row.plate || ''} · ${row.amount ? won(row.amount) : ''}`,
+      danger: true,
+    });
+    if (!ok) return;
+    try {
+      await commitRemove({
+        entity: 'penalty',
+        sessionCompanyId: companyId,
+        rec: row.raw,
+        key,
+        reason: '수기 삭제',
+      });
+      setSelected(null);
+      reload();
+      toast('삭제됨', 'success');
+    } catch {
+      toast(NEED_COMPANY, 'error');
+    }
+  };
+
   const cols = penaltyMode
     ? (colView === '기본' ? PENALTY_BASIC_COLS : PENALTY_ALL_COLS)
     : (colView === '기본' ? WORK_BASIC_COLS : WORK_ALL_COLS);
@@ -444,6 +473,7 @@ function WorkLedgerInner() {
             setGroupAndUrl('과태료');
             setSelected(row as WorkLedgerRow);
           }}
+          onRemoveItem={(row) => { void removePenalty(row); }}
         />
       ) : selected ? (
         <LedgerRecordPanel
@@ -467,29 +497,7 @@ function WorkLedgerInner() {
                 <Btn
                   size="sm"
                   variant="danger"
-                  onClick={async () => {
-                    const key = String(selected.raw._key || '');
-                    if (!key) return;
-                    const ok = await confirm({
-                      message: `이 과태료를 삭제할까요? (휴지통에서 복구 가능)\n${selected.plate || ''} · ${selected.amount ? won(selected.amount) : ''}`,
-                      danger: true,
-                    });
-                    if (!ok) return;
-                    try {
-                      await commitRemove({
-                        entity: 'penalty',
-                        sessionCompanyId: companyId,
-                        rec: selected.raw,
-                        key,
-                        reason: '수기 삭제',
-                      });
-                      setSelected(null);
-                      reload();
-                      toast('삭제됨', 'success');
-                    } catch {
-                      toast(NEED_COMPANY, 'error');
-                    }
-                  }}
+                  onClick={() => { void removePenalty(selected); }}
                 >
                   <Trash2 size={14} /> 삭제
                 </Btn>

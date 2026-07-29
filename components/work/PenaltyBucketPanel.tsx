@@ -1,11 +1,11 @@
 'use client';
 
 /**
- * 과태료 집계(버킷) 상세 — 유형별 섹션으로 고지서 목록(조회 위주).
- * CMS집금 패널과 대칭: 펼쳐 보기만, 처리는 «과태료» 구분에서.
+ * 과태료 집계(버킷) 상세 — 유형별 섹션으로 고지서 목록.
+ * CMS집금 패널과 대칭: 펼쳐 보기 · 개별 행 열기/삭제 · 처리는 «과태료» 구분에서.
  */
 import { Badge, Btn, C, won } from '@/components/ui';
-import { FileText, UploadCloud, X } from 'lucide-react';
+import { FileText, Trash2, UploadCloud, X } from 'lucide-react';
 import {
   groupPenaltiesByKind,
   type PenaltyWorkRow,
@@ -15,6 +15,7 @@ export function PenaltyBucketPanel({
   rows,
   onClose,
   onOpenItem,
+  onRemoveItem,
   onUpload,
   onDocs,
   matchedDocs,
@@ -22,6 +23,8 @@ export function PenaltyBucketPanel({
   rows: PenaltyWorkRow[];
   onClose: () => void;
   onOpenItem: (row: PenaltyWorkRow) => void;
+  /** 개별 고지서 소프트삭제(확인·commit은 페이지). */
+  onRemoveItem?: (row: PenaltyWorkRow) => void;
   onUpload: () => void;
   onDocs: () => void;
   matchedDocs: number;
@@ -64,35 +67,54 @@ export function PenaltyBucketPanel({
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               {g.rows.map((r) => (
-                <button
+                <div
                   key={r.id}
-                  type="button"
-                  onClick={() => onOpenItem(r)}
                   style={{
-                    textAlign: 'left',
                     border: `1px solid ${C.line}`,
                     borderRadius: 'var(--radius)',
                     background: C.card,
                     padding: '10px 12px',
-                    cursor: 'pointer',
                     display: 'grid',
-                    gridTemplateColumns: '1fr auto',
+                    gridTemplateColumns: onRemoveItem ? '1fr auto auto' : '1fr auto',
                     gap: 8,
+                    alignItems: 'center',
                   }}
                 >
-                  <div style={{ minWidth: 0 }}>
+                  <button
+                    type="button"
+                    onClick={() => onOpenItem(r)}
+                    style={{
+                      textAlign: 'left',
+                      border: 'none',
+                      background: 'transparent',
+                      padding: 0,
+                      cursor: 'pointer',
+                      minWidth: 0,
+                    }}
+                  >
                     <div style={{ fontSize: 13, fontWeight: 700, color: C.ink }}>
                       {r.plate || '차번 없음'} · {r.violationDate || '—'}
                     </div>
                     <div style={{ fontSize: 11.5, color: C.mute, marginTop: 3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       {r.title} · {r.driverName}
                     </div>
-                  </div>
+                  </button>
                   <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
                     <Badge tone={r.process === '종결' ? 'green' : r.process === '미매칭' ? 'red' : 'amber'}>{r.status}</Badge>
                     <span style={{ fontSize: 12, fontWeight: 700, color: C.warn }}>{won(r.amount)}</span>
                   </div>
-                </button>
+                  {onRemoveItem ? (
+                    <Btn
+                      size="sm"
+                      variant="ghost"
+                      tip="삭제"
+                      aria-label="과태료 삭제"
+                      onClick={() => onRemoveItem(r)}
+                    >
+                      <Trash2 size={14} />
+                    </Btn>
+                  ) : null}
+                </div>
               ))}
             </div>
           </div>
