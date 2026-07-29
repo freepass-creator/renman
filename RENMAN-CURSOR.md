@@ -70,6 +70,7 @@ curl -s -o /dev/null -w "%{http_code}" http://localhost:6006/<route>   # 200
 
 | 날짜 | 작업자 | 내용 | 상태 |
 |---|---|---|---|
+| 2026-07-29 | Cursor | 계약 상세 수납스케줄 임베드 잔유 제거 · ContractScheduleEmbed 삭제 | f491fad |
 | 2026-07-29 | Cursor | 리스크 상세 Vehicle360 임베드 잔유 제거 · VehicleSideEmbed 삭제 | 45555d7 |
 | 2026-07-29 | Cursor | 자산·운영 상세 Vehicle360 임베드 잔유 제거 | 938b31c |
 | 2026-07-29 | Cursor | 자금 거래 상세 DETAIL_DEFS 승격 | 6ff5890 |
