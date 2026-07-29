@@ -1,16 +1,16 @@
 /**
  * 재무원장 열 SSOT — 계좌 입·출금 스트림(CashRow).
  * 엑셀 추가/삭제: `자금 · 엑셀기본|엑셀전체 · +|-key` @see lib/ledger-ext.ts
- * (카탈로그·KEYS는 아래 CASH_SHEET_KEYS — BASIC/EXPANDED와 동기.)
  */
 import { Badge, C, type SheetCol } from '@/components/ui';
 import { companyDisplay } from '@/lib/companies';
 import { groupOfLabel, isUnclassified, kindOfLabel } from '@/lib/payments/ledger-subjects';
 import type { CashRow } from '@/lib/finance/cash-ledger';
-import type { SheetViewKeys } from '@/lib/ledger-ext';
+import { buildSheetViews, type SheetViewKeys } from '@/lib/ledger-ext';
+import { LEDGER_EMPTY } from '@/lib/ledger-empty';
 
 const coName = (r: CashRow) => companyDisplay(r.companyId);
-const amt = (n: number) => (n ? n.toLocaleString('ko-KR') : '—');
+const amt = (n: number) => (n ? n.toLocaleString('ko-KR') : LEDGER_EMPTY.dash);
 const content = (r: CashRow) => {
   const a = (r.party || '').trim();
   const b = (r.memo || '').trim();
@@ -31,7 +31,7 @@ const matchStatus = (r: CashRow) => {
   return { label: '해당없음', tone: 'gray' as const };
 };
 
-export const CASH_BASIC_COLS: SheetCol<CashRow>[] = [
+const CASH_COL_CATALOG: SheetCol<CashRow>[] = [
   {
     key: 'co', label: '회사명', pin: true, priority: 1,
     render: (r) => (r.nest === 'cms-item'
@@ -41,41 +41,22 @@ export const CASH_BASIC_COLS: SheetCol<CashRow>[] = [
   },
   {
     key: 'acctName', label: '계좌명', pin: true, priority: 1,
-    render: (r) => r.accountName || (r.nest === 'cms-pending' ? 'CMS 명세' : '—'),
+    render: (r) => r.accountName || (r.nest === 'cms-pending' ? 'CMS 명세' : LEDGER_EMPTY.dash),
     text: (r) => r.accountName || (r.nest === 'cms-pending' ? 'CMS 명세' : ''),
   },
   {
     key: 'acct', label: '계좌번호', priority: 2,
     render: (r) => {
-      if (r.nest === 'cms-item') return <span style={{ color: C.mute, fontSize: 11 }}>{r.account || '—'}</span>;
+      if (r.nest === 'cms-item') return <span style={{ color: C.mute, fontSize: 11 }}>{r.account || LEDGER_EMPTY.dash}</span>;
       if (r.nest === 'cms-pending') return <span style={{ color: C.mute }}>CMS명세</span>;
-      return r.account || '—';
+      return r.account || LEDGER_EMPTY.dash;
     },
     text: (r) => r.account || (r.nest === 'cms-pending' ? 'CMS명세' : ''),
   },
   {
-    key: 'match', label: '매칭상태', align: 'c', priority: 1,
-    render: (r) => {
-      const status = matchStatus(r);
-      return <Badge tone={status.tone}>{status.label}</Badge>;
-    },
-    text: (r) => matchStatus(r).label,
-  },
-  { key: 'date', label: '일자', align: 'c', priority: 1, render: (r) => r.date || '—', text: (r) => r.date },
-  {
-    key: 'in', label: '입금', align: 'r', priority: 1,
-    render: (r) => (r.inAmt
-      ? <span style={{
-          color: (r.nest === 'cms-item' || r.nest === 'cms-pending') ? C.brand : C.ok,
-          fontWeight: 700,
-        }}>{amt(r.inAmt)}</span>
-      : '—'),
-    text: (r) => r.inAmt,
-  },
-  {
-    key: 'out', label: '출금', align: 'r', priority: 1,
-    render: (r) => (r.outAmt ? <span style={{ fontWeight: 700 }}>{amt(r.outAmt)}</span> : '—'),
-    text: (r) => r.outAmt,
+    key: 'content', label: '내용', priority: 2,
+    render: (r) => content(r) || <span style={{ color: C.faint }}>{LEDGER_EMPTY.dash}</span>,
+    text: (r) => content(r),
   },
   {
     key: 'cat', label: '계정과목', priority: 1,
@@ -87,7 +68,7 @@ export const CASH_BASIC_COLS: SheetCol<CashRow>[] = [
         return <Badge tone={settled ? 'blue' : 'amber'}>{settled ? 'CMS집금' : 'CMS집금·미매칭'}</Badge>;
       }
       if (isUnclassified(r.category)) return <Badge tone="amber">미분류</Badge>;
-      return r.category || '—';
+      return r.category || LEDGER_EMPTY.dash;
     },
     text: (r) => {
       if (r.nest === 'cms-item') return 'CMS연결';
@@ -96,9 +77,28 @@ export const CASH_BASIC_COLS: SheetCol<CashRow>[] = [
     },
   },
   {
-    key: 'content', label: '내용', priority: 2,
-    render: (r) => content(r) || <span style={{ color: C.faint }}>—</span>,
-    text: (r) => content(r),
+    key: 'match', label: '매칭상태', align: 'c', priority: 1,
+    render: (r) => {
+      const status = matchStatus(r);
+      return <Badge tone={status.tone}>{status.label}</Badge>;
+    },
+    text: (r) => matchStatus(r).label,
+  },
+  { key: 'date', label: '일자', align: 'c', priority: 1, render: (r) => r.date || LEDGER_EMPTY.dash, text: (r) => r.date },
+  {
+    key: 'in', label: '입금', align: 'r', priority: 1,
+    render: (r) => (r.inAmt
+      ? <span style={{
+          color: (r.nest === 'cms-item' || r.nest === 'cms-pending') ? C.brand : C.ok,
+          fontWeight: 700,
+        }}>{amt(r.inAmt)}</span>
+      : LEDGER_EMPTY.dash),
+    text: (r) => r.inAmt,
+  },
+  {
+    key: 'out', label: '출금', align: 'r', priority: 1,
+    render: (r) => (r.outAmt ? <span style={{ fontWeight: 700 }}>{amt(r.outAmt)}</span> : LEDGER_EMPTY.dash),
+    text: (r) => r.outAmt,
   },
   {
     key: 'alert', label: '데이터알람', priority: 3,
@@ -107,18 +107,14 @@ export const CASH_BASIC_COLS: SheetCol<CashRow>[] = [
       if (alert) return <Badge tone="amber">{alert}</Badge>;
       if (r.nest === 'cms-pending') return <Badge tone="amber">집금 연결 필요</Badge>;
       if (r.raw.reconciliationStatus === '매칭완료') return <Badge tone="green">원본 대사완료</Badge>;
-      return <span style={{ color: C.faint }}>—</span>;
+      return <span style={{ color: C.faint }}>{LEDGER_EMPTY.dash}</span>;
     },
     text: (r) => String(r.raw.dataAlert || r.raw.reconciliationStatus || ''),
   },
-];
-
-export const CASH_EXPANDED_COLS: SheetCol<CashRow>[] = [
-  ...CASH_BASIC_COLS,
   {
     key: 'flowNature', label: '수지구분', align: 'c',
     render: (r) => {
-      const value = kindOfLabel(r.category) || (r.inAmt > 0 ? '수입' : r.outAmt > 0 ? '지출' : '—');
+      const value = kindOfLabel(r.category) || (r.inAmt > 0 ? '수입' : r.outAmt > 0 ? '지출' : LEDGER_EMPTY.dash);
       return <Badge tone={value === '수입' ? 'green' : value === '지출' ? 'amber' : 'gray'}>{value}</Badge>;
     },
     text: (r) => kindOfLabel(r.category) || (r.inAmt > 0 ? '수입' : r.outAmt > 0 ? '지출' : ''),
@@ -132,24 +128,28 @@ export const CASH_EXPANDED_COLS: SheetCol<CashRow>[] = [
   },
   {
     key: 'matchedContract', label: '매칭계약',
-    render: (r) => String(r.raw.matchedContractId || '—'),
+    render: (r) => String(r.raw.matchedContractId || LEDGER_EMPTY.dash),
     text: (r) => String(r.raw.matchedContractId || ''),
   },
   {
     key: 'matchedSchedule', label: '매칭회차', align: 'c',
-    render: (r) => r.raw.matchedScheduleSeq ? `${String(r.raw.matchedScheduleSeq)}회차` : '—',
+    render: (r) => r.raw.matchedScheduleSeq ? `${String(r.raw.matchedScheduleSeq)}회차` : LEDGER_EMPTY.dash,
     text: (r) => String(r.raw.matchedScheduleSeq || ''),
   },
   { key: 'src', label: '출처', align: 'c', render: (r) => <Badge tone="gray">{r.source}</Badge>, text: (r) => r.source },
   { key: 'ent', label: '원천', align: 'c', render: (r) => r.entity, text: (r) => r.entity },
-  { key: 'key', label: '키', render: (r) => r.recKey || '—', text: (r) => r.recKey },
+  { key: 'key', label: '키', render: (r) => r.recKey || LEDGER_EMPTY.dash, text: (r) => r.recKey },
 ];
 
-/** 자금 엑셀 열 keys — 추가/삭제 요청 시 여기와 BASIC/EXPANDED를 같이 맞춤. */
+/** 회사 → 신원(계좌) → 내용 → 분류 → 상태(매칭) → 수치 */
 export const CASH_SHEET_KEYS: SheetViewKeys = {
-  basic: ['co', 'acctName', 'acct', 'match', 'date', 'in', 'out', 'cat', 'content', 'alert'],
+  basic: ['co', 'acctName', 'acct', 'content', 'cat', 'match', 'date', 'in', 'out', 'alert'],
   all: [
-    'co', 'acctName', 'acct', 'match', 'date', 'in', 'out', 'cat', 'content', 'alert',
+    'co', 'acctName', 'acct', 'content', 'cat', 'match', 'date', 'in', 'out', 'alert',
     'flowNature', 'fundNature', 'matchedContract', 'matchedSchedule', 'src', 'ent', 'key',
   ],
 };
+
+const _cashViews = buildSheetViews(CASH_COL_CATALOG, CASH_SHEET_KEYS);
+export const CASH_BASIC_COLS = _cashViews.basic;
+export const CASH_EXPANDED_COLS = _cashViews.expanded;

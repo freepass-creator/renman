@@ -38,6 +38,7 @@ import { buildDetailSections, type DetailSectionDef } from '@/lib/ledger-detail-
 import {
   CASH_ACCOUNT_FILTER_DEFS, CASH_TX_FILTER_DEFS, countActiveFilters, emptyFilterValues, eqFilter, matchLedgerFilters,
 } from '@/lib/ledger-filter-defs';
+import { LEDGER_EMPTY } from '@/lib/ledger-empty';
 
 type Flow = '전체' | '입금' | '출금';
 type CashLedgerKind = '입출금내역' | '계좌관리' | 'CMS 원천내역' | '법인카드 원천내역';
@@ -834,7 +835,7 @@ export default function CashLedgerPage() {
       ) : selected ? (
         <LedgerRecordPanel
           title={`${selected.date || '일자 없음'} · ${selected.category || '거래'}`}
-          identity={selected.party || '거래처 미입력'}
+          identity={selected.party || LEDGER_EMPTY.none}
           statusBadge={CASH_BASIC_COLS.find((c) => c.key === 'match')?.render(selected)}
           row={selected}
           cols={CASH_TRANSACTION_DETAIL_COLS}
