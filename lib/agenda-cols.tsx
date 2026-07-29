@@ -8,12 +8,13 @@ import type { AgendaItem } from './agenda';
 import {
   buildDetailSections, buildSheetViews, type DetailSectionDef, type SheetViewKeys,
 } from './ledger-ext';
+import { LEDGER_EMPTY } from './ledger-empty';
 
 const statusTone = (s: AgendaItem['status']): 'red' | 'amber' | 'green' =>
   s === '어김' ? 'red' : s === '임박' ? 'amber' : 'green';
 
 const AGENDA_COL_CATALOG: SheetCol<AgendaItem>[] = [
-  { key: 'company', label: '표시명', pin: true, align: 'c', render: (r) => r.company || '—', text: (r) => r.company },
+  { key: 'company', label: '표시명', pin: true, align: 'c', render: (r) => r.company || LEDGER_EMPTY.dash, text: (r) => r.company },
   { key: 'date', label: '기한일', align: 'c', render: (r) => r.date, text: (r) => r.date },
   {
     key: 'dday', label: 'D-day', align: 'c',
@@ -34,9 +35,9 @@ const AGENDA_COL_CATALOG: SheetCol<AgendaItem>[] = [
     render: (r) => <Badge tone="gray">{r.kind}</Badge>,
     text: (r) => r.kind,
   },
-  { key: 'plate', label: '차량', pin: true, render: (r) => r.plate || '—', text: (r) => r.plate },
-  { key: 'title', label: '내용', render: (r) => r.title || '—', text: (r) => r.title },
-  { key: 'companyId', label: '회사ID', render: (r) => r.companyId || '—', text: (r) => r.companyId },
+  { key: 'plate', label: '차량', pin: true, render: (r) => r.plate || LEDGER_EMPTY.dash, text: (r) => r.plate },
+  { key: 'title', label: '내용', render: (r) => r.title || LEDGER_EMPTY.dash, text: (r) => r.title },
+  { key: 'companyId', label: '회사ID', render: (r) => r.companyId || LEDGER_EMPTY.dash, text: (r) => r.companyId },
   { key: 'key', label: '키', render: (r) => r.key, text: (r) => r.key },
 ];
 

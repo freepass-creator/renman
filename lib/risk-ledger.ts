@@ -16,6 +16,7 @@ import { buildHomePendingRows } from '@/lib/home-rows';
 import { companyShort } from '@/lib/companies';
 import type { BadgeTone } from '@/components/ui/misc';
 import { NAV_GROUPS, type NavItem } from '@/lib/nav';
+import { LEDGER_EMPTY } from '@/lib/ledger-empty';
 
 /** 만기 칩 경계 — D≤이 값(경과 포함은 미완료, 임박만 만기). buildAgenda 임박과 동일. */
 export const RISK_DDAY_BOUND = 7;
@@ -57,14 +58,14 @@ const GROUP_TONE: Record<RiskSheetGroup, { tone: RiskTone; badgeTone: BadgeTone 
 const GROUP_RANK: Record<RiskSheetGroup, number> = { 미완료: 0, 미납: 1, 만기: 2, 휴차: 3 };
 
 function ddayLabel(d: number | null): string {
-  if (d == null) return '—';
+  if (d == null) return LEDGER_EMPTY.dash;
   if (d < 0) return `D+${Math.abs(d)}`;
   if (d === 0) return 'D-Day';
   return `D-${d}`;
 }
 
 function carNameOf(r: FleetRow): string {
-  return r.carName || [r.maker, r.subModel].filter(Boolean).join(' ') || '—';
+  return r.carName || [r.maker, r.subModel].filter(Boolean).join(' ') || LEDGER_EMPTY.dash;
 }
 
 function companyOf(fr?: Pick<FleetRow, 'companyId' | 'company'>, rec?: EntityRecord): { companyId: string; company: string } {
@@ -128,9 +129,9 @@ export function buildRiskSheetRows(
       kind: '만기경과',
       ...companyOf(r),
       plate: r.plate,
-      customer: r.customer || '—',
+      customer: r.customer || LEDGER_EMPTY.none,
       carName: carNameOf(r),
-      due: `${ddayLabel(r.dday)} · ${r.end || '—'}`,
+      due: `${ddayLabel(r.dday)} · ${r.end || LEDGER_EMPTY.dash}`,
       dueDate: (r.end || '').slice(0, 10),
       amount: Math.max(0, r.net),
       status: '만기경과',
@@ -142,7 +143,7 @@ export function buildRiskSheetRows(
       kind: '인도예정',
       ...companyOf(r),
       plate: r.plate,
-      customer: r.customer || '—',
+      customer: r.customer || LEDGER_EMPTY.none,
       carName: carNameOf(r),
       due: r.status || r.ownership,
       dueDate: (r.acqDate || r.start || '').slice(0, 10),
@@ -159,8 +160,8 @@ export function buildRiskSheetRows(
       kind: a.kind,
       ...companyOf(fr),
       plate: a.plate,
-      customer: a.title || '—',
-      carName: fr ? carNameOf(fr) : '—',
+      customer: a.title || LEDGER_EMPTY.none,
+      carName: fr ? carNameOf(fr) : LEDGER_EMPTY.dash,
       due: `${ddayLabel(a.dday)} · ${a.date}`,
       dueDate: a.date,
       amount: 0,
@@ -180,8 +181,8 @@ export function buildRiskSheetRows(
       kind: v.ended ? '반환미수' : '미납',
       ...companyOf(fr, v.rec),
       plate,
-      customer: String(v.rec.contractorName || '—'),
-      carName: fr ? carNameOf(fr) : String(v.rec.carName || '—'),
+      customer: String(v.rec.contractorName || LEDGER_EMPTY.none),
+      carName: fr ? carNameOf(fr) : String(v.rec.carName || LEDGER_EMPTY.dash),
       due: v.overdueDays ? `${v.overdueDays}일 연체` : ddayLabel(v.dday),
       dueDate: String(v.rec.endDate || '').slice(0, 10),
       amount: v.net,
@@ -199,9 +200,9 @@ export function buildRiskSheetRows(
       kind: '만기임박',
       ...companyOf(r),
       plate: r.plate,
-      customer: r.customer || '—',
+      customer: r.customer || LEDGER_EMPTY.none,
       carName: carNameOf(r),
-      due: `${ddayLabel(r.dday)} · ${r.end || '—'}`,
+      due: `${ddayLabel(r.dday)} · ${r.end || LEDGER_EMPTY.dash}`,
       dueDate: (r.end || '').slice(0, 10),
       amount: Math.max(0, r.net),
       status: '만기임박',
@@ -218,8 +219,8 @@ export function buildRiskSheetRows(
       kind: a.kind,
       ...companyOf(fr),
       plate: a.plate,
-      customer: a.title || '—',
-      carName: fr ? carNameOf(fr) : '—',
+      customer: a.title || LEDGER_EMPTY.none,
+      carName: fr ? carNameOf(fr) : LEDGER_EMPTY.dash,
       due: `${ddayLabel(a.dday)} · ${a.date}`,
       dueDate: a.date,
       amount: 0,
@@ -237,9 +238,9 @@ export function buildRiskSheetRows(
       kind: p.kind,
       ...companyOf(fr),
       plate: p.plate,
-      customer: p.title || '—',
-      carName: fr ? carNameOf(fr) : '—',
-      due: p.detail || '—',
+      customer: p.title || LEDGER_EMPTY.none,
+      carName: fr ? carNameOf(fr) : LEDGER_EMPTY.dash,
+      due: p.detail || LEDGER_EMPTY.dash,
       dueDate: '',
       amount: Math.max(0, p.amount),
       status: '미처리',
@@ -253,9 +254,9 @@ export function buildRiskSheetRows(
       kind: '휴차',
       ...companyOf(r),
       plate: r.plate,
-      customer: r.customer || '—',
+      customer: r.customer || LEDGER_EMPTY.none,
       carName: carNameOf(r),
-      due: '—',
+      due: LEDGER_EMPTY.dash,
       dueDate: '',
       amount: Math.max(0, r.net),
       status: r.status || '휴차',

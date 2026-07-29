@@ -16,31 +16,32 @@ import { dday } from './dashboard-consts';
 import { AlertTriangle } from 'lucide-react';
 import { buildDetailSections, buildSheetViews, type DetailSectionDef, type SheetViewKeys } from './ledger-ext';
 import { paymentTimingOf } from './schema/contract';
+import { LEDGER_EMPTY } from './ledger-empty';
 
 const toneBadge = (t: SheetRow['tone']): 'green' | 'amber' | 'red' | 'gray' =>
   t === 'ok' ? 'green' : t === 'warn' ? 'amber' : t === 'danger' ? 'red' : 'gray';
 
 /** @deprecated 웹 /asset는 master-ledger-cols. 레거시 SheetRow 전용 — 신규 사용 금지. */
 export const ASSET_COLS: SheetCol<SheetRow>[] = [
-  { key: 'co', label: '회사명', pin: true, render: (r) => r.company || '—', text: (r) => r.company },
-  { key: 'plate', label: '차량번호', pin: true, render: (r) => r.plate || '—', text: (r) => r.plate },
+  { key: 'co', label: '회사명', pin: true, render: (r) => r.company || LEDGER_EMPTY.dash, text: (r) => r.company },
+  { key: 'plate', label: '차량번호', pin: true, render: (r) => r.plate || LEDGER_EMPTY.dash, text: (r) => r.plate },
   // 생애단계 = 카드뷰 섹션(구매예정·등록예정·보유중·처분예정·처분완료)이 엑셀에선 이 분류 열로. align center.
   { key: 'own', label: '생애단계', align: 'c', render: (r) => <Badge tone={r.ownership === '보유중' ? 'green' : r.ownership === '처분완료' ? 'gray' : 'amber'}>{r.ownership}</Badge>, text: (r) => r.ownership },
   { key: 'util', label: '가동', align: 'c', render: (r) => <Badge tone={toneBadge(r.tone)}>{r.util}</Badge>, text: (r) => r.util },
-  { key: 'car', label: '차명', render: (r) => r.carName || '—', text: (r) => r.carName },
-  { key: 'year', label: '연식', render: (r) => r.year || '—', text: (r) => r.year },
-  { key: 'cust', label: '계약자', render: (r) => r.customer || '—', text: (r) => r.customer },
-  { key: 'rent', label: '대여료', align: 'r', render: (r) => r.rent ? won(r.rent) : '—', text: (r) => r.rent },
+  { key: 'car', label: '차명', render: (r) => r.carName || LEDGER_EMPTY.dash, text: (r) => r.carName },
+  { key: 'year', label: '연식', render: (r) => r.year || LEDGER_EMPTY.dash, text: (r) => r.year },
+  { key: 'cust', label: '계약자', render: (r) => r.customer || LEDGER_EMPTY.none, text: (r) => r.customer },
+  { key: 'rent', label: '대여료', align: 'r', render: (r) => r.rent ? won(r.rent) : LEDGER_EMPTY.dash, text: (r) => r.rent },
   {
     key: 'net', label: '미수', align: 'r',
-    render: (r) => r.net > 0 ? <span style={{ color: C.danger, fontWeight: 700 }}>{won(r.net)}</span> : '—',
+    render: (r) => r.net > 0 ? <span style={{ color: C.danger, fontWeight: 700 }}>{won(r.net)}</span> : LEDGER_EMPTY.dash,
     text: (r) => r.net,
   },
-  { key: 'start', label: '시작', render: (r) => r.start || '—', text: (r) => r.start },
-  { key: 'end', label: '만기', render: (r) => r.end || '—', text: (r) => r.end },
+  { key: 'start', label: '시작', render: (r) => r.start || LEDGER_EMPTY.dash, text: (r) => r.start },
+  { key: 'end', label: '만기', render: (r) => r.end || LEDGER_EMPTY.dash, text: (r) => r.end },
   {
     key: 'dday', label: 'D-day', align: 'r',
-    render: (r) => r.dday == null ? '—' : r.dday < 0 ? <span style={{ color: C.danger }}>{r.dday}</span> : `D-${r.dday}`,
+    render: (r) => r.dday == null ? LEDGER_EMPTY.dash : r.dday < 0 ? <span style={{ color: C.danger }}>{r.dday}</span> : `D-${r.dday}`,
     text: (r) => r.dday ?? '',
   },
 ];
@@ -49,24 +50,24 @@ export const ASSET_COLS: SheetCol<SheetRow>[] = [
  *   표식=회사명→차량번호 선두 · 누구(계약자) · 돈 · 시간 · 상태 · 연락처(끝)
  *   탭/화면마다 «빼기»만 · 자리 고정 — 눈이 같은 데를 본다. */
 const misu = (r: ContractRow) =>
-  r.net > 0 ? <span style={{ color: C.danger, fontWeight: 700 }}>{won(r.net)}</span> : '—';
+  r.net > 0 ? <span style={{ color: C.danger, fontWeight: 700 }}>{won(r.net)}</span> : LEDGER_EMPTY.dash;
 
 const CT = {
-  co: { key: 'co', label: '회사명', pin: true, render: (r) => r.company || '—', text: (r) => r.company },
-  plate: { key: 'plate', label: '차량번호', pin: true, render: (r) => r.plate || '—', text: (r) => r.plate },
-  car: { key: 'car', label: '차명', render: (r) => r.carName || '—', text: (r) => r.carName },
-  cust: { key: 'cust', label: '계약자', render: (r) => r.customer || '—', text: (r) => r.customer },
-  rent: { key: 'rent', label: '대여료', align: 'r', render: (r) => r.rent ? won(r.rent) : '—', text: (r) => r.rent },
-  dep: { key: 'dep', label: '보증금', align: 'r', render: (r) => r.deposit ? won(r.deposit) : '—', text: (r) => r.deposit },
+  co: { key: 'co', label: '회사명', pin: true, render: (r) => r.company || LEDGER_EMPTY.dash, text: (r) => r.company },
+  plate: { key: 'plate', label: '차량번호', pin: true, render: (r) => r.plate || LEDGER_EMPTY.dash, text: (r) => r.plate },
+  car: { key: 'car', label: '차명', render: (r) => r.carName || LEDGER_EMPTY.dash, text: (r) => r.carName },
+  cust: { key: 'cust', label: '계약자', render: (r) => r.customer || LEDGER_EMPTY.none, text: (r) => r.customer },
+  rent: { key: 'rent', label: '대여료', align: 'r', render: (r) => r.rent ? won(r.rent) : LEDGER_EMPTY.dash, text: (r) => r.rent },
+  dep: { key: 'dep', label: '보증금', align: 'r', render: (r) => r.deposit ? won(r.deposit) : LEDGER_EMPTY.dash, text: (r) => r.deposit },
   net: { key: 'net', label: '미수', align: 'r', render: misu, text: (r) => r.net },
-  start: { key: 'start', label: '시작', render: (r) => r.start || '—', text: (r) => r.start },
-  end: { key: 'end', label: '만기', render: (r) => r.end || '—', text: (r) => r.end },
+  start: { key: 'start', label: '시작', render: (r) => r.start || LEDGER_EMPTY.dash, text: (r) => r.start },
+  end: { key: 'end', label: '만기', render: (r) => r.end || LEDGER_EMPTY.dash, text: (r) => r.end },
   dday: {
     key: 'dday', label: 'D-day', align: 'r',
-    render: (r) => r.dday == null ? '—' : r.dday < 0 ? <span style={{ color: C.danger }}>{r.dday}</span> : `D-${r.dday}`,
+    render: (r) => r.dday == null ? LEDGER_EMPTY.dash : r.dday < 0 ? <span style={{ color: C.danger }}>{r.dday}</span> : `D-${r.dday}`,
     text: (r) => r.dday ?? '',
   },
-  ret: { key: 'ret', label: '반납일', render: (r) => r.returned || '—', text: (r) => r.returned },
+  ret: { key: 'ret', label: '반납일', render: (r) => r.returned || LEDGER_EMPTY.dash, text: (r) => r.returned },
   st: { key: 'st', label: '상태', render: (r) => <Badge tone={r.ended ? 'gray' : 'green'}>{r.status}</Badge>, text: (r) => r.status },
   alert: {
     key: 'alert', label: '데이터알람',
@@ -79,11 +80,11 @@ const CT = {
     key: 'od', label: '연체일', align: 'r',
     render: (r) => r.overdueDays > 0
       ? <span style={{ color: r.overdueDays >= 90 ? C.danger : C.warn, fontWeight: 700 }}>{r.overdueDays}일</span>
-      : '—',
+      : LEDGER_EMPTY.dash,
     text: (r) => r.overdueDays,
   },
-  cnt: { key: 'cnt', label: '미납회차', align: 'r', render: (r) => r.count || '—', text: (r) => r.count },
-  phone: { key: 'phone', label: '연락처', render: (r) => r.phone || '—', text: (r) => r.phone },
+  cnt: { key: 'cnt', label: '미납회차', align: 'r', render: (r) => r.count || LEDGER_EMPTY.dash, text: (r) => r.count },
+  phone: { key: 'phone', label: '연락처', render: (r) => r.phone || LEDGER_EMPTY.dash, text: (r) => r.phone },
 } satisfies Record<string, SheetCol<ContractRow>>;
 
 /** @deprecated 웹 /contract는 master-ledger-cols. 레거시 ContractRow 전용 — 신규 사용 금지. */
@@ -108,12 +109,12 @@ export const DEBT_COLS: SheetCol<ContractRow>[] = [
  *   기본 = 자산(번호판·법인·상태·차명) + 계약/손님(계약자·기간·월렌트) + 미수.
  *   전체 = 기본 + 자산상세(연식·VIN·취득·검사·GPS) + 할부(할부사·원금·이율·개월) + 보험(보험사·만기·보험료) + 연체.
  *   자리 고정 — 전체는 기본 열 사이에 «끼워넣지» 말고 뒤로 확장(눈이 같은 데를 본다). */
-const won0 = (n: number) => (n ? won(n) : '—');
-const n0 = (n: number) => (n ? n.toLocaleString('ko-KR') : '—');   // 콤마 숫자(₩ 없음) — 보증금·대여료용
-const ymd = (s: string) => s ? s.slice(0, 10) : '—';
+const won0 = (n: number) => (n ? won(n) : LEDGER_EMPTY.dash);
+const n0 = (n: number) => (n ? n.toLocaleString('ko-KR') : LEDGER_EMPTY.dash);   // 콤마 숫자(₩ 없음) — 보증금·대여료용
+const ymd = (s: string) => s ? s.slice(0, 10) : LEDGER_EMPTY.dash;
 // 만기 셀 — «한 셀 한 값»: 날짜 하나만, 긴급도는 색으로(만료·D-7=빨강 / D-30=주황 / 그 외 기본). 검사·보험 공용.
 const ddayCell = (s: string) => {
-  if (!s) return '—';
+  if (!s) return LEDGER_EMPTY.dash;
   const t = ymd(s);
   const d = dday(s);
   if (d == null) return t;
@@ -134,26 +135,26 @@ export function remainSpanLabel(d: number | null): string {
   return parts.length ? parts.join(' ') : '0일';
 }
 const FL = {
-  plate: { key: 'plate', label: '차량번호', pin: true, render: (r) => r.plate || '—', text: (r) => r.plate },
-  co: { key: 'co', label: '회사명', pin: true, render: (r) => r.company || '—', text: (r) => r.company },
+  plate: { key: 'plate', label: '차량번호', pin: true, render: (r) => r.plate || LEDGER_EMPTY.dash, text: (r) => r.plate },
+  co: { key: 'co', label: '회사명', pin: true, render: (r) => r.company || LEDGER_EMPTY.dash, text: (r) => r.company },
   status: { key: 'status', label: '차량상태', render: (r) => <Badge tone={toneBadge(r.tone)}>{r.status}</Badge>, text: (r) => r.status },
-  loc: { key: 'loc', label: '현위치', render: (r) => r.location || '—', text: (r) => r.location },
-  car: { key: 'car', label: '차명', render: (r) => r.carName || '—', text: (r) => r.carName },
-  maker: { key: 'maker', label: '제조사', render: (r) => r.maker || '—', text: (r) => r.maker },
-  sub: { key: 'sub', label: '세부모델', render: (r) => r.subModel || '—', text: (r) => r.subModel },
-  year: { key: 'year', label: '연식', render: (r) => r.year || '—', text: (r) => r.year },
-  vin: { key: 'vin', label: '차대번호', render: (r) => r.vin || '—', text: (r) => r.vin },
+  loc: { key: 'loc', label: '현위치', render: (r) => r.location || LEDGER_EMPTY.dash, text: (r) => r.location },
+  car: { key: 'car', label: '차명', render: (r) => r.carName || LEDGER_EMPTY.dash, text: (r) => r.carName },
+  maker: { key: 'maker', label: '제조사', render: (r) => r.maker || LEDGER_EMPTY.dash, text: (r) => r.maker },
+  sub: { key: 'sub', label: '세부모델', render: (r) => r.subModel || LEDGER_EMPTY.dash, text: (r) => r.subModel },
+  year: { key: 'year', label: '연식', render: (r) => r.year || LEDGER_EMPTY.dash, text: (r) => r.year },
+  vin: { key: 'vin', label: '차대번호', render: (r) => r.vin || LEDGER_EMPTY.dash, text: (r) => r.vin },
   acqDate: { key: 'acqDate', label: '취득일', render: (r) => ymd(r.acqDate), text: (r) => r.acqDate },
   acqPrice: { key: 'acqPrice', label: '취득가', align: 'r', render: (r) => won0(r.acqPrice), text: (r) => r.acqPrice },
   inspect: { key: 'inspect', label: '검사만기', render: (r) => ddayCell(r.inspectionTo), text: (r) => r.inspectionTo },
-  gps: { key: 'gps', label: 'GPS', render: (r) => r.gps || '—', text: (r) => r.gps },
-  loanCo: { key: 'loanCo', label: '할부사', render: (r) => r.loanCompany || '—', text: (r) => r.loanCompany },
+  gps: { key: 'gps', label: 'GPS', render: (r) => r.gps || LEDGER_EMPTY.dash, text: (r) => r.gps },
+  loanCo: { key: 'loanCo', label: '할부사', render: (r) => r.loanCompany || LEDGER_EMPTY.dash, text: (r) => r.loanCompany },
   loanAmt: { key: 'loanAmt', label: '할부원금', align: 'r', render: (r) => won0(r.loanPrincipal), text: (r) => r.loanPrincipal },
-  loanRate: { key: 'loanRate', label: '이율', align: 'r', render: (r) => r.loanRate ? `${(r.loanRate * 100).toFixed(1)}%` : '—', text: (r) => r.loanRate },
-  loanMon: { key: 'loanMon', label: '할부개월', align: 'r', render: (r) => r.loanMonths || '—', text: (r) => r.loanMonths },
-  cust: { key: 'cust', label: '사용처', render: (r) => r.customer || '—', text: (r) => r.customer },
-  term: { key: 'term', label: '계약기간', align: 'r', render: (r) => r.termMonths ? `${r.termMonths}개월` : '—', text: (r) => r.termMonths },
-  phone: { key: 'phone', label: '연락처', render: (r) => r.phone || '—', text: (r) => r.phone },
+  loanRate: { key: 'loanRate', label: '이율', align: 'r', render: (r) => r.loanRate ? `${(r.loanRate * 100).toFixed(1)}%` : LEDGER_EMPTY.dash, text: (r) => r.loanRate },
+  loanMon: { key: 'loanMon', label: '할부개월', align: 'r', render: (r) => r.loanMonths || LEDGER_EMPTY.dash, text: (r) => r.loanMonths },
+  cust: { key: 'cust', label: '사용처', render: (r) => r.customer || LEDGER_EMPTY.none, text: (r) => r.customer },
+  term: { key: 'term', label: '계약기간', align: 'r', render: (r) => r.termMonths ? `${r.termMonths}개월` : LEDGER_EMPTY.dash, text: (r) => r.termMonths },
+  phone: { key: 'phone', label: '연락처', render: (r) => r.phone || LEDGER_EMPTY.dash, text: (r) => r.phone },
   rent: { key: 'rent', label: '대여료', align: 'r', render: (r) => n0(r.rent), text: (r) => r.rent },
   dep: { key: 'dep', label: '보증금', align: 'r', render: (r) => n0(r.deposit), text: (r) => r.deposit },
   start: { key: 'start', label: '시작', render: (r) => ymd(r.start), text: (r) => r.start },
@@ -161,7 +162,7 @@ const FL = {
   dday: {
     key: 'dday', label: '반납까지', align: 'r',
     render: (r) => {
-      if (r.dday == null) return '—';
+      if (r.dday == null) return LEDGER_EMPTY.dash;
       const tip = remainSpanLabel(r.dday);
       const color = r.dday < 0 ? C.danger : r.dday <= 7 ? C.warn : undefined;
       const body = r.dday === 0 ? '0' : String(r.dday);
@@ -171,26 +172,26 @@ const FL = {
     },
     text: (r) => r.dday ?? '',
   },
-  insurer: { key: 'insurer', label: '보험사', render: (r) => r.insurer || '—', text: (r) => r.insurer },
+  insurer: { key: 'insurer', label: '보험사', render: (r) => r.insurer || LEDGER_EMPTY.dash, text: (r) => r.insurer },
   insEnd: { key: 'insEnd', label: '보험만기', render: (r) => ddayCell(r.insEnd), text: (r) => r.insEnd },
   insPrem: { key: 'insPrem', label: '보험료', align: 'r', render: (r) => won0(r.insPremium), text: (r) => r.insPremium },
   net: {
     key: 'net', label: '미수', align: 'r',
-    render: (r) => r.net > 0 ? <span style={{ color: C.danger, fontWeight: 700 }}>{n0(r.net)}</span> : '—',
+    render: (r) => r.net > 0 ? <span style={{ color: C.danger, fontWeight: 700 }}>{n0(r.net)}</span> : LEDGER_EMPTY.dash,
     text: (r) => r.net,
   },
   od: {
     key: 'od', label: '미수기간', align: 'r',
-    render: (r) => r.overdueDays > 0 ? <span style={{ color: r.overdueDays >= 90 ? C.danger : C.warn, fontWeight: 700 }}>{r.overdueDays}일</span> : '—',
+    render: (r) => r.overdueDays > 0 ? <span style={{ color: r.overdueDays >= 90 ? C.danger : C.warn, fontWeight: 700 }}>{r.overdueDays}일</span> : LEDGER_EMPTY.dash,
     text: (r) => r.overdueDays,
   },
-  own: { key: 'own', label: '소유', render: (r) => r.ownership || '—', text: (r) => r.ownership },
-  util: { key: 'util', label: '가동', render: (r) => r.util || '—', text: (r) => r.util },
+  own: { key: 'own', label: '소유', render: (r) => r.ownership || LEDGER_EMPTY.dash, text: (r) => r.ownership },
+  util: { key: 'util', label: '가동', render: (r) => r.util || LEDGER_EMPTY.dash, text: (r) => r.util },
   loanStart: { key: 'loanStart', label: '할부시작', render: (r) => ymd(r.loanStart), text: (r) => r.loanStart },
   stage: {
     key: 'stage', label: '회수단계',
     render: (r) => {
-      if (r.overdueDays <= 0) return '—';
+      if (r.overdueDays <= 0) return LEDGER_EMPTY.dash;
       const cs = collectionStage(r.overdueDays);
       const col = (cs.tone === 'red' || cs.tone === 'purple') ? C.danger : cs.tone === 'orange' ? C.warn : C.mute;
       return <span style={{ color: col, fontWeight: 700 }}>{cs.stage}</span>;
@@ -215,13 +216,13 @@ const FL = {
   // 결제일 · 납부시기 — 한 셀에 합치지 않음(각각 열).
   paymentDay: {
     key: 'paymentDay', label: '결제일', align: 'c',
-    render: (r) => (r.paymentDay ? `${r.paymentDay}일` : '—'),
+    render: (r) => (r.paymentDay ? `${r.paymentDay}일` : LEDGER_EMPTY.dash),
     text: (r) => (r.paymentDay ? `${r.paymentDay}일` : ''),
   },
   paymentTiming: {
     key: 'paymentTiming', label: '납부시기', align: 'c',
     render: (r) => {
-      if (!r.paymentDay && !r.paymentTiming) return '—';
+      if (!r.paymentDay && !r.paymentTiming) return LEDGER_EMPTY.dash;
       const t = paymentTimingOf(r.paymentTiming);
       return <span style={{ color: t === '후납' ? C.warn : C.mute, fontWeight: 700 }}>{t}</span>;
     },
@@ -230,14 +231,14 @@ const FL = {
   // 회차 — 도래/총(예 11/12). 계약 없으면 —.
   round: {
     key: 'round', label: '회차', align: 'c',
-    render: (r) => (r.roundTotal ? `${r.roundDue}/${r.roundTotal}` : '—'),
+    render: (r) => (r.roundTotal ? `${r.roundDue}/${r.roundTotal}` : LEDGER_EMPTY.dash),
     text: (r) => (r.roundTotal ? `${r.roundDue}/${r.roundTotal}` : ''),
   },
   // 비고 — 자유 메모(차량 note/memo). 없으면 —.
-  note: { key: 'note', label: '비고', render: (r) => r.note || '—', text: (r) => r.note },
+  note: { key: 'note', label: '비고', render: (r) => r.note || LEDGER_EMPTY.dash, text: (r) => r.note },
   rentalType: {
     key: 'rentalType', label: '대여형태', align: 'c',
-    render: (r) => r.rentalType || '—',
+    render: (r) => r.rentalType || LEDGER_EMPTY.dash,
     text: (r) => r.rentalType,
   },
 } satisfies Record<string, SheetCol<FleetRow>>;

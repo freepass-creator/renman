@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { TODAY } from '@/lib/dashboard-consts';
 import { useEntityLists } from '@/lib/use-entity-lists';
 import { buildRiskSheetRows, type RiskSheetGroup } from '@/lib/risk-ledger';
+import { LEDGER_EMPTY } from '@/lib/ledger-empty';
 import { Rows, ObjRow, EmptyState, PageLoading, FilterChips, C } from '@/components/ui';
 import { MHead } from '@/components/m/MHead';
 
@@ -59,7 +60,7 @@ export default function MRisk() {
                     badgeTone={item.badgeTone}
                     plate={item.plate || undefined}
                     name={!item.plate ? item.kind : undefined}
-                    meta={`${item.customer}${item.carName && item.carName !== '—' ? ` · ${item.carName}` : ''}`}
+                    meta={`${item.customer}${item.carName && item.carName !== LEDGER_EMPTY.dash ? ` · ${item.carName}` : ''}`}
                     sub={item.due}
                     right={item.amount > 0 ? `${item.amount.toLocaleString('ko-KR')}원` : item.status}
                     rightTone={item.amount > 0 ? 'danger' : item.tone === 'warn' ? 'warn' : 'ink'}

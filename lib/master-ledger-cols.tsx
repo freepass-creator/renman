@@ -5,11 +5,12 @@ import {
 } from './ledger-ext';
 import { paymentTimingOf } from './schema/contract';
 import { workRailStyle } from './work-rail';
+import { LEDGER_EMPTY } from './ledger-empty';
 
-const dash = (v: unknown) => (v === '' || v === null || v === undefined || v === 0 ? '—' : String(v));
-const date = (v: string) => v ? v.slice(0, 10) : '—';
-const money = (v: number) => v ? won(v) : '—';
-const number = (v: number, suffix = '') => v ? `${v.toLocaleString('ko-KR')}${suffix}` : '—';
+const dash = (v: unknown) => (v === '' || v === null || v === undefined || v === 0 ? LEDGER_EMPTY.dash : String(v));
+const date = (v: string) => (v ? v.slice(0, 10) : LEDGER_EMPTY.dash);
+const money = (v: number) => (v ? won(v) : LEDGER_EMPTY.dash);
+const number = (v: number, suffix = '') => (v ? `${v.toLocaleString('ko-KR')}${suffix}` : LEDGER_EMPTY.dash);
 
 /** 자산 원장 rail — 상태·차종 축(함대 fleetRail 비재사용). */
 export function assetRail(r: Pick<AssetMasterRow, 'disposed' | 'status' | 'vehicleType'>): RailTone {
@@ -177,9 +178,9 @@ const C0 = {
   contractNo: { key: 'contractNo', label: '계약번호', pin: true, priority: 1, render: (r) => dash(r.contractNo), text: (r) => r.contractNo },
   status: { key: 'status', label: '계약상태', align: 'c', priority: 1, render: (r) => <Badge tone={r.ended ? 'gray' : 'green'}>{r.status}</Badge>, text: (r) => r.status },
   rentalType: { key: 'rentalType', label: '대여형태', align: 'c', priority: 2, render: (r) => dash(r.rentalType), text: (r) => r.rentalType },
-  contractorName: { key: 'contractorName', label: '계약자', priority: 1, render: (r) => dash(r.contractorName), text: (r) => r.contractorName },
+  contractorName: { key: 'contractorName', label: '계약자', priority: 1, render: (r) => (r.contractorName ? String(r.contractorName) : LEDGER_EMPTY.none), text: (r) => r.contractorName },
   contractorPhone: { key: 'contractorPhone', label: '연락처', priority: 3, render: (r) => dash(r.contractorPhone), text: (r) => r.contractorPhone },
-  plate: { key: 'plate', label: '계약차량', priority: 1, render: (r) => dash(r.plate), text: (r) => r.plate },
+  plate: { key: 'plate', label: '계약차량', priority: 1, render: (r) => (r.plate ? String(r.plate) : LEDGER_EMPTY.unassigned), text: (r) => r.plate },
   carName: { key: 'carName', label: '계약차종', priority: 3, render: (r) => dash(r.carName), text: (r) => r.carName },
   contractDate: { key: 'contractDate', label: '계약일', priority: 4, render: (r) => date(r.contractDate), text: (r) => r.contractDate },
   startDate: { key: 'startDate', label: '시작일', priority: 2, render: (r) => date(r.startDate), text: (r) => r.startDate },
@@ -188,7 +189,7 @@ const C0 = {
   deposit: { key: 'deposit', label: '보증금', align: 'r', priority: 3, render: (r) => money(r.deposit), text: (r) => r.deposit },
   paymentDay: {
     key: 'paymentDay', label: '결제일', align: 'c', priority: 3,
-    render: (r) => (r.paymentDay ? `${r.paymentDay}일` : '—'),
+    render: (r) => (r.paymentDay ? `${r.paymentDay}일` : LEDGER_EMPTY.dash),
     text: (r) => r.paymentDay || '',
   },
   paymentTiming: {
@@ -204,8 +205,8 @@ const C0 = {
     render: (r) => dash(r.paymentMethod),
     text: (r) => r.paymentMethod,
   },
-  risk: { key: 'riskLabel', label: '리스크', priority: 1, render: (r) => r.atRisk ? <Badge tone="red">{r.riskLabel}</Badge> : '—', text: (r) => r.riskLabel },
-  net: { key: 'net', label: '미수금액', align: 'r', priority: 1, render: (r) => r.net ? <span style={{ color: C.danger, fontWeight: 700 }}>{won(r.net)}</span> : '—', text: (r) => r.net },
+  risk: { key: 'riskLabel', label: '리스크', priority: 1, render: (r) => r.atRisk ? <Badge tone="red">{r.riskLabel}</Badge> : LEDGER_EMPTY.dash, text: (r) => r.riskLabel },
+  net: { key: 'net', label: '미수금액', align: 'r', priority: 1, render: (r) => r.net ? <span style={{ color: C.danger, fontWeight: 700 }}>{won(r.net)}</span> : LEDGER_EMPTY.dash, text: (r) => r.net },
   alert: { key: 'alert', label: '데이터알람', priority: 2, render: (r) => r.dataAlert ? <Badge tone="amber">{r.dataAlert}</Badge> : <Badge tone="green">원본 대사완료</Badge>, text: (r) => r.dataAlert || '원본 대사완료' },
 } satisfies Record<string, SheetCol<ContractMasterRow>>;
 

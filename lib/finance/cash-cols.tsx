@@ -20,14 +20,14 @@ const content = (r: CashRow) => {
 
 const matchStatus = (r: CashRow) => {
   if (r.nest === 'cms-item') return { label: '매칭완료', tone: 'green' as const };
-  if (r.nest === 'cms-pending') return { label: '미매칭', tone: 'amber' as const };
+  if (r.nest === 'cms-pending') return { label: LEDGER_EMPTY.unmatched, tone: 'amber' as const };
   if (r.nest === 'cms-dep') {
     return String(r.raw.settlementRole || '') === 'deposit'
       ? { label: '매칭완료', tone: 'green' as const }
-      : { label: '미매칭', tone: 'amber' as const };
+      : { label: LEDGER_EMPTY.unmatched, tone: 'amber' as const };
   }
   if (r.raw.matchedContractId || r.raw.matchedScheduleSeq) return { label: '매칭완료', tone: 'green' as const };
-  if (r.inAmt > 0) return { label: '미매칭', tone: 'amber' as const };
+  if (r.inAmt > 0) return { label: LEDGER_EMPTY.unmatched, tone: 'amber' as const };
   return { label: '해당없음', tone: 'gray' as const };
 };
 
@@ -65,7 +65,7 @@ const CASH_COL_CATALOG: SheetCol<CashRow>[] = [
       if (r.nest === 'cms-pending') return <Badge tone="amber">CMS미연결</Badge>;
       if (r.nest === 'cms-dep') {
         const settled = String(r.raw.settlementRole || '') === 'deposit';
-        return <Badge tone={settled ? 'blue' : 'amber'}>{settled ? 'CMS집금' : 'CMS집금·미매칭'}</Badge>;
+        return <Badge tone={settled ? 'blue' : 'amber'}>{settled ? 'CMS집금' : `CMS집금·${LEDGER_EMPTY.unmatched}`}</Badge>;
       }
       if (isUnclassified(r.category)) return <Badge tone="amber">미분류</Badge>;
       return r.category || LEDGER_EMPTY.dash;
