@@ -7,7 +7,7 @@ import { ASSET_DETAIL_SECTIONS, ASSET_MASTER_BASIC_COLS, ASSET_MASTER_EXPANDED_C
 import { useEntityList } from '@/lib/use-entity-lists';
 import { textMatch } from '@/lib/search-match';
 import {
-  Btn, C, FilterChips, LedgerActions, LedgerCreatePanel, LedgerEditPanel, LedgerFilterButton, LedgerFilterFields, LedgerFilterPanel, LedgerFrame, LedgerRecordPanel, PeriodBar, Search, Select,
+  Btn, C, FilterChips, LedgerActions, LedgerCreatePanel, LedgerEditPanel, LedgerFilterSelects, LedgerFrame, LedgerRecordPanel, PeriodBar, Search, Select,
   type LedgerColView, type LedgerFormSection,
 } from '@/components/ui';
 import { useIsMobile } from '@/lib/use-mobile';
@@ -18,7 +18,7 @@ import { latestDateOf, summarizeAssetLedgerStats } from '@/lib/ledger-stats';
 import { MigrateDataButton } from '@/components/MigrateDataButton';
 import { openIngest } from '@/lib/ui-bus';
 import {
-  ASSET_FILTER_DEFS, countActiveFilters, emptyFilterValues, eqFilter, matchLedgerFilters,
+  ASSET_FILTER_DEFS, emptyFilterValues, eqFilter, matchLedgerFilters,
 } from '@/lib/ledger-filter-defs';
 import { LEDGER_EMPTY } from '@/lib/ledger-empty';
 type AssetOwnershipScope = '보유자산' | '처분자산' | '전체자산';
@@ -64,7 +64,6 @@ export default function AssetLedgerPage() {
   const [allAssetQuickFilter, setAllAssetQuickFilter] = useState<AllAssetQuickFilter | null>(null);
   const [dateBasis, setDateBasis] = useState<AssetDateBasis>('취득일');
   const [range, setRange] = useState({ from: '', to: '' });
-  const [filterOpen, setFilterOpen] = useState(false);
   const [detailFilters, setDetailFilters] = useState(() => emptyFilterValues(ASSET_FILTER_DEFS));
   const [colView, setColView] = useState<LedgerColView>('기본');
   const [selected, setSelected] = useState<ReturnType<typeof assetMasterRow> | null>(null);
@@ -99,7 +98,6 @@ export default function AssetLedgerPage() {
   }), [searchedRows, ownershipScope, quickFilter, fleet, allAssetQuickFilter, detailFilters, assetFilterMatchers, dateBasis, range.from, range.to]);
   const assetStatuses = useMemo(() => [...new Set(allRows.map((r) => r.status).filter(Boolean))].sort(), [allRows]);
   const assetMakers = useMemo(() => [...new Set(allRows.map((r) => r.maker).filter(Boolean))].sort(), [allRows]);
-  const detailFilterCount = countActiveFilters(detailFilters, ASSET_FILTER_DEFS);
   const { held, disposed, contracted, idle, salePending } = useMemo(
     () => summarizeAssetLedgerStats(searchedRows, fleet),
     [searchedRows, fleet],
@@ -128,7 +126,12 @@ export default function AssetLedgerPage() {
       </LedgerActions>}
       filters={<>
         <Search size="sm" placeholder="차량번호·VIN·차명·소유자·상태" value={q} onChange={(e) => setQ(e.target.value)} style={{ width: mobile ? '100%' : 300 }} />
-        <LedgerFilterButton open={filterOpen} count={detailFilterCount} onClick={() => setFilterOpen((open) => !open)} />
+        <LedgerFilterSelects
+          defs={ASSET_FILTER_DEFS}
+          values={detailFilters}
+          onChange={(key, value) => setDetailFilters((prev) => ({ ...prev, [key]: value }))}
+          options={{ status: assetStatuses, maker: assetMakers }}
+        />
         <Select
           size="sm"
           aria-label="자산 범위"
@@ -197,20 +200,6 @@ export default function AssetLedgerPage() {
         setSelected(row);
       }}
       onCloseDetail={() => { setSelected(null); setEditing(false); }}
-      filterPanel={filterOpen ? (
-        <LedgerFilterPanel
-          title="자산 세부 필터"
-          onClose={() => setFilterOpen(false)}
-          onReset={() => setDetailFilters(emptyFilterValues(ASSET_FILTER_DEFS))}
-        >
-          <LedgerFilterFields
-            defs={ASSET_FILTER_DEFS}
-            values={detailFilters}
-            onChange={(key, value) => setDetailFilters((prev) => ({ ...prev, [key]: value }))}
-            options={{ status: assetStatuses, maker: assetMakers }}
-          />
-        </LedgerFilterPanel>
-      ) : null}
       sidePanel={creating ? (
         <LedgerCreatePanel
           key="new-asset"

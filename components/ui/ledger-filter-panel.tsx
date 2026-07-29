@@ -77,6 +77,48 @@ export function LedgerFilterFields({
   );
 }
 
+/**
+ * 세부필터 → 상단 필터줄 Select (좌측 패널 없이).
+ * 필드 적은 원장(자산 등) — 3분할(필터|표|상세) 번잡 회피. DEFS·options SSOT 유지.
+ */
+export function LedgerFilterSelects({
+  defs,
+  values,
+  onChange,
+  options,
+  size = 'sm',
+}: {
+  defs: readonly LedgerFilterFieldDef[];
+  values: Record<string, string>;
+  onChange: (key: string, value: string) => void;
+  options: Record<string, readonly LedgerFilterOption[]>;
+  size?: 'sm' | 'md';
+}) {
+  return (
+    <>
+      {defs.map((def) => {
+        const opts = options[def.key] || [];
+        return (
+          <Select
+            key={def.key}
+            size={size}
+            aria-label={def.label}
+            value={values[def.key] || ''}
+            onChange={(event) => onChange(def.key, event.target.value)}
+          >
+            <option value="">{def.emptyLabel ?? `${def.label} 전체`}</option>
+            {opts.map((opt) => {
+              const value = typeof opt === 'string' ? opt : opt.value;
+              const label = typeof opt === 'string' ? opt : opt.label;
+              return <option key={value} value={value}>{label}</option>;
+            })}
+          </Select>
+        );
+      })}
+    </>
+  );
+}
+
 /** 좌측 필터 패널 — 헤더/하단바 = 상세패널과 동일 규격(--ledger-head-h / --ledger-foot-h). */
 export function LedgerFilterPanel({
   title = '세부 필터',
