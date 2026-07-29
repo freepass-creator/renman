@@ -30,6 +30,8 @@ export type AssetMasterRow = {
   gpsProvider: string; gpsDeviceId: string; gpsInstalledDate: string; gpsControl: string;
   saleDate: string; salePrice: number; optionList: string;
   dealerAgency: string; dealerContact: string; dealerPhone: string;
+  /** 정비비 함대 랭킹 — page가 fleetMaintRanking으로 채움(원장은 0). */
+  maintCost: number; maintCount: number; maintLastDate: string; maintVsAvg: number;
 };
 
 export function assetMasterRow(raw: EntityRecord): AssetMasterRow {
@@ -64,6 +66,7 @@ export function assetMasterRow(raw: EntityRecord): AssetMasterRow {
     gpsInstalledDate: str(raw.gpsInstalledDate), gpsControl: str(raw.gpsControl),
     saleDate: str(raw.saleDate), salePrice: num(raw.salePrice), optionList: str(raw.optionList),
     dealerAgency: str(raw.dealerAgency), dealerContact: str(raw.dealerContact), dealerPhone: str(raw.dealerPhone),
+    maintCost: 0, maintCount: 0, maintLastDate: '', maintVsAvg: 0,
   };
 }
 

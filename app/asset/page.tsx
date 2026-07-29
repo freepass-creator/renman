@@ -3,12 +3,16 @@
 import { useMemo, useState } from 'react';
 import { Pencil, Plus, UploadCloud } from 'lucide-react';
 import { assetMasterRow, type AssetMasterRow } from '@/lib/master-ledgers';
-import { ASSET_DETAIL_SECTIONS, ASSET_MASTER_BASIC_COLS, ASSET_MASTER_EXPANDED_COLS, assetRail, assetRailStyle } from '@/lib/master-ledger-cols';
-import { useEntityList } from '@/lib/use-entity-lists';
+import {
+  ASSET_DETAIL_SECTIONS, ASSET_MASTER_BASIC_COLS, ASSET_MASTER_EXPANDED_COLS,
+  ASSET_MAINT_BASIC_COLS, assetRail, assetRailStyle,
+} from '@/lib/master-ledger-cols';
+import { fleetMaintRanking } from '@/lib/asset-econ';
+import { useEntityLists } from '@/lib/use-entity-lists';
 import { textMatch } from '@/lib/search-match';
 import {
-  Btn, C, FilterChips, LedgerActions, LedgerCreatePanel, LedgerEditPanel, LedgerFilterSelects, LedgerFrame, LedgerRecordPanel, PeriodBar, Search, Select,
-  type LedgerColView, type LedgerFormSection,
+  Btn, C, FilterChips, LedgerActions, LedgerCreatePanel, LedgerEditPanel, LedgerFilterSelects, LedgerFrame, LedgerRecordPanel, PeriodBar, PillTabs, Search, Select,
+  type LedgerFormSection,
 } from '@/components/ui';
 import { useIsMobile } from '@/lib/use-mobile';
 import { TODAY } from '@/lib/dashboard-consts';
@@ -25,6 +29,7 @@ type AssetOwnershipScope = '보유자산' | '처분자산' | '전체자산';
 type AssetQuickFilter = '계약중' | '휴차' | '매각대기';
 type AllAssetQuickFilter = '보유' | '처분';
 type AssetDateBasis = '취득일' | '처분일';
+type AssetSheetView = '기본' | '전체' | '정비비';
 const ASSET_QUICK_FILTERS: AssetQuickFilter[] = ['계약중', '휴차', '매각대기'];
 const ASSET_QUICK_FILTER_LABEL: Record<AssetQuickFilter, string> = {
   계약중: '계약중',
@@ -56,8 +61,7 @@ const ASSET_CREATE_SECTIONS: LedgerFormSection[] = [
 
 export default function AssetLedgerPage() {
   const mobile = useIsMobile();
-  const { rows: vehicles, loading } = useEntityList('vehicle');
-  const { rows: contracts, loading: contractsLoading } = useEntityList('contract');
+  const { data: [vehicles = [], contracts = [], history = []], loading } = useEntityLists(['vehicle', 'contract', 'history']);
   const [q, setQ] = useState('');
   const [ownershipScope, setOwnershipScope] = useState<AssetOwnershipScope>('보유자산');
   const [quickFilter, setQuickFilter] = useState<AssetQuickFilter | null>(null);
@@ -65,11 +69,33 @@ export default function AssetLedgerPage() {
   const [dateBasis, setDateBasis] = useState<AssetDateBasis>('취득일');
   const [range, setRange] = useState({ from: '', to: '' });
   const [detailFilters, setDetailFilters] = useState(() => emptyFilterValues(ASSET_FILTER_DEFS));
-  const [colView, setColView] = useState<LedgerColView>('기본');
+  const [sheetView, setSheetView] = useState<AssetSheetView>('기본');
   const [selected, setSelected] = useState<ReturnType<typeof assetMasterRow> | null>(null);
   const [creating, setCreating] = useState(false);
   const [editing, setEditing] = useState(false);
-  const allRows = useMemo(() => vehicles.map(assetMasterRow).sort((a, b) => a.plate.localeCompare(b.plate, 'ko')), [vehicles]);
+
+  const maintByPlate = useMemo(() => {
+    const map = new Map(fleetMaintRanking(vehicles, history).map((m) => [m.plate, m]));
+    return map;
+  }, [vehicles, history]);
+
+  const allRows = useMemo(() => vehicles.map((raw) => {
+    const row = assetMasterRow(raw);
+    const m = maintByPlate.get(row.plate);
+    if (!m) return row;
+    return {
+      ...row,
+      maintCost: m.maintCost,
+      maintCount: m.maintCount,
+      maintLastDate: m.maintLastDate,
+      maintVsAvg: m.vsAvg,
+    };
+  }).sort((a, b) => (
+    sheetView === '정비비'
+      ? (b.maintCost - a.maintCost || a.plate.localeCompare(b.plate, 'ko'))
+      : a.plate.localeCompare(b.plate, 'ko')
+  )), [vehicles, maintByPlate, sheetView]);
+
   const fleet = useMemo(() => linkFleet(vehicles, contracts, TODAY), [vehicles, contracts]);
   const searchedRows = useMemo(() => allRows.filter((r) =>
     textMatch(q, r.company, r.assetCode, r.plate, r.status, r.carName, r.maker, r.modelLine, r.subModel, r.trim, r.vin, r.ownerName),
@@ -83,8 +109,8 @@ export default function AssetLedgerPage() {
     [allRows, dateBasis],
   );
   const assetFilterMatchers = useMemo(() => ({
-    status: eqFilter<ReturnType<typeof assetMasterRow>>((r) => r.status),
-    maker: eqFilter<ReturnType<typeof assetMasterRow>>((r) => r.maker),
+    status: eqFilter<AssetMasterRow>((r) => r.status),
+    maker: eqFilter<AssetMasterRow>((r) => r.maker),
   }), []);
   const rows = useMemo(() => searchedRows.filter((r) => {
     if (!matchesOwnership(r, ownershipScope) || !matchesQuickFilter(r, quickFilter, fleet)) return false;
@@ -102,6 +128,12 @@ export default function AssetLedgerPage() {
     () => summarizeAssetLedgerStats(searchedRows, fleet),
     [searchedRows, fleet],
   );
+
+  const sheetCols = sheetView === '정비비'
+    ? ASSET_MAINT_BASIC_COLS
+    : sheetView === '기본'
+      ? ASSET_MASTER_BASIC_COLS
+      : ASSET_MASTER_EXPANDED_COLS;
 
   return (
     <LedgerFrame
@@ -179,9 +211,21 @@ export default function AssetLedgerPage() {
         <PeriodBar latest={latest} initial="전체" size="sm" onRange={setRange} />
       </>}
       stats={<span style={{ fontSize: 12.5, color: C.mute }}>보유 <b>{held}</b> · 계약중 <b style={{ color: C.ok }}>{contracted}</b> · 휴차 <b style={{ color: C.warn }}>{idle}</b> · 매각대기 <b>{salePending}</b> · 처분 <b>{disposed}</b></span>}
-      colView={colView}
-      onColView={setColView}
-      loading={loading || contractsLoading}
+      showColView={false}
+      colView={sheetView === '기본' ? '기본' : '전체'}
+      view={(
+        <PillTabs
+          size="sm"
+          value={sheetView}
+          onChange={(v) => setSheetView((v as AssetSheetView) || '기본')}
+          tabs={[
+            { key: '기본', label: '기본' },
+            { key: '전체', label: '전체' },
+            { key: '정비비', label: '정비비' },
+          ]}
+        />
+      )}
+      loading={loading}
       empty={<>
         등록된 자산이 없습니다. 등록증은 데이터관리에서 담으세요.
         <div style={{ marginTop: 14, display: 'flex', justifyContent: 'center', gap: 8 }}>
@@ -189,7 +233,7 @@ export default function AssetLedgerPage() {
           <MigrateDataButton size="sm" />
         </div>
       </>}
-      cols={colView === '기본' ? ASSET_MASTER_BASIC_COLS : ASSET_MASTER_EXPANDED_COLS}
+      cols={sheetCols}
       rows={rows}
       rowKey={(r) => r.plate}
       selectedRowKey={selected?.plate}

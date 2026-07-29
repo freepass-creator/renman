@@ -117,6 +117,26 @@ const ASSET_COL_CATALOG: SheetCol<AssetMasterRow>[] = [
   ax('gpsProvider', 'GPS 공급사'), ax('gpsDeviceId', 'GPS 단말번호'), ax('gpsInstalledDate', 'GPS 설치일', { date: true }), ax('gpsControl', '시동제어'),
   ax('dealerAgency', '취급대리점'), ax('dealerContact', '딜러담당자'), ax('dealerPhone', '딜러연락처'),
   ax('optionList', '선택옵션'), ax('saleDate', '매각일', { date: true }), ax('salePrice', '매각가', { money: true, align: 'r' }),
+  {
+    key: 'maintCost', label: '정비비누계', align: 'r', priority: 1,
+    render: (r) => (r.maintCost ? <b style={{ color: r.maintVsAvg >= 2 ? C.danger : r.maintVsAvg >= 1.5 ? C.warn : C.ink }}>{money(r.maintCost)}</b> : LEDGER_EMPTY.dash),
+    text: (r) => r.maintCost,
+  },
+  {
+    key: 'maintVsAvg', label: '평균대비', align: 'r', priority: 1,
+    render: (r) => (r.maintVsAvg ? `${r.maintVsAvg.toFixed(1)}×` : LEDGER_EMPTY.dash),
+    text: (r) => r.maintVsAvg,
+  },
+  {
+    key: 'maintCount', label: '정비건수', align: 'r', priority: 2,
+    render: (r) => (r.maintCount ? `${r.maintCount}건` : LEDGER_EMPTY.dash),
+    text: (r) => r.maintCount,
+  },
+  {
+    key: 'maintLastDate', label: '최근정비', align: 'c', priority: 2,
+    render: (r) => (r.maintLastDate ? date(r.maintLastDate) : LEDGER_EMPTY.dash),
+    text: (r) => r.maintLastDate,
+  },
 ];
 
 /**
@@ -145,12 +165,29 @@ export const ASSET_SHEET_KEYS: SheetViewKeys = {
     'insuranceCompany', 'insurancePolicyNo', 'insuranceExpiryDate',
     'gpsProvider', 'gpsDeviceId', 'gpsInstalledDate', 'gpsControl',
     'dealerAgency', 'dealerContact', 'dealerPhone', 'optionList', 'saleDate', 'salePrice',
+    'maintCost', 'maintVsAvg', 'maintCount', 'maintLastDate',
+  ],
+};
+
+/** 정비비 함대 랭킹 보기 — 기존 maint 계산 재사용. */
+export const ASSET_MAINT_SHEET_KEYS: SheetViewKeys = {
+  basic: [
+    'company', 'plate', 'carName', 'status',
+    'maintCost', 'maintVsAvg', 'maintCount', 'maintLastDate', 'mileage',
+  ],
+  all: [
+    'company', 'plate', 'carName', 'status', 'maker', 'modelLine',
+    'maintCost', 'maintVsAvg', 'maintCount', 'maintLastDate', 'mileage', 'acquisitionPrice',
   ],
 };
 
 const _assetViews = buildSheetViews(ASSET_COL_CATALOG, ASSET_SHEET_KEYS);
 export const ASSET_MASTER_BASIC_COLS = _assetViews.basic;
 export const ASSET_MASTER_EXPANDED_COLS = _assetViews.expanded;
+
+const _assetMaintViews = buildSheetViews(ASSET_COL_CATALOG, ASSET_MAINT_SHEET_KEYS);
+export const ASSET_MAINT_BASIC_COLS = _assetMaintViews.basic;
+export const ASSET_MAINT_EXPANDED_COLS = _assetMaintViews.expanded;
 
 /**
  * 자산 상세 — 필드 추가 요청 시 해당 섹션 keys에만 push.
