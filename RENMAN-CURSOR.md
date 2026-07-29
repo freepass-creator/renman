@@ -70,6 +70,7 @@ curl -s -o /dev/null -w "%{http_code}" http://localhost:6006/<route>   # 200
 
 | 날짜 | 작업자 | 내용 | 상태 |
 |---|---|---|---|
+| 2026-07-29 | Cursor | 초과주행 과금(반납정산 라인아이템) | tsc0 · 7면200 |
 | 2026-07-29 | Cursor | 파생3: 할부이자(B)·정비비랭킹(C)·연체이력(D) | tsc0 · 0c20d99…92ff726 · push |
 | 2026-07-29 | Cursor | 기본뷰2차: status18·asset16·contract19·cash14·work+due · fit priority | tsc0 · 6면200 |
 | 2026-07-29 | Cursor | ExcelSheet 카드뷰 danger 틴트(rowStyle→ObjCard.style) · RailDot 없이 | tsc0 · /risk·/status·/work 200 |
