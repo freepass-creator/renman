@@ -115,7 +115,7 @@ export function KV({ rows, editing, form, onChange }: { rows: KVRow[]; editing?:
   );
 }
 
-/* 공용 입력 폼 — 직접입력·상세수정 공용. vehicle/contract-picker = 대상 신원 피커. */
+/* 공용 입력 폼 — 직접입력·상세수정 공용. vehicle/contract-picker = 목록에서만 선택(순수 텍스트 금지). */
 export function FormGrid({
   fields, form, onChange, onPatch, cols = 2,
 }: {
@@ -128,33 +128,26 @@ export function FormGrid({
 }) {
   const mobile = useIsMobile();
   const c = mobile ? 1 : cols;
-  const targetType = String(form.targetType || '');
 
   return (
     <div style={{ display: 'grid', gridTemplateColumns: `repeat(${c},1fr)`, gap: 9 }}>
       {fields.map((f) => {
-        // 대상구분에 따라 피커·텍스트 노출 (erp4 field-group)
         if (f.type === 'vehicle-picker') {
-          if (targetType === '계약') return null; // 계약 피커가 plate 동반
-          if (!targetType || targetType === '자산' || targetType === '차량') {
-            return (
-              <label key={f.key} style={{ fontSize: 11.5, color: C.mute, gridColumn: mobile ? undefined : '1 / -1' }}>
-                {f.label}{f.required && <span style={{ color: C.danger }}> *</span>}
-                <div style={{ marginTop: 3 }}>
-                  <VehicleFieldPicker
-                    value={String(form.plate || '')}
-                    onChange={(plate) => onChange('plate', plate)}
-                    onPatch={onPatch}
-                  />
-                </div>
-                {f.note && <small style={{ display: 'block', marginTop: 3, color: C.faint }}>{f.note}</small>}
-              </label>
-            );
-          }
-          // 고객/자금/회사/기타 → 텍스트 폴백
+          return (
+            <label key={f.key} style={{ fontSize: 11.5, color: C.mute, gridColumn: mobile ? undefined : '1 / -1' }}>
+              {f.label}{f.required && <span style={{ color: C.danger }}> *</span>}
+              <div style={{ marginTop: 3 }}>
+                <VehicleFieldPicker
+                  value={String(form.plate || '')}
+                  onChange={(plate) => onChange('plate', plate)}
+                  onPatch={onPatch}
+                />
+              </div>
+              {f.note && <small style={{ display: 'block', marginTop: 3, color: C.faint }}>{f.note}</small>}
+            </label>
+          );
         }
         if (f.type === 'contract-picker') {
-          if (targetType !== '계약') return null;
           return (
             <label key={f.key} style={{ fontSize: 11.5, color: C.mute, gridColumn: mobile ? undefined : '1 / -1' }}>
               {f.label}{f.required && <span style={{ color: C.danger }}> *</span>}
@@ -166,22 +159,17 @@ export function FormGrid({
                 />
               </div>
               {f.note && <small style={{ display: 'block', marginTop: 3, color: C.faint }}>{f.note}</small>}
+              {/* 계약 선택 시 동반 채움 표시(읽기) */}
+              {(form.contractNo || form.customerName || form.plate) && String(form.contractKey || '') ? (
+                <small style={{ display: 'block', marginTop: 4, color: C.mute }}>
+                  {[form.customerName, form.contractNo, form.plate].filter(Boolean).map(String).join(' · ')}
+                </small>
+              ) : null}
             </label>
           );
         }
-        // 계약 피커가 채우는 보조키 — 계약 모드에선 읽기표시만(중복 입력 방지)
-        if (targetType === '계약' && (f.key === 'contractNo' || f.key === 'plate' || f.key === 'customerName')) {
-          const val = String(form[f.key] ?? '');
-          if (!val) return null;
-          return (
-            <label key={f.key} style={{ fontSize: 11.5, color: C.mute }}>
-              {f.label}
-              <div style={{ marginTop: 3, fontSize: 12.5, fontWeight: 600, color: C.ink }}>{val}</div>
-            </label>
-          );
-        }
-        // 피커 필드 키는 위에서 처리 — contractKey는 계약 외에서 숨김
-        if (f.key === 'contractKey') return null;
+        // 피커가 담당하는 키 — 텍스트 입력으로 노출하지 않음
+        if (f.key === 'contractKey' || f.key === 'plate') return null;
 
         const val = (form[f.key] as string) ?? '';
         const empty = val === '' || val == null;
