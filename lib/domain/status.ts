@@ -12,7 +12,7 @@ export const CONTRACT_ENDED = new Set<string>(['반납', '해지', '채권']);
 export const CONTRACT_ACTIVE = new Set<string>(['운행']); // 인도완료·미반납 표시값
 
 /* ── 차량 소유·가동 파티션 (classifyVehicle 과 동일) ── */
-export const VEHICLE_OUT = new Set(['매각', '말소']); // 처분완료
+export const VEHICLE_OUT = new Set(['매각', '말소', '폐차']); // 처분완료
 /** 유휴(세워둔 차). 매각대기는 아직 보유 → OUT 아님. */
 export const VEHICLE_IDLE = new Set([
   '대기', '상품대기', '휴차', '유휴', '구매대기', '등록대기', '상품화', '연장대기', '종료대기', '매각대기',

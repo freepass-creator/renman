@@ -1,5 +1,5 @@
 /** 원장 통계 배지 SSOT — 페이지 `.filter().length` / `.reduce()` 손롤 금지. */
-import { type Fleet } from '@/lib/domain/model';
+import { isVehicleHeld, type Fleet } from '@/lib/domain/model';
 import { type AssetMasterRow, type ContractMasterRow } from '@/lib/master-ledgers';
 import { normPlate } from '@/lib/plate';
 import { selectReceivables } from '@/lib/snapshot/selectors';
@@ -67,12 +67,12 @@ export type FleetStatusStats = {
 
 /**
  * 운영현황 배지.
- *   held/run = 검색 스코프(`searched`) · 미수합·검사임박 = 표에 보이는 행(`rows`).
+ *   held/run = 검색 스코프(`searched`) 중 `isVehicleHeld` · 미수합·검사임박 = 표에 보이는 행(`rows`).
  */
 export function summarizeFleetStatusStats(searched: FleetRow[], rows: FleetRow[]): FleetStatusStats {
   let heldN = 0, runN = 0;
   for (const r of searched) {
-    if (r.ownership === '처분완료') continue;
+    if (!isVehicleHeld(r)) continue;
     heldN++;
     if (r.util === '운행') runN++;
   }

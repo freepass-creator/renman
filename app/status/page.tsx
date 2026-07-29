@@ -6,7 +6,7 @@
 import { useMemo, useState } from 'react';
 import { Car, CalendarClock, FileText } from 'lucide-react';
 import { TODAY } from '@/lib/dashboard-consts';
-import { linkFleet } from '@/lib/domain/model';
+import { isVehicleHeld, linkFleet } from '@/lib/domain/model';
 import { buildFleetRows, fleetRail, statusRank, type FleetRow } from '@/lib/sheet-rows';
 import { FLEET_BASIC_COLS, FLEET_DETAIL_SECTIONS, FLEET_EXPANDED_COLS } from '@/lib/sheet-cols';
 import { summarizeFleetStatusStats, latestDateOf } from '@/lib/ledger-stats';
@@ -64,10 +64,9 @@ export default function StatusPage() {
 
   const fleetFilterMatchers = useMemo(() => ({
     contract: (r: FleetRow, value: string) => {
-      const held = r.ownership !== '처분완료';
       if (value === '만기임박') return r.dday != null && r.dday >= 0 && r.dday <= 30;
       if (value === '반납지남') return r.dday != null && r.dday < 0;
-      if (value === '계약없음') return !r.customer && held && r.status !== '차량없음';
+      if (value === '계약없음') return !r.customer && isVehicleHeld(r) && r.status !== '차량없음';
       return true;
     },
     warn: (r: FleetRow, value: string) => {
@@ -78,9 +77,9 @@ export default function StatusPage() {
   }), []);
 
   const rows = useMemo(() => searched.filter((r) => {
-    const held = r.ownership !== '처분완료';
+    const held = isVehicleHeld(r);
     if (own === '보유' && !held) return false;
-    if (own === '매각' && held) return false;
+    if (own === '매각' && r.ownership !== '처분완료') return false;
     if (utilChip && r.util !== utilChip) return false;
     if (riskOnly && !(r.net > 0 || r.warnings.length > 0 || (r.dday != null && r.dday < 0))) return false;
     if (rentalChip !== '전체' && r.rentalType !== rentalChip) return false;

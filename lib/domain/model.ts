@@ -61,8 +61,18 @@ export type VehicleClass = {
   label: string;
   tone: Tone;
 };
-/** 장부 잔존(아직 처분완료 아님) — 보유 대수·자산 집계. */
+/** 장부 잔존(아직 처분완료 아님) — 자산 원장·KPI 보유대수. 처분예정·구매/등록예정 포함. */
 export const onBooks = (o: Ownership) => o !== '처분완료';
+
+/**
+ * 운영 보유(굴리는 함대) — `/status` 기본 스코프 SSOT.
+ * 포함: 운행·정비·사고·휴차(`ownership === '보유중'`).
+ * 제외: 매각·말소·폐차(처분완료) · 매각대기·매각검토(처분예정).
+ * 구매예정·등록예정 = 사장님 결정 전 → 기본 제외(`onBooks`와 다름).
+ */
+export function isVehicleHeld(r: { ownership: Ownership | string }): boolean {
+  return r.ownership === '보유중';
+}
 
 /** 차량 → 2축 분류. 가동은 보유중만 파생(활성 계약→운행, 아니면 유휴/정비). */
 export function classifyVehicle(veh: EntityRecord, hasActiveContract: boolean): VehicleClass {

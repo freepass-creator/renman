@@ -4,7 +4,7 @@
  */
 import { useMemo } from 'react';
 import { TODAY, dday } from '@/lib/dashboard-consts';
-import { linkFleet } from '@/lib/domain/model';
+import { isVehicleHeld, linkFleet } from '@/lib/domain/model';
 import { buildFleetRows, statusRank, fleetRail, type FleetRow } from '@/lib/sheet-rows';
 import { FLEET_BASIC_COLS, FLEET_EXPANDED_COLS, FLEET_REVEAL_COLS } from '@/lib/sheet-cols';
 import { useEntityLists } from '@/lib/use-entity-lists';
@@ -70,9 +70,9 @@ export const FLEET_DEF: PageDef<FleetRow> = {
     const debt = ['할부있음', '보험없음'].filter((x) => facets.has(x));
     const warn = ['경고있음', '위험만'].filter((x) => facets.has(x));
     const ct = ['만기임박', '반납지남', '계약없음'].filter((x) => facets.has(x));
-    const held = r.ownership !== '처분완료';
+    const held = isVehicleHeld(r);
     if (facets.has('전체')) { /* 전부 */ }
-    else if (facets.has('매각')) { if (held) return false; }
+    else if (facets.has('매각')) { if (r.ownership !== '처분완료') return false; }
     else if (!held) return false;
     if (util.length && !util.includes(r.util)) return false;
     if (misu.length && !((misu.includes('미수있음') && r.net > 0) || (misu.includes('연체90일+') && r.overdueDays >= 90))) return false;
@@ -100,11 +100,11 @@ export const FLEET_DEF: PageDef<FleetRow> = {
     const c: Record<string, number> = { 보유: 0, 전체: 0, 매각: 0, 운행: 0, 휴차: 0, 정비: 0, 만기임박: 0, 반납지남: 0, 계약없음: 0, 경고있음: 0, 위험만: 0, 미수있음: 0, '연체90일+': 0, 검사임박: 0, 보험임박: 0, 할부있음: 0, 보험없음: 0 };
     for (const r of allRows) {
       c['전체']++;
-      if (r.ownership !== '처분완료') c['보유']++; else c['매각']++;
+      if (isVehicleHeld(r)) c['보유']++; else if (r.ownership === '처분완료') c['매각']++;
       if (c[r.util] != null) c[r.util]++;
       if (r.dday != null && r.dday >= 0 && r.dday <= 30) c['만기임박']++;
       if (r.dday != null && r.dday < 0) c['반납지남']++;
-      if (!r.customer && r.ownership !== '처분완료' && r.status !== '차량없음') c['계약없음']++;
+      if (!r.customer && isVehicleHeld(r) && r.status !== '차량없음') c['계약없음']++;
       if (r.warnings.length > 0) c['경고있음']++;
       if (r.warnings.some((w) => w.sev === 'high')) c['위험만']++;
       if (r.net > 0) c['미수있음']++;
@@ -118,7 +118,7 @@ export const FLEET_DEF: PageDef<FleetRow> = {
   },
 
   summary: [
-    { key: 'held', label: '보유', value: (rows) => rows.reduce((n, r) => n + (r.ownership !== '처분완료' ? 1 : 0), 0) },
+    { key: 'held', label: '보유', value: (rows) => rows.reduce((n, r) => n + (isVehicleHeld(r) ? 1 : 0), 0) },
     { key: 'idle', label: '휴차', value: (rows) => rows.reduce((n, r) => n + (r.util === '휴차' ? 1 : 0), 0) },
     { key: 'net', label: '미수', tone: 'danger', show: (rows) => netTotal(rows) > 0, value: (rows) => won(netTotal(rows)) },
   ],
