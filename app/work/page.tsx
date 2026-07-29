@@ -9,7 +9,7 @@ import type { EntityRecord } from '@/lib/intake/entities';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
   Badge, Btn, C, FilterChips, LedgerActions, LedgerCreatePanel, LedgerFilterButton, LedgerFilterFields, LedgerFilterPanel, LedgerFrame, LedgerRecordPanel, PageLoading, Search, won,
-  PeriodBar, Select, useConfirm, type LedgerColView, type SheetCol,
+  PeriodBar, Select, useConfirm, type LedgerColView,
 } from '@/components/ui';
 import { useSession } from '@/lib/session';
 import { commitRemove } from '@/lib/commit';
@@ -17,9 +17,6 @@ import { NEED_COMPANY } from '@/lib/scope';
 import { toast } from '@/lib/toast';
 import { useIsMobile } from '@/lib/use-mobile';
 import { todayKST } from '@/lib/contracts/dates';
-import {
-  buildDetailSections, buildSheetViews, type DetailSectionDef, type SheetViewKeys,
-} from '@/lib/ledger-ext';
 import {
   WORK_FILTER_DEFS, countActiveFilters, emptyFilterValues, eqFilter, matchLedgerFilters,
 } from '@/lib/ledger-filter-defs';
@@ -29,273 +26,21 @@ import {
   type PenaltyKind, type PenaltyProcess, type PenaltyWorkRow,
 } from '@/lib/penalty-work';
 import { LEDGER_EMPTY } from '@/lib/ledger-empty';
-import { WORK_SECTIONS_BY_KIND, type WorkGroup } from '@/lib/work-form-sections';
+import { WORK_SECTIONS_BY_KIND } from '@/lib/work-form-sections';
 import { PenaltyBucketPanel } from '@/components/work/PenaltyBucketPanel';
 import { workRail, workRailStyle } from '@/lib/work-rail';
-import { rentalTypeOf } from '@/lib/schema/contract';
-
-type WorkGroupFilter = '전체' | WorkGroup;
-type WorkSource = 'work_item' | 'history' | 'penalty' | 'inbox';
-/** 업무 상태 SSOT — 미분류는 업무구분(분류) 미지정값이지 상태 아님. */
-type WorkStatus = '대기' | '진행' | '완료' | '보류' | '미배정';
-
-type WorkLedgerRow = {
-  id: string;
-  company: string;
-  companyId: string;
-  kind: string;
-  group: WorkGroup;
-  /** 검색용 합본 */
-  target: string;
-  title: string;
-  workAt: string;
-  workDate: string;
-  createdAt: string;
-  updatedAt: string;
-  dueDate: string;
-  status: WorkStatus | string;
-  assignee: string;
-  amount: number;
-  source: WorkSource;
-  nest?: 'penalty-bucket';
-  plate?: string;
-  carName?: string;
-  contractKey?: string;
-  contractNo?: string;
-  /** 계약자명 — 신원 컬럼 */
-  customerName?: string;
-  /** 대여형태 — 계약자 sub */
-  rentalType?: string;
-  priority?: string;
-  violationDate?: string;
-  driverName?: string;
-  penaltyKind?: PenaltyKind;
-  process?: PenaltyProcess;
-  matched?: boolean;
-  count?: number;
-  openCount?: number;
-  raw: EntityRecord;
-};
-
-function carNameOf(plate: string, vehicles: EntityRecord[]): string {
-  if (!plate) return '';
-  const v = vehicles.find((x) => String(x.plate || '') === plate);
-  return v ? String(v.carName || v.model || '') : '';
-}
-
-function contractMeta(
-  contractKey: string,
-  contracts: EntityRecord[],
-): { customerName: string; contractNo: string; rentalType: string; plate: string } {
-  if (!contractKey) return { customerName: '', contractNo: '', rentalType: '', plate: '' };
-  const c = contracts.find((x) => String(x._key || '') === contractKey);
-  if (!c) return { customerName: '', contractNo: '', rentalType: '', plate: '' };
-  return {
-    customerName: String(c.contractorName || ''),
-    contractNo: String(c.contractNo || ''),
-    rentalType: rentalTypeOf(c),
-    plate: String(c.plate || ''),
-  };
-}
-
-/** ISO → MM-DD HH:mm (시:분까지). 날짜만 있으면 MM-DD. */
-function fmtStamp(iso: string): string {
-  if (!iso) return '—';
-  const m = String(iso).replace('T', ' ').match(/(?:\d{4}-)?(\d{2})-(\d{2})(?:[ T](\d{2}):(\d{2}))?/);
-  if (!m) return '—';
-  return m[3] != null ? `${m[1]}-${m[2]} ${m[3]}:${m[4]}` : `${m[1]}-${m[2]}`;
-}
-
-/** 원천 status → 대기·진행·완료·보류·미배정. '미분류'는 상태로 쓰지 않음. */
-function normalizeWorkStatus(raw: unknown, done?: boolean): WorkStatus {
-  if (done || raw === 'completed' || raw === true) return '완료';
-  const s = String(raw ?? '').trim();
-  if (!s || s === '미분류') return '대기';
-  if (/완료|종결/.test(s)) return '완료';
-  if (/보류|취소/.test(s)) return '보류';
-  if (/미배정/.test(s)) return '미배정';
-  if (/진행/.test(s)) return '진행';
-  if (/대기|접수|예정|todo|waiting/.test(s)) return '대기';
-  return '대기';
-}
-
-function workStatusTone(status: string): 'green' | 'amber' | 'red' | 'gray' | 'blue' {
-  if (status === '완료') return 'green';
-  if (status === '진행') return 'blue';
-  if (status === '미배정' || status === '대기' || status === '보류') return 'amber';
-  if (/지연|미매칭|경과|미처리/.test(status)) return 'red';
-  return 'gray';
-}
-
-/** 차량번호 — 1줄 차번 · 2줄 mute 차명. 없으면 미배정(셀은 대시). */
-function PlateCell({ r }: { r: WorkLedgerRow }) {
-  if (!r.plate) {
-    return <span style={{ color: C.mute }}>{LEDGER_EMPTY.dash}</span>;
-  }
-  return (
-    <div style={{ minWidth: 0 }}>
-      <div style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-        {r.plate}
-      </div>
-      {r.carName ? (
-        <div style={{ fontSize: 11, color: C.mute, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-          {r.carName}
-        </div>
-      ) : null}
-    </div>
-  );
-}
-
-/** 계약자 — 없으면 LEDGER_EMPTY.none. sub=대여형태. */
-function ContractorCell({ r }: { r: WorkLedgerRow }) {
-  const name = String(r.customerName || '').trim();
-  if (!name) {
-    return <span style={{ color: C.mute }}>{LEDGER_EMPTY.none}</span>;
-  }
-  return (
-    <div style={{ minWidth: 0 }}>
-      <div style={{ fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name}</div>
-      {r.rentalType ? (
-        <div style={{ fontSize: 11, color: C.mute, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-          {r.rentalType}
-        </div>
-      ) : null}
-    </div>
-  );
-}
-
-function KindCell({ kind }: { kind: string }) {
-  if (!kind || kind === '미분류' || kind === '일반') {
-    return <Badge tone="amber">미분류</Badge>;
-  }
-  return <>{kind}</>;
-}
-
-function AssigneeCell({ name }: { name: string }) {
-  if (!name) return <Badge tone="amber">미지정</Badge>;
-  return <>{name}</>;
-}
-
-const WORK_GROUPS: WorkGroupFilter[] = ['전체', '일정', '고객상담', '정비·수선', '사고', '과태료', '문서', '기타'];
-const WORK_SOURCE_LABEL: Record<WorkSource, string> = {
-  work_item: '업무',
-  history: '이력',
-  penalty: '과태료',
-  inbox: '문서함',
-};
+import {
+  WORK_GROUPS, WORK_SOURCE_LABEL,
+  carNameOf, contractMeta, normalizeWorkStatus, parseWorkGroup, workGroup,
+  type WorkGroupFilter, type WorkLedgerRow, type WorkSource, type WorkStatus,
+} from '@/lib/work-ledger';
+import {
+  WORK_BASIC_COLS, WORK_ALL_COLS, WORK_DETAIL_SECTIONS,
+  PENALTY_BASIC_COLS, PENALTY_ALL_COLS, PENALTY_DETAIL_SECTIONS,
+  workStatusTone,
+} from '@/lib/work-cols';
 
 const PENALTY_ROW_BG = 'color-mix(in srgb, var(--brand) 10%, var(--bg-card))';
-
-function workGroup(kind: unknown): WorkGroup {
-  const value = String(kind || '');
-  if (!value || value === '미분류' || value === '일반') return '기타';
-  if (/일정|스케줄|예약/.test(value)) return '일정';
-  if (/상담|통화|문자|연락|고객|민원/.test(value)) return '고객상담';
-  if (/정비|수선|검사|세차|부품|오일|타이어/.test(value)) return '정비·수선';
-  if (/사고|파손|보험접수/.test(value)) return '사고';
-  if (/과태료|범칙|통행료|주차/.test(value)) return '과태료';
-  if (/문서|증빙|서류|계약서|등록증|증권/.test(value)) return '문서';
-  return '기타';
-}
-
-const WORK_COL_CATALOG: SheetCol<WorkLedgerRow>[] = [
-  { key: 'co', label: '회사명', pin: true, priority: 2, render: (r) => r.company || LEDGER_EMPTY.dash, text: (r) => r.company },
-  {
-    key: 'kind', label: '업무구분', pin: true, priority: 1,
-    render: (r) => <KindCell kind={r.kind} />,
-    text: (r) => r.kind,
-  },
-  {
-    key: 'status', label: '상태', align: 'c', priority: 1,
-    render: (r) => <Badge tone={workStatusTone(r.status)}>{r.status}</Badge>,
-    text: (r) => r.status,
-  },
-  {
-    key: 'plate', label: '차량번호', priority: 1, pin: true,
-    render: (r) => <PlateCell r={r} />,
-    text: (r) => [r.plate, r.carName].filter(Boolean).join(' '),
-  },
-  {
-    key: 'contractor', label: '계약자', priority: 1,
-    render: (r) => <ContractorCell r={r} />,
-    text: (r) => r.customerName || LEDGER_EMPTY.none,
-  },
-  { key: 'title', label: '업무내용', priority: 1, render: (r) => r.title || LEDGER_EMPTY.dash, text: (r) => r.title },
-  {
-    key: 'assignee', label: '담당자', priority: 1,
-    render: (r) => <AssigneeCell name={r.assignee} />,
-    text: (r) => r.assignee,
-  },
-  {
-    key: 'created', label: '생성일시', priority: 1,
-    render: (r) => fmtStamp(r.createdAt),
-    text: (r) => r.createdAt,
-  },
-  {
-    key: 'updated', label: '최종처리', priority: 1,
-    render: (r) => fmtStamp(r.updatedAt),
-    text: (r) => r.updatedAt,
-  },
-  { key: 'due', label: '기한', render: (r) => r.dueDate || LEDGER_EMPTY.dash, text: (r) => r.dueDate },
-  { key: 'amount', label: '금액', align: 'r', render: (r) => r.amount ? won(r.amount) : LEDGER_EMPTY.dash, text: (r) => r.amount || '' },
-  { key: 'source', label: '원천', render: (r) => WORK_SOURCE_LABEL[r.source], text: (r) => r.source },
-];
-
-/** 과태료 전용 열 — 1건=1행: 위반일·차번·금액·실운전자·처리상태 */
-const PENALTY_COL_CATALOG: SheetCol<WorkLedgerRow>[] = [
-  { key: 'violationDate', label: '위반일', pin: true, priority: 1, render: (r) => r.violationDate || LEDGER_EMPTY.dash, text: (r) => r.violationDate || '' },
-  { key: 'plate', label: '차번', pin: true, priority: 1, render: (r) => r.plate || LEDGER_EMPTY.dash, text: (r) => r.plate || '' },
-  {
-    key: 'amount', label: '금액', align: 'r', priority: 1,
-    render: (r) => r.amount ? <span style={{ color: C.warn, fontWeight: 700 }}>{won(r.amount)}</span> : LEDGER_EMPTY.dash,
-    text: (r) => r.amount || '',
-  },
-  { key: 'driver', label: '실운전자', priority: 1, render: (r) => r.driverName || LEDGER_EMPTY.unmatched, text: (r) => r.driverName || '' },
-  {
-    key: 'status', label: '처리상태', align: 'c', priority: 1,
-    render: (r) => <Badge tone={workStatusTone(r.status)}>{r.status}</Badge>,
-    text: (r) => r.status,
-  },
-  { key: 'ptype', label: '유형', priority: 2, render: (r) => r.penaltyKind || LEDGER_EMPTY.dash, text: (r) => r.penaltyKind || '' },
-  { key: 'title', label: '위반내용', priority: 2, render: (r) => r.title || LEDGER_EMPTY.dash, text: (r) => r.title },
-  { key: 'co', label: '회사명', priority: 2, render: (r) => r.company || LEDGER_EMPTY.dash, text: (r) => r.company },
-  { key: 'due', label: '납기', priority: 2, render: (r) => r.dueDate || LEDGER_EMPTY.dash, text: (r) => r.dueDate },
-];
-
-const WORK_SHEET_KEYS: SheetViewKeys = {
-  // 회사 → 신원 → 내용 → 분류 → 상태 → 수치/담당·시각
-  basic: ['co', 'plate', 'contractor', 'title', 'kind', 'status', 'assignee', 'created', 'updated'],
-  all: ['co', 'plate', 'contractor', 'title', 'kind', 'status', 'assignee', 'created', 'updated', 'due', 'amount', 'source'],
-};
-const PENALTY_SHEET_KEYS: SheetViewKeys = {
-  // 신원(차)·수치 → 신원(운전자) → 상태 → 내용·보조
-  basic: ['co', 'plate', 'driver', 'title', 'status', 'violationDate', 'amount'],
-  all: ['co', 'plate', 'driver', 'title', 'status', 'violationDate', 'amount', 'ptype', 'due'],
-};
-
-const _workViews = buildSheetViews(WORK_COL_CATALOG, WORK_SHEET_KEYS);
-const BASIC_COLS = _workViews.basic;
-const ALL_COLS = _workViews.expanded;
-const _penViews = buildSheetViews(PENALTY_COL_CATALOG, PENALTY_SHEET_KEYS);
-const PEN_BASIC = _penViews.basic;
-const PEN_ALL = _penViews.expanded;
-
-const WORK_DETAIL_DEFS: DetailSectionDef[] = [
-  { title: '업무 분류', open: true, keys: ['co', 'kind', 'status', 'source'] },
-  { title: '신원·내용', keys: ['plate', 'contractor', 'title'] },
-  { title: '처리정보', keys: ['created', 'updated', 'due', 'assignee', 'amount'] },
-];
-const PENALTY_DETAIL_DEFS: DetailSectionDef[] = [
-  { title: '고지서', open: true, keys: ['violationDate', 'plate', 'amount', 'driver', 'status'] },
-  { title: '부가', keys: ['ptype', 'title', 'co', 'due'] },
-];
-const WORK_DETAIL_SECTIONS = buildDetailSections(ALL_COLS, WORK_DETAIL_DEFS);
-const PENALTY_DETAIL_SECTIONS = buildDetailSections(PEN_ALL, PENALTY_DETAIL_DEFS);
-
-function parseGroup(raw: string | null): WorkGroupFilter {
-  if (raw && (WORK_GROUPS as string[]).includes(raw)) return raw as WorkGroupFilter;
-  return '전체';
-}
 
 function WorkLedgerInner() {
   const mobile = useIsMobile();
@@ -307,7 +52,7 @@ function WorkLedgerInner() {
     useEntityLists(['work_item', 'history', 'penalty', 'inbox', 'contract', 'vehicle']);
   const [q, setQ] = useState('');
   const [colView, setColView] = useState<LedgerColView>('기본');
-  const [group, setGroup] = useState<WorkGroupFilter>(() => parseGroup(searchParams.get('group')));
+  const [group, setGroup] = useState<WorkGroupFilter>(() => parseWorkGroup(searchParams.get('group')));
   const [detailFilters, setDetailFilters] = useState(() => emptyFilterValues(WORK_FILTER_DEFS));
   const [filterOpen, setFilterOpen] = useState(false);
   const [range, setRange] = useState({ from: '', to: '' });
@@ -317,7 +62,7 @@ function WorkLedgerInner() {
   const [penKind, setPenKind] = useState<PenaltyKind | null>(null);
 
   useEffect(() => {
-    setGroup(parseGroup(searchParams.get('group')));
+    setGroup(parseWorkGroup(searchParams.get('group')));
   }, [searchParams]);
 
   const penaltyRows = useMemo(
@@ -538,8 +283,8 @@ function WorkLedgerInner() {
   };
 
   const cols = penaltyMode
-    ? (colView === '기본' ? PEN_BASIC : PEN_ALL)
-    : (colView === '기본' ? BASIC_COLS : ALL_COLS);
+    ? (colView === '기본' ? PENALTY_BASIC_COLS : PENALTY_ALL_COLS)
+    : (colView === '기본' ? WORK_BASIC_COLS : WORK_ALL_COLS);
 
   return (
     <LedgerFrame
@@ -694,7 +439,7 @@ function WorkLedgerInner() {
             : `${selected.plate || LEDGER_EMPTY.unassigned} · ${selected.customerName || LEDGER_EMPTY.none}`}
           statusBadge={<Badge tone={workStatusTone(selected.status)}>{selected.status}</Badge>}
           row={selected}
-          cols={selected.source === 'penalty' ? PEN_ALL : ALL_COLS}
+          cols={selected.source === 'penalty' ? PENALTY_ALL_COLS : WORK_ALL_COLS}
           sections={selected.source === 'penalty' ? PENALTY_DETAIL_SECTIONS : WORK_DETAIL_SECTIONS}
           onClose={() => setSelected(null)}
           actions={(
