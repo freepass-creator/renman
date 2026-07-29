@@ -2,6 +2,7 @@
 import React from 'react';
 import { Check, ChevronDown, ChevronUp } from 'lucide-react';
 import { useIsMobile } from '@/lib/use-mobile';
+import { useSession } from '@/lib/session';
 import { haptic } from '@/lib/haptics';
 import { C, R, SH, thX, thXR, thXC, thXPin, tdX, tdXR, tdXC, tdXPin, ctrlH, ctrlFs } from './tokens';
 import { ObjCard, Cards } from './misc';
@@ -17,6 +18,8 @@ import { Search } from './controls';
  *   · 체크리스트 값 = **셀에 보이는 문자열 그대로**(col.text). 보이는 것만 고를 수 있어야 헷갈리지 않는다.
  *   · 개수는 «다른 열 필터를 반영한» 교차집계 — 내 열만 빼고 센다. 그래야 숫자가 실제 결과와 맞는다.
  *   · 필터는 원자 안에 산다. 페이지는 onFiltered 로 결과만 받아 건수·CSV에 쓴다(집계 손롤 금지).
+ *
+ * 회사열: key=`company` 는 다회사(scopeAll)만. 단일회사 세션은 ExcelSheet가 숨김(페이지 손롤 금지).
  */
 export type SheetCol<T> = {
   key: string;
@@ -159,13 +162,19 @@ export function ExcelSheet<T>({
   rowClickable?: (row: T) => boolean;
 }) {
   const mobile = useIsMobile();
+  const { scopeAll } = useSession();
+  /** 단일회사 = 회사열 숨김. 다회사(합본)만 표시. */
+  const visibleCols = React.useMemo(
+    () => (scopeAll ? cols : cols.filter((c) => c.key !== 'company')),
+    [cols, scopeAll],
+  );
   // 훅은 조건부 return 앞에서 — 모바일 분기보다 위.
   const [hover, setHover] = React.useState<number | null>(null);
   const [colFilter, setColFilter] = React.useState<Record<string, Set<string>>>({});
   const [colSort, setColSort] = React.useState<ColSort>(null);
   const [openCol, setOpenCol] = React.useState<{ key: string; x: number; y: number } | null>(null);
   const clickTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
-  const byKey = React.useMemo(() => new Map(cols.map((c) => [c.key, c])), [cols]);
+  const byKey = React.useMemo(() => new Map(visibleCols.map((c) => [c.key, c])), [visibleCols]);
 
   React.useEffect(() => () => {
     if (clickTimer.current) clearTimeout(clickTimer.current);
@@ -197,8 +206,8 @@ export function ExcelSheet<T>({
         {view.map((r, i) => (
           <ObjCard
             key={rowKey?.(r, i) ?? i}
-            title={cols[0]?.render(r)}
-            fields={cols.slice(1, 5).map((c) => [c.label, c.render(r)] as [React.ReactNode, React.ReactNode])}
+            title={visibleCols[0]?.render(r)}
+            fields={visibleCols.slice(1, 5).map((c) => [c.label, c.render(r)] as [React.ReactNode, React.ReactNode])}
             onClick={(onRowDoubleClick || onRow) ? () => {
               haptic.tap();
               (onRowDoubleClick || onRow)?.(r);
@@ -237,7 +246,7 @@ export function ExcelSheet<T>({
         }}>
           <thead>
             <tr>
-              {cols.map((c, colIndex) => {
+              {visibleCols.map((c, colIndex) => {
                 const base = c.pin ? thXPin : c.align === 'r' ? thXR : c.align === 'c' ? thXC : thX;
                 const canFilter = !!c.text;
                 const on = !!colFilter[c.key]?.size || (colSort?.key === c.key);
@@ -321,7 +330,7 @@ export function ExcelSheet<T>({
                   onMouseEnter={() => setHover(i)}
                   onMouseLeave={() => setHover((h) => (h === i ? null : h))}
                 >
-                  {cols.map((c, colIndex) => {
+                  {visibleCols.map((c, colIndex) => {
                     const base = c.pin ? { ...tdXPin, background: rowBg } : c.align === 'r' ? tdXR : c.align === 'c' ? tdXC : tdX;
                     return (
                       <td
