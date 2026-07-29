@@ -9,7 +9,7 @@ import { TODAY } from '@/lib/dashboard-consts';
 import { linkFleet } from '@/lib/domain/model';
 import { buildFleetRows, statusRank, type FleetRow } from '@/lib/sheet-rows';
 import { FLEET_BASIC_COLS, FLEET_DETAIL_SECTIONS, FLEET_EXPANDED_COLS } from '@/lib/sheet-cols';
-import { summarizeFleetStatusStats } from '@/lib/ledger-stats';
+import { summarizeFleetStatusStats, latestDateOf } from '@/lib/ledger-stats';
 import { useEntityLists } from '@/lib/use-entity-lists';
 import { textMatch } from '@/lib/search-match';
 import {
@@ -57,10 +57,10 @@ export default function StatusPage() {
     textMatch(q, r.company, r.plate, r.carName, r.maker, r.customer, r.phone, r.status, r.util, r.location, r.rentalType),
   ), [allRows, q]);
 
-  const latest = useMemo(() => allRows.reduce((acc, r) => {
-    const d = r.start || r.acqDate;
-    return d > acc ? d : acc;
-  }, TODAY), [allRows]);
+  const latest = useMemo(
+    () => latestDateOf(allRows, (r) => r.start || r.acqDate, TODAY),
+    [allRows],
+  );
 
   const fleetFilterMatchers = useMemo(() => ({
     contract: (r: FleetRow, value: string) => {

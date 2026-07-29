@@ -14,7 +14,7 @@ import { useIsMobile } from '@/lib/use-mobile';
 import { TODAY } from '@/lib/dashboard-consts';
 import { linkFleet, type Fleet } from '@/lib/domain/model';
 import { normPlate } from '@/lib/plate';
-import { summarizeAssetLedgerStats } from '@/lib/ledger-stats';
+import { latestDateOf, summarizeAssetLedgerStats } from '@/lib/ledger-stats';
 import { MigrateDataButton } from '@/components/MigrateDataButton';
 import { openIngest } from '@/lib/ui-bus';
 import {
@@ -75,10 +75,14 @@ export default function AssetLedgerPage() {
   const searchedRows = useMemo(() => allRows.filter((r) =>
     textMatch(q, r.company, r.assetCode, r.plate, r.status, r.carName, r.maker, r.modelLine, r.subModel, r.trim, r.vin, r.ownerName),
   ), [allRows, q]);
-  const latest = useMemo(() => allRows.reduce((latestDate, row) => {
-    const date = dateBasis === '처분일' ? row.saleDate : (row.acquisitionDate || row.purchasedDate || row.firstReg);
-    return date > latestDate ? date : latestDate;
-  }, TODAY), [allRows, dateBasis]);
+  const latest = useMemo(
+    () => latestDateOf(
+      allRows,
+      (row) => (dateBasis === '처분일' ? row.saleDate : (row.acquisitionDate || row.purchasedDate || row.firstReg)),
+      TODAY,
+    ),
+    [allRows, dateBasis],
+  );
   const assetFilterMatchers = useMemo(() => ({
     status: eqFilter<ReturnType<typeof assetMasterRow>>((r) => r.status),
     maker: eqFilter<ReturnType<typeof assetMasterRow>>((r) => r.maker),

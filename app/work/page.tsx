@@ -27,6 +27,8 @@ import {
   type PenaltyKind, type PenaltyProcess, type PenaltyWorkRow,
 } from '@/lib/penalty-work';
 import { LEDGER_EMPTY } from '@/lib/ledger-empty';
+import { latestDateOf } from '@/lib/ledger-stats';
+import { TODAY } from '@/lib/dashboard-consts';
 import { WORK_SECTIONS_BY_KIND } from '@/lib/work-form-sections';
 import { PenaltyBucketPanel } from '@/components/work/PenaltyBucketPanel';
 import { workRail, workRailStyle } from '@/lib/work-rail';
@@ -255,7 +257,7 @@ function WorkLedgerInner() {
   }), []);
   const detailFilterCount = countActiveFilters(detailFilters, WORK_FILTER_DEFS);
   const latest = useMemo(
-    () => allRows.reduce((value, r) => (r.workDate > value ? r.workDate : value), new Date().toISOString().slice(0, 10)),
+    () => latestDateOf(allRows, (r) => r.workDate, TODAY),
     [allRows],
   );
 

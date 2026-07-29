@@ -6,7 +6,7 @@ import { useSearchParams } from 'next/navigation';
 import { TODAY } from '@/lib/dashboard-consts';
 import { contractMasterRow } from '@/lib/master-ledgers';
 import { CONTRACT_DETAIL_SECTIONS, CONTRACT_MASTER_BASIC_COLS, CONTRACT_MASTER_EXPANDED_COLS } from '@/lib/master-ledger-cols';
-import { summarizeContractLedgerStats } from '@/lib/ledger-stats';
+import { latestDateOf, summarizeContractLedgerStats } from '@/lib/ledger-stats';
 import { useEntityList } from '@/lib/use-entity-lists';
 import { textMatch } from '@/lib/search-match';
 import {
@@ -76,10 +76,14 @@ function ContractLedgerInner() {
   const searchedRows = useMemo(() => allRows.filter((r) =>
     textMatch(q, r.company, r.contractNo, r.plate, r.carName, r.contractorName, r.contractorPhone, r.contractorLicenseNo, r.status, r.rentalType, r.dataAlert, r.riskLabel),
   ), [allRows, q]);
-  const latest = useMemo(() => allRows.reduce((latestDate, row) => {
-    const date = dateBasis === '종료일' ? (row.returnedDate || row.endDate) : (row.contractDate || row.startDate);
-    return date > latestDate ? date : latestDate;
-  }, TODAY), [allRows, dateBasis]);
+  const latest = useMemo(
+    () => latestDateOf(
+      allRows,
+      (row) => (dateBasis === '종료일' ? (row.returnedDate || row.endDate) : (row.contractDate || row.startDate)),
+      TODAY,
+    ),
+    [allRows, dateBasis],
+  );
   const contractFilterMatchers = useMemo(() => ({
     status: eqFilter<ReturnType<typeof contractMasterRow>>((r) => r.status),
     endReason: eqFilter<ReturnType<typeof contractMasterRow>>((r) => r.endReason),

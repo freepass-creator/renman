@@ -130,3 +130,20 @@ export function summarizeAccountLedgerStats(rows: BankAccountRow[]): AccountLedg
   }
   return { total: rows.length, active };
 }
+
+/**
+ * PeriodBar `latest` — 행에서 날짜 필드 max.
+ * 페이지 `reduce` 손롤 금지. pick이 빈 문자열이면 스킵.
+ */
+export function latestDateOf<T>(
+  rows: readonly T[],
+  pick: (row: T) => string | null | undefined,
+  fallback: string,
+): string {
+  let latest = fallback;
+  for (const row of rows) {
+    const date = pick(row);
+    if (date && date > latest) latest = date;
+  }
+  return latest;
+}

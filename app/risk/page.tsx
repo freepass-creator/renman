@@ -12,6 +12,7 @@ import { textMatch } from '@/lib/search-match';
 import { buildRiskSheetRows, countRiskSheetGroups, type RiskSheetGroup, type RiskSheetRow } from '@/lib/risk-ledger';
 import { RISK_BASIC_COLS, RISK_DETAIL_SECTIONS, RISK_EXPANDED_COLS } from '@/lib/risk-cols';
 import { LEDGER_EMPTY } from '@/lib/ledger-empty';
+import { latestDateOf } from '@/lib/ledger-stats';
 import { sendNoticeCert, sendNoticeCertBulk } from '@/lib/docs/send-notice';
 import { useSession } from '@/lib/session';
 import { toast } from '@/lib/toast';
@@ -54,7 +55,7 @@ export default function RiskPage() {
     return true;
   }), [searched, group, range.from, range.to]);
 
-  const latest = useMemo(() => allRows.reduce((acc, r) => (r.dueDate > acc ? r.dueDate : acc), TODAY), [allRows]);
+  const latest = useMemo(() => latestDateOf(allRows, (r) => r.dueDate, TODAY), [allRows]);
   const counts = useMemo(() => countRiskSheetGroups(searched), [searched]);
 
   const unpaidRows = useMemo(() => rows.filter((r) => r.group === '미납' && r.contractKey), [rows]);

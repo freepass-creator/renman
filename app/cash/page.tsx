@@ -14,7 +14,7 @@ import {
   ACCOUNT_ALL_COLS, ACCOUNT_BASIC_COLS, ACCOUNT_DETAIL_SECTIONS,
 } from '@/lib/finance/account-cols';
 import { isUnclassified } from '@/lib/payments/ledger-subjects';
-import { summarizeAccountLedgerStats, summarizeCashTxStats } from '@/lib/ledger-stats';
+import { latestDateOf, summarizeAccountLedgerStats, summarizeCashTxStats } from '@/lib/ledger-stats';
 import { useCashLedgerLists } from '@/lib/use-cash-ledger-lists';
 import { useEntityList } from '@/lib/use-entity-lists';
 import { textMatch } from '@/lib/search-match';
@@ -297,7 +297,7 @@ export default function CashLedgerPage() {
   }, [bank, card]);
 
   const latest = useMemo(
-    () => allRows.filter((r) => r.nest !== 'cms-item').reduce((m, r) => (r.date > m ? r.date : m), TODAY),
+    () => latestDateOf(allRows, (r) => (r.nest === 'cms-item' ? '' : r.date), TODAY),
     [allRows],
   );
 
