@@ -7,7 +7,7 @@
  *   자산·계약 마스터 열 = lib/master-ledger-cols.
  */
 import React from 'react';
-import { Badge, money, C, type SheetCol } from '@/components/ui';
+import { Badge, money, C, IconCount, type SheetCol } from '@/components/ui';
 import { type FleetRow } from './sheet-rows';
 import { collectionStage } from './domain/status';
 import { dday } from './dashboard-consts';
@@ -111,7 +111,7 @@ const FL = {
     },
     text: (r) => (r.overdueDays > 0 ? collectionStage(r.overdueDays).stage : ''),
   },
-  // 인라인 경고 — 최고심각도 톤(위험 빨강·경고 주황) + 건수. hover(title)=사유 나열. 값=sheet-warnings.
+  // 인라인 경고 — 최고심각도 톤 + 건수. hover=사유. IconCount 원자.
   warn: {
     key: 'warn', label: '경고',
     render: (r) => {
@@ -119,9 +119,12 @@ const FL = {
       if (!ws.length) return <span style={{ color: C.faint }}>—</span>;
       const high = ws.some((w) => w.sev === 'high');
       return (
-        <span title={ws.map((w) => (w.sev === 'high' ? '⚠ ' : '· ') + w.label).join('\n')} style={{ display: 'inline-flex', alignItems: 'center', gap: 3, color: high ? C.danger : C.warn, fontWeight: 800, whiteSpace: 'nowrap', cursor: 'help' }}>
-          <AlertTriangle size={13} /> {ws.length}
-        </span>
+        <IconCount
+          icon={AlertTriangle}
+          count={ws.length}
+          tone={high ? 'danger' : 'warn'}
+          title={ws.map((w) => (w.sev === 'high' ? '⚠ ' : '· ') + w.label).join('\n')}
+        />
       );
     },
     text: (r) => r.warnings.map((w) => w.label).join(' · '),
@@ -154,6 +157,16 @@ const FL = {
     render: (r) => r.rentalType || LEDGER_EMPTY.dash,
     text: (r) => r.rentalType,
   },
+  mileage: {
+    key: 'mileage', label: '주행거리', align: 'r',
+    render: (r) => (r.mileage ? `${r.mileage.toLocaleString('ko-KR')}km` : LEDGER_EMPTY.dash),
+    text: (r) => r.mileage,
+  },
+  contractNo: {
+    key: 'contractNo', label: '계약번호',
+    render: (r) => r.contractNo || LEDGER_EMPTY.dash,
+    text: (r) => r.contractNo,
+  },
 } satisfies Record<string, SheetCol<FleetRow>>;
 
 /** 기본 = 자산기본(차번·법인·상태·차명·연식) + 계약조건 + 수납/리스크. 한 셀 한 값 · 자리 고정.
@@ -167,7 +180,7 @@ const FLEET_COL_CATALOG: SheetCol<FleetRow>[] = alignCols([
   FL.company, FL.plate, FL.status, FL.maker, FL.sub, FL.year,
   FL.cust, FL.phone, FL.rentalType, FL.term, FL.start, FL.end, FL.dep, FL.rent, FL.paymentDay, FL.paymentTiming, FL.round, FL.dday,
   FL.net, FL.od, FL.stage, FL.warn, FL.note,
-  FL.car, FL.loc, FL.own, FL.util,
+  FL.car, FL.loc, FL.own, FL.util, FL.mileage, FL.contractNo,
   FL.vin, FL.acqDate, FL.acqPrice, FL.gps,
   FL.loanCo, FL.loanAmt, FL.loanRate, FL.loanMon, FL.loanStart,
   FL.insurer, FL.insEnd, FL.insPrem, FL.inspect,
@@ -175,15 +188,15 @@ const FLEET_COL_CATALOG: SheetCol<FleetRow>[] = alignCols([
 
 /** 운영 엑셀 열 — `운영 · 엑셀기본|엑셀전체 · +|-key` @see lib/ledger-ext.ts */
 export const FLEET_SHEET_KEYS: SheetViewKeys = {
-  // 기본=스캔 핵심만 · 제조/납부조건/비고는 전체
+  // 설계서: 회사·차번·차명·상태·사용처·연락처·만기·반납D·회차·대여료·미수·보험만기·주행거리·경고 (대여형태 제외)
   basic: [
-    'company', 'plate', 'cust', 'status', 'rentalType', 'end', 'dday', 'rent', 'net', 'od', 'warn',
+    'company', 'plate', 'car', 'status', 'cust', 'phone', 'end', 'dday', 'round', 'rent', 'net', 'insEnd', 'mileage', 'warn',
   ],
   all: [
     'company', 'plate', 'cust', 'status', 'maker', 'sub', 'year',
     'phone', 'rentalType', 'term', 'start', 'end', 'dep', 'rent', 'paymentDay', 'paymentTiming', 'round', 'dday',
     'net', 'od', 'stage', 'warn', 'note',
-    'car', 'loc', 'own', 'util',
+    'car', 'loc', 'own', 'util', 'mileage', 'contractNo',
     'vin', 'acqDate', 'acqPrice', 'gps',
     'loanCo', 'loanAmt', 'loanRate', 'loanMon', 'loanStart',
     'insurer', 'insEnd', 'insPrem', 'inspect',
@@ -198,7 +211,7 @@ export const FLEET_DETAIL_DEFS: DetailSectionDef[] = [
   {
     title: '차량·상태',
     open: true,
-    keys: ['company', 'plate', 'status', 'maker', 'sub', 'year', 'car', 'loc', 'own', 'util'],
+    keys: ['company', 'plate', 'status', 'maker', 'sub', 'year', 'car', 'loc', 'own', 'util', 'mileage', 'contractNo'],
   },
   {
     title: '계약',

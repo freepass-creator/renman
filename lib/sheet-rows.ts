@@ -23,12 +23,12 @@ export type FleetRow = {
   plate: string; companyId: string; company: string;
   // 자산
   ownership: string; util: string; status: string; location: string; carName: string; maker: string; subModel: string; year: string; vin: string; note: string;
-  acqDate: string; acqPrice: number; inspectionTo: string; gps: string;
+  acqDate: string; acqPrice: number; inspectionTo: string; gps: string; mileage: number;
   // 할부
   loanCompany: string; loanPrincipal: number; loanRate: number; loanMonths: number; loanStart: string;
   // 계약(활성)
   customer: string; phone: string; rentalType: string; rent: number; deposit: number; termMonths: number; start: string; end: string; dday: number | null;
-  paymentDay: number; paymentTiming: string; roundDue: number; roundTotal: number;
+  paymentDay: number; paymentTiming: string; roundDue: number; roundTotal: number; contractNo: string;
   // 보험
   insurer: string; insEnd: string; insPremium: number;
   // 미수
@@ -77,6 +77,7 @@ export function buildFleetRows(vehicles: VehicleNode[], insurance: EntityRecord[
       acqPrice: Number(veh?.acquisitionPrice) || 0,
       inspectionTo: String(veh?.inspectionTo || ''),
       gps: String(veh?.gpsProvider || ''),
+      mileage: Number(veh?.mileage) || 0,
       loanCompany: String(veh?.loanCompany || '') || (veh && isCash(veh) ? '현금' : ''),
       loanPrincipal: Number(veh?.loanPrincipal) || 0,
       loanRate: Number(veh?.loanRate) || 0,
@@ -95,6 +96,7 @@ export function buildFleetRows(vehicles: VehicleNode[], insurance: EntityRecord[
       paymentTiming: active ? paymentTimingOf(v?.rec.paymentTiming) : '',
       roundDue: v?.roundDue ?? 0,
       roundTotal: v?.roundTotal ?? 0,
+      contractNo: String(v?.rec.contractNo || ''),
       insurer: String(ins?.insurer || ''),
       insEnd: String(ins?.endDate || ''),
       insPremium: Number(ins?.totalPremium) || 0,

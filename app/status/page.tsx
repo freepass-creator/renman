@@ -1,7 +1,7 @@
 'use client';
 /**
  * 운영현황 — 차량 1대=1행 통합 원장 (LedgerFrame 규격).
- * 데이터 = linkFleet → buildFleetRows · 열 = FLEET_*_COLS. 옛 FacetPage/OpsLens 금지.
+ * 기본 스코프 = isVehicleHeld(실물 보유). 필터 = 검색 + 칩1군 + 기간.
  */
 import { useMemo, useState } from 'react';
 import { Car, CalendarClock, FileText } from 'lucide-react';
@@ -14,36 +14,29 @@ import { workRailStyle } from '@/lib/work-rail';
 import { useEntityLists } from '@/lib/use-entity-lists';
 import { textMatch } from '@/lib/search-match';
 import {
-  Btn, C, FilterChips, LedgerActions, LedgerFilterSelects, LedgerFrame, LedgerRecordPanel,
-  PeriodBar, Search, Select, won,
+  Btn, C, FilterChips, LedgerActions, LedgerFrame, LedgerRecordPanel,
+  PeriodBar, Search, won,
   type LedgerColView,
 } from '@/components/ui';
 import { useIsMobile } from '@/lib/use-mobile';
-import {
-  FLEET_FILTER_DEFS, emptyFilterValues, matchLedgerFilters,
-} from '@/lib/ledger-filter-defs';
-import { RENTAL_TYPES } from '@/lib/schema/contract';
 import { LEDGER_EMPTY } from '@/lib/ledger-empty';
 
-const RENTAL_CHIP_OPTS = [
-  { key: '전체' as const, label: '전체' },
-  ...RENTAL_TYPES.map((t) => ({ key: t, label: t })),
-];
-type RentalChip = (typeof RENTAL_CHIP_OPTS)[number]['key'];
+type ScopeChip = '전체' | '운행' | '정비' | '휴차' | '리스크';
 
-type OwnScope = '보유' | '전체' | '매각';
-type UtilChip = '운행' | '휴차' | '정비';
+const SCOPE_OPTS: { key: ScopeChip; label: string }[] = [
+  { key: '전체', label: '전체' },
+  { key: '운행', label: '운행' },
+  { key: '정비', label: '정비' },
+  { key: '휴차', label: '휴차' },
+  { key: '리스크', label: '리스크' },
+];
 
 export default function StatusPage() {
   const mobile = useIsMobile();
   const { data: [vs = [], cs = [], ins = [], hs = []], loading } = useEntityLists(['vehicle', 'contract', 'insurance', 'history']);
   const [q, setQ] = useState('');
-  const [own, setOwn] = useState<OwnScope>('보유');
-  const [utilChip, setUtilChip] = useState<UtilChip | null>(null);
-  const [riskOnly, setRiskOnly] = useState(false);
-  const [rentalChip, setRentalChip] = useState<RentalChip>('전체');
+  const [scope, setScope] = useState<ScopeChip>('전체');
   const [range, setRange] = useState({ from: '', to: '' });
-  const [detailFilters, setDetailFilters] = useState(() => emptyFilterValues(FLEET_FILTER_DEFS));
   const [colView, setColView] = useState<LedgerColView>('기본');
   const [selected, setSelected] = useState<FleetRow | null>(null);
 
@@ -53,37 +46,24 @@ export default function StatusPage() {
       .sort((a, b) => statusRank(a) - statusRank(b) || a.plate.localeCompare(b.plate, 'ko'));
   }, [vs, cs, ins, hs]);
 
-  const searched = useMemo(() => allRows.filter((r) =>
-    textMatch(q, r.company, r.plate, r.carName, r.maker, r.customer, r.phone, r.status, r.util, r.location, r.rentalType),
-  ), [allRows, q]);
+  /** 기본 스코프 = 보유(실물). 검색은 이 안에서. */
+  const heldRows = useMemo(() => allRows.filter(isVehicleHeld), [allRows]);
+
+  const searched = useMemo(() => heldRows.filter((r) =>
+    textMatch(q, r.company, r.plate, r.carName, r.maker, r.customer, r.phone, r.status, r.util, r.location),
+  ), [heldRows, q]);
 
   const latest = useMemo(
-    () => latestDateOf(allRows, (r) => r.start || r.acqDate, TODAY),
-    [allRows],
+    () => latestDateOf(heldRows, (r) => r.start || r.acqDate, TODAY),
+    [heldRows],
   );
 
-  const fleetFilterMatchers = useMemo(() => ({
-    contract: (r: FleetRow, value: string) => {
-      if (value === '만기임박') return r.dday != null && r.dday >= 0 && r.dday <= 30;
-      if (value === '반납지남') return r.dday != null && r.dday < 0;
-      if (value === '계약없음') return !r.customer && isVehicleHeld(r) && r.status !== '차량없음';
-      return true;
-    },
-    warn: (r: FleetRow, value: string) => {
-      if (value === '경고있음') return r.warnings.length > 0;
-      if (value === '위험만') return r.warnings.some((w) => w.sev === 'high');
-      return true;
-    },
-  }), []);
-
   const rows = useMemo(() => searched.filter((r) => {
-    const held = isVehicleHeld(r);
-    if (own === '보유' && !held) return false;
-    if (own === '매각' && r.ownership !== '처분완료') return false;
-    if (utilChip && r.util !== utilChip) return false;
-    if (riskOnly && !(r.net > 0 || r.warnings.length > 0 || (r.dday != null && r.dday < 0))) return false;
-    if (rentalChip !== '전체' && r.rentalType !== rentalChip) return false;
-    if (!matchLedgerFilters(r, detailFilters, fleetFilterMatchers)) return false;
+    if (scope === '운행' || scope === '정비' || scope === '휴차') {
+      if (r.util !== scope) return false;
+    } else if (scope === '리스크') {
+      if (!(r.net > 0 || r.warnings.length > 0 || (r.dday != null && r.dday < 0))) return false;
+    }
     if (range.from || range.to) {
       const s = (r.start || '').slice(0, 10);
       const e = (r.end || '').slice(0, 10);
@@ -92,7 +72,7 @@ export default function StatusPage() {
       if (range.to && s && s > range.to) return false;
     }
     return true;
-  }), [searched, own, utilChip, riskOnly, rentalChip, detailFilters, fleetFilterMatchers, range.from, range.to]);
+  }), [searched, scope, range.from, range.to]);
 
   const { heldN, utilPct, netSum, inspSoon } = useMemo(
     () => summarizeFleetStatusStats(searched, rows),
@@ -116,40 +96,10 @@ export default function StatusPage() {
           onChange={(e) => setQ(e.target.value)}
           style={{ width: mobile ? '100%' : 280 }}
         />
-        <LedgerFilterSelects
-          defs={FLEET_FILTER_DEFS}
-          values={detailFilters}
-          onChange={(key, value) => setDetailFilters((prev) => ({ ...prev, [key]: value }))}
-          options={{
-            contract: ['만기임박', '반납지남', '계약없음'],
-            warn: ['경고있음', '위험만'],
-          }}
-        />
-        <Select size="sm" aria-label="보유 범위" value={own} onChange={(e) => setOwn(e.target.value as OwnScope)}>
-          <option value="보유">보유</option>
-          <option value="전체">전체</option>
-          <option value="매각">매각</option>
-        </Select>
         <FilterChips
-          allowOff
-          value={utilChip}
-          onChange={setUtilChip}
-          options={[
-            { key: '운행', label: '운행' },
-            { key: '휴차', label: '휴차' },
-            { key: '정비', label: '정비' },
-          ]}
-        />
-        <FilterChips
-          allowOff
-          value={riskOnly ? '리스크' : null}
-          onChange={(v) => setRiskOnly(v === '리스크')}
-          options={[{ key: '리스크', label: '리스크' }]}
-        />
-        <FilterChips
-          value={rentalChip}
-          onChange={(v) => setRentalChip(v ?? '전체')}
-          options={RENTAL_CHIP_OPTS}
+          value={scope}
+          onChange={(v) => setScope(v ?? '전체')}
+          options={SCOPE_OPTS}
         />
         <PeriodBar latest={latest} initial="전체" size="sm" onRange={setRange} />
       </>}
