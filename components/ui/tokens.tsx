@@ -152,7 +152,7 @@ export const tdR: CSSProperties = { ...td, textAlign: 'right', fontVariantNumeri
 const EXCEL_PAD_Y = 5;
 const EXCEL_PAD_X = 8;
 /** 엑셀 thead·행 · 우측 상세패널 헤더 · Page frame 타이틀행 공통 높이. */
-const EXCEL_ROW_H = 36;
+const EXCEL_ROW_H = 40;
 export const thX: CSSProperties = {
   padding: `${EXCEL_PAD_Y}px ${EXCEL_PAD_X}px`, textAlign: 'left', fontSize: 12, color: C.mute, fontWeight: 700,
   background: C.head, borderBottom: `1px solid ${C.line}`, borderRight: `1px solid ${C.line}`, whiteSpace: 'nowrap',
@@ -165,7 +165,8 @@ export const thXC: CSSProperties = { ...thX, textAlign: 'center' };
 export const thXPin: CSSProperties = { ...thX, left: 0, zIndex: 5, boxShadow: `1px 0 0 ${C.line}` };
 export const tdX: CSSProperties = {
   padding: `${EXCEL_PAD_Y}px ${EXCEL_PAD_X}px`, fontSize: 12, whiteSpace: 'nowrap', color: C.ink,
-  borderRight: `1px solid ${C.line2}`,   // 세로 격자선 — 엑셀식. 좌/우 정렬 무관하게 칸 경계 균일.
+  borderRight: `1px solid ${C.line2}`,
+  borderBottom: `1px solid ${C.line2}`,
   verticalAlign: 'middle', height: EXCEL_ROW_H, maxHeight: EXCEL_ROW_H, boxSizing: 'border-box', overflow: 'hidden',
 };
 export const tdXR: CSSProperties = { ...tdX, textAlign: 'right', fontVariantNumeric: 'tabular-nums', fontFamily: NUM, fontWeight: 600 };

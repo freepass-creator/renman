@@ -70,6 +70,9 @@ curl -s -o /dev/null -w "%{http_code}" http://localhost:6006/<route>   # 200
 
 | 날짜 | 작업자 | 내용 | 상태 |
 |---|---|---|---|
+| 2026-07-29 | Cursor | ERP질감: rail세로선제거·danger틴트·팔레트대비·badge5px·행고40 | tsc0 |
+| 2026-07-29 | Cursor | 행 상태표시 3px레일→RailDot(6px점) ExcelSheet/ObjRow/ObjCard | tsc0 |
+| 2026-07-29 | Cursor | 리스크 rail 전행 빨강벽 해소(급함만 danger·그외 warn) | tsc0 |
 | 2026-07-29 | Cursor | 손익·부가세 과목표 집계 SSOT(`subject-summary`) | 3b77b1a |
 | 2026-07-29 | Cursor | 미수관리 집계 SSOT(`receivables-ledger`) · 내용증명 일괄 ghost | 83ed867 |
 | 2026-07-29 | Cursor | 단일회사 회사열 숨김(ExcelSheet) · 계약·운영·업무·자금 필터 상단 흡수 | 79c09c5 · 9fdcb21 |
