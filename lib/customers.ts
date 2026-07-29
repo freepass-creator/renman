@@ -14,6 +14,14 @@ export interface CustomerAgg {
   vehicles: string[];   // 이용 차량번호들
   lastEnd: string;      // 최근 계약 종료/반납일(재계약 판단)
   licenseNo: string;
+  /** 연체 중인(overdueDays>0) 계약 건수 — computeContractView 롤업. */
+  overdueCount: number;
+  /** 계약별 overdueDays 최대. */
+  maxOverdueDays: number;
+  /** overdueDays ≥ 90 계약 건수. */
+  overdue90Count: number;
+  /** 최근 연체 시작일(오늘−overdueDays 중 최신). 없으면 ''. */
+  lastOverdueDate: string;
 }
 
 /** 손님 식별키 SSOT — phone 우선, 없으면 name. openCustomer·집계·360이 동일 규칙. */
@@ -32,7 +40,11 @@ export function aggregateCustomers(contracts: EntityRecord[], today: string): Cu
     const key = customerKey(name, phone);
     let agg = map.get(key);
     if (!agg) {
-      agg = { key, name, phone, companyId: String(c.companyId || ''), contracts: [], activeCount: 0, totalUnpaid: 0, vehicles: [], lastEnd: '', licenseNo: String(c.contractorLicenseNo || '') };
+      agg = {
+        key, name, phone, companyId: String(c.companyId || ''), contracts: [],
+        activeCount: 0, totalUnpaid: 0, vehicles: [], lastEnd: '', licenseNo: String(c.contractorLicenseNo || ''),
+        overdueCount: 0, maxOverdueDays: 0, overdue90Count: 0, lastOverdueDate: '',
+      };
       map.set(key, agg);
     }
     agg.contracts.push(c);
@@ -45,8 +57,27 @@ export function aggregateCustomers(contracts: EntityRecord[], today: string): Cu
     if (plate && !agg.vehicles.includes(plate)) agg.vehicles.push(plate);
     const end = String(c.returnedDate || c.endDate || '').slice(0, 10);
     if (end > agg.lastEnd) agg.lastEnd = end;
+    // 연체이력 — ContractView.overdueDays 롤업(새 엔진 금지).
+    if (v.overdueDays > 0) {
+      agg.overdueCount += 1;
+      if (v.overdueDays > agg.maxOverdueDays) agg.maxOverdueDays = v.overdueDays;
+      if (v.overdueDays >= 90) agg.overdue90Count += 1;
+      const since = overdueSinceDate(today, v.overdueDays);
+      if (since > agg.lastOverdueDate) agg.lastOverdueDate = since;
+    }
   }
   return Array.from(map.values());
+}
+
+/** today − overdueDays → YYYY-MM-DD (연체 시작 추정일). */
+function overdueSinceDate(today: string, overdueDays: number): string {
+  const t = Date.parse(today.slice(0, 10));
+  if (!Number.isFinite(t) || overdueDays <= 0) return '';
+  const d = new Date(t - overdueDays * 86400000);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
 }
 
 /** 한 손님만 — 전 계약 aggregate 후 find 금지. 매칭 계약만 집계. */

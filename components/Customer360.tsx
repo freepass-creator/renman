@@ -55,6 +55,15 @@ export function Customer360({ ckey, onTitle }: { ckey: string; onTitle?: (name: 
         </Cards>
       </Sec>
 
+      <Sec id="cu-overdue" title="연체이력" desc="계약별 연체일(ContractView) 롤업 · 생성 시 경고는 다음 단계">
+        <Cards min={128}>
+          <Metric label="연체 계약" value={cust.overdueCount} tone={cust.overdueCount > 0 ? 'danger' : 'ink'} />
+          <Metric label="최대 연체일" value={cust.maxOverdueDays > 0 ? `${cust.maxOverdueDays}일` : '—'} tone={cust.maxOverdueDays >= 90 ? 'danger' : cust.maxOverdueDays > 0 ? 'warn' : 'ink'} />
+          <Metric label="90일↑" value={cust.overdue90Count} tone={cust.overdue90Count > 0 ? 'danger' : 'ink'} />
+          <Metric label="최근 연체일" value={cust.lastOverdueDate || '—'} />
+        </Cards>
+      </Sec>
+
       <Sec id="cu-active" title="진행중 계약" n={activeV.length} desc="차 클릭 → 360">
         {activeV.length === 0 ? <div style={{ fontSize: 12.5, color: C.faint }}>진행중 계약 없음</div> :
           <Cards min={340}>{activeV.map(({ c, v }, i) => { const cs = collectionStage(v.overdueDays); return <ObjCard key={i} onClick={() => openCar(c.plate)} rail={v.net > 0 ? 'danger' : 'none'} badge={v.net > 0 ? cs.stage : '운행'} badgeTone={v.net > 0 ? cs.tone : 'green'} plate={String(c.plate)} carType={c.carName ? String(c.carName) : undefined} fields={[['기간', `${c.startDate || ''}~${c.endDate || ''}`], ['월', won(c.monthlyRent)]]} right={v.net > 0 ? <span style={{ color: C.danger, fontWeight: 700 }}>미수 {won(v.net)}</span> : undefined} />; })}</Cards>}
