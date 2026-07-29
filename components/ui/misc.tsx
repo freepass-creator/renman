@@ -1,10 +1,10 @@
 'use client';
 import React from 'react';
-import { Check, AlertTriangle } from 'lucide-react';
+import { Check, AlertTriangle, type LucideIcon } from 'lucide-react';
 import { companyTone, companyShort } from '@/lib/companies';
 import { type CrosscheckResult } from '@/lib/ocr-crosscheck';
 import { useIsMobile } from '@/lib/use-mobile';
-import { C, R, NUM, SH, METRIC_FS, GAP_M, SPACE_M, TOUCH, CELL_SUB_FS } from './tokens';
+import { C, R, NUM, SH, METRIC_FS, GAP_M, SPACE_M, TOUCH, CELL_SUB_FS, INDENT_UNIT } from './tokens';
 import { Spinner } from '../Spinner';
 
 /* 카드·지표·상태/이슈 어휘 등 — UI 키트의 "나머지" 원자 모음. */
@@ -118,13 +118,10 @@ export function Metric({ label, value, hint, tone, onClick }: { label: React.Rea
 }
 // 객체 카드 = 목록의 단일 원자(2행 신원카드). 웹·모바일 높이 56(= freepass ERP4 ObjCard).
 //  1행 신원: [회사][상태배지][차량번호(모노·무잘림) 또는 이름][차종(축소가능)] …[우측 핵심수치]
-//  2행 원자: fields(라벨-값, 우선순위 상위 3 + ＋n) 또는 sub(자유문). 좌측=RailDot(6px)·세로선·행틴트 금지.
+//  2행 원자: fields(라벨-값, 우선순위 상위 3 + ＋n) 또는 sub(자유문). danger=옅은 배경 틴트. 좌측점·세로선 금지.
 //  호출부는 "필요한 원자만" 넘긴다. 차번=plate, 비차량 주체(자금 상대방·고객)=name, 부가식별=carType.
-// 레일 톤 SSOT — 판정용 RailTone. 시각=RailDot. brand·violet은 상태축용.
+// 레일 톤 SSOT — 판정용 RailTone. 시각=danger 틴트만(workRailStyle). brand·violet은 상태축용.
 export type RailTone = 'none' | 'brand' | 'danger' | 'warn' | 'violet' | 'ok' | 'mute';
-/** ExcelSheet rowStyle에 심는 CSS 변수 — 색·톤명. 페이지는 workRailStyle만. */
-export const ROW_RAIL_VAR = '--jpk-rail';
-export const ROW_RAIL_TONE_VAR = '--jpk-rail-tone';
 export function railToneColor(tone: Exclude<RailTone, 'none'>): string {
   return tone === 'brand' ? C.brand
     : tone === 'danger' ? C.danger
@@ -132,19 +129,6 @@ export function railToneColor(tone: Exclude<RailTone, 'none'>): string {
     : tone === 'violet' ? C.violet
     : tone === 'ok' ? C.ok
     : C.faint;
-}
-/** 행 앞 상태점(6px). none=미렌더. 세로선·행 틴트 대신 이것만. */
-export function RailDot({ tone }: { tone: RailTone }) {
-  if (tone === 'none') return null;
-  return (
-    <span
-      aria-hidden
-      style={{
-        flex: '0 0 auto', width: 6, height: 6, borderRadius: '50%',
-        background: railToneColor(tone), display: 'inline-block',
-      }}
-    />
-  );
 }
 
 /**
@@ -178,6 +162,34 @@ export function TwoLineCell({
     </div>
   );
 }
+
+/** 트리/CMS 하위행 들여쓰기 — `INDENT_UNIT`만. */
+export function TreeIndent({ children, depth = 1 }: { children: React.ReactNode; depth?: number }) {
+  return <span style={{ color: C.mute, paddingLeft: INDENT_UNIT * depth }}>{children}</span>;
+}
+
+/** 아이콘+건수(경고 열 등). 컬럼에서 flex/gap 손롤 금지 → 이것만. */
+export function IconCount({
+  icon: Icon, count, tone = 'warn', title,
+}: {
+  icon: LucideIcon;
+  count: number;
+  tone?: 'danger' | 'warn' | 'mute';
+  title?: string;
+}) {
+  const color = tone === 'danger' ? C.danger : tone === 'warn' ? C.warn : C.faint;
+  return (
+    <span
+      title={title}
+      style={{
+        display: 'inline-flex', alignItems: 'center', gap: 3,
+        color, fontWeight: 800, whiteSpace: 'nowrap', cursor: title ? 'help' : undefined,
+      }}
+    >
+      <Icon size={13} aria-hidden />{count}
+    </span>
+  );
+}
 const ATOM_CAP = 3; // 2행 원자 표시 상한 — 넘으면 ＋n(우선순위 상위만 생존, 픽셀측정 대신 count-cap)
 export function ObjCard({ badge, badgeTone = 'gray', co, rail = 'none', plate, name, carType, title, sub, right, fields, onClick }: {
   badge?: React.ReactNode; badgeTone?: BadgeTone; co?: string; rail?: RailTone;
@@ -202,15 +214,17 @@ export function ObjCard({ badge, badgeTone = 'gray', co, rail = 'none', plate, n
   return (
     <div onClick={onClick} {...on} style={{
       ...(grouped
-        ? { background: h && !!onClick ? C.hover : 'transparent', cursor: onClick ? 'pointer' : 'default', transition: 'background .12s ease' }
-        : cardStyle(h, !!onClick)),
+        ? { background: h && !!onClick ? C.hover : (rail === 'danger' ? 'var(--danger-tint)' : 'transparent'), cursor: onClick ? 'pointer' : 'default', transition: 'background .12s ease' }
+        : {
+            ...cardStyle(h, !!onClick),
+            ...(rail === 'danger' && !h ? { background: 'var(--danger-tint)' } : {}),
+          }),
       position: 'relative', overflow: 'hidden',
       height: mobile ? 'auto' : 56, minHeight: mobile ? 60 : 56,
       padding: mobile ? '10px 14px' : '0 12px 0 14px',
-      display: 'flex', alignItems: 'center', gap: 8, minWidth: 0,
+      display: 'flex', alignItems: 'center', minWidth: 0,
       WebkitTapHighlightColor: 'transparent',
     }}>
-      <RailDot tone={rail} />
       <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 3 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 7, minWidth: 0, overflow: 'hidden' }}>
           {co ? <span style={{ flex: '0 0 auto' }}><CompanyBadge co={co} /></span> : null}

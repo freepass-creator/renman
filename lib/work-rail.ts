@@ -1,10 +1,10 @@
 /**
  * 원장 행 rail 판정 — status/priority·도메인 축.
  * fleetRail/statusRank는 함대 전용(재사용 금지). 원자 RailTone만 공용.
- * 정상(진행·완료)=무색. 시각 = 좌측 RailDot(6px). 세로선·행 틴트 금지.
+ * 정상(진행·완료)=무색. 시각 = danger만 `--danger-tint` 배경(좌측 점·세로선 금지).
  */
 import type { CSSProperties } from 'react';
-import { ROW_RAIL_TONE_VAR, ROW_RAIL_VAR, railToneColor, type RailTone } from '@/components/ui';
+import type { RailTone } from '@/components/ui';
 
 export function workRail(r: {
   status?: string;
@@ -26,13 +26,10 @@ export function workRail(r: {
 }
 
 /**
- * ExcelSheet rowStyle용 — RailTone → CSS 변수(색·톤명).
- * ExcelSheet가 첫 칸에 RailDot을 찍는다. none=undefined.
+ * ExcelSheet rowStyle용 — danger만 `--danger-tint` 배경.
+ * warn/mute/none = 배지만(배경 없음). 좌측 점·inset 선 금지.
  */
 export function workRailStyle(tone: RailTone): CSSProperties | undefined {
-  if (tone === 'none') return undefined;
-  return {
-    [ROW_RAIL_VAR]: railToneColor(tone),
-    [ROW_RAIL_TONE_VAR]: tone,
-  } as CSSProperties;
+  if (tone !== 'danger') return undefined;
+  return { background: 'var(--danger-tint)' };
 }
