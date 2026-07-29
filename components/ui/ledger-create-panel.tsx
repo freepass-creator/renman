@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
-import { ChevronRight, Plus, Save, X } from 'lucide-react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { ChevronRight, Plus, Save, UploadCloud, X } from 'lucide-react';
 import { COMPANIES, companyLabel, companyShort } from '@/lib/companies';
 import { ENTITIES, type EntityRecord, type Field } from '@/lib/intake/entities';
 import { saveIntake } from '@/lib/intake';
@@ -11,12 +11,21 @@ import { toast } from '@/lib/toast';
 import { Btn, Input, PillTabs, Select } from './controls';
 import { FormGrid } from './detail';
 import { LedgerPanelFooter } from './ledger-actions';
+import { Message } from './misc';
 import { C } from './tokens';
 
 export type LedgerFormSection = {
   title: string;
   fields: string[];
   open?: boolean;
+};
+
+/** kind 값 → 일반 폼 대신 게이트웨이(저장 금지 · 외부 등록 경로). */
+export type LedgerKindGateway = {
+  message: ReactNode;
+  actionLabel: string;
+  href?: string;
+  onAction?: () => void;
 };
 
 function normalizedForm(fields: Field[], form: EntityRecord): EntityRecord {
@@ -37,6 +46,8 @@ export function LedgerCreatePanel({
   sectionsByKind,
   kindField = 'category',
   fallbackKind = '기타',
+  kindGateways,
+  onKindChange,
   initial,
   quick,
   prefix,
@@ -52,6 +63,10 @@ export function LedgerCreatePanel({
   /** sectionsByKind 키로 쓸 폼 필드(기본 category). */
   kindField?: string;
   fallbackKind?: string;
+  /** kind 선택 시 폼 대신 안내+외부액션(해당 kind는 saveIntake 차단). */
+  kindGateways?: Record<string, LedgerKindGateway>;
+  /** kindField 값 변경 콜백(탭 전환 등). */
+  onKindChange?: (kind: string) => void;
   initial?: EntityRecord;
   /** 회사만으로도 저장하되 아래 상세 입력은 선택적으로 유지한다. */
   quick?: boolean;
@@ -99,20 +114,31 @@ export function LedgerCreatePanel({
   const fieldByKey = useMemo(() => new Map(selectedFields.map((field) => [field.key, field])), [selectedFields]);
 
   if (!entity) return null;
+  const kindValue = String(form[kindField] || '');
+  const gateway = kindGateways?.[kindValue];
   const companyReady = !scopeAll || !!String(form.companyId || '').trim();
-  const fieldsReady = quick
-    ? !!String(form.title || '').trim()
-    : selectedFields.every((field) => !field.required || !!String(form[field.key] ?? '').trim());
-  const canSave = companyReady && fieldsReady;
+  const fieldsReady = gateway
+    ? false
+    : quick
+      ? !!String(form.title || '').trim()
+      : selectedFields.every((field) => !field.required || !!String(form[field.key] ?? '').trim());
+  const canSave = !gateway && companyReady && fieldsReady;
 
-  const change = (key: string, value: string) => setForm((current) => {
-    const next: EntityRecord = { ...current, [key]: value };
-    if (key === 'category') next.workType = value;
-    return next;
-  });
+  const change = (key: string, value: string) => {
+    setForm((current) => {
+      const next: EntityRecord = { ...current, [key]: value };
+      if (key === 'category') next.workType = value;
+      return next;
+    });
+    if (key === kindField) onKindChange?.(value);
+  };
   const patch = (next: Record<string, string>) => setForm((current) => ({ ...current, ...next }));
 
   async function save() {
+    if (gateway) {
+      toast('이 구분은 업로드/전용 경로로 등록합니다.', 'info');
+      return;
+    }
     const targetCompany = resolveWriteCompany(companyId, { companyId: form.companyId });
     if (!targetCompany) {
       toast(NEED_COMPANY, 'error');
@@ -205,7 +231,7 @@ export function LedgerCreatePanel({
           )
         )}
 
-        {quick && (
+        {quick && !gateway && (
           <div>
             <label className="ledger-create-panel__field">
               <span>업무 내용 <span style={{ color: C.danger }}>*</span></span>
@@ -237,9 +263,22 @@ export function LedgerCreatePanel({
             </details>
           );
         })}
+
+        {gateway && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 4 }}>
+            <Message variant="info">{gateway.message}</Message>
+            <Btn
+              size="sm"
+              href={gateway.href}
+              onClick={gateway.onAction}
+            >
+              <UploadCloud size={14} /> {gateway.actionLabel}
+            </Btn>
+          </div>
+        )}
       </div>
 
-      <LedgerPanelFooter hint="등록일·등록자는 저장 시 자동 기록됩니다.">
+      <LedgerPanelFooter hint={gateway ? '과태료는 work_item이 아니라 고지서 엔티티로 등록됩니다.' : '등록일·등록자는 저장 시 자동 기록됩니다.'}>
         <Btn size="sm" variant="ghost" disabled={busy} onClick={onClose}>취소</Btn>
         <Btn size="sm" disabled={busy || !canSave} onClick={save}><Save size={14} /> {busy ? '저장 중…' : '생성'}</Btn>
       </LedgerPanelFooter>
