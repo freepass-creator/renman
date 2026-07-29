@@ -31,11 +31,11 @@ const RENTAL_CHIP_OPTS = [
 type RentalChip = (typeof RENTAL_CHIP_OPTS)[number]['key'];
 
 const CONTRACT_CREATE_SECTIONS: LedgerFormSection[] = [
-  { title: '계약 기본정보', open: true, fields: ['contractNo', 'status', 'rentalType', 'contractDate', 'plate', 'carName'] },
-  { title: '계약자정보', fields: ['contractorName', 'contractorPhone', 'contractorBirth', 'contractorLicenseNo', 'licenseType', 'contractorAddress'] },
-  { title: '기간·차량조건', fields: ['startDate', 'endDate', 'rentalMonths', 'annualMileageLimit', 'pickupPlace', 'returnPlace'] },
-  { title: '요금·납부조건', fields: ['monthlyRent', 'deposit', 'reservationFee', 'paymentDay', 'paymentTiming', 'lateFeeRate', 'earlyTerminationRate'] },
-  { title: '보험·운전자', fields: ['driverAgeMin', 'insuranceAge', 'cdw', 'deductible', 'superCover', 'additionalDrivers', 'withDriver'] },
+  { title: '계약 기본', open: true, fields: ['contractNo', 'status', 'rentalType', 'contractDate', 'plate', 'carName'] },
+  { title: '계약자', fields: ['contractorName', 'contractorPhone', 'contractorBirth', 'contractorLicenseNo', 'licenseType', 'contractorAddress'] },
+  { title: '기간·인도', fields: ['startDate', 'endDate', 'rentalMonths', 'annualMileageLimit', 'pickupPlace', 'returnPlace'] },
+  { title: '요금·납부', fields: ['monthlyRent', 'deposit', 'reservationFee', 'paymentDay', 'paymentTiming', 'lateFeeRate', 'earlyTerminationRate'] },
+  { title: '보험·특약', fields: ['driverAgeMin', 'insuranceAge', 'cdw', 'deductible', 'superCover', 'additionalDrivers', 'withDriver'] },
 ];
 
 function ContractLedgerInner() {
