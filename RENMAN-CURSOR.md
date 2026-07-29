@@ -70,6 +70,7 @@ curl -s -o /dev/null -w "%{http_code}" http://localhost:6006/<route>   # 200
 
 | 날짜 | 작업자 | 내용 | 상태 |
 |---|---|---|---|
+| 2026-07-29 | Cursor | 고아 WebPage 삭제 · 자금·운영 배지 ledger-stats 위임 | 9e8e58d · caa5121 |
 | 2026-07-29 | Cursor | 회사 열 key co→company 통일(운영·자금) | 7914bb1 |
 | 2026-07-29 | Cursor | 원장 빈값 카피 LEDGER_EMPTY 스윕(운영·자산·계약·리스크·일정·자금) | 6bbab6f |
 | 2026-07-29 | Cursor | 계약 상세 수납스케줄 임베드 잔유 제거 · ContractScheduleEmbed 삭제 | f491fad |
