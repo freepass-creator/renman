@@ -6,24 +6,38 @@ import {
 import { paymentTimingOf } from './schema/contract';
 import { workRailStyle } from './work-rail';
 import { LEDGER_EMPTY } from './ledger-empty';
+import { isContractEndedStatus } from './domain/status';
+import { dday } from './dashboard-consts';
 
 const dash = (v: unknown) => (v === '' || v === null || v === undefined || v === 0 ? LEDGER_EMPTY.dash : String(v));
 const date = (v: string) => (v ? v.slice(0, 10) : LEDGER_EMPTY.dash);
 const money = (v: number) => (v ? won(v) : LEDGER_EMPTY.dash);
 const number = (v: number, suffix = '') => (v ? `${v.toLocaleString('ko-KR')}${suffix}` : LEDGER_EMPTY.dash);
 
-/** 자산 원장 rail — 상태·차종 축(함대 fleetRail 비재사용). */
+/** 자산 원장 rail — 상태·차종 축(함대 fleetRail 비재사용). 정상(운행)=무색. */
 export function assetRail(r: Pick<AssetMasterRow, 'disposed' | 'status' | 'vehicleType'>): RailTone {
   if (r.disposed) return 'mute';
   if (r.status === '사고') return 'danger';
   if (r.status === '정비') return 'warn';
-  if (r.status === '운행') return 'ok';
+  if (r.status === '운행') return 'none';
   if (/화물|승합|버스/.test(String(r.vehicleType || ''))) return 'violet';
   if (/휴차|대기|상품/.test(String(r.status || ''))) return 'brand';
   return 'mute';
 }
 
 export { workRailStyle as assetRailStyle };
+
+/** 계약 원장 rail — 만기경과·미납=danger · 만기임박=warn · 종료=mute · 정상=무색. */
+export function contractRail(r: Pick<ContractMasterRow, 'ended' | 'status' | 'net' | 'unpaidCount' | 'endDate'>): RailTone {
+  if (r.ended || isContractEndedStatus(r.status)) return 'mute';
+  if (r.net > 0 || r.unpaidCount > 0) return 'danger';
+  const d = dday(r.endDate);
+  if (d != null && d < 0) return 'danger';
+  if (d != null && d <= 30) return 'warn';
+  return 'none';
+}
+
+export { workRailStyle as contractRailStyle };
 
 function assetStatusTone(r: Pick<AssetMasterRow, 'disposed' | 'status' | 'vehicleType'>): 'gray' | 'green' | 'amber' | 'red' | 'blue' | 'purple' {
   if (r.disposed) return 'gray';

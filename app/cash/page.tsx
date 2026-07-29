@@ -9,7 +9,7 @@ import { useMemo, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { Plus, X, Link2, Unlink, UploadCloud, Landmark, GitMerge, CircleDollarSign } from 'lucide-react';
 import { buildCashLedger, withCmsItemRows, buildBankAccountLedger, type CashRow, type BankAccountRow } from '@/lib/finance/cash-ledger';
-import { CASH_BASIC_COLS, CASH_CARD_DETAIL_SECTIONS, CASH_EXPANDED_COLS, CASH_TX_DETAIL_SECTIONS } from '@/lib/finance/cash-cols';
+import { CASH_BASIC_COLS, CASH_CARD_DETAIL_SECTIONS, CASH_EXPANDED_COLS, CASH_TX_DETAIL_SECTIONS, cashRail, cashRailStyle } from '@/lib/finance/cash-cols';
 import {
   ACCOUNT_ALL_COLS, ACCOUNT_BASIC_COLS, ACCOUNT_DETAIL_SECTIONS,
 } from '@/lib/finance/account-cols';
@@ -644,7 +644,7 @@ export default function CashLedgerPage() {
         ) : selectedAccount ? (
           <LedgerRecordPanel
             title={`${selectedAccount.bankName} ${selectedAccount.accountNumber}`}
-            identity={selectedAccount.company || '회사 미입력'}
+            identity={selectedAccount.company || LEDGER_EMPTY.dash}
             statusBadge={<Badge tone={selectedAccount.status === '사용중' ? 'green' : 'gray'}>{selectedAccount.status}</Badge>}
             row={selectedAccount}
             cols={ACCOUNT_ALL_COLS}
@@ -740,9 +740,12 @@ export default function CashLedgerPage() {
       rowKey={(r) => r.id}
       selectedRowKey={selected?.id}
       rowStyle={(r) => {
-        if (r.nest === 'cms-dep') return { background: CMS_DEP_BG };
-        if (r.nest === 'cms-pending') return { background: 'color-mix(in srgb, var(--orange-text) 8%, var(--bg-card))' };
-        return undefined;
+        const rail = cashRailStyle(cashRail(r));
+        if (r.nest === 'cms-dep') return { ...rail, background: CMS_DEP_BG };
+        if (r.nest === 'cms-pending') {
+          return { ...rail, background: 'color-mix(in srgb, var(--orange-text) 8%, var(--bg-card))' };
+        }
+        return rail;
       }}
       onRowDoubleClick={(row) => {
         setCreating(null);
@@ -774,7 +777,7 @@ export default function CashLedgerPage() {
       ) : selected ? (
         <LedgerRecordPanel
           title={`${selected.date || '일자 없음'} · ${selected.category || '거래'}`}
-          identity={selected.party || LEDGER_EMPTY.none}
+          identity={selected.accountName || selected.account || LEDGER_EMPTY.unassigned}
           statusBadge={CASH_BASIC_COLS.find((c) => c.key === 'match')?.render(selected)}
           row={selected}
           cols={CASH_EXPANDED_COLS}

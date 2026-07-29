@@ -7,9 +7,10 @@ import { useMemo, useState } from 'react';
 import { Car, CalendarClock, FileText } from 'lucide-react';
 import { TODAY } from '@/lib/dashboard-consts';
 import { linkFleet } from '@/lib/domain/model';
-import { buildFleetRows, statusRank, type FleetRow } from '@/lib/sheet-rows';
+import { buildFleetRows, fleetRail, statusRank, type FleetRow } from '@/lib/sheet-rows';
 import { FLEET_BASIC_COLS, FLEET_DETAIL_SECTIONS, FLEET_EXPANDED_COLS } from '@/lib/sheet-cols';
 import { summarizeFleetStatusStats, latestDateOf } from '@/lib/ledger-stats';
+import { workRailStyle } from '@/lib/work-rail';
 import { useEntityLists } from '@/lib/use-entity-lists';
 import { textMatch } from '@/lib/search-match';
 import {
@@ -163,6 +164,7 @@ export default function StatusPage() {
       rows={rows}
       rowKey={(r) => r.plate || `${r.companyId}:${r.customer}`}
       selectedRowKey={selected?.plate ?? null}
+      rowStyle={(r) => workRailStyle(fleetRail(r))}
       onRowDoubleClick={(row) => setSelected(row)}
       onCloseDetail={() => setSelected(null)}
       filterPanel={filterOpen ? (

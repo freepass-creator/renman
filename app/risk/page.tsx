@@ -9,7 +9,7 @@ import { FileWarning } from 'lucide-react';
 import { TODAY } from '@/lib/dashboard-consts';
 import { useDashboardData } from '@/lib/use-dashboard-data';
 import { textMatch } from '@/lib/search-match';
-import { buildRiskSheetRows, countRiskSheetGroups, type RiskSheetGroup, type RiskSheetRow } from '@/lib/risk-ledger';
+import { buildRiskSheetRows, countRiskSheetGroups, riskRail, riskRailStyle, type RiskSheetGroup, type RiskSheetRow } from '@/lib/risk-ledger';
 import { RISK_BASIC_COLS, RISK_DETAIL_SECTIONS, RISK_EXPANDED_COLS } from '@/lib/risk-cols';
 import { LEDGER_EMPTY } from '@/lib/ledger-empty';
 import { latestDateOf } from '@/lib/ledger-stats';
@@ -101,7 +101,7 @@ export default function RiskPage() {
           )}
           <Btn
             size="sm"
-            variant="danger"
+            variant="ghost"
             disabled={noticeTargets.length === 0}
             onClick={() => void sendBulk()}
           >
@@ -145,6 +145,7 @@ export default function RiskPage() {
       rows={rows}
       rowKey={(r) => r.id}
       selectedRowKey={selected?.id ?? null}
+      rowStyle={(r) => riskRailStyle(riskRail(r))}
       onRowDoubleClick={(r) => setSelected(r)}
       onCloseDetail={() => setSelected(null)}
       sidePanel={selected ? (
