@@ -115,9 +115,13 @@ export function KV({ rows, editing, form, onChange }: { rows: KVRow[]; editing?:
   );
 }
 
-/* 공용 입력 폼 — 직접입력·상세수정 공용. vehicle/contract-picker = 목록에서만 선택(순수 텍스트 금지). */
+/* 공용 입력 폼 — 직접입력·상세수정 공용. vehicle/contract-picker = 목록에서만 선택(순수 텍스트 금지).
+ * 사이드패널 cols=1 · 넓은 ingest/표 편집은 cols=2.
+ * note 기본 비표시(개발 주석 누출 방지) — showNotes로만 켬.
+ * Select background 통째 override 금지(캐럿 깨짐) → backgroundColor만.
+ */
 export function FormGrid({
-  fields, form, onChange, onPatch, cols = 2,
+  fields, form, onChange, onPatch, cols = 2, showNotes = false,
 }: {
   fields: Field[];
   form: EntityRecord;
@@ -125,6 +129,8 @@ export function FormGrid({
   /** 피커 선택 시 plate+contractKey 등 동반 세팅 */
   onPatch?: (patch: Record<string, string>) => void;
   cols?: number;
+  /** true면 field.note 헬프 노출(ingest OCR 등). 패널 기본 false. */
+  showNotes?: boolean;
 }) {
   const mobile = useIsMobile();
   const c = mobile ? 1 : cols;
@@ -134,7 +140,7 @@ export function FormGrid({
       {fields.map((f) => {
         if (f.type === 'vehicle-picker') {
           return (
-            <label key={f.key} style={{ fontSize: 11.5, color: C.mute, gridColumn: mobile ? undefined : '1 / -1' }}>
+            <label key={f.key} style={{ fontSize: 11.5, color: C.mute, gridColumn: c > 1 && !mobile ? '1 / -1' : undefined }}>
               {f.label}{f.required && <span style={{ color: C.danger }}> *</span>}
               <div style={{ marginTop: 3 }}>
                 <VehicleFieldPicker
@@ -143,13 +149,13 @@ export function FormGrid({
                   onPatch={onPatch}
                 />
               </div>
-              {f.note && <small style={{ display: 'block', marginTop: 3, color: C.faint }}>{f.note}</small>}
+              {showNotes && f.note ? <small style={{ display: 'block', marginTop: 3, color: C.faint }}>{f.note}</small> : null}
             </label>
           );
         }
         if (f.type === 'contract-picker') {
           return (
-            <label key={f.key} style={{ fontSize: 11.5, color: C.mute, gridColumn: mobile ? undefined : '1 / -1' }}>
+            <label key={f.key} style={{ fontSize: 11.5, color: C.mute, gridColumn: c > 1 && !mobile ? '1 / -1' : undefined }}>
               {f.label}{f.required && <span style={{ color: C.danger }}> *</span>}
               <div style={{ marginTop: 3 }}>
                 <ContractFieldPicker
@@ -158,8 +164,7 @@ export function FormGrid({
                   onPatch={onPatch}
                 />
               </div>
-              {f.note && <small style={{ display: 'block', marginTop: 3, color: C.faint }}>{f.note}</small>}
-              {/* 계약 선택 시 동반 채움 표시(읽기) */}
+              {showNotes && f.note ? <small style={{ display: 'block', marginTop: 3, color: C.faint }}>{f.note}</small> : null}
               {(form.contractNo || form.customerName || form.plate) && String(form.contractKey || '') ? (
                 <small style={{ display: 'block', marginTop: 4, color: C.mute }}>
                   {[form.customerName, form.contractNo, form.plate].filter(Boolean).map(String).join(' · ')}
@@ -168,24 +173,24 @@ export function FormGrid({
             </label>
           );
         }
-        // 피커가 담당하는 키 — 텍스트 입력으로 노출하지 않음
-        if (f.key === 'contractKey' || f.key === 'plate') return null;
 
         const val = (form[f.key] as string) ?? '';
         const empty = val === '' || val == null;
-        const bg = f.manual && empty ? 'var(--orange-bg)' : C.card;
+        // 직접입력 빈칸 강조 — background 통째 덮지 않음(Select 캐럿·appearance 유지)
+        const emptyHint = f.manual && empty ? { backgroundColor: 'var(--orange-bg)' } as const : undefined;
         return (
           <label key={f.key} style={{ fontSize: 11.5, color: C.mute }}>
             {f.label}{f.required && <span style={{ color: C.danger }}> *</span>}{f.manual && <span style={{ color: 'var(--orange-text)' }}> ·직접</span>}
             {f.type === 'select' ? (
-              <Select value={val} onChange={(e) => onChange(f.key, e.target.value)} style={{ width: '100%', marginTop: 3, background: bg }}>
+              <Select value={val} onChange={(e) => onChange(f.key, e.target.value)} style={{ width: '100%', marginTop: 3, ...emptyHint }}>
                 <option value="">—</option>
                 {(f.options || []).map((o) => <option key={o} value={o}>{o}</option>)}
               </Select>
             ) : (
               <Input type={f.type === 'number' ? 'number' : f.type === 'date' ? 'date' : 'text'} value={val}
-                onChange={(e) => onChange(f.key, e.target.value)} style={{ width: '100%', marginTop: 3, background: bg }} />
+                onChange={(e) => onChange(f.key, e.target.value)} style={{ width: '100%', marginTop: 3, ...emptyHint }} />
             )}
+            {showNotes && f.note ? <small style={{ display: 'block', marginTop: 3, color: C.faint }}>{f.note}</small> : null}
           </label>
         );
       })}
