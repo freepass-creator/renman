@@ -70,6 +70,8 @@ curl -s -o /dev/null -w "%{http_code}" http://localhost:6006/<route>   # 200
 
 | 날짜 | 작업자 | 내용 | 상태 |
 |---|---|---|---|
+| 2026-07-29 | Cursor | FormGrid note 기본표시 회귀 · Create/Edit만 숨김 | 5bc2f65 |
+| 2026-07-29 | Cursor | FormGrid·패널 세로 리듬(갭14·라벨6·패딩) | 74dbe8d |
 | 2026-07-29 | Cursor | 상세패널 정합 1: FormGrid cols=1(Create/Edit) | 7f8e961 |
 | 2026-07-29 | Cursor | 상세패널 정합 2: 업무 CLASSIFY title 중복 제거 | 6dd0120 |
 | 2026-07-29 | Cursor | 상세패널 정합 3–4: note 기본숨김 + Select backgroundColor | a940dde |
