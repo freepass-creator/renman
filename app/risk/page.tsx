@@ -23,7 +23,6 @@ import {
 } from '@/components/ui';
 import { useIsMobile } from '@/lib/use-mobile';
 
-const GROUPS: RiskSheetGroup[] = ['미완료', '미납', '만기', '휴차'];
 type GroupFilter = '전체' | RiskSheetGroup;
 
 export default function RiskPage() {
@@ -123,7 +122,10 @@ export default function RiskPage() {
             onChange={(v) => { if (v) setGroup(v); }}
             options={[
               { key: '전체' as const, label: '전체', count: counts.전체 || undefined },
-              ...GROUPS.map((key) => ({ key, label: key, count: counts[key] || undefined })),
+              { key: '미완료' as const, label: '미완료', count: counts.미완료 || undefined, countTone: 'danger' },
+              { key: '미납' as const, label: '미납', count: counts.미납 || undefined, countTone: 'danger' },
+              { key: '만기' as const, label: '만기', count: counts.만기 || undefined, countTone: 'warn' },
+              { key: '휴차' as const, label: '휴차', count: counts.휴차 || undefined },
             ]}
           />
           <PeriodBar latest={latest || TODAY} initial="전체" size="sm" onRange={setRange} />

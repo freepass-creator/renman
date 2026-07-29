@@ -29,7 +29,7 @@ export function LedgerFilterButton({ open, count, onClick }: { open: boolean; co
       {count > 0 && (
         <span style={{
           position: 'absolute', top: -6, right: -6, minWidth: 16, height: 16, padding: '0 4px',
-          borderRadius: 999, background: C.danger, color: C.inverse, boxSizing: 'border-box',
+          borderRadius: 'var(--radius-badge)', background: 'var(--zinc-text)', color: C.inverse, boxSizing: 'border-box',
           fontSize: 10, fontWeight: 800, lineHeight: '16px', textAlign: 'center',
         }}>{count > 99 ? '99+' : count}</span>
       )}

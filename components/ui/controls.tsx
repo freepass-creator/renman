@@ -73,8 +73,16 @@ export function CompanyFilter({ size = 'md' }: { size?: 'sm' | 'md' }) {
   );
 }
 
+/** 칩·탭 카운트 톤 — 급한 것만 danger/warn, 기본 mute(중립 회색). */
+export type ChipCountTone = 'danger' | 'warn' | 'mute';
+
 // PillTabs — 룩=toggleStyle. 모바일=CTRL.md(40)+16px (ERP4). lg는 위저드 CTA만.
-export function PillTabs<T extends string>({ tabs, value, onChange, size = 'md' }: { tabs: { key: T; label: React.ReactNode; title?: string; badge?: number }[]; value: T; onChange: (k: T) => void; size?: 'sm' | 'md' | 'lg' }) {
+export function PillTabs<T extends string>({ tabs, value, onChange, size = 'md' }: {
+  tabs: { key: T; label: React.ReactNode; title?: string; badge?: number; badgeTone?: ChipCountTone }[];
+  value: T;
+  onChange: (k: T) => void;
+  size?: 'sm' | 'md' | 'lg';
+}) {
   const mobile = useIsMobile();
   const s: 'sm' | 'md' | 'lg' = size === 'lg' ? 'lg' : (size === 'sm' ? 'sm' : 'md');
   return (
@@ -82,6 +90,8 @@ export function PillTabs<T extends string>({ tabs, value, onChange, size = 'md' 
       {tabs.map((t) => {
         // 뱃지 = 그 탭에 «쌓여 있는 건수». 0이면 안 붙인다 — 0을 보여주면 없는 일도 있는 것처럼 읽힌다.
         const n = t.badge && t.badge > 0 ? t.badge : 0;
+        const tone = t.badgeTone || 'mute';
+        const badgeBg = tone === 'danger' ? C.danger : tone === 'warn' ? C.warn : 'var(--zinc-text)';
         return (
           <button key={t.key} type="button" data-ui="toggle" aria-pressed={value === t.key} onClick={() => onChange(t.key)}
             title={t.title} style={{ ...toggleStyle(value === t.key, s, mobile), position: 'relative', overflow: 'visible' }}>
@@ -89,7 +99,7 @@ export function PillTabs<T extends string>({ tabs, value, onChange, size = 'md' 
             {n > 0 && (
               <span aria-label={`${n}건`} style={{
                 position: 'absolute', top: -6, right: -6, minWidth: 16, height: 16, padding: '0 4px',
-                borderRadius: 999, background: C.danger, color: C.inverse, boxSizing: 'border-box',
+                borderRadius: 'var(--radius-badge)', background: badgeBg, color: C.inverse, boxSizing: 'border-box',
                 fontSize: 10, fontWeight: 800, lineHeight: '15px', textAlign: 'center',
                 fontVariantNumeric: 'tabular-nums', boxShadow: `0 0 0 2px ${C.bg}`,
               }}>{n > 99 ? '99+' : n}</span>
@@ -154,8 +164,8 @@ export function ToggleChips<T extends string>({ selected, onToggle, options, siz
 
 /* 퀵필터 — 단일선택 칩. 칩 높이 = ctrlChipH (웹28 · 모바일40).
  *   allowOff: 활성 재클릭 → null (원장 빠른필터).
- *   count: 우측 상단 뱃지(미분류 건수 등). */
-export type ChipOpt<T extends string> = { key: T; label: React.ReactNode; count?: number };
+ *   count: 우측 상단 뱃지. countTone: 급한 것만 danger/warn, 기본=중립 회색. */
+export type ChipOpt<T extends string> = { key: T; label: React.ReactNode; count?: number; countTone?: ChipCountTone };
 export function FilterChips<T extends string>({
   value, onChange, options, allowOff = false,
 }: {
@@ -170,6 +180,8 @@ export function FilterChips<T extends string>({
       {options.map((o) => {
         const active = value === o.key;
         const badge = o.count != null && o.count > 0;
+        const tone = o.countTone || 'mute';
+        const badgeBg = tone === 'danger' ? C.danger : tone === 'warn' ? C.warn : 'var(--zinc-text)';
         return (
           <button
             key={o.key}
@@ -191,7 +203,7 @@ export function FilterChips<T extends string>({
             {badge && (
               <span style={{
                 position: 'absolute', top: -6, right: -6, minWidth: 16, height: 16, padding: '0 4px',
-                borderRadius: 999, background: C.danger, color: C.inverse, boxSizing: 'border-box',
+                borderRadius: 'var(--radius-badge)', background: badgeBg, color: C.inverse, boxSizing: 'border-box',
                 fontSize: 10, fontWeight: 800, lineHeight: '15px', textAlign: 'center',
                 fontVariantNumeric: 'tabular-nums', boxShadow: `0 0 0 2px ${C.bg}`,
               }}>{o.count! > 99 ? '99+' : o.count}</span>
