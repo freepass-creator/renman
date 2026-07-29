@@ -174,14 +174,8 @@ export function LedgerFrame<R>({
             )}
           </div>
           {sidePanel != null && (
-            <aside
-              className="ledger-workspace__panel"
-              onDoubleClick={(event) => {
-                if ((event.target as HTMLElement).closest('button,a,input,select,textarea')) return;
-                setPickedKey(null);
-                onCloseDetail?.();
-              }}
-            >
+            // 상세패널 안 더블클릭은 닫힘과 무관 — 닫기는 X버튼·행 재더블클릭·바깥으로만.
+            <aside className="ledger-workspace__panel">
               {sidePanel}
             </aside>
           )}
