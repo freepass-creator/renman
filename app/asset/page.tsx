@@ -20,7 +20,6 @@ import { openIngest } from '@/lib/ui-bus';
 import {
   ASSET_FILTER_DEFS, countActiveFilters, emptyFilterValues, eqFilter, matchLedgerFilters,
 } from '@/lib/ledger-filter-defs';
-import { VehicleSideEmbed } from '@/components/ledger/VehicleSideEmbed';
 import { LEDGER_EMPTY } from '@/lib/ledger-empty';
 type AssetOwnershipScope = '보유자산' | '처분자산' | '전체자산';
 type AssetQuickFilter = '계약중' | '휴차' | '매각대기';
@@ -239,9 +238,7 @@ export default function AssetLedgerPage() {
           actions={<>
             <Btn size="sm" onClick={() => setEditing(true)}><Pencil size={14} /> 수정</Btn>
           </>}
-        >
-          {selected.plate ? <VehicleSideEmbed plate={selected.plate} /> : null}
-        </LedgerRecordPanel>
+        />
       ) : null}
     />
   );

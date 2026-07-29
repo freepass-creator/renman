@@ -21,7 +21,6 @@ import {
   FLEET_FILTER_DEFS, countActiveFilters, emptyFilterValues, matchLedgerFilters,
 } from '@/lib/ledger-filter-defs';
 import { RENTAL_TYPES } from '@/lib/schema/contract';
-import { VehicleSideEmbed } from '@/components/ledger/VehicleSideEmbed';
 import { LEDGER_EMPTY } from '@/lib/ledger-empty';
 
 const RENTAL_CHIP_OPTS = [
@@ -192,9 +191,7 @@ export default function StatusPage() {
           cols={FLEET_EXPANDED_COLS}
           sections={FLEET_DETAIL_SECTIONS}
           onClose={() => setSelected(null)}
-        >
-          {selected.plate ? <VehicleSideEmbed plate={selected.plate} /> : null}
-        </LedgerRecordPanel>
+        />
       ) : null}
     />
   );
