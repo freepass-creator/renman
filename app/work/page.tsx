@@ -1,12 +1,11 @@
 'use client';
 
 import { Suspense, useEffect, useMemo, useState } from 'react';
-import { Plus, UploadCloud, CarFront, FileText, Trash2 } from 'lucide-react';
+import { Plus, UploadCloud, FileText, Trash2 } from 'lucide-react';
 import { useEntityLists } from '@/lib/use-entity-lists';
 import { textMatch } from '@/lib/search-match';
 import { companyDisplay } from '@/lib/companies';
 import type { EntityRecord } from '@/lib/intake/entities';
-import { openCar } from '@/lib/ui-bus';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
   Badge, Btn, C, FilterChips, LedgerActions, LedgerCreatePanel, LedgerFilterButton, LedgerFilterFields, LedgerFilterPanel, LedgerFrame, LedgerRecordPanel, PageLoading, Search, won,
@@ -32,6 +31,7 @@ import {
 import { WORK_SECTIONS_BY_KIND, type WorkGroup } from '@/lib/work-form-sections';
 import { PenaltyBucketPanel } from '@/components/work/PenaltyBucketPanel';
 import { workRail, workRailStyle } from '@/lib/work-rail';
+import { rentalTypeOf } from '@/lib/schema/contract';
 
 type WorkGroupFilter = '전체' | WorkGroup;
 type WorkSource = 'work_item' | 'history' | 'penalty' | 'inbox';
@@ -44,10 +44,9 @@ type WorkLedgerRow = {
   companyId: string;
   kind: string;
   group: WorkGroup;
-  /** 검색용 합본(표시는 plate/carName/contractNo 구조 셀) */
+  /** 검색용 합본 */
   target: string;
   title: string;
-  /** @deprecated 기간필터용 — createdAt 날짜 */
   workAt: string;
   workDate: string;
   createdAt: string;
@@ -62,7 +61,10 @@ type WorkLedgerRow = {
   carName?: string;
   contractKey?: string;
   contractNo?: string;
+  /** 계약자명 — 신원 컬럼 */
   customerName?: string;
+  /** 대여형태 — 계약자 sub */
+  rentalType?: string;
   priority?: string;
   violationDate?: string;
   driverName?: string;
@@ -78,6 +80,21 @@ function carNameOf(plate: string, vehicles: EntityRecord[]): string {
   if (!plate) return '';
   const v = vehicles.find((x) => String(x.plate || '') === plate);
   return v ? String(v.carName || v.model || '') : '';
+}
+
+function contractMeta(
+  contractKey: string,
+  contracts: EntityRecord[],
+): { customerName: string; contractNo: string; rentalType: string; plate: string } {
+  if (!contractKey) return { customerName: '', contractNo: '', rentalType: '', plate: '' };
+  const c = contracts.find((x) => String(x._key || '') === contractKey);
+  if (!c) return { customerName: '', contractNo: '', rentalType: '', plate: '' };
+  return {
+    customerName: String(c.contractorName || ''),
+    contractNo: String(c.contractNo || ''),
+    rentalType: rentalTypeOf(c),
+    plate: String(c.plate || ''),
+  };
 }
 
 /** ISO → MM-DD HH:mm (시:분까지). 날짜만 있으면 MM-DD. */
@@ -109,27 +126,37 @@ function workStatusTone(status: string): 'green' | 'amber' | 'red' | 'gray' | 'b
   return 'gray';
 }
 
-/** 대상 셀 — 1줄 차번+차명 · 2줄 mute 계약/고객 · 둘 다 없으면 미배정 */
-function TargetCell({ r }: { r: WorkLedgerRow }) {
-  const plate = String(r.plate || '');
-  const contractKey = String(r.contractKey || '');
-  if (!plate && !contractKey && r.nest !== 'penalty-bucket') {
-    return <Badge tone="amber">미배정</Badge>;
-  }
-  const line1 = [plate, r.carName].filter(Boolean).join(' ');
-  const line2 = [r.contractNo, r.customerName].filter(Boolean).join(' · ')
-    || (!line1 ? String(r.target || '') : '');
-  if (!line1 && !line2) {
-    return <Badge tone="amber">미배정</Badge>;
+/** 차량번호 — 1줄 차번 · 2줄 mute 차명. 없으면 상태 미배정(컬럼은 —). */
+function PlateCell({ r }: { r: WorkLedgerRow }) {
+  if (!r.plate) {
+    return <span style={{ color: C.mute }}>—</span>;
   }
   return (
     <div style={{ minWidth: 0 }}>
-      <div style={{ fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-        {line1 || '—'}
+      <div style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+        {r.plate}
       </div>
-      {line2 ? (
+      {r.carName ? (
         <div style={{ fontSize: 11, color: C.mute, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-          {line2}
+          {r.carName}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+/** 계약자 — 없으면 '없음'. sub=대여형태. */
+function ContractorCell({ r }: { r: WorkLedgerRow }) {
+  const name = String(r.customerName || '').trim();
+  if (!name) {
+    return <span style={{ color: C.mute }}>없음</span>;
+  }
+  return (
+    <div style={{ minWidth: 0 }}>
+      <div style={{ fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name}</div>
+      {r.rentalType ? (
+        <div style={{ fontSize: 11, color: C.mute, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {r.rentalType}
         </div>
       ) : null}
     </div>
@@ -183,9 +210,14 @@ const WORK_COL_CATALOG: SheetCol<WorkLedgerRow>[] = [
     text: (r) => r.status,
   },
   {
-    key: 'target', label: '대상', priority: 1,
-    render: (r) => <TargetCell r={r} />,
-    text: (r) => [r.plate, r.carName, r.contractNo, r.customerName, r.target].filter(Boolean).join(' '),
+    key: 'plate', label: '차량번호', priority: 1, pin: true,
+    render: (r) => <PlateCell r={r} />,
+    text: (r) => [r.plate, r.carName].filter(Boolean).join(' '),
+  },
+  {
+    key: 'contractor', label: '계약자', priority: 1,
+    render: (r) => <ContractorCell r={r} />,
+    text: (r) => r.customerName || '없음',
   },
   { key: 'title', label: '업무내용', priority: 1, render: (r) => r.title || '—', text: (r) => r.title },
   {
@@ -230,8 +262,8 @@ const PENALTY_COL_CATALOG: SheetCol<WorkLedgerRow>[] = [
 ];
 
 const WORK_SHEET_KEYS: SheetViewKeys = {
-  basic: ['co', 'kind', 'status', 'target', 'title', 'assignee', 'created', 'updated'],
-  all: ['co', 'kind', 'status', 'target', 'title', 'assignee', 'created', 'updated', 'due', 'amount'],
+  basic: ['co', 'kind', 'status', 'plate', 'contractor', 'title', 'assignee', 'created', 'updated'],
+  all: ['co', 'kind', 'status', 'plate', 'contractor', 'title', 'assignee', 'created', 'updated', 'due', 'amount'],
 };
 const PENALTY_SHEET_KEYS: SheetViewKeys = {
   basic: ['violationDate', 'plate', 'amount', 'driver', 'status'],
@@ -247,7 +279,7 @@ const PEN_ALL = _penViews.expanded;
 
 const WORK_DETAIL_DEFS: DetailSectionDef[] = [
   { title: '업무 분류', open: true, keys: ['co', 'kind', 'status', 'source'] },
-  { title: '대상·내용', keys: ['target', 'title'] },
+  { title: '신원·내용', keys: ['plate', 'contractor', 'title'] },
   { title: '처리정보', keys: ['created', 'updated', 'due', 'assignee', 'amount'] },
 ];
 const PENALTY_DETAIL_DEFS: DetailSectionDef[] = [
@@ -289,23 +321,27 @@ function WorkLedgerInner() {
     () => (buildPenaltyWorkRows(penalties, contracts) as WorkLedgerRow[]).map((r) => {
       const plate = String(r.plate || '');
       const contractKey = String(r.raw.contractKey || r.raw.contractId || '');
-      const contractNo = String(r.raw.contractNo || '');
-      const customerName = String(r.driverName || '');
+      const meta = contractMeta(contractKey, contracts);
+      const customerName = meta.customerName
+        || (String(r.driverName || '') !== '미매칭' ? String(r.driverName || '') : '');
       const createdAt = String(r.raw.createdAt || r.workAt || '');
       const updatedAt = String(r.raw.updatedAt || r.workAt || createdAt);
+      let status = normalizeWorkStatus(r.status);
+      if (!plate && status !== '완료' && status !== '보류') status = '미배정';
       return {
         ...r,
         plate,
         carName: carNameOf(plate, vehicles),
         contractKey,
-        contractNo,
-        customerName: customerName !== '미매칭' ? customerName : '',
-        target: [plate, contractNo, customerName].filter(Boolean).join(' '),
+        contractNo: meta.contractNo || String(r.raw.contractNo || ''),
+        customerName,
+        rentalType: meta.rentalType,
+        target: [plate, customerName].filter(Boolean).join(' '),
         createdAt,
         updatedAt,
         workAt: createdAt,
         workDate: createdAt.slice(0, 10),
-        status: normalizeWorkStatus(r.status),
+        status,
       };
     }),
     [penalties, contracts, vehicles],
@@ -320,22 +356,23 @@ function WorkLedgerInner() {
     const scheduled = workItems.map((r): WorkLedgerRow => {
       const createdAt = String(r.createdAt || r.date || r.dueDate || '');
       const updatedAt = String(r.updatedAt || r.completedAt || createdAt);
-      const plate = String(r.plate || '');
       const contractKey = String(r.contractKey || '');
-      const contractNo = String(r.contractNo || '');
-      const customerName = String(r.customerName || '');
+      const meta = contractMeta(contractKey, contracts);
+      const plate = String(r.plate || meta.plate || '');
+      const contractNo = String(r.contractNo || meta.contractNo || '');
+      const customerName = String(r.customerName || meta.customerName || '');
       const carName = String(r.carName || '') || carNameOf(plate, vehicles);
       const kind = String(r.workType || r.category || '').trim() || '미분류';
-      const hasTarget = !!(plate || contractKey);
       let status = normalizeWorkStatus(r.status, !!(r.status === 'completed' || r.done));
-      if (!hasTarget && status !== '완료' && status !== '보류') status = '미배정';
+      // 차량번호 없으면 미배정 (계약자만으로는 신원 미완)
+      if (!plate && status !== '완료' && status !== '보류') status = '미배정';
       return {
         id: `work:${String(r._key || r.id)}`,
         company: companyDisplay(String(r.companyId || '')),
         companyId: String(r.companyId || ''),
         kind,
         group: workGroup(kind),
-        target: [plate, carName, contractNo, customerName, r.relatedEntity].filter(Boolean).join(' '),
+        target: [plate, carName, customerName, contractNo].filter(Boolean).join(' '),
         title: String(r.title || r.memo || ''),
         workAt: createdAt,
         workDate: createdAt.slice(0, 10),
@@ -347,6 +384,7 @@ function WorkLedgerInner() {
         amount: Number(r.amount || r.cost) || 0,
         source: 'work_item',
         plate, carName, contractKey, contractNo, customerName,
+        rentalType: meta.rentalType,
         priority: String(r.priority || ''),
         raw: r,
       };
@@ -358,9 +396,8 @@ function WorkLedgerInner() {
       const contractNo = String(r.contractNo || '');
       const carName = carNameOf(plate, vehicles);
       const kind = String(r.category || (r._kind === 'work' ? '정비' : '')).trim() || '미분류';
-      const hasTarget = !!plate;
       let status = normalizeWorkStatus(r.work_status || r.status);
-      if (!hasTarget && status !== '완료' && status !== '보류') status = '미배정';
+      if (!plate && status !== '완료' && status !== '보류') status = '미배정';
       return {
         id: `history:${String(r._key || r.id)}`,
         company: companyDisplay(String(r.companyId || '')),
@@ -379,26 +416,28 @@ function WorkLedgerInner() {
         amount: Number(r.cost || r.amount) || 0,
         source: 'history',
         plate, carName, contractKey: '', contractNo, customerName: '',
+        rentalType: '',
         raw: r,
       };
     });
     const documents = inbox.map((r): WorkLedgerRow => {
       const createdAt = String(r.createdAt || r.uploadedAt || '');
       const updatedAt = String(r.updatedAt || r.matchedAt || createdAt);
-      const plate = String(r.plate || '');
-      const contractNo = String(r.contractNo || '');
+      const contractKey = String(r.contractKey || '');
+      const meta = contractMeta(contractKey, contracts);
+      const plate = String(r.plate || meta.plate || '');
+      const contractNo = String(r.contractNo || meta.contractNo || '');
       const carName = carNameOf(plate, vehicles);
       const kind = String(r.workType || '').trim() || '문서검토';
-      const hasTarget = !!(plate || r.contractKey);
       let status = normalizeWorkStatus(r.status || (r.matchedAt ? '완료' : '대기'));
-      if (!hasTarget && status !== '완료' && status !== '보류') status = '미배정';
+      if (!plate && status !== '완료' && status !== '보류') status = '미배정';
       return {
         id: `inbox:${String(r._key || r.id)}`,
         company: companyDisplay(String(r.companyId || '')),
         companyId: String(r.companyId || ''),
         kind,
         group: '문서',
-        target: [plate, carName, contractNo, r.matchedEntity].filter(Boolean).join(' '),
+        target: [plate, carName, meta.customerName, contractNo].filter(Boolean).join(' '),
         title: String(r.title || r.fileName || r.memo || r.kind || '수집 문서 확인'),
         workAt: createdAt,
         workDate: createdAt.slice(0, 10),
@@ -409,14 +448,16 @@ function WorkLedgerInner() {
         assignee: String(r.assignee || r.uploadedBy || ''),
         amount: Number(r.amount) || 0,
         source: 'inbox',
-        plate, carName, contractKey: String(r.contractKey || ''), contractNo, customerName: '',
+        plate, carName, contractKey, contractNo,
+        customerName: meta.customerName,
+        rentalType: meta.rentalType,
         raw: r,
       };
     });
     // 기본 정렬 = 최종처리 오래된 순(방치 감지)
     return [...scheduled, ...activities, ...documents]
       .sort((a, b) => (a.updatedAt || '').localeCompare(b.updatedAt || '') || a.kind.localeCompare(b.kind, 'ko'));
-  }, [workItems, history, inbox, vehicles]);
+  }, [workItems, history, inbox, vehicles, contracts]);
 
   const penaltyMode = group === '과태료';
 
@@ -476,7 +517,7 @@ function WorkLedgerInner() {
     return textMatch(
       q,
       r.company, r.kind, r.target, r.title, r.status, r.assignee, r.createdAt, r.updatedAt,
-      r.plate, r.carName, r.contractKey, r.contractNo, r.customerName,
+      r.plate, r.carName, r.contractKey, r.contractNo, r.customerName, r.rentalType,
       r.driverName, r.violationDate, r.penaltyKind,
     );
   }), [allRows, penaltyMode, penProcess, penKind, group, detailFilters, workFilterMatchers, range.from, range.to, q]);
@@ -524,7 +565,7 @@ function WorkLedgerInner() {
       filters={<>
         <Search
           size="sm"
-          placeholder={penaltyMode ? '차번·실운전자·위반·상태' : '구분·대상·내용·상태·담당자'}
+          placeholder={penaltyMode ? '차번·실운전자·위반·상태' : '구분·차량·계약자·내용·상태·담당자'}
           value={q}
           onChange={(e) => setQ(e.target.value)}
           style={{ width: mobile ? '100%' : 250 }}
@@ -583,6 +624,11 @@ function WorkLedgerInner() {
         }
         return rail;
       }}
+      onRow={(row) => {
+        // 표 클릭 = 우측 상세패널만 (다른 페이지 이동 없음)
+        setCreating(false);
+        setSelected(row);
+      }}
       onRowDoubleClick={(row) => {
         setCreating(false);
         setSelected(row);
@@ -617,7 +663,7 @@ function WorkLedgerInner() {
           quick
           initial={{
             date: todayKST(),
-            status: '접수',
+            status: '대기',
             category: '기타',
             workType: '기타',
             title: '',
@@ -642,33 +688,16 @@ function WorkLedgerInner() {
           title={selected.title || selected.kind}
           subtitle={selected.source === 'penalty'
             ? `${selected.plate || '차번 없음'} · ${selected.driverName || '미매칭'}`
-            : `${selected.kind} · ${[selected.plate, selected.carName, selected.contractNo, selected.customerName].filter(Boolean).join(' · ') || '미배정'}`}
+            : `${selected.kind} · ${selected.plate || '차량 미배정'} · ${selected.customerName || '계약자 없음'}`}
           row={selected}
           cols={selected.source === 'penalty' ? PEN_ALL : ALL_COLS}
           sections={selected.source === 'penalty' ? PENALTY_DETAIL_SECTIONS : WORK_DETAIL_SECTIONS}
           onClose={() => setSelected(null)}
           actions={(
             <>
-              {(selected.plate || String(selected.raw.plate || '')) ? (
-                <Btn size="sm" variant="ghost" onClick={() => openCar(String(selected.plate || selected.raw.plate))}>
-                  <CarFront size={14} /> 차량·매칭
-                </Btn>
-              ) : null}
               {selected.source === 'penalty' && matchedDocs > 0 ? (
                 <Btn size="sm" variant="ghost" href="/penalty/docs">
                   <FileText size={14} /> 변경부과 공문
-                </Btn>
-              ) : null}
-              {(selected.contractKey || String(selected.raw.contractKey || '') || String(selected.raw.contractNo || selected.contractNo || '')) ? (
-                <Btn
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => {
-                    const key = String(selected.contractKey || selected.raw.contractKey || '');
-                    router.push(key ? `/contract?open=${encodeURIComponent(key)}` : '/contract');
-                  }}
-                >
-                  <FileText size={14} /> 계약
                 </Btn>
               ) : null}
               {selected.source === 'penalty' && selected.nest !== 'penalty-bucket' ? (

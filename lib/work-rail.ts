@@ -17,7 +17,7 @@ export function workRail(r: {
   const pri = String(r.priority || '');
   if (/지연|미매칭|경과|미처리/.test(st)) return 'danger';
   if (/긴급/.test(pri)) return 'danger';
-  if (st === '미배정' || (!r.plate && !r.contractKey && !/완료|종결/.test(st))) return 'warn';
+  if (st === '미배정' || (!r.plate && !/완료|종결/.test(st))) return 'warn';
   if (/진행|대기|보류/.test(st)) return 'warn';
   if (/완료|종결|completed/.test(st)) return 'ok';
   if (/높음/.test(pri)) return 'violet';
