@@ -191,10 +191,12 @@ export function IconCount({
   );
 }
 const ATOM_CAP = 3; // 2행 원자 표시 상한 — 넘으면 ＋n(우선순위 상위만 생존, 픽셀측정 대신 count-cap)
-export function ObjCard({ badge, badgeTone = 'gray', co, rail = 'none', plate, name, carType, title, sub, right, fields, onClick }: {
+export function ObjCard({ badge, badgeTone = 'gray', co, rail = 'none', plate, name, carType, title, sub, right, fields, onClick, style }: {
   badge?: React.ReactNode; badgeTone?: BadgeTone; co?: string; rail?: RailTone;
   plate?: string; name?: React.ReactNode; carType?: React.ReactNode; title?: React.ReactNode;
   sub?: React.ReactNode; right?: React.ReactNode; fields?: [React.ReactNode, React.ReactNode][]; onClick?: () => void;
+  /** ExcelSheet rowStyle 등 — 배경 틴트만. 좌측 점/레일 금지. */
+  style?: React.CSSProperties;
 }) {
   const mobile = useIsMobile();
   const { h, on } = useHover();
@@ -211,13 +213,15 @@ export function ObjCard({ badge, badgeTone = 'gray', co, rail = 'none', plate, n
     : name != null
       ? <span style={{ flex: '0 1 auto', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: mobile ? 15 : 13, fontWeight: 700, color: C.ink }}>{name}</span>
       : <span style={{ flex: '0 1 auto', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: mobile ? 14 : 12.5, fontWeight: 600, color: C.ink }}>{title}</span>;
+  // danger 틴트: rowStyle.background 또는 rail==='danger'. 호버 시 hover가 우선.
+  const tintBg = style?.background ?? (rail === 'danger' ? 'var(--danger-tint)' : undefined);
   return (
     <div onClick={onClick} {...on} style={{
       ...(grouped
-        ? { background: h && !!onClick ? C.hover : (rail === 'danger' ? 'var(--danger-tint)' : 'transparent'), cursor: onClick ? 'pointer' : 'default', transition: 'background .12s ease' }
+        ? { background: h && !!onClick ? C.hover : (tintBg ?? 'transparent'), cursor: onClick ? 'pointer' : 'default', transition: 'background .12s ease' }
         : {
             ...cardStyle(h, !!onClick),
-            ...(rail === 'danger' && !h ? { background: 'var(--danger-tint)' } : {}),
+            ...(!h && tintBg ? { background: tintBg } : {}),
           }),
       position: 'relative', overflow: 'hidden',
       height: mobile ? 'auto' : 56, minHeight: mobile ? 60 : 56,

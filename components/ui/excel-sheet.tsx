@@ -201,6 +201,7 @@ export function ExcelSheet<T>({
 
   if (mobile || mode === 'card') {
     // 목록 = 그룹 카드 규격(Cards): 모바일=한 그룹 박스+구분선 행 / 데스크톱 카드뷰=그리드. 개별 박스 흩뿌림 금지.
+    // danger 행 = rowStyle 배경 틴트만(표와 동일). 좌측 점/레일 금지.
     return (
       <Cards>
         {view.map((r, i) => (
@@ -208,6 +209,7 @@ export function ExcelSheet<T>({
             key={rowKey?.(r, i) ?? i}
             title={visibleCols[0]?.render(r)}
             fields={visibleCols.slice(1, 5).map((c) => [c.label, c.render(r)] as [React.ReactNode, React.ReactNode])}
+            style={rowStyle?.(r)}
             onClick={(onRowDoubleClick || onRow) ? () => {
               haptic.tap();
               (onRowDoubleClick || onRow)?.(r);
