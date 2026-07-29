@@ -4,13 +4,11 @@
  *   회사 열 key = `company` (전 원장 통일).
  *   회사명(풀)=companyLabel 은 공문·설정용 · 표의 회사열은 companyDisplay/short.
  *   컬럼을 페이지마다 손롤하지 말 것 — 여기서 따다 씀.
- *
- *   ⚠ 아래 ASSET_COLS / CONTRACT_COLS / DEBT_COLS 는 레거시 SheetRow용.
- *     웹 /asset·/contract 는 lib/master-ledger-cols. **신규 사용 금지.**
+ *   자산·계약 마스터 열 = lib/master-ledger-cols.
  */
 import React from 'react';
 import { Badge, won, C, type SheetCol } from '@/components/ui';
-import { type SheetRow, type ContractRow, type FleetRow } from './sheet-rows';
+import { type FleetRow } from './sheet-rows';
 import { collectionStage } from './domain/status';
 import { dday } from './dashboard-consts';
 import { AlertTriangle } from 'lucide-react';
@@ -18,92 +16,8 @@ import { buildDetailSections, buildSheetViews, type DetailSectionDef, type Sheet
 import { paymentTimingOf } from './schema/contract';
 import { LEDGER_EMPTY } from './ledger-empty';
 
-const toneBadge = (t: SheetRow['tone']): 'green' | 'amber' | 'red' | 'gray' =>
+const toneBadge = (t: FleetRow['tone']): 'green' | 'amber' | 'red' | 'gray' =>
   t === 'ok' ? 'green' : t === 'warn' ? 'amber' : t === 'danger' ? 'red' : 'gray';
-
-/** @deprecated 웹 /asset는 master-ledger-cols. 레거시 SheetRow 전용 — 신규 사용 금지. */
-export const ASSET_COLS: SheetCol<SheetRow>[] = [
-  { key: 'company', label: '회사명', pin: true, render: (r) => r.company || LEDGER_EMPTY.dash, text: (r) => r.company },
-  { key: 'plate', label: '차량번호', pin: true, render: (r) => r.plate || LEDGER_EMPTY.dash, text: (r) => r.plate },
-  // 생애단계 = 카드뷰 섹션(구매예정·등록예정·보유중·처분예정·처분완료)이 엑셀에선 이 분류 열로. align center.
-  { key: 'own', label: '생애단계', align: 'c', render: (r) => <Badge tone={r.ownership === '보유중' ? 'green' : r.ownership === '처분완료' ? 'gray' : 'amber'}>{r.ownership}</Badge>, text: (r) => r.ownership },
-  { key: 'util', label: '가동', align: 'c', render: (r) => <Badge tone={toneBadge(r.tone)}>{r.util}</Badge>, text: (r) => r.util },
-  { key: 'car', label: '차명', render: (r) => r.carName || LEDGER_EMPTY.dash, text: (r) => r.carName },
-  { key: 'year', label: '연식', render: (r) => r.year || LEDGER_EMPTY.dash, text: (r) => r.year },
-  { key: 'cust', label: '계약자', render: (r) => r.customer || LEDGER_EMPTY.none, text: (r) => r.customer },
-  { key: 'rent', label: '대여료', align: 'r', render: (r) => r.rent ? won(r.rent) : LEDGER_EMPTY.dash, text: (r) => r.rent },
-  {
-    key: 'net', label: '미수', align: 'r',
-    render: (r) => r.net > 0 ? <span style={{ color: C.danger, fontWeight: 700 }}>{won(r.net)}</span> : LEDGER_EMPTY.dash,
-    text: (r) => r.net,
-  },
-  { key: 'start', label: '시작', render: (r) => r.start || LEDGER_EMPTY.dash, text: (r) => r.start },
-  { key: 'end', label: '만기', render: (r) => r.end || LEDGER_EMPTY.dash, text: (r) => r.end },
-  {
-    key: 'dday', label: 'D-day', align: 'r',
-    render: (r) => r.dday == null ? LEDGER_EMPTY.dash : r.dday < 0 ? <span style={{ color: C.danger }}>{r.dday}</span> : `D-${r.dday}`,
-    text: (r) => r.dday ?? '',
-  },
-];
-
-/* ── 계약 열 문법(계약·채권·반납·미수 공용) ──
- *   표식=회사명→차량번호 선두 · 누구(계약자) · 돈 · 시간 · 상태 · 연락처(끝)
- *   탭/화면마다 «빼기»만 · 자리 고정 — 눈이 같은 데를 본다. */
-const misu = (r: ContractRow) =>
-  r.net > 0 ? <span style={{ color: C.danger, fontWeight: 700 }}>{won(r.net)}</span> : LEDGER_EMPTY.dash;
-
-const CT = {
-  company: { key: 'company', label: '회사명', pin: true, render: (r) => r.company || LEDGER_EMPTY.dash, text: (r) => r.company },
-  plate: { key: 'plate', label: '차량번호', pin: true, render: (r) => r.plate || LEDGER_EMPTY.dash, text: (r) => r.plate },
-  car: { key: 'car', label: '차명', render: (r) => r.carName || LEDGER_EMPTY.dash, text: (r) => r.carName },
-  cust: { key: 'cust', label: '계약자', render: (r) => r.customer || LEDGER_EMPTY.none, text: (r) => r.customer },
-  rent: { key: 'rent', label: '대여료', align: 'r', render: (r) => r.rent ? won(r.rent) : LEDGER_EMPTY.dash, text: (r) => r.rent },
-  dep: { key: 'dep', label: '보증금', align: 'r', render: (r) => r.deposit ? won(r.deposit) : LEDGER_EMPTY.dash, text: (r) => r.deposit },
-  net: { key: 'net', label: '미수', align: 'r', render: misu, text: (r) => r.net },
-  start: { key: 'start', label: '시작', render: (r) => r.start || LEDGER_EMPTY.dash, text: (r) => r.start },
-  end: { key: 'end', label: '만기', render: (r) => r.end || LEDGER_EMPTY.dash, text: (r) => r.end },
-  dday: {
-    key: 'dday', label: 'D-day', align: 'r',
-    render: (r) => r.dday == null ? LEDGER_EMPTY.dash : r.dday < 0 ? <span style={{ color: C.danger }}>{r.dday}</span> : `D-${r.dday}`,
-    text: (r) => r.dday ?? '',
-  },
-  ret: { key: 'ret', label: '반납일', render: (r) => r.returned || LEDGER_EMPTY.dash, text: (r) => r.returned },
-  st: { key: 'st', label: '상태', render: (r) => <Badge tone={r.ended ? 'gray' : 'green'}>{r.status}</Badge>, text: (r) => r.status },
-  alert: {
-    key: 'alert', label: '데이터알람',
-    render: (r) => r.dataAlert
-      ? <span title={`원본 미수 ${won(r.sourceCarryUnpaid)} · 차이 ${won(r.reconciliationDelta)}`}><Badge tone="amber">{r.dataAlert}</Badge></span>
-      : <Badge tone="green">원본 대사완료</Badge>,
-    text: (r) => r.dataAlert || '원본 대사완료',
-  },
-  od: {
-    key: 'od', label: '연체일', align: 'r',
-    render: (r) => r.overdueDays > 0
-      ? <span style={{ color: r.overdueDays >= 90 ? C.danger : C.warn, fontWeight: 700 }}>{r.overdueDays}일</span>
-      : LEDGER_EMPTY.dash,
-    text: (r) => r.overdueDays,
-  },
-  cnt: { key: 'cnt', label: '미납회차', align: 'r', render: (r) => r.count || LEDGER_EMPTY.dash, text: (r) => r.count },
-  phone: { key: 'phone', label: '연락처', render: (r) => r.phone || LEDGER_EMPTY.dash, text: (r) => r.phone },
-} satisfies Record<string, SheetCol<ContractRow>>;
-
-/** @deprecated 웹 /contract는 master-ledger-cols. 레거시 ContractRow 전용 — 신규 사용 금지. */
-export const CONTRACT_COLS: SheetCol<ContractRow>[] = [
-  CT.company, CT.plate, CT.car, CT.cust,
-  CT.rent, CT.dep, CT.net,
-  CT.start, CT.end, CT.dday,
-  CT.st, CT.alert,
-  CT.phone,
-];
-
-/** @deprecated 미수 전용 레거시 열 — 웹 /risk·/contract 미사용. 신규 사용 금지. */
-export const DEBT_COLS: SheetCol<ContractRow>[] = [
-  CT.company, CT.plate, CT.car, CT.cust,
-  CT.rent, CT.dep, CT.net,
-  CT.start, CT.end, CT.dday,
-  CT.st, CT.od, CT.cnt, CT.alert,
-  CT.phone,
-];
 
 /* ── 통합 마스터 열 (운영시트: 차량 1대 = 1행) ──
  *   기본 = 자산(번호판·법인·상태·차명) + 계약/손님(계약자·기간·월렌트) + 미수.

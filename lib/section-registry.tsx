@@ -513,4 +513,3 @@ export const SECTIONS: SectionDef[] = [
 ];
 
 export const SECTION_MAP: Record<string, SectionDef> = Object.fromEntries(SECTIONS.map((s) => [s.id, s]));
-export const DESK_GROUPS: DeskGroup[] = ['미결', '리스크', '자산', '자금', '고객'];
