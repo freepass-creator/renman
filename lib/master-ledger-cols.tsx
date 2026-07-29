@@ -85,8 +85,8 @@ const A = {
   mileage: { key: 'mileage', label: '주행거리', align: 'r', priority: 3, render: (r) => number(r.mileage, 'km'), text: (r) => r.mileage },
 } satisfies Record<string, SheetCol<AssetMasterRow>>;
 
-const ax = (key: keyof AssetMasterRow, label: string, opts?: { date?: boolean; money?: boolean; num?: string; align?: 'l' | 'c' | 'r' }): SheetCol<AssetMasterRow> => ({
-  key: String(key), label, align: opts?.align,
+const ax = (key: keyof AssetMasterRow, label: string, opts?: { date?: boolean; money?: boolean; num?: string; align?: 'l' | 'c' | 'r'; priority?: 1 | 2 | 3 | 4 }): SheetCol<AssetMasterRow> => ({
+  key: String(key), label, align: opts?.align, priority: opts?.priority,
   render: (r) => opts?.date ? date(String(r[key] || '')) : opts?.money ? moneyCell(Number(r[key]) || 0) : opts?.num != null ? number(Number(r[key]) || 0, opts.num) : dash(r[key]),
   text: (r) => r[key] as string | number,
 });
@@ -96,7 +96,7 @@ const ASSET_COL_CATALOG: SheetCol<AssetMasterRow>[] = [
   A.company, A.assetCode, A.plate, A.status, A.carName, A.maker, A.modelLine,
   A.subModel, A.trim, A.modelYear, A.yearMonth, A.vin, A.ownerName, A.firstReg, A.inspectionTo, A.mileage,
   ax('documentNo', '문서확인번호'), ax('certIssueDate', '등록증발급일', { date: true }),
-  ax('vehicleType', '차종'), ax('usage', '용도'), ax('typeNumber', '형식'), ax('engineType', '원동기형식'),
+  ax('vehicleType', '차종'), ax('usage', '용도', { priority: 3 }), ax('typeNumber', '형식'), ax('engineType', '원동기형식'),
   ax('ownerBizNo', '법인번호/생년월일'), ax('useAddress', '사용본거지'), ax('approvalNumber', '제원관리번호'),
   ax('fuel', '연료'), ax('displacement', '배기량', { num: 'cc', align: 'r' }), ax('ratedOutput', '정격출력'),
   ax('cylinders', '기통수'), ax('driveType', '구동방식'), ax('transmission', '변속기'),
@@ -106,14 +106,14 @@ const ASSET_COL_CATALOG: SheetCol<AssetMasterRow>[] = [
   ax('seats', '승차정원', { num: '명', align: 'r' }), ax('maxLoadKg', '최대적재', { num: 'kg', align: 'r' }),
   ax('fuelEfficiency', '연비', { num: 'km/L', align: 'r' }),
   ax('inspectionFrom', '검사시작일', { date: true }), ax('inspectionType', '검사구분'),
-  ax('acquisitionPrice', '매입가', { money: true, align: 'r' }), ax('consumerPrice', '소비자가', { money: true, align: 'r' }),
+  ax('acquisitionPrice', '매입가', { money: true, align: 'r', priority: 2 }), ax('consumerPrice', '소비자가', { money: true, align: 'r' }),
   ax('optionPrice', '옵션가', { money: true, align: 'r' }), ax('optionDiscount', '옵션할인', { money: true, align: 'r' }),
   ax('taxExempt', '과세/면세'), ax('purchasedDate', '매입완료일', { date: true }),
-  ax('acquisitionDate', '취득일', { date: true }), ax('supplier', '매입처'),
-  ax('loanKind', '금융구분'), ax('loanCompany', '할부/리스사'), ax('loanMonths', '할부개월', { num: '개월', align: 'r' }),
-  ax('loanPrincipal', '할부원금', { money: true, align: 'r' }), ax('loanRemainingPrincipal', '잔여원금', { money: true, align: 'r' }),
+  ax('acquisitionDate', '취득일', { date: true, priority: 3 }), ax('supplier', '매입처'),
+  ax('loanKind', '금융구분'), ax('loanCompany', '할부/리스사', { priority: 3 }), ax('loanMonths', '할부개월', { num: '개월', align: 'r' }),
+  ax('loanPrincipal', '할부원금', { money: true, align: 'r' }), ax('loanRemainingPrincipal', '잔여원금', { money: true, align: 'r', priority: 2 }),
   ax('loanRate', '연이율', { num: '%', align: 'r' }), ax('loanStartDate', '할부개시일', { date: true }),
-  ax('insuranceCompany', '보험사'), ax('insurancePolicyNo', '보험증권번호'), ax('insuranceExpiryDate', '보험만기', { date: true }),
+  ax('insuranceCompany', '보험사'), ax('insurancePolicyNo', '보험증권번호'), ax('insuranceExpiryDate', '보험만기', { date: true, priority: 2 }),
   ax('gpsProvider', 'GPS 공급사'), ax('gpsDeviceId', 'GPS 단말번호'), ax('gpsInstalledDate', 'GPS 설치일', { date: true }), ax('gpsControl', '시동제어'),
   ax('dealerAgency', '취급대리점'), ax('dealerContact', '딜러담당자'), ax('dealerPhone', '딜러연락처'),
   ax('optionList', '선택옵션'), ax('saleDate', '매각일', { date: true }), ax('salePrice', '매각가', { money: true, align: 'r' }),
@@ -124,10 +124,11 @@ const ASSET_COL_CATALOG: SheetCol<AssetMasterRow>[] = [
  * @see lib/ledger-ext.ts
  */
 export const ASSET_SHEET_KEYS: SheetViewKeys = {
-  // 회사·차번·차명·상태·제조사·모델·연식·주행거리·취득가·잔여할부·보험만기·검사만료
+  // 회사·차번·차명·상태·제조사·모델·연식·용도·소유자·취득일·취득가·할부사·잔여할부·주행·보험만기·검사만료
   basic: [
-    'company', 'plate', 'carName', 'status', 'maker', 'modelLine', 'modelYear',
-    'mileage', 'acquisitionPrice', 'loanRemainingPrincipal', 'insuranceExpiryDate', 'inspectionTo',
+    'company', 'plate', 'carName', 'status', 'maker', 'modelLine', 'modelYear', 'usage', 'ownerName',
+    'acquisitionDate', 'acquisitionPrice', 'loanCompany', 'loanRemainingPrincipal', 'mileage',
+    'insuranceExpiryDate', 'inspectionTo',
   ],
   all: [
     'company', 'assetCode', 'plate', 'status', 'carName', 'maker', 'modelLine',
@@ -210,16 +211,16 @@ const C0 = {
   status: { key: 'status', label: '계약상태', align: 'c', priority: 1, render: (r) => <Badge tone={r.ended ? 'gray' : 'green'}>{r.status}</Badge>, text: (r) => r.status },
   rentalType: { key: 'rentalType', label: '대여형태', align: 'c', priority: 2, render: (r) => dash(r.rentalType), text: (r) => r.rentalType },
   contractorName: { key: 'contractorName', label: '계약자', priority: 1, render: (r) => (r.contractorName ? String(r.contractorName) : LEDGER_EMPTY.none), text: (r) => r.contractorName },
-  contractorPhone: { key: 'contractorPhone', label: '연락처', priority: 3, render: (r) => dash(r.contractorPhone), text: (r) => r.contractorPhone },
+  contractorPhone: { key: 'contractorPhone', label: '연락처', priority: 2, render: (r) => dash(r.contractorPhone), text: (r) => r.contractorPhone },
   plate: { key: 'plate', label: '계약차량', priority: 1, render: (r) => (r.plate ? String(r.plate) : LEDGER_EMPTY.unassigned), text: (r) => r.plate },
-  carName: { key: 'carName', label: '계약차종', priority: 3, render: (r) => dash(r.carName), text: (r) => r.carName },
+  carName: { key: 'carName', label: '계약차종', priority: 2, render: (r) => dash(r.carName), text: (r) => r.carName },
   contractDate: { key: 'contractDate', label: '계약일', priority: 4, render: (r) => date(r.contractDate), text: (r) => r.contractDate },
   startDate: { key: 'startDate', label: '시작일', priority: 2, render: (r) => date(r.startDate), text: (r) => r.startDate },
   endDate: { key: 'endDate', label: '종료일', priority: 2, render: (r) => date(r.endDate), text: (r) => r.endDate },
   monthlyRent: { key: 'monthlyRent', label: '월대여료', align: 'r', priority: 1, render: (r) => moneyCell(r.monthlyRent), text: (r) => r.monthlyRent },
-  deposit: { key: 'deposit', label: '보증금', align: 'r', priority: 3, render: (r) => moneyCell(r.deposit), text: (r) => r.deposit },
+  deposit: { key: 'deposit', label: '보증금', align: 'r', priority: 2, render: (r) => moneyCell(r.deposit), text: (r) => r.deposit },
   paymentDay: {
-    key: 'paymentDay', label: '결제일', align: 'c', priority: 3,
+    key: 'paymentDay', label: '결제일', align: 'c', priority: 2,
     render: (r) => (r.paymentDay ? `${r.paymentDay}일` : LEDGER_EMPTY.dash),
     text: (r) => r.paymentDay || '',
   },
@@ -241,8 +242,8 @@ const C0 = {
   alert: { key: 'alert', label: '데이터알람', priority: 2, render: (r) => r.dataAlert ? <Badge tone="amber">{r.dataAlert}</Badge> : <Badge tone="green">원본 대사완료</Badge>, text: (r) => r.dataAlert || '원본 대사완료' },
 } satisfies Record<string, SheetCol<ContractMasterRow>>;
 
-const cx = (key: keyof ContractMasterRow, label: string, opts?: { date?: boolean; money?: boolean; num?: string; align?: 'l' | 'c' | 'r' }): SheetCol<ContractMasterRow> => ({
-  key: String(key), label, align: opts?.align,
+const cx = (key: keyof ContractMasterRow, label: string, opts?: { date?: boolean; money?: boolean; num?: string; align?: 'l' | 'c' | 'r'; priority?: 1 | 2 | 3 | 4 }): SheetCol<ContractMasterRow> => ({
+  key: String(key), label, align: opts?.align, priority: opts?.priority,
   render: (r) => opts?.date ? date(String(r[key] || '')) : opts?.money ? moneyCell(Number(r[key]) || 0) : opts?.num != null ? number(Number(r[key]) || 0, opts.num) : dash(r[key]),
   text: (r) => r[key] as string | number,
 });
@@ -254,7 +255,7 @@ const CONTRACT_COL_CATALOG: SheetCol<ContractMasterRow>[] = [
   C0.monthlyRent, C0.deposit, C0.paymentDay, C0.paymentTiming, C0.paymentMethod, C0.risk, C0.net, C0.alert,
   cx('contractorBirth', '생년월일', { date: true }), cx('contractorLicenseNo', '면허번호'),
   cx('licenseType', '면허종별'), cx('contractorAddress', '주소'),
-  cx('rentalMonths', '대여기간', { num: '개월', align: 'r' }), cx('annualMileageLimit', '연주행한도', { num: 'km', align: 'r' }),
+  cx('rentalMonths', '대여기간', { num: '개월', align: 'r', priority: 3 }), cx('annualMileageLimit', '연주행한도', { num: 'km', align: 'r' }),
   cx('deliveredDate', '인도일', { date: true }), cx('returnScheduledDate', '반납예정일', { date: true }),
   cx('returnedDate', '반납/해지일', { date: true }), cx('pickupPlace', '인수장소'), cx('returnPlace', '반환장소'),
   cx('reservationFee', '예약금', { money: true, align: 'r' }),
@@ -264,16 +265,17 @@ const CONTRACT_COL_CATALOG: SheetCol<ContractMasterRow>[] = [
   cx('cdw', '자차보험(CDW)'), cx('deductible', '면책금', { money: true, align: 'r' }), cx('superCover', '완전면책'),
   cx('additionalDrivers', '추가운전자'), cx('withDriver', '기사포함'), cx('fuelOut', '인수연료'), cx('fuelIn', '반납연료'),
   cx('depositSettledDate', '보증금정산일', { date: true }), cx('endReason', '종료사유'),
-  cx('overdueDays', '연체일', { num: '일', align: 'r' }), cx('unpaidCount', '미납회차', { num: '회', align: 'r' }),
+  cx('overdueDays', '연체일', { num: '일', align: 'r', priority: 1 }), cx('unpaidCount', '미납회차', { num: '회', align: 'r', priority: 2 }),
   cx('sourceCarryUnpaid', '사업현황 미수', { money: true, align: 'r' }), cx('reconciliationDelta', '원본차이', { money: true, align: 'r' }),
 ];
 
 /** 계약 엑셀 열 — `계약 · 엑셀기본|엑셀전체 · +|-key` @see lib/ledger-ext.ts */
 export const CONTRACT_SHEET_KEYS: SheetViewKeys = {
-  // 회사 → 신원(계약자·차) → 내용(계약번호) → 분류 → 상태 → 수치/기한 (+연락처·반납예정·연체)
+  // 회사·계약번호·계약자·연락처·차·차명·대여형태·상태·시작·종료·기간·월대여·보증·결제·납부시기·미납회차·연체·미수·리스크
   basic: [
-    'company', 'contractorName', 'contractorPhone', 'plate', 'contractNo', 'rentalType', 'status',
-    'endDate', 'returnScheduledDate', 'monthlyRent', 'paymentDay', 'paymentTiming', 'riskLabel', 'net', 'overdueDays', 'alert',
+    'company', 'contractNo', 'contractorName', 'contractorPhone', 'plate', 'carName', 'rentalType', 'status',
+    'startDate', 'endDate', 'rentalMonths', 'monthlyRent', 'deposit', 'paymentDay', 'paymentTiming',
+    'unpaidCount', 'overdueDays', 'net', 'riskLabel',
   ],
   all: [
     'company', 'contractNo', 'status', 'rentalType', 'contractorName', 'contractorPhone',
