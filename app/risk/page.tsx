@@ -2,7 +2,7 @@
 /**
  * 리스크관리 — 예외 통합 원장 (LedgerFrame).
  * 데이터 = lib/risk-ledger SSOT. 칩: 전체·미완료·미납·만기·휴차.
- * 상세 = VehicleSideEmbed · 미납 조치(내용증명·일괄).
+ * 상세 = RISK_DETAIL_SECTIONS · 미납 조치(내용증명·일괄).
  */
 import { useMemo, useState } from 'react';
 import { FileWarning } from 'lucide-react';
@@ -21,7 +21,6 @@ import {
   type LedgerColView,
 } from '@/components/ui';
 import { useIsMobile } from '@/lib/use-mobile';
-import { VehicleSideEmbed } from '@/components/ledger/VehicleSideEmbed';
 
 const GROUPS: RiskSheetGroup[] = ['미완료', '미납', '만기', '휴차'];
 type GroupFilter = '전체' | RiskSheetGroup;
@@ -183,11 +182,7 @@ export default function RiskPage() {
               )}
             </>
           )}
-        >
-          {selected.plate ? (
-            <VehicleSideEmbed plate={selected.plate} focus={selected.group === '미납' ? 'unpaid' : undefined} />
-          ) : null}
-        </LedgerRecordPanel>
+        />
       ) : null}
     />
   );
