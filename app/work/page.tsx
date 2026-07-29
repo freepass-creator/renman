@@ -1,7 +1,7 @@
 'use client';
 
 import { Suspense, useEffect, useMemo, useState } from 'react';
-import { Plus, UploadCloud, CarFront, FileText } from 'lucide-react';
+import { Plus, UploadCloud, CarFront, FileText, Trash2 } from 'lucide-react';
 import { useEntityLists } from '@/lib/use-entity-lists';
 import { textMatch } from '@/lib/search-match';
 import { companyDisplay } from '@/lib/companies';
@@ -10,8 +10,12 @@ import { openCar } from '@/lib/ui-bus';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
   Badge, Btn, C, FilterChips, LedgerActions, LedgerCreatePanel, LedgerFilterButton, LedgerFilterFields, LedgerFilterPanel, LedgerFrame, LedgerRecordPanel, PageLoading, Search, won,
-  PeriodBar, Select, type LedgerColView, type SheetCol,
+  PeriodBar, Select, useConfirm, type LedgerColView, type SheetCol,
 } from '@/components/ui';
+import { useSession } from '@/lib/session';
+import { commitRemove } from '@/lib/commit';
+import { NEED_COMPANY } from '@/lib/scope';
+import { toast } from '@/lib/toast';
 import { useIsMobile } from '@/lib/use-mobile';
 import { todayKST } from '@/lib/contracts/dates';
 import {
@@ -201,6 +205,8 @@ function WorkLedgerInner() {
   const mobile = useIsMobile();
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { companyId } = useSession();
+  const confirm = useConfirm();
   const { data: [workItems = [], history = [], penalties = [], inbox = [], contracts = [], vehicles = []], loading, reload } =
     useEntityLists(['work_item', 'history', 'penalty', 'inbox', 'contract', 'vehicle']);
   const [q, setQ] = useState('');
@@ -566,6 +572,37 @@ function WorkLedgerInner() {
                   }}
                 >
                   <FileText size={14} /> 계약
+                </Btn>
+              ) : null}
+              {selected.source === 'penalty' && selected.nest !== 'penalty-bucket' ? (
+                <Btn
+                  size="sm"
+                  variant="danger"
+                  onClick={async () => {
+                    const key = String(selected.raw._key || '');
+                    if (!key) return;
+                    const ok = await confirm({
+                      message: `이 과태료를 삭제할까요? (휴지통에서 복구 가능)\n${selected.plate || ''} · ${selected.amount ? won(selected.amount) : ''}`,
+                      danger: true,
+                    });
+                    if (!ok) return;
+                    try {
+                      await commitRemove({
+                        entity: 'penalty',
+                        sessionCompanyId: companyId,
+                        rec: selected.raw,
+                        key,
+                        reason: '수기 삭제',
+                      });
+                      setSelected(null);
+                      reload();
+                      toast('삭제됨', 'success');
+                    } catch {
+                      toast(NEED_COMPANY, 'error');
+                    }
+                  }}
+                >
+                  <Trash2 size={14} /> 삭제
                 </Btn>
               ) : null}
             </>

@@ -12,6 +12,11 @@ const toneColor = (tone: RiskSheetRow['tone']) => (
 
 const CATALOG: SheetCol<RiskSheetRow>[] = [
   {
+    key: 'company', label: '회사명', pin: true, priority: 2,
+    render: (r) => r.company || '—',
+    text: (r) => r.company,
+  },
+  {
     key: 'group', label: '구분', priority: 1, align: 'c',
     render: (r) => <Badge tone={r.badgeTone}>{r.group}</Badge>,
     text: (r) => r.group,
@@ -56,8 +61,8 @@ const CATALOG: SheetCol<RiskSheetRow>[] = [
 ];
 
 export const RISK_SHEET_KEYS: SheetViewKeys = {
-  basic: ['group', 'plate', 'customer', 'carName', 'due', 'amount', 'status'],
-  all: ['group', 'kind', 'plate', 'customer', 'carName', 'due', 'amount', 'status'],
+  basic: ['company', 'group', 'plate', 'customer', 'carName', 'due', 'amount', 'status'],
+  all: ['company', 'group', 'kind', 'plate', 'customer', 'carName', 'due', 'amount', 'status'],
 };
 
 const views = buildSheetViews(CATALOG, RISK_SHEET_KEYS);

@@ -1,20 +1,47 @@
-import { Badge, C, won, type SheetCol } from '@/components/ui';
+import { Badge, C, won, type RailTone, type SheetCol } from '@/components/ui';
 import type { AssetMasterRow, ContractMasterRow } from './master-ledgers';
 import {
   buildDetailSections, buildSheetViews, type DetailSectionDef, type SheetViewKeys,
 } from './ledger-ext';
 import { paymentTimingOf } from './schema/contract';
+import { workRailStyle } from './work-rail';
 
 const dash = (v: unknown) => (v === '' || v === null || v === undefined || v === 0 ? '—' : String(v));
 const date = (v: string) => v ? v.slice(0, 10) : '—';
 const money = (v: number) => v ? won(v) : '—';
 const number = (v: number, suffix = '') => v ? `${v.toLocaleString('ko-KR')}${suffix}` : '—';
 
+/** 자산 원장 rail — 상태·차종 축(함대 fleetRail 비재사용). */
+export function assetRail(r: Pick<AssetMasterRow, 'disposed' | 'status' | 'vehicleType'>): RailTone {
+  if (r.disposed) return 'mute';
+  if (r.status === '사고') return 'danger';
+  if (r.status === '정비') return 'warn';
+  if (r.status === '운행') return 'ok';
+  if (/화물|승합|버스/.test(String(r.vehicleType || ''))) return 'violet';
+  if (/휴차|대기|상품/.test(String(r.status || ''))) return 'brand';
+  return 'mute';
+}
+
+export { workRailStyle as assetRailStyle };
+
+function assetStatusTone(r: Pick<AssetMasterRow, 'disposed' | 'status' | 'vehicleType'>): 'gray' | 'green' | 'amber' | 'red' | 'blue' | 'purple' {
+  if (r.disposed) return 'gray';
+  if (r.status === '사고') return 'red';
+  if (r.status === '정비') return 'amber';
+  if (r.status === '운행') return 'green';
+  if (/화물|승합|버스/.test(String(r.vehicleType || ''))) return 'purple';
+  return 'blue';
+}
+
 const A = {
   company: { key: 'company', label: '회사명', pin: true, priority: 2, render: (r) => r.company, text: (r) => r.company },
   assetCode: { key: 'assetCode', label: '자산코드', priority: 4, render: (r) => dash(r.assetCode), text: (r) => r.assetCode },
   plate: { key: 'plate', label: '차량번호', pin: true, priority: 1, render: (r) => r.plate, text: (r) => r.plate },
-  status: { key: 'status', label: '자산상태', align: 'c', priority: 1, render: (r) => <Badge tone={r.disposed ? 'gray' : r.status === '운행' ? 'green' : r.status === '정비' || r.status === '사고' ? 'amber' : 'blue'}>{r.status}</Badge>, text: (r) => r.status },
+  status: {
+    key: 'status', label: '자산상태', align: 'c', priority: 1,
+    render: (r) => <Badge tone={assetStatusTone(r)}>{r.status}</Badge>,
+    text: (r) => r.status,
+  },
   carName: { key: 'carName', label: '차명', priority: 1, render: (r) => dash(r.carName), text: (r) => r.carName },
   maker: { key: 'maker', label: '제조사', priority: 3, render: (r) => dash(r.maker), text: (r) => r.maker },
   modelLine: { key: 'modelLine', label: '모델', priority: 2, render: (r) => dash(r.modelLine), text: (r) => r.modelLine },

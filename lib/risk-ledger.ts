@@ -13,6 +13,7 @@ import { computeContractView } from '@/lib/contract-ops';
 import { selectReceivables } from '@/lib/snapshot/selectors';
 import { computeDashboard } from '@/lib/operating-snapshot';
 import { buildHomePendingRows } from '@/lib/home-rows';
+import { companyShort } from '@/lib/companies';
 import type { BadgeTone } from '@/components/ui/misc';
 import { NAV_GROUPS, type NavItem } from '@/lib/nav';
 
@@ -26,6 +27,8 @@ export type RiskSheetRow = {
   id: string;
   group: RiskSheetGroup;
   kind: string;
+  companyId: string;
+  company: string;
   plate: string;
   customer: string;
   carName: string;
@@ -62,6 +65,11 @@ function ddayLabel(d: number | null): string {
 
 function carNameOf(r: FleetRow): string {
   return r.carName || [r.maker, r.subModel].filter(Boolean).join(' ') || '—';
+}
+
+function companyOf(fr?: Pick<FleetRow, 'companyId' | 'company'>, rec?: EntityRecord): { companyId: string; company: string } {
+  const companyId = String(fr?.companyId || rec?.companyId || '');
+  return { companyId, company: fr?.company || companyShort(companyId) };
 }
 
 function rowOf(
@@ -118,6 +126,7 @@ export function buildRiskSheetRows(
     push(rowOf('미완료', {
       id: `미완료:만기경과:${r.plate}`,
       kind: '만기경과',
+      ...companyOf(r),
       plate: r.plate,
       customer: r.customer || '—',
       carName: carNameOf(r),
@@ -131,6 +140,7 @@ export function buildRiskSheetRows(
     push(rowOf('미완료', {
       id: `미완료:인도:${r.plate}`,
       kind: '인도예정',
+      ...companyOf(r),
       plate: r.plate,
       customer: r.customer || '—',
       carName: carNameOf(r),
@@ -147,6 +157,7 @@ export function buildRiskSheetRows(
     push(rowOf('미완료', {
       id: `미완료:일정:${a.key}`,
       kind: a.kind,
+      ...companyOf(fr),
       plate: a.plate,
       customer: a.title || '—',
       carName: fr ? carNameOf(fr) : '—',
@@ -167,6 +178,7 @@ export function buildRiskSheetRows(
     push(rowOf('미납', {
       id: `미납:${v.rec._key || v.rec.contractNo || plate}`,
       kind: v.ended ? '반환미수' : '미납',
+      ...companyOf(fr, v.rec),
       plate,
       customer: String(v.rec.contractorName || '—'),
       carName: fr ? carNameOf(fr) : String(v.rec.carName || '—'),
@@ -185,6 +197,7 @@ export function buildRiskSheetRows(
     push(rowOf('만기', {
       id: `만기:임박:${r.plate}`,
       kind: '만기임박',
+      ...companyOf(r),
       plate: r.plate,
       customer: r.customer || '—',
       carName: carNameOf(r),
@@ -203,6 +216,7 @@ export function buildRiskSheetRows(
     push(rowOf('만기', {
       id: `만기:일정:${a.key}`,
       kind: a.kind,
+      ...companyOf(fr),
       plate: a.plate,
       customer: a.title || '—',
       carName: fr ? carNameOf(fr) : '—',
@@ -221,6 +235,7 @@ export function buildRiskSheetRows(
     push(rowOf('미완료', {
       id: `미완료:업무:${p.id}`,
       kind: p.kind,
+      ...companyOf(fr),
       plate: p.plate,
       customer: p.title || '—',
       carName: fr ? carNameOf(fr) : '—',
@@ -236,6 +251,7 @@ export function buildRiskSheetRows(
     push(rowOf('휴차', {
       id: `휴차:${r.plate}`,
       kind: '휴차',
+      ...companyOf(r),
       plate: r.plate,
       customer: r.customer || '—',
       carName: carNameOf(r),

@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react';
 import { Pencil, Plus, UploadCloud } from 'lucide-react';
 import { assetMasterRow, type AssetMasterRow } from '@/lib/master-ledgers';
-import { ASSET_DETAIL_SECTIONS, ASSET_MASTER_BASIC_COLS, ASSET_MASTER_EXPANDED_COLS } from '@/lib/master-ledger-cols';
+import { ASSET_DETAIL_SECTIONS, ASSET_MASTER_BASIC_COLS, ASSET_MASTER_EXPANDED_COLS, assetRail, assetRailStyle } from '@/lib/master-ledger-cols';
 import { useEntityList } from '@/lib/use-entity-lists';
 import { textMatch } from '@/lib/search-match';
 import {
@@ -186,6 +186,7 @@ export default function AssetLedgerPage() {
       rows={rows}
       rowKey={(r) => r.plate}
       selectedRowKey={selected?.plate}
+      rowStyle={(r) => assetRailStyle(assetRail(r))}
       onRowDoubleClick={(row) => {
         setCreating(false);
         setEditing(false);

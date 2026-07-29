@@ -42,7 +42,7 @@ export default function RiskPage() {
     [vehicles, contracts, insurances, penalties, history, bankTx],
   );
   const searched = useMemo(() => allRows.filter((r) =>
-    textMatch(q, r.group, r.kind, r.plate, r.customer, r.carName, r.status, r.due),
+    textMatch(q, r.company, r.group, r.kind, r.plate, r.customer, r.carName, r.status, r.due),
   ), [allRows, q]);
   const rows = useMemo(() => searched.filter((r) => {
     if (group !== '전체' && r.group !== group) return false;
