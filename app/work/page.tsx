@@ -440,6 +440,16 @@ function WorkLedgerInner() {
           sectionsByKind={WORK_SECTIONS_BY_KIND}
           kindField="category"
           fallbackKind="기타"
+          kindGateways={{
+            과태료: {
+              message: '과태료는 고지서 파일로 등록합니다. 업로드하면 OCR로 위반일시·차량을 읽어 계약(임차인)을 자동 매칭합니다.',
+              actionLabel: '고지서 업로드',
+              href: '/penalty/upload',
+            },
+          }}
+          onKindChange={(kind) => {
+            if (kind === '과태료') setGroupAndUrl('과태료');
+          }}
           quick
           initial={{
             date: todayKST(),
