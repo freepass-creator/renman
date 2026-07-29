@@ -149,7 +149,7 @@ export const ENTITIES: Record<string, Entity> = {
     fields: [
       { key: 'date', label: '업무일', type: 'date', required: true },
       { key: 'category', label: '업무구분', type: 'select', required: true, options: ['일정', '고객상담', '정비·수선', '사고', '문서', '기타'] },
-      { key: 'status', label: '상태', type: 'select', options: ['미분류', '접수', '예정', '진행중', '보류', '완료', '취소'] },
+      { key: 'status', label: '상태', type: 'select', options: ['대기', '진행', '완료', '보류', '미배정'] },
       { key: 'priority', label: '우선순위', type: 'select', options: ['긴급', '높음', '보통', '낮음'] },
       { key: 'title', label: '업무내용', type: 'text', required: true },
       { key: 'targetType', label: '대상구분', type: 'select', options: ['자산', '계약', '고객', '자금', '회사', '기타'] },

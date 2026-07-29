@@ -15,10 +15,10 @@ export function workRail(r: {
   if (r.nest === 'penalty-bucket') return 'brand';
   const st = String(r.status || '');
   const pri = String(r.priority || '');
-  if (/지연|미매칭|경과|취소|미처리/.test(st)) return 'danger';
+  if (/지연|미매칭|경과|미처리/.test(st)) return 'danger';
   if (/긴급/.test(pri)) return 'danger';
-  if (!r.plate && !r.contractKey && !/완료|종결/.test(st)) return 'warn';
-  if (/진행|대기|접수|확인|신청|todo|waiting|예정|보류/.test(st)) return 'warn';
+  if (st === '미배정' || (!r.plate && !r.contractKey && !/완료|종결/.test(st))) return 'warn';
+  if (/진행|대기|보류/.test(st)) return 'warn';
   if (/완료|종결|completed/.test(st)) return 'ok';
   if (/높음/.test(pri)) return 'violet';
   return 'mute';

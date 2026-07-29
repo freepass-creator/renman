@@ -35,6 +35,8 @@ import { workRail, workRailStyle } from '@/lib/work-rail';
 
 type WorkGroupFilter = '전체' | WorkGroup;
 type WorkSource = 'work_item' | 'history' | 'penalty' | 'inbox';
+/** 업무 상태 SSOT — 미분류는 업무구분(분류) 미지정값이지 상태 아님. */
+type WorkStatus = '대기' | '진행' | '완료' | '보류' | '미배정';
 
 type WorkLedgerRow = {
   id: string;
@@ -45,10 +47,13 @@ type WorkLedgerRow = {
   /** 검색용 합본(표시는 plate/carName/contractNo 구조 셀) */
   target: string;
   title: string;
+  /** @deprecated 기간필터용 — createdAt 날짜 */
   workAt: string;
   workDate: string;
+  createdAt: string;
+  updatedAt: string;
   dueDate: string;
-  status: string;
+  status: WorkStatus | string;
   assignee: string;
   amount: number;
   source: WorkSource;
@@ -73,6 +78,35 @@ function carNameOf(plate: string, vehicles: EntityRecord[]): string {
   if (!plate) return '';
   const v = vehicles.find((x) => String(x.plate || '') === plate);
   return v ? String(v.carName || v.model || '') : '';
+}
+
+/** ISO → MM-DD HH:mm (시:분까지). 날짜만 있으면 MM-DD. */
+function fmtStamp(iso: string): string {
+  if (!iso) return '—';
+  const m = String(iso).replace('T', ' ').match(/(?:\d{4}-)?(\d{2})-(\d{2})(?:[ T](\d{2}):(\d{2}))?/);
+  if (!m) return '—';
+  return m[3] != null ? `${m[1]}-${m[2]} ${m[3]}:${m[4]}` : `${m[1]}-${m[2]}`;
+}
+
+/** 원천 status → 대기·진행·완료·보류·미배정. '미분류'는 상태로 쓰지 않음. */
+function normalizeWorkStatus(raw: unknown, done?: boolean): WorkStatus {
+  if (done || raw === 'completed' || raw === true) return '완료';
+  const s = String(raw ?? '').trim();
+  if (!s || s === '미분류') return '대기';
+  if (/완료|종결/.test(s)) return '완료';
+  if (/보류|취소/.test(s)) return '보류';
+  if (/미배정/.test(s)) return '미배정';
+  if (/진행/.test(s)) return '진행';
+  if (/대기|접수|예정|todo|waiting/.test(s)) return '대기';
+  return '대기';
+}
+
+function workStatusTone(status: string): 'green' | 'amber' | 'red' | 'gray' | 'blue' {
+  if (status === '완료') return 'green';
+  if (status === '진행') return 'blue';
+  if (status === '미배정' || status === '대기' || status === '보류') return 'amber';
+  if (/지연|미매칭|경과|미처리/.test(status)) return 'red';
+  return 'gray';
 }
 
 /** 대상 셀 — 1줄 차번+차명 · 2줄 mute 계약/고객 · 둘 다 없으면 미배정 */
@@ -102,6 +136,18 @@ function TargetCell({ r }: { r: WorkLedgerRow }) {
   );
 }
 
+function KindCell({ kind }: { kind: string }) {
+  if (!kind || kind === '미분류' || kind === '일반') {
+    return <Badge tone="amber">미분류</Badge>;
+  }
+  return <>{kind}</>;
+}
+
+function AssigneeCell({ name }: { name: string }) {
+  if (!name) return <Badge tone="amber">미지정</Badge>;
+  return <>{name}</>;
+}
+
 const WORK_GROUPS: WorkGroupFilter[] = ['전체', '일정', '고객상담', '정비·수선', '사고', '과태료', '문서', '기타'];
 const WORK_SOURCE_LABEL: Record<WorkSource, string> = {
   work_item: '업무',
@@ -114,6 +160,7 @@ const PENALTY_ROW_BG = 'color-mix(in srgb, var(--brand) 10%, var(--bg-card))';
 
 function workGroup(kind: unknown): WorkGroup {
   const value = String(kind || '');
+  if (!value || value === '미분류' || value === '일반') return '기타';
   if (/일정|스케줄|예약/.test(value)) return '일정';
   if (/상담|통화|문자|연락|고객|민원/.test(value)) return '고객상담';
   if (/정비|수선|검사|세차|부품|오일|타이어/.test(value)) return '정비·수선';
@@ -123,26 +170,40 @@ function workGroup(kind: unknown): WorkGroup {
   return '기타';
 }
 
-function statusTone(status: string): 'green' | 'amber' | 'red' | 'gray' {
-  if (/완료|종결|completed/.test(status)) return 'green';
-  if (/지연|미매칭|경과|취소|미처리/.test(status)) return 'red';
-  if (/진행|대기|접수|확인|신청|todo|waiting/.test(status)) return 'amber';
-  return 'gray';
-}
-
 const WORK_COL_CATALOG: SheetCol<WorkLedgerRow>[] = [
   { key: 'co', label: '회사명', pin: true, priority: 2, render: (r) => r.company || '—', text: (r) => r.company },
-  { key: 'kind', label: '업무구분', pin: true, priority: 1, render: (r) => r.kind, text: (r) => r.kind },
+  {
+    key: 'kind', label: '업무구분', pin: true, priority: 1,
+    render: (r) => <KindCell kind={r.kind} />,
+    text: (r) => r.kind,
+  },
+  {
+    key: 'status', label: '상태', align: 'c', priority: 1,
+    render: (r) => <Badge tone={workStatusTone(r.status)}>{r.status}</Badge>,
+    text: (r) => r.status,
+  },
   {
     key: 'target', label: '대상', priority: 1,
     render: (r) => <TargetCell r={r} />,
     text: (r) => [r.plate, r.carName, r.contractNo, r.customerName, r.target].filter(Boolean).join(' '),
   },
   { key: 'title', label: '업무내용', priority: 1, render: (r) => r.title || '—', text: (r) => r.title },
-  { key: 'at', label: '업무일시', priority: 1, render: (r) => r.workAt ? r.workAt.slice(0, 16).replace('T', ' ') : '—', text: (r) => r.workAt },
-  { key: 'status', label: '상태', align: 'c', priority: 1, render: (r) => <Badge tone={statusTone(r.status)}>{r.status}</Badge>, text: (r) => r.status },
-  { key: 'assignee', label: '담당자', priority: 2, render: (r) => r.assignee || '—', text: (r) => r.assignee },
-  { key: 'due', label: '예정일', render: (r) => r.dueDate || '—', text: (r) => r.dueDate },
+  {
+    key: 'assignee', label: '담당자', priority: 1,
+    render: (r) => <AssigneeCell name={r.assignee} />,
+    text: (r) => r.assignee,
+  },
+  {
+    key: 'created', label: '생성일시', priority: 1,
+    render: (r) => fmtStamp(r.createdAt),
+    text: (r) => r.createdAt,
+  },
+  {
+    key: 'updated', label: '최종처리', priority: 1,
+    render: (r) => fmtStamp(r.updatedAt),
+    text: (r) => r.updatedAt,
+  },
+  { key: 'due', label: '기한', render: (r) => r.dueDate || '—', text: (r) => r.dueDate },
   { key: 'amount', label: '금액', align: 'r', render: (r) => r.amount ? won(r.amount) : '—', text: (r) => r.amount || '' },
   { key: 'source', label: '원천', render: (r) => WORK_SOURCE_LABEL[r.source], text: (r) => r.source },
 ];
@@ -159,7 +220,7 @@ const PENALTY_COL_CATALOG: SheetCol<WorkLedgerRow>[] = [
   { key: 'driver', label: '실운전자', priority: 1, render: (r) => r.driverName || '미매칭', text: (r) => r.driverName || '' },
   {
     key: 'status', label: '처리상태', align: 'c', priority: 1,
-    render: (r) => <Badge tone={statusTone(r.status)}>{r.status}</Badge>,
+    render: (r) => <Badge tone={workStatusTone(r.status)}>{r.status}</Badge>,
     text: (r) => r.status,
   },
   { key: 'ptype', label: '유형', priority: 2, render: (r) => r.penaltyKind || '—', text: (r) => r.penaltyKind || '' },
@@ -169,8 +230,8 @@ const PENALTY_COL_CATALOG: SheetCol<WorkLedgerRow>[] = [
 ];
 
 const WORK_SHEET_KEYS: SheetViewKeys = {
-  basic: ['co', 'kind', 'target', 'title', 'at', 'status', 'assignee'],
-  all: ['co', 'kind', 'target', 'title', 'at', 'status', 'assignee', 'due', 'amount', 'source'],
+  basic: ['co', 'kind', 'status', 'target', 'title', 'assignee', 'created', 'updated'],
+  all: ['co', 'kind', 'status', 'target', 'title', 'assignee', 'created', 'updated', 'due', 'amount'],
 };
 const PENALTY_SHEET_KEYS: SheetViewKeys = {
   basic: ['violationDate', 'plate', 'amount', 'driver', 'status'],
@@ -187,7 +248,7 @@ const PEN_ALL = _penViews.expanded;
 const WORK_DETAIL_DEFS: DetailSectionDef[] = [
   { title: '업무 분류', open: true, keys: ['co', 'kind', 'status', 'source'] },
   { title: '대상·내용', keys: ['target', 'title'] },
-  { title: '처리정보', keys: ['at', 'due', 'assignee', 'amount'] },
+  { title: '처리정보', keys: ['created', 'updated', 'due', 'assignee', 'amount'] },
 ];
 const PENALTY_DETAIL_DEFS: DetailSectionDef[] = [
   { title: '고지서', open: true, keys: ['violationDate', 'plate', 'amount', 'driver', 'status'] },
@@ -230,6 +291,8 @@ function WorkLedgerInner() {
       const contractKey = String(r.raw.contractKey || r.raw.contractId || '');
       const contractNo = String(r.raw.contractNo || '');
       const customerName = String(r.driverName || '');
+      const createdAt = String(r.raw.createdAt || r.workAt || '');
+      const updatedAt = String(r.raw.updatedAt || r.workAt || createdAt);
       return {
         ...r,
         plate,
@@ -238,6 +301,11 @@ function WorkLedgerInner() {
         contractNo,
         customerName: customerName !== '미매칭' ? customerName : '',
         target: [plate, contractNo, customerName].filter(Boolean).join(' '),
+        createdAt,
+        updatedAt,
+        workAt: createdAt,
+        workDate: createdAt.slice(0, 10),
+        status: normalizeWorkStatus(r.status),
       };
     }),
     [penalties, contracts, vehicles],
@@ -250,24 +318,31 @@ function WorkLedgerInner() {
 
   const otherRows = useMemo<WorkLedgerRow[]>(() => {
     const scheduled = workItems.map((r): WorkLedgerRow => {
-      const workAt = String(r.completedAt || r.date || r.dueDate || r.updatedAt || r.createdAt || '');
+      const createdAt = String(r.createdAt || r.date || r.dueDate || '');
+      const updatedAt = String(r.updatedAt || r.completedAt || createdAt);
       const plate = String(r.plate || '');
       const contractKey = String(r.contractKey || '');
       const contractNo = String(r.contractNo || '');
       const customerName = String(r.customerName || '');
       const carName = String(r.carName || '') || carNameOf(plate, vehicles);
+      const kind = String(r.workType || r.category || '').trim() || '미분류';
+      const hasTarget = !!(plate || contractKey);
+      let status = normalizeWorkStatus(r.status, !!(r.status === 'completed' || r.done));
+      if (!hasTarget && status !== '완료' && status !== '보류') status = '미배정';
       return {
         id: `work:${String(r._key || r.id)}`,
         company: companyDisplay(String(r.companyId || '')),
         companyId: String(r.companyId || ''),
-        kind: String(r.workType || r.category || (r.source === 'schedule' ? '일정' : '일반')),
-        group: workGroup(r.workType || r.category || (r.source === 'schedule' ? '일정' : '일반')),
+        kind,
+        group: workGroup(kind),
         target: [plate, carName, contractNo, customerName, r.relatedEntity].filter(Boolean).join(' '),
         title: String(r.title || r.memo || ''),
-        workAt,
-        workDate: workAt.slice(0, 10),
+        workAt: createdAt,
+        workDate: createdAt.slice(0, 10),
+        createdAt,
+        updatedAt,
         dueDate: String(r.dueDate || r.date || '').slice(0, 10),
-        status: String(r.status === 'completed' || r.done ? '완료' : r.status || '대기'),
+        status,
         assignee: String(r.assigneeName || r.assigneeId || ''),
         amount: Number(r.amount || r.cost) || 0,
         source: 'work_item',
@@ -277,22 +352,29 @@ function WorkLedgerInner() {
       };
     });
     const activities = history.map((r): WorkLedgerRow => {
-      const workAt = String(r.occurredAt || r.date || r.updatedAt || r.createdAt || '');
+      const createdAt = String(r.createdAt || r.occurredAt || r.date || '');
+      const updatedAt = String(r.updatedAt || r.occurredAt || createdAt);
       const plate = String(r.plate || '');
       const contractNo = String(r.contractNo || '');
       const carName = carNameOf(plate, vehicles);
+      const kind = String(r.category || (r._kind === 'work' ? '정비' : '')).trim() || '미분류';
+      const hasTarget = !!plate;
+      let status = normalizeWorkStatus(r.work_status || r.status);
+      if (!hasTarget && status !== '완료' && status !== '보류') status = '미배정';
       return {
         id: `history:${String(r._key || r.id)}`,
         company: companyDisplay(String(r.companyId || '')),
         companyId: String(r.companyId || ''),
-        kind: String(r.category || (r._kind === 'work' ? '정비' : '업무')),
-        group: workGroup(r.category || (r._kind === 'work' ? '정비' : '업무')),
+        kind,
+        group: workGroup(kind),
         target: [plate, carName, contractNo].filter(Boolean).join(' '),
         title: String(r.title || r.memo || r.vendor || ''),
-        workAt,
-        workDate: workAt.slice(0, 10),
+        workAt: createdAt,
+        workDate: createdAt.slice(0, 10),
+        createdAt,
+        updatedAt,
         dueDate: String(r.dueDate || r.date || '').slice(0, 10),
-        status: String(r.work_status || r.status || '접수'),
+        status,
         assignee: String(r.author || r.assignee || ''),
         amount: Number(r.cost || r.amount) || 0,
         source: 'history',
@@ -301,22 +383,29 @@ function WorkLedgerInner() {
       };
     });
     const documents = inbox.map((r): WorkLedgerRow => {
-      const workAt = String(r.matchedAt || r.uploadedAt || r.updatedAt || r.createdAt || '');
+      const createdAt = String(r.createdAt || r.uploadedAt || '');
+      const updatedAt = String(r.updatedAt || r.matchedAt || createdAt);
       const plate = String(r.plate || '');
       const contractNo = String(r.contractNo || '');
       const carName = carNameOf(plate, vehicles);
+      const kind = String(r.workType || '').trim() || '문서검토';
+      const hasTarget = !!(plate || r.contractKey);
+      let status = normalizeWorkStatus(r.status || (r.matchedAt ? '완료' : '대기'));
+      if (!hasTarget && status !== '완료' && status !== '보류') status = '미배정';
       return {
         id: `inbox:${String(r._key || r.id)}`,
         company: companyDisplay(String(r.companyId || '')),
         companyId: String(r.companyId || ''),
-        kind: String(r.workType || '문서검토'),
+        kind,
         group: '문서',
         target: [plate, carName, contractNo, r.matchedEntity].filter(Boolean).join(' '),
         title: String(r.title || r.fileName || r.memo || r.kind || '수집 문서 확인'),
-        workAt,
-        workDate: workAt.slice(0, 10),
+        workAt: createdAt,
+        workDate: createdAt.slice(0, 10),
+        createdAt,
+        updatedAt,
         dueDate: String(r.dueDate || r.uploadedAt || r.createdAt || '').slice(0, 10),
-        status: String(r.status || (r.matchedAt ? '완료' : '대기')),
+        status,
         assignee: String(r.assignee || r.uploadedBy || ''),
         amount: Number(r.amount) || 0,
         source: 'inbox',
@@ -324,8 +413,9 @@ function WorkLedgerInner() {
         raw: r,
       };
     });
+    // 기본 정렬 = 최종처리 오래된 순(방치 감지)
     return [...scheduled, ...activities, ...documents]
-      .sort((a, b) => b.workAt.localeCompare(a.workAt) || a.kind.localeCompare(b.kind, 'ko'));
+      .sort((a, b) => (a.updatedAt || '').localeCompare(b.updatedAt || '') || a.kind.localeCompare(b.kind, 'ko'));
   }, [workItems, history, inbox, vehicles]);
 
   const penaltyMode = group === '과태료';
@@ -333,7 +423,14 @@ function WorkLedgerInner() {
   const allRows = useMemo<WorkLedgerRow[]>(() => {
     if (penaltyMode) return penaltyRows;
     const base = otherRows.filter((r) => r.group !== '과태료');
-    return penaltyBucket ? [...base, penaltyBucket] : base;
+    if (!penaltyBucket) return base;
+    const bucket: WorkLedgerRow = {
+      ...(penaltyBucket as WorkLedgerRow),
+      createdAt: String(penaltyBucket.workAt || ''),
+      updatedAt: String(penaltyBucket.workAt || ''),
+      status: penaltyBucket.openCount ? '대기' : '완료',
+    };
+    return [...base, bucket];
   }, [penaltyMode, penaltyRows, otherRows, penaltyBucket]);
 
   useEffect(() => {
@@ -378,13 +475,13 @@ function WorkLedgerInner() {
     if (range.to && r.workDate && r.workDate > range.to) return false;
     return textMatch(
       q,
-      r.company, r.kind, r.target, r.title, r.status, r.assignee, r.workAt,
+      r.company, r.kind, r.target, r.title, r.status, r.assignee, r.createdAt, r.updatedAt,
       r.plate, r.carName, r.contractKey, r.contractNo, r.customerName,
       r.driverName, r.violationDate, r.penaltyKind,
     );
   }), [allRows, penaltyMode, penProcess, penKind, group, detailFilters, workFilterMatchers, range.from, range.to, q]);
 
-  const inProgress = rows.filter((r) => !/완료|종결|취소/.test(r.status)).length;
+  const inProgress = rows.filter((r) => !/완료|종결/.test(r.status)).length;
 
   const setGroupAndUrl = (next: WorkGroupFilter) => {
     setGroup(next);
