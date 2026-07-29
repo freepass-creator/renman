@@ -1,4 +1,4 @@
-import { Badge, C, won, type RailTone, type SheetCol } from '@/components/ui';
+import { Badge, C, money, type RailTone, type SheetCol } from '@/components/ui';
 import type { AssetMasterRow, ContractMasterRow } from './master-ledgers';
 import {
   buildDetailSections, buildSheetViews, type DetailSectionDef, type SheetViewKeys,
@@ -14,7 +14,7 @@ import { dday } from './dashboard-consts';
 
 const dash = (v: unknown) => (v === '' || v === null || v === undefined || v === 0 ? LEDGER_EMPTY.dash : String(v));
 const date = (v: string) => (v ? v.slice(0, 10) : LEDGER_EMPTY.dash);
-const money = (v: number) => (v ? won(v) : LEDGER_EMPTY.dash);
+const moneyCell = (v: number) => (v ? money(v) : LEDGER_EMPTY.dash);
 const number = (v: number, suffix = '') => (v ? `${v.toLocaleString('ko-KR')}${suffix}` : LEDGER_EMPTY.dash);
 
 /** rail 전용 보강 — domain 집합 밖 표시값(도메인 분류/집계는 건드리지 않음). */
@@ -87,7 +87,7 @@ const A = {
 
 const ax = (key: keyof AssetMasterRow, label: string, opts?: { date?: boolean; money?: boolean; num?: string; align?: 'l' | 'c' | 'r' }): SheetCol<AssetMasterRow> => ({
   key: String(key), label, align: opts?.align,
-  render: (r) => opts?.date ? date(String(r[key] || '')) : opts?.money ? money(Number(r[key]) || 0) : opts?.num != null ? number(Number(r[key]) || 0, opts.num) : dash(r[key]),
+  render: (r) => opts?.date ? date(String(r[key] || '')) : opts?.money ? moneyCell(Number(r[key]) || 0) : opts?.num != null ? number(Number(r[key]) || 0, opts.num) : dash(r[key]),
   text: (r) => r[key] as string | number,
 });
 
@@ -213,8 +213,8 @@ const C0 = {
   contractDate: { key: 'contractDate', label: '계약일', priority: 4, render: (r) => date(r.contractDate), text: (r) => r.contractDate },
   startDate: { key: 'startDate', label: '시작일', priority: 2, render: (r) => date(r.startDate), text: (r) => r.startDate },
   endDate: { key: 'endDate', label: '종료일', priority: 2, render: (r) => date(r.endDate), text: (r) => r.endDate },
-  monthlyRent: { key: 'monthlyRent', label: '월대여료', align: 'r', priority: 1, render: (r) => money(r.monthlyRent), text: (r) => r.monthlyRent },
-  deposit: { key: 'deposit', label: '보증금', align: 'r', priority: 3, render: (r) => money(r.deposit), text: (r) => r.deposit },
+  monthlyRent: { key: 'monthlyRent', label: '월대여료', align: 'r', priority: 1, render: (r) => moneyCell(r.monthlyRent), text: (r) => r.monthlyRent },
+  deposit: { key: 'deposit', label: '보증금', align: 'r', priority: 3, render: (r) => moneyCell(r.deposit), text: (r) => r.deposit },
   paymentDay: {
     key: 'paymentDay', label: '결제일', align: 'c', priority: 3,
     render: (r) => (r.paymentDay ? `${r.paymentDay}일` : LEDGER_EMPTY.dash),
@@ -234,13 +234,13 @@ const C0 = {
     text: (r) => r.paymentMethod,
   },
   risk: { key: 'riskLabel', label: '리스크', priority: 1, render: (r) => r.atRisk ? <Badge tone="red">{r.riskLabel}</Badge> : LEDGER_EMPTY.dash, text: (r) => r.riskLabel },
-  net: { key: 'net', label: '미수금액', align: 'r', priority: 1, render: (r) => r.net ? <span style={{ color: C.danger, fontWeight: 700 }}>{won(r.net)}</span> : LEDGER_EMPTY.dash, text: (r) => r.net },
+  net: { key: 'net', label: '미수금액', align: 'r', priority: 1, render: (r) => r.net ? <span style={{ color: C.danger, fontWeight: 700 }}>{money(r.net)}</span> : LEDGER_EMPTY.dash, text: (r) => r.net },
   alert: { key: 'alert', label: '데이터알람', priority: 2, render: (r) => r.dataAlert ? <Badge tone="amber">{r.dataAlert}</Badge> : <Badge tone="green">원본 대사완료</Badge>, text: (r) => r.dataAlert || '원본 대사완료' },
 } satisfies Record<string, SheetCol<ContractMasterRow>>;
 
 const cx = (key: keyof ContractMasterRow, label: string, opts?: { date?: boolean; money?: boolean; num?: string; align?: 'l' | 'c' | 'r' }): SheetCol<ContractMasterRow> => ({
   key: String(key), label, align: opts?.align,
-  render: (r) => opts?.date ? date(String(r[key] || '')) : opts?.money ? money(Number(r[key]) || 0) : opts?.num != null ? number(Number(r[key]) || 0, opts.num) : dash(r[key]),
+  render: (r) => opts?.date ? date(String(r[key] || '')) : opts?.money ? moneyCell(Number(r[key]) || 0) : opts?.num != null ? number(Number(r[key]) || 0, opts.num) : dash(r[key]),
   text: (r) => r[key] as string | number,
 });
 

@@ -3,13 +3,13 @@
  * ObjRow + Rows — 훑는 동종 목록의 키스톤 원자 (통일 규격 설계서 §2).
  *   jpkerp5 ContractListItem 해부 → renman 토큰 번역. grouped ObjCard 목록의 대체재.
  *   규칙: 행마다 박스 금지 — 테두리·radius·bg는 Rows 컨테이너 전유, 행은 헤어라인 구분.
- *         상태점 금지 — danger=옅은 배경 틴트. 행 안 버튼·input 금지(행동=드릴인/패널).
+ *         상태점=RailDot(6px). 세로선·행 틴트 금지. 행 안 버튼·input 금지(행동=드릴인/패널).
  *   드릴인: ObjRow는 라우팅 무지. 호출부가 onClick={() => openCar(plate)} — 자산360.
  */
 import React from 'react';
 import { ChevronRight, ChevronDown, Check } from 'lucide-react';
 import { C, NUM, R } from './tokens';
-import { Badge, CompanyBadge, type BadgeTone, type RailTone } from './misc';
+import { Badge, CompanyBadge, RailDot, type BadgeTone, type RailTone } from './misc';
 import { useIsMobile } from '@/lib/use-mobile';
 
 // Rows 그룹헤더 톤 — Badge와 같은 --{tone}-text/-bg 브릿지(gray=zinc).
@@ -27,7 +27,7 @@ function useHover() {
 }
 
 export interface ObjRowProps {
-  rail?: RailTone;                     // danger=옅은 틴트 (기본 none)
+  rail?: RailTone;                     // 좌측 RailDot (기본 none=미렌더)
   co?: string;                         // CompanyBadge
   plate?: string;                      // 차번 앵커(모노·무잘림)
   name?: React.ReactNode;              // 비차량 주체 앵커 (plate 없을 때)
@@ -64,10 +64,11 @@ export function ObjRow({
     <div onClick={onClick} {...on} {...kb} style={{
       position: 'relative', display: 'flex', alignItems: 'center', gap: 10, minWidth: 0,
       minHeight: mobile ? 52 : 44, padding: mobile ? '8px 14px' : '6px 12px 6px 14px',
-      background: h && !!onClick ? C.hover : (rail === 'danger' ? 'var(--danger-tint)' : 'transparent'),
+      background: h && !!onClick ? C.hover : 'transparent',
       cursor: onClick ? 'pointer' : 'default', transition: 'background .12s ease',
       WebkitTapHighlightColor: 'transparent',
     }}>
+      <RailDot tone={rail} />
       {selectable && (
         <span onClick={(e) => { e.stopPropagation(); onToggle?.(); }} style={{
           flex: '0 0 auto', width: 18, height: 18, borderRadius: 4,

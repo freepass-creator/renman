@@ -2,7 +2,7 @@
  * 자금·계좌 열 SSOT — BankAccountRow.
  * 엑셀: `자금·계좌 · 엑셀기본|엑셀전체 · ±key` @see lib/ledger-ext.ts
  */
-import { Badge, C, won, type SheetCol } from '@/components/ui';
+import { Badge, C, money, type SheetCol } from '@/components/ui';
 import type { BankAccountRow } from '@/lib/finance/cash-ledger';
 import { buildDetailSections, buildSheetViews, type DetailSectionDef, type SheetViewKeys } from '@/lib/ledger-ext';
 import { LEDGER_EMPTY } from '@/lib/ledger-empty';
@@ -21,17 +21,17 @@ const ACCOUNT_COL_CATALOG: SheetCol<BankAccountRow>[] = [
   },
   {
     key: 'totalIn', label: '누적입금', priority: 1, align: 'r',
-    render: (r) => (r.totalIn ? <b style={{ color: C.ok }}>{won(r.totalIn)}</b> : LEDGER_EMPTY.dash),
+    render: (r) => (r.totalIn ? <b style={{ color: C.ok }}>{money(r.totalIn)}</b> : LEDGER_EMPTY.dash),
     text: (r) => r.totalIn,
   },
   {
     key: 'totalOut', label: '누적출금', priority: 1, align: 'r',
-    render: (r) => (r.totalOut ? <b>{won(r.totalOut)}</b> : LEDGER_EMPTY.dash),
+    render: (r) => (r.totalOut ? <b>{money(r.totalOut)}</b> : LEDGER_EMPTY.dash),
     text: (r) => r.totalOut,
   },
   {
     key: 'currentBalance', label: '최종잔액', priority: 1, align: 'r',
-    render: (r) => won(r.currentBalance),
+    render: (r) => money(r.currentBalance),
     text: (r) => r.currentBalance,
   },
   {
@@ -48,7 +48,7 @@ const ACCOUNT_COL_CATALOG: SheetCol<BankAccountRow>[] = [
   { key: 'closed', label: '해지일', render: (r) => r.closedDate || LEDGER_EMPTY.dash, text: (r) => r.closedDate },
   {
     key: 'balance', label: '등록시점 잔액', align: 'r',
-    render: (r) => (r.openingBalance ? won(r.openingBalance) : LEDGER_EMPTY.dash),
+    render: (r) => (r.openingBalance ? money(r.openingBalance) : LEDGER_EMPTY.dash),
     text: (r) => r.openingBalance,
   },
   { key: 'method', label: '수집방법', render: (r) => r.importMethod || LEDGER_EMPTY.dash, text: (r) => r.importMethod },

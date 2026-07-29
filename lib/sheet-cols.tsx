@@ -7,7 +7,7 @@
  *   자산·계약 마스터 열 = lib/master-ledger-cols.
  */
 import React from 'react';
-import { Badge, won, C, type SheetCol } from '@/components/ui';
+import { Badge, money, C, type SheetCol } from '@/components/ui';
 import { type FleetRow } from './sheet-rows';
 import { collectionStage } from './domain/status';
 import { dday } from './dashboard-consts';
@@ -23,8 +23,7 @@ const toneBadge = (t: FleetRow['tone']): 'green' | 'amber' | 'red' | 'gray' =>
  *   기본 = 자산(번호판·법인·상태·차명) + 계약/손님(계약자·기간·월렌트) + 미수.
  *   전체 = 기본 + 자산상세(연식·VIN·취득·검사·GPS) + 할부(할부사·원금·이율·개월) + 보험(보험사·만기·보험료) + 연체.
  *   자리 고정 — 전체는 기본 열 사이에 «끼워넣지» 말고 뒤로 확장(눈이 같은 데를 본다). */
-const won0 = (n: number) => (n ? won(n) : LEDGER_EMPTY.dash);
-const n0 = (n: number) => (n ? n.toLocaleString('ko-KR') : LEDGER_EMPTY.dash);   // 콤마 숫자(₩ 없음) — 보증금·대여료용
+const money0 = (n: number) => (n ? money(n) : LEDGER_EMPTY.dash);
 const ymd = (s: string) => s ? s.slice(0, 10) : LEDGER_EMPTY.dash;
 // 만기 셀 — «한 셀 한 값»: 날짜 하나만, 긴급도는 색으로(만료·D-7=빨강 / D-30=주황 / 그 외 기본). 검사·보험 공용.
 const ddayCell = (s: string) => {
@@ -59,18 +58,18 @@ const FL = {
   year: { key: 'year', label: '연식', render: (r) => r.year || LEDGER_EMPTY.dash, text: (r) => r.year },
   vin: { key: 'vin', label: '차대번호', render: (r) => r.vin || LEDGER_EMPTY.dash, text: (r) => r.vin },
   acqDate: { key: 'acqDate', label: '취득일', render: (r) => ymd(r.acqDate), text: (r) => r.acqDate },
-  acqPrice: { key: 'acqPrice', label: '취득가', align: 'r', render: (r) => won0(r.acqPrice), text: (r) => r.acqPrice },
+  acqPrice: { key: 'acqPrice', label: '취득가', align: 'r', render: (r) => money0(r.acqPrice), text: (r) => r.acqPrice },
   inspect: { key: 'inspect', label: '검사만기', render: (r) => ddayCell(r.inspectionTo), text: (r) => r.inspectionTo },
   gps: { key: 'gps', label: 'GPS', render: (r) => r.gps || LEDGER_EMPTY.dash, text: (r) => r.gps },
   loanCo: { key: 'loanCo', label: '할부사', render: (r) => r.loanCompany || LEDGER_EMPTY.dash, text: (r) => r.loanCompany },
-  loanAmt: { key: 'loanAmt', label: '할부원금', align: 'r', render: (r) => won0(r.loanPrincipal), text: (r) => r.loanPrincipal },
+  loanAmt: { key: 'loanAmt', label: '할부원금', align: 'r', render: (r) => money0(r.loanPrincipal), text: (r) => r.loanPrincipal },
   loanRate: { key: 'loanRate', label: '이율', align: 'r', render: (r) => r.loanRate ? `${(r.loanRate * 100).toFixed(1)}%` : LEDGER_EMPTY.dash, text: (r) => r.loanRate },
   loanMon: { key: 'loanMon', label: '할부개월', align: 'r', render: (r) => r.loanMonths || LEDGER_EMPTY.dash, text: (r) => r.loanMonths },
   cust: { key: 'cust', label: '사용처', render: (r) => r.customer || LEDGER_EMPTY.none, text: (r) => r.customer },
   term: { key: 'term', label: '계약기간', align: 'r', render: (r) => r.termMonths ? `${r.termMonths}개월` : LEDGER_EMPTY.dash, text: (r) => r.termMonths },
   phone: { key: 'phone', label: '연락처', render: (r) => r.phone || LEDGER_EMPTY.dash, text: (r) => r.phone },
-  rent: { key: 'rent', label: '대여료', align: 'r', render: (r) => n0(r.rent), text: (r) => r.rent },
-  dep: { key: 'dep', label: '보증금', align: 'r', render: (r) => n0(r.deposit), text: (r) => r.deposit },
+  rent: { key: 'rent', label: '대여료', align: 'r', render: (r) => money0(r.rent), text: (r) => r.rent },
+  dep: { key: 'dep', label: '보증금', align: 'r', render: (r) => money0(r.deposit), text: (r) => r.deposit },
   start: { key: 'start', label: '시작', render: (r) => ymd(r.start), text: (r) => r.start },
   end: { key: 'end', label: '만기', render: (r) => ymd(r.end), text: (r) => r.end },
   dday: {
@@ -88,10 +87,10 @@ const FL = {
   },
   insurer: { key: 'insurer', label: '보험사', render: (r) => r.insurer || LEDGER_EMPTY.dash, text: (r) => r.insurer },
   insEnd: { key: 'insEnd', label: '보험만기', render: (r) => ddayCell(r.insEnd), text: (r) => r.insEnd },
-  insPrem: { key: 'insPrem', label: '보험료', align: 'r', render: (r) => won0(r.insPremium), text: (r) => r.insPremium },
+  insPrem: { key: 'insPrem', label: '보험료', align: 'r', render: (r) => money0(r.insPremium), text: (r) => r.insPremium },
   net: {
     key: 'net', label: '미수', align: 'r',
-    render: (r) => r.net > 0 ? <span style={{ color: C.danger, fontWeight: 700 }}>{n0(r.net)}</span> : LEDGER_EMPTY.dash,
+    render: (r) => r.net > 0 ? <span style={{ color: C.danger, fontWeight: 700 }}>{money0(r.net)}</span> : LEDGER_EMPTY.dash,
     text: (r) => r.net,
   },
   od: {

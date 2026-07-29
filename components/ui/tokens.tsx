@@ -9,11 +9,21 @@ export const C = {
   line: 'var(--border)', line2: 'var(--border-soft)', lineStrong: 'var(--border-strong)',
   inverse: 'var(--text-inverse)', card: 'var(--bg-card)',
   bg: 'var(--bg-page)', zebra: 'var(--bg-stripe)', head: 'var(--bg-header)', hover: 'var(--bg-hover)',
+  selected: 'var(--bg-selected)',
   danger: 'var(--red-text)', ok: 'var(--green-text)', warn: 'var(--orange-text)', violet: 'var(--purple-text)', accent: 'var(--text-link)',
   brand: 'var(--brand)', taupe: 'var(--text-sub)', taupeBg: 'var(--bg-card)', taupeLine: 'var(--border)',
 };
 export const R = 4; // = --radius (jpkerp5 표준 4px)
 export const NUM = "var(--font-mono)";
+
+/** 엑셀 트리/CMS 하위행 들여쓰기 단위(px). 매직넘버 금지. */
+export const INDENT_UNIT = 14;
+/** 셀 서브텍스트 — TwoLineCell·트리 하위. globals `--cell-sub-fs`. */
+export const CELL_SUB_FS = 'var(--cell-sub-fs)';
+/** 엑셀 데이터 행 높이 — globals `--ledger-row-h`. 페이지 예외 금지. */
+export const EXCEL_ROW_H = 'var(--ledger-row-h)';
+export const EXCEL_PAD_Y = 5;
+export const EXCEL_PAD_X = 8;
 
 /* 그림자 SSOT — globals.css --shadow-* 만 씀. rgba 하드코딩 금지. */
 export const SH = {
@@ -149,10 +159,6 @@ export const td: CSSProperties = { padding: '5px 10px', fontSize: 12, whiteSpace
 export const tdR: CSSProperties = { ...td, textAlign: 'right', fontVariantNumeric: 'tabular-nums', fontFamily: NUM, fontWeight: 600 };
 
 /* 엑셀 시트(프리패스 ERP4 이식) — sticky 헤더·좌측 핀 · 행고 고정. DataTable과 별도(현황 한눈). */
-const EXCEL_PAD_Y = 5;
-const EXCEL_PAD_X = 8;
-/** 엑셀 thead·행 · 우측 상세패널 헤더 · Page frame 타이틀행 공통 높이. */
-const EXCEL_ROW_H = 40;
 export const thX: CSSProperties = {
   padding: `${EXCEL_PAD_Y}px ${EXCEL_PAD_X}px`, textAlign: 'left', fontSize: 12, color: C.mute, fontWeight: 700,
   background: C.head, borderBottom: `1px solid ${C.line}`, borderRight: `1px solid ${C.line}`, whiteSpace: 'nowrap',

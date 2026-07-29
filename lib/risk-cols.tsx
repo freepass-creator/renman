@@ -2,7 +2,7 @@
  * 리스크관리 엑셀 열 — 구분 · 차번 · 대상 · 차명 · 기한 · 금액 · 상태
  */
 import React from 'react';
-import { Badge, won, C, type SheetCol } from '@/components/ui';
+import { Badge, money, C, type SheetCol } from '@/components/ui';
 import type { RiskSheetRow } from './risk-ledger';
 import { buildSheetViews, buildDetailSections, type DetailSectionDef, type SheetViewKeys } from './ledger-ext';
 import { LEDGER_EMPTY } from './ledger-empty';
@@ -54,7 +54,7 @@ const CATALOG: SheetCol<RiskSheetRow>[] = [
   {
     key: 'amount', label: '금액', priority: 1, align: 'r', sortNum: true,
     render: (r) => (r.amount > 0
-      ? <span style={{ color: C.danger, fontWeight: 700 }}>{won(r.amount)}</span>
+      ? <span style={{ color: C.danger, fontWeight: 700 }}>{money(r.amount)}</span>
       : LEDGER_EMPTY.dash),
     text: (r) => r.amount,
   },

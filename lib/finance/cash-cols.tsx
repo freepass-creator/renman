@@ -2,7 +2,7 @@
  * 재무원장 열 SSOT — 계좌 입·출금 스트림(CashRow).
  * 엑셀 추가/삭제: `자금 · 엑셀기본|엑셀전체 · +|-key` @see lib/ledger-ext.ts
  */
-import { Badge, C, won, type RailTone, type SheetCol } from '@/components/ui';
+import { Badge, C, money, CELL_SUB_FS, INDENT_UNIT, type RailTone, type SheetCol } from '@/components/ui';
 import { companyDisplay } from '@/lib/companies';
 import { groupOfLabel, isUnclassified, kindOfLabel } from '@/lib/payments/ledger-subjects';
 import type { CashRow } from '@/lib/finance/cash-ledger';
@@ -11,7 +11,6 @@ import { LEDGER_EMPTY } from '@/lib/ledger-empty';
 import { workRailStyle } from '@/lib/work-rail';
 
 const coName = (r: CashRow) => companyDisplay(r.companyId);
-const amt = (n: number) => (n ? n.toLocaleString('ko-KR') : LEDGER_EMPTY.dash);
 const content = (r: CashRow) => {
   const a = (r.party || '').trim();
   const b = (r.memo || '').trim();
@@ -43,7 +42,7 @@ const CASH_COL_CATALOG: SheetCol<CashRow>[] = [
   {
     key: 'company', label: '회사명', pin: true, priority: 1,
     render: (r) => (r.nest === 'cms-item'
-      ? <span style={{ color: C.mute, paddingLeft: 14 }}>↳ CMS</span>
+      ? <span style={{ color: C.mute, paddingLeft: INDENT_UNIT }}>↳ CMS</span>
       : coName(r)),
     text: (r) => (r.nest === 'cms-item' ? 'CMS연결' : coName(r)),
   },
@@ -55,7 +54,7 @@ const CASH_COL_CATALOG: SheetCol<CashRow>[] = [
   {
     key: 'acct', label: '계좌번호', priority: 2,
     render: (r) => {
-      if (r.nest === 'cms-item') return <span style={{ color: C.mute, fontSize: 11 }}>{r.account || LEDGER_EMPTY.dash}</span>;
+      if (r.nest === 'cms-item') return <span style={{ color: C.mute, fontSize: CELL_SUB_FS }}>{r.account || LEDGER_EMPTY.dash}</span>;
       if (r.nest === 'cms-pending') return <span style={{ color: C.mute }}>CMS명세</span>;
       return r.account || LEDGER_EMPTY.dash;
     },
@@ -99,13 +98,13 @@ const CASH_COL_CATALOG: SheetCol<CashRow>[] = [
       ? <span style={{
           color: (r.nest === 'cms-item' || r.nest === 'cms-pending') ? C.brand : C.ok,
           fontWeight: 700,
-        }}>{amt(r.inAmt)}</span>
+        }}>{money(r.inAmt)}</span>
       : LEDGER_EMPTY.dash),
     text: (r) => r.inAmt,
   },
   {
     key: 'out', label: '출금', align: 'r', priority: 1,
-    render: (r) => (r.outAmt ? <span style={{ fontWeight: 700 }}>{amt(r.outAmt)}</span> : LEDGER_EMPTY.dash),
+    render: (r) => (r.outAmt ? <span style={{ fontWeight: 700 }}>{money(r.outAmt)}</span> : LEDGER_EMPTY.dash),
     text: (r) => r.outAmt,
   },
   {
@@ -185,7 +184,7 @@ const CARD_DETAIL_CATALOG: SheetCol<CashRow>[] = [
   { key: 'approvalNo', label: '승인번호', render: (r) => String(r.raw.approvalNo || LEDGER_EMPTY.dash) },
   {
     key: 'cardAmount', label: '승인금액', align: 'r',
-    render: (r) => won(Number(r.raw.amount) || r.outAmt),
+    render: (r) => money(Number(r.raw.amount) || r.outAmt),
   },
 ];
 

@@ -282,7 +282,7 @@ export function countRiskSheetGroups(rows: RiskSheetRow[]): RiskGroupCounts {
 
 /**
  * 리스크 행 rail — row.tone 재활용(틴트 판정).
- * 시각은 workRailStyle이 danger만 옅은 배경. 좌측 세로선 없음.
+ * 시각은 workRailStyle→ExcelSheet/ObjRow RailDot(6px). 세로선·행 틴트 없음.
  */
 export function riskRail(r: Pick<RiskSheetRow, 'tone'>): RailTone {
   return r.tone;

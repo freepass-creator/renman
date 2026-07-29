@@ -49,7 +49,7 @@ type SourceQuickFilter = '정산완료' | '미정산' | '승인' | '취소' | nu
 type AccountStatusFilter = '전체' | '사용중' | '휴면';
 type CashInputKind = '계좌' | '계좌거래' | 'CMS' | '법인카드';
 type BulkInputSource = '파일' | '링크' | '텍스트';
-const amt = (n: number) => (n ? n.toLocaleString('ko-KR') : '—');
+const amt = (n: number) => (n ? won(n) : '—');
 /** 표 DOM 폭주 방지 — 24·25 CMS미연결 수백건이면 페이지가 죽음 */
 const ROW_DISPLAY_CAP = 200;
 const CASH_SEARCH_WIDTH = 280;

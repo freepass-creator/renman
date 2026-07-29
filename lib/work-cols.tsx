@@ -6,7 +6,7 @@
 'use client';
 
 import React from 'react';
-import { Badge, C, won, type SheetCol } from '@/components/ui';
+import { Badge, C, money, TwoLineCell, type SheetCol } from '@/components/ui';
 import { buildDetailSections, buildSheetViews, type DetailSectionDef, type SheetViewKeys } from '@/lib/ledger-ext';
 import { LEDGER_EMPTY } from '@/lib/ledger-empty';
 import {
@@ -15,43 +15,6 @@ import {
   workStatusTone,
   type WorkLedgerRow,
 } from '@/lib/work-ledger';
-
-/** 차량번호 — 1줄 차번 · 2줄 mute 차명. 없으면 대시. */
-function PlateCell({ r }: { r: WorkLedgerRow }) {
-  if (!r.plate) {
-    return <span style={{ color: C.mute }}>{LEDGER_EMPTY.dash}</span>;
-  }
-  return (
-    <div style={{ minWidth: 0 }}>
-      <div style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-        {r.plate}
-      </div>
-      {r.carName ? (
-        <div style={{ fontSize: 11, color: C.mute, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-          {r.carName}
-        </div>
-      ) : null}
-    </div>
-  );
-}
-
-/** 계약자 — 없으면 LEDGER_EMPTY.none. sub=대여형태. */
-function ContractorCell({ r }: { r: WorkLedgerRow }) {
-  const name = String(r.customerName || '').trim();
-  if (!name) {
-    return <span style={{ color: C.mute }}>{LEDGER_EMPTY.none}</span>;
-  }
-  return (
-    <div style={{ minWidth: 0 }}>
-      <div style={{ fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name}</div>
-      {r.rentalType ? (
-        <div style={{ fontSize: 11, color: C.mute, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-          {r.rentalType}
-        </div>
-      ) : null}
-    </div>
-  );
-}
 
 function KindCell({ kind }: { kind: string }) {
   if (!kind || kind === '미분류' || kind === '일반') {
@@ -79,12 +42,18 @@ const WORK_COL_CATALOG: SheetCol<WorkLedgerRow>[] = [
   },
   {
     key: 'plate', label: '차량번호', priority: 1, pin: true,
-    render: (r) => <PlateCell r={r} />,
+    render: (r) => (r.plate
+      ? <TwoLineCell mono main={r.plate} sub={r.carName || undefined} />
+      : <span style={{ color: C.mute }}>{LEDGER_EMPTY.dash}</span>),
     text: (r) => [r.plate, r.carName].filter(Boolean).join(' '),
   },
   {
     key: 'contractor', label: '계약자', priority: 1,
-    render: (r) => <ContractorCell r={r} />,
+    render: (r) => {
+      const name = String(r.customerName || '').trim();
+      if (!name) return <span style={{ color: C.mute }}>{LEDGER_EMPTY.none}</span>;
+      return <TwoLineCell main={name} sub={r.rentalType || undefined} />;
+    },
     text: (r) => r.customerName || LEDGER_EMPTY.none,
   },
   { key: 'title', label: '업무내용', priority: 1, render: (r) => r.title || LEDGER_EMPTY.dash, text: (r) => r.title },
@@ -104,7 +73,7 @@ const WORK_COL_CATALOG: SheetCol<WorkLedgerRow>[] = [
     text: (r) => r.updatedAt,
   },
   { key: 'due', label: '기한', render: (r) => r.dueDate || LEDGER_EMPTY.dash, text: (r) => r.dueDate },
-  { key: 'amount', label: '금액', align: 'r', render: (r) => (r.amount ? won(r.amount) : LEDGER_EMPTY.dash), text: (r) => r.amount || '' },
+  { key: 'amount', label: '금액', align: 'r', render: (r) => (r.amount ? money(r.amount) : LEDGER_EMPTY.dash), text: (r) => r.amount || '' },
   { key: 'source', label: '원천', render: (r) => WORK_SOURCE_LABEL[r.source], text: (r) => r.source },
 ];
 
@@ -113,7 +82,7 @@ const PENALTY_COL_CATALOG: SheetCol<WorkLedgerRow>[] = [
   { key: 'plate', label: '차량번호', pin: true, priority: 1, render: (r) => r.plate || LEDGER_EMPTY.dash, text: (r) => r.plate || '' },
   {
     key: 'amount', label: '금액', align: 'r', priority: 1,
-    render: (r) => (r.amount ? <span style={{ color: C.warn, fontWeight: 700 }}>{won(r.amount)}</span> : LEDGER_EMPTY.dash),
+    render: (r) => (r.amount ? <span style={{ color: C.warn, fontWeight: 700 }}>{money(r.amount)}</span> : LEDGER_EMPTY.dash),
     text: (r) => r.amount || '',
   },
   { key: 'driver', label: '실운전자', priority: 1, render: (r) => r.driverName || LEDGER_EMPTY.unmatched, text: (r) => r.driverName || '' },

@@ -70,6 +70,9 @@ curl -s -o /dev/null -w "%{http_code}" http://localhost:6006/<route>   # 200
 
 | 날짜 | 작업자 | 내용 | 상태 |
 |---|---|---|---|
+| 2026-07-29 | Cursor | P1 그릇: money/TwoLineCell/INDENT/ROW_H44/bg-selected + redesign박제 | tsc0 · 7면200 |
+| 2026-07-29 | Cursor | rail 시각=RailDot(6px)·틴트/세로선 폐기 | tsc0 · /risk·/work·/status 200 |
+| 2026-07-29 | Cursor | `/status` 보유=`isVehicleHeld`(매각·처분예정·구매예정 제외) SSOT | tsc0 · /status·/sheet 200 |
 | 2026-07-29 | Cursor | ERP질감: rail세로선제거·danger틴트·팔레트대비·badge5px·행고40 | tsc0 |
 | 2026-07-29 | Cursor | 행 상태표시 3px레일→RailDot(6px점) ExcelSheet/ObjRow/ObjCard | tsc0 |
 | 2026-07-29 | Cursor | 리스크 rail 전행 빨강벽 해소(급함만 danger·그외 warn) | tsc0 |

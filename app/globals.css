@@ -34,6 +34,8 @@
   --bg-card:     #ffffff;
   --bg-header:   #f4f4f5;  /* 테이블 thead 배경 */
   --ledger-head-h: 36px;   /* 원장 Page 타이틀 · 엑셀 thead · 좌/우 패널 헤더 공통 */
+  --ledger-row-h: 44px;    /* 엑셀 데이터 행 · TwoLineCell 수용 (헤더와 별도) */
+  --cell-sub-fs: 11px;     /* 2줄셀 sub · 트리 하위행 서브텍스트 */
   --ledger-foot-h: 36px;   /* 원장 좌/우 패널 하단바(초기화·수정·저장) — 헤더와 동일 높이 */
   --bg-sunken:   #f4f4f5;
   --bg-hover:    #e9e9eb;  /* tr:hover */

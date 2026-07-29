@@ -15,7 +15,7 @@ alwaysApply: true
 ## 모바일 = `/m` 전문 트리 (웹 축소본 아님 ★)
 - **/m은 반응형 웹 축소가 아니라 «폰 전용 전문 페이지»다.** 데스크톱 표+더블클릭패널을 폰에 욱여넣지 말 것.
 - 하단 **5탭 고정**(홈·운영·리스크·입력·설정). 햄버거 없음. 셸=`components/m/{MTabBar,MHead,MBackBar}`. 상단=MHead(제목+3px 탭색).
-- 목록 = `ObjRow`+`Rows`(`components/ui/obj-row.tsx`): 행마다 박스 금지(테두리는 Rows), **좌측 rail 세로선 금지** · danger=옅은 틴트(`--danger-tint`), 행 안 버튼 금지(선택 체크박스만). 섹션 접기 가능.
+- 목록 = `ObjRow`+`Rows`(`components/ui/obj-row.tsx`): 행마다 박스 금지(테두리는 Rows), **좌측 RailDot(6px)** · 세로선·행틴트 금지, 행 안 버튼 금지(선택 체크박스만). 섹션 접기 가능.
 - 드릴인 = `/m/vehicle/[plate]`(Vehicle360 재사용). 탭루트=MTabBar / 스택=MBackBar(`app/m/layout.tsx`).
 - **데이터는 웹과 동일 도메인 SSOT**(`linkFleet`/`buildFleetRows`, 이후 master-ledgers) — /m 전용 데이터 로직 신설 금지.
 - SessionBar는 `/m`·`/dev/preview`에서 `null`(웹 크롬 숨김) — 유지.
@@ -30,7 +30,7 @@ alwaysApply: true
 
 | 슬롯 | 역할 |
 |---|---|
-| rail색 | 상태/생사·긴급. **전원장 공용 의미:** 회색=끝/비활성 · 빨강=급함 · 주황=주의 · **정상=무색(`none`)**. `ok`(초록)을 정상 표시로 쓰지 말 것. **시각:** 좌측 세로선·도트 금지 · **danger만** `--danger-tint` 행 배경. warn/mute=배지만. 원자=`RailTone` + `workRailStyle`. 함대 `fleetRail`/`statusRank`를 업무·리스크에 재사용 금지. |
+| rail색 | 상태/생사·긴급. **전원장 공용 의미:** 회색=끝/비활성 · 빨강=급함 · 주황=주의 · **정상=무색(`none`)**. `ok`(초록)을 정상 표시로 쓰지 말 것. **시각:** 좌측 **RailDot(6px)** · 세로선·행 틴트 금지. 원자=`RailTone` + `RailDot`/`workRailStyle`. 함대 `fleetRail`/`statusRank`를 업무·리스크에 재사용 금지. |
 | 회사 | 다회사 뷰만(단일 회사면 ExcelSheet가 `company` 열 숨김 — 페이지 손롤 금지) |
 | 신원 | 대상·관통·검색의 열쇠. **역할은 공용, 이름·강조는 페이지별** — 계약=계약자 · 자산=차량 · 자금=거래처 · 업무=차량번호+계약자. 없으면 `미배정`. |
 | 내용 | 의도 한 줄(제목·위반내용·메모) |
@@ -47,6 +47,32 @@ alwaysApply: true
 - 상태·분류를 신원보다 앞에 두지 말 것 (업무·자산에서 깨졌던 패턴).
 - 빈값 카피 SSOT = `lib/ledger-empty.ts` (`—` · `미배정` · `없음` · `미매칭`).
 - 열 추가/삭제 요청 규격 = `lib/ledger-ext.ts`.
+
+## 엑셀뷰 공통 그릇 (100% 공통 · 이탈 금지)
+
+| 항목 | 규격 |
+|---|---|
+| 셀 여백 | `EXCEL_PAD_Y/X` = 5 / 8 |
+| 행높이 | `--ledger-row-h`(44) · `EXCEL_ROW_H` 단일토큰. 페이지 예외 금지 |
+| 헤더 높이 | `--ledger-head-h`(36) |
+| 숫자 | 우측 + tabular + `NUM` 폰트 |
+| 텍스트·날짜·배지 | 좌측(배지·상태만 center 허용) |
+| 헤더 정렬 | 데이터 열과 동일 |
+| 금액 표기 | **표 셀** = `money()`(₩ 없음) · **합계·지표·패널 요약** = `won()`(₩) |
+| 빈값 | `LEDGER_EMPTY` · 신원없음 `'미배정'` |
+| 배지 라운드 | `--radius-badge` |
+| 2줄 셀 | **`TwoLineCell`만** (`CELL_SUB_FS` sub) |
+| 들여쓰기 | `INDENT_UNIT`(14) · 매직넘버 금지 |
+| 선택행 | `--bg-selected` / `C.selected` 만 |
+
+### 금지 (컬럼 `render` 안 «그릇 변형»)
+`padding` / `margin` / `height` / `fontSize` / `lineHeight` / `display:flex` / `gap` 등 레이아웃·타이포 인라인 style 금지.
+**허용:** 상태색(`color` / `background`) · `fontWeight` · `fontFamily: NUM`(모노 신원).
+
+### 공통 vs 페이지별
+- **공통** = 틀(`LedgerFrame`) · 원자(`Badge`/`TwoLineCell`/`money`) · 토큰 · 셀규격 · 정렬규칙
+- **페이지별** = 컬럼 배열(`*_SHEET_KEYS`) · 필터축 · 스코프
+- 공통을 페이지 내용에 강제 주입 금지(예: 운영현황에 대여형태)
 
 ## 분류→상태 SSOT (잠정 — 추후 수정 가능)
 각 원장 행 = **분류 1 + 상태 1**.

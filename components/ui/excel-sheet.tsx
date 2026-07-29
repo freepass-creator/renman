@@ -5,7 +5,7 @@ import { useIsMobile } from '@/lib/use-mobile';
 import { useSession } from '@/lib/session';
 import { haptic } from '@/lib/haptics';
 import { C, R, SH, thX, thXR, thXC, thXPin, tdX, tdXR, tdXC, tdXPin, ctrlH, ctrlFs } from './tokens';
-import { ObjCard, Cards } from './misc';
+import { ObjCard, Cards, RailDot, ROW_RAIL_TONE_VAR, type RailTone } from './misc';
 import { Search } from './controls';
 
 /**
@@ -203,17 +203,22 @@ export function ExcelSheet<T>({
     // 목록 = 그룹 카드 규격(Cards): 모바일=한 그룹 박스+구분선 행 / 데스크톱 카드뷰=그리드. 개별 박스 흩뿌림 금지.
     return (
       <Cards>
-        {view.map((r, i) => (
-          <ObjCard
-            key={rowKey?.(r, i) ?? i}
-            title={visibleCols[0]?.render(r)}
-            fields={visibleCols.slice(1, 5).map((c) => [c.label, c.render(r)] as [React.ReactNode, React.ReactNode])}
-            onClick={(onRowDoubleClick || onRow) ? () => {
-              haptic.tap();
-              (onRowDoubleClick || onRow)?.(r);
-            } : undefined}
-          />
-        ))}
+        {view.map((r, i) => {
+          const custom = rowStyle?.(r) as Record<string, string> | undefined;
+          const rail = (custom?.[ROW_RAIL_TONE_VAR] as RailTone | undefined) ?? 'none';
+          return (
+            <ObjCard
+              key={rowKey?.(r, i) ?? i}
+              rail={rail}
+              title={visibleCols[0]?.render(r)}
+              fields={visibleCols.slice(1, 5).map((c) => [c.label, c.render(r)] as [React.ReactNode, React.ReactNode])}
+              onClick={(onRowDoubleClick || onRow) ? () => {
+                haptic.tap();
+                (onRowDoubleClick || onRow)?.(r);
+              } : undefined}
+            />
+          );
+        })}
       </Cards>
     );
   }
@@ -275,6 +280,7 @@ export function ExcelSheet<T>({
           <tbody>
             {view.map((r, i) => {
               const custom = rowStyle?.(r);
+              const railTone = (custom as Record<string, string> | undefined)?.[ROW_RAIL_TONE_VAR] as RailTone | undefined;
               const rowId = rowKey?.(r, i) ?? String(i);
               const clickable = (onRow || onRowDoubleClick) ? (rowClickable ? rowClickable(r) : true) : false;
               const selected = selectedRowKey != null && rowId === selectedRowKey;
@@ -284,7 +290,7 @@ export function ExcelSheet<T>({
               // 고정(pin) 칸은 가로스크롤 시 뒤 내용을 가려야 해서 «자기 배경»이 필요하다.
               // 그래서 행 배경만 바꾸면 그 칸만 호버가 안 먹는다 → hover 행은 여기서 함께 계산한다.
               const rowBg = selected
-                ? 'color-mix(in srgb, var(--brand) 9%, var(--bg-card))'
+                ? 'var(--bg-selected)'
                 : (hover === i && clickable ? C.hover : bg);
               return (
                 <tr
@@ -338,7 +344,12 @@ export function ExcelSheet<T>({
                         className={`excel-sheet__col excel-sheet__col--p${c.priority ?? Math.min(4, Math.floor(colIndex / 3) + 1)}`}
                         style={{ ...base, textOverflow: fit ? 'ellipsis' : undefined }}
                       >
-                        {c.render(r)}
+                        {colIndex === 0 && railTone && railTone !== 'none' ? (
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, minWidth: 0, maxWidth: '100%' }}>
+                            <RailDot tone={railTone} />
+                            <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: fit ? 'ellipsis' : undefined }}>{c.render(r)}</span>
+                          </span>
+                        ) : c.render(r)}
                       </td>
                     );
                   })}
