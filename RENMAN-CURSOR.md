@@ -70,6 +70,7 @@ curl -s -o /dev/null -w "%{http_code}" http://localhost:6006/<route>   # 200
 
 | 날짜 | 작업자 | 내용 | 상태 |
 |---|---|---|---|
+| 2026-07-29 | Cursor | 죽은 레거시 COLS·SheetRow/ContractRow·MyDesk·archive 스크랩 삭제 | df9a880 |
 | 2026-07-29 | Cursor | PeriodBar latestDateOf SSOT (원장·손익·부가세) | aa99dda |
 | 2026-07-29 | Cursor | 리스크·업무 칩/배지 집계 SSOT (countRiskSheetGroups·work/penalty) | a6a1699 |
 | 2026-07-29 | Cursor | 고아 WebPage 삭제 · 자금·운영 배지 ledger-stats 위임 | 9e8e58d · caa5121 |
