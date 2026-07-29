@@ -1,18 +1,18 @@
 /**
  * 업무생성 폼 섹션 — erp4 field-group 패턴.
  *   공통(업무분류·대상연결) + 구분(category)별 전용 섹션.
- *   과태료는 CMS 뷰 담당 → 생성 구분에서 제외.
+ *   과태료 = 고지서 업로드 게이트웨이(폼 필드 없음 · LedgerCreatePanel kindGateways).
  */
 
 export type WorkGroup = '일정' | '고객상담' | '정비·수선' | '사고' | '과태료' | '문서' | '기타';
-/** 업무생성 Select 값 — 과태료 제외. */
-export type WorkCreateKind = Exclude<WorkGroup, '과태료'>;
+/** 업무생성 Select 값 — 과태료 포함(선택 시 업로드로 분기). */
+export type WorkCreateKind = WorkGroup;
 
 /** LedgerFormSection과 동일 형태(lib→components 순환 import 방지). */
 export type WorkFormSection = { title: string; fields: string[]; open?: boolean };
 
 export const WORK_CREATE_KINDS: WorkCreateKind[] = [
-  '일정', '고객상담', '정비·수선', '사고', '문서', '기타',
+  '일정', '고객상담', '정비·수선', '사고', '문서', '기타', '과태료',
 ];
 
 const CLASSIFY: WorkFormSection = {
@@ -34,6 +34,7 @@ function secs(...extra: WorkFormSection[]): WorkFormSection[] {
 /**
  * 구분 → 섹션 목록. LedgerCreatePanel이 category 값으로 고른다.
  * 전용 필드는 WorkForm(수선)·상담·일정 실무 필드 additive.
+ * 과태료는 분류(category)만 — 본문은 kindGateways 안내로 대체.
  */
 export const WORK_SECTIONS_BY_KIND: Record<WorkCreateKind, WorkFormSection[]> = {
   '일정': secs({
@@ -73,6 +74,8 @@ export const WORK_SECTIONS_BY_KIND: Record<WorkCreateKind, WorkFormSection[]> = 
     title: '처리정보', open: true,
     fields: ['dueDate', 'assigneeName', 'vendor', 'amount', 'description'],
   }),
+  // category Select만 노출(구분 전환 유지). 대상·처리 필드 없음.
+  '과태료': [{ title: '업무 분류', open: true, fields: ['category'] }],
 };
 
 /** category 문자열 → 생성용 kind (미지정·레거시 → 기타). */
