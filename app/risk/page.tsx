@@ -15,7 +15,7 @@ import { sendNoticeCert, sendNoticeCertBulk } from '@/lib/docs/send-notice';
 import { useSession } from '@/lib/session';
 import { toast } from '@/lib/toast';
 import {
-  Btn, C, FilterChips, LedgerActions, LedgerFrame, LedgerRecordPanel, PeriodBar, Search,
+  Badge, Btn, C, FilterChips, LedgerActions, LedgerFrame, LedgerRecordPanel, PeriodBar, Search,
   useConfirm, won,
   type LedgerColView,
 } from '@/components/ui';
@@ -154,8 +154,9 @@ export default function RiskPage() {
       onCloseDetail={() => setSelected(null)}
       sidePanel={selected ? (
         <LedgerRecordPanel
-          title={selected.plate || selected.kind}
-          subtitle={`${selected.group} · ${selected.customer}`}
+          title={selected.kind || selected.group}
+          identity={`${selected.plate || '미배정'} · ${selected.customer || '—'}`}
+          statusBadge={<Badge tone={selected.badgeTone}>{selected.status}</Badge>}
           row={selected}
           cols={RISK_EXPANDED_COLS}
           onClose={() => setSelected(null)}

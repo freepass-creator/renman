@@ -2627,6 +2627,30 @@ kbd {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.ledger-record-panel__meta {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  overflow: hidden;
+}
+.ledger-record-panel__identity {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-sub);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ledger-record-panel__badge {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+}
 .ledger-record-panel__close {
   width: 24px;
   height: 24px;

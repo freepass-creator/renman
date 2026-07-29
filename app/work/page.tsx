@@ -686,9 +686,10 @@ function WorkLedgerInner() {
       ) : selected ? (
         <LedgerRecordPanel
           title={selected.title || selected.kind}
-          subtitle={selected.source === 'penalty'
-            ? `${selected.plate || '차번 없음'} · ${selected.driverName || '미매칭'}`
-            : `${selected.kind} · ${selected.plate || '차량 미배정'} · ${selected.customerName || '계약자 없음'}`}
+          identity={selected.source === 'penalty'
+            ? `${selected.plate || '미배정'} · ${selected.driverName || '미매칭'}`
+            : `${selected.plate || '미배정'} · ${selected.customerName || '없음'}`}
+          statusBadge={<Badge tone={workStatusTone(selected.status)}>{selected.status}</Badge>}
           row={selected}
           cols={selected.source === 'penalty' ? PEN_ALL : ALL_COLS}
           sections={selected.source === 'penalty' ? PENALTY_DETAIL_SECTIONS : WORK_DETAIL_SECTIONS}

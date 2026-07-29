@@ -184,8 +184,9 @@ export default function StatusPage() {
       ) : null}
       sidePanel={selected ? (
         <LedgerRecordPanel
-          title={selected.plate || '차량'}
-          subtitle={`${selected.customer || '계약 없음'} · ${selected.carName || selected.status}`}
+          title={selected.carName || selected.status || '차량'}
+          identity={`${selected.plate || '미배정'} · ${selected.customer || '계약 없음'}`}
+          statusBadge={FLEET_EXPANDED_COLS.find((c) => c.key === 'status')?.render(selected)}
           row={selected}
           cols={FLEET_EXPANDED_COLS}
           sections={FLEET_DETAIL_SECTIONS}

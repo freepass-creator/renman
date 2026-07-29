@@ -10,7 +10,7 @@ import { summarizeContractLedgerStats } from '@/lib/ledger-stats';
 import { useEntityList } from '@/lib/use-entity-lists';
 import { textMatch } from '@/lib/search-match';
 import {
-  Btn, C, FilterChips, LedgerActions, LedgerCreatePanel, LedgerEditPanel, LedgerFilterButton, LedgerFilterFields, LedgerFilterPanel, LedgerFrame, LedgerRecordPanel, PageLoading, PeriodBar, Search, Select, won,
+  Badge, Btn, C, FilterChips, LedgerActions, LedgerCreatePanel, LedgerEditPanel, LedgerFilterButton, LedgerFilterFields, LedgerFilterPanel, LedgerFrame, LedgerRecordPanel, PageLoading, PeriodBar, Search, Select, won,
   type LedgerColView, type LedgerFormSection,
 } from '@/components/ui';
 import { useIsMobile } from '@/lib/use-mobile';
@@ -207,8 +207,9 @@ function ContractLedgerInner() {
         />
       ) : selected ? (
         <LedgerRecordPanel
-          title={selected.contractNo || selected.contractorName}
-          subtitle={`${selected.contractorName || '계약자 미입력'} · ${selected.plate || '차량 미입력'}`}
+          title={selected.contractNo || selected.contractorName || '계약'}
+          identity={`${selected.contractorName || '계약자 미입력'}${selected.plate ? ` · ${selected.plate}` : ''}`}
+          statusBadge={<Badge tone={selected.ended ? 'gray' : 'green'}>{selected.status}</Badge>}
           row={selected}
           cols={CONTRACT_MASTER_EXPANDED_COLS}
           sections={CONTRACT_DETAIL_SECTIONS}

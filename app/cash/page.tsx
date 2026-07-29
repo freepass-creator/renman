@@ -704,7 +704,8 @@ export default function CashLedgerPage() {
         ) : selectedAccount ? (
           <LedgerRecordPanel
             title={`${selectedAccount.bankName} ${selectedAccount.accountNumber}`}
-            subtitle={`${selectedAccount.company} · ${selectedAccount.status}`}
+            identity={selectedAccount.company || '회사 미입력'}
+            statusBadge={<Badge tone={selectedAccount.status === '사용중' ? 'green' : 'gray'}>{selectedAccount.status}</Badge>}
             row={selectedAccount}
             cols={ACCOUNT_ALL_COLS}
             sections={ACCOUNT_DETAIL_SECTIONS}
@@ -832,8 +833,9 @@ export default function CashLedgerPage() {
         />
       ) : selected ? (
         <LedgerRecordPanel
-          title={`${selected.date || '일자 없음'} · ${selected.party || selected.category || '거래'}`}
-          subtitle={`${companyDisplay(selected.companyId)} · ${selected.account || '계좌 미입력'}`}
+          title={`${selected.date || '일자 없음'} · ${selected.category || '거래'}`}
+          identity={selected.party || '거래처 미입력'}
+          statusBadge={CASH_BASIC_COLS.find((c) => c.key === 'match')?.render(selected)}
           row={selected}
           cols={CASH_TRANSACTION_DETAIL_COLS}
           sections={[

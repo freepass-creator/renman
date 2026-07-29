@@ -228,8 +228,9 @@ export default function AssetLedgerPage() {
         />
       ) : selected ? (
         <LedgerRecordPanel
-          title={selected.plate}
-          subtitle={`${selected.carName || '차명 미입력'} · ${selected.status}`}
+          title={selected.carName || '차명 미입력'}
+          identity={selected.plate || '미배정'}
+          statusBadge={ASSET_MASTER_EXPANDED_COLS.find((c) => c.key === 'status')?.render(selected)}
           row={selected}
           cols={ASSET_MASTER_EXPANDED_COLS}
           sections={ASSET_DETAIL_SECTIONS}

@@ -4,7 +4,6 @@ import React from 'react';
 import { ChevronRight, X } from 'lucide-react';
 import type { SheetCol } from './excel-sheet';
 import { LedgerPanelFooter } from './ledger-actions';
-import { C } from './tokens';
 
 export type LedgerRecordSection<T> = {
   title: React.ReactNode;
@@ -43,6 +42,8 @@ function RecordSection<T>({
 export function LedgerRecordPanel<T>({
   title,
   subtitle,
+  identity,
+  statusBadge,
   row,
   cols,
   sections,
@@ -51,7 +52,12 @@ export function LedgerRecordPanel<T>({
   onClose,
 }: {
   title: React.ReactNode;
+  /** @deprecated identity+statusBadge 권장. 하위호환 유지. */
   subtitle?: React.ReactNode;
+  /** 행문법 신원(차번·계약자 등 페이지별) */
+  identity?: React.ReactNode;
+  /** 행문법 상태 배지 */
+  statusBadge?: React.ReactNode;
   row: T;
   /** sections 없을 때 평탄 필드. sections 있으면 폴백·생략 가능. */
   cols?: SheetCol<T>[];
@@ -66,20 +72,28 @@ export function LedgerRecordPanel<T>({
       {fieldCols.map((col) => (
         <div className="ledger-record-panel__field" key={col.key}>
           <dt>{col.label}</dt>
-          <dd style={{ color: C.ink }}>{col.render(row)}</dd>
+          <dd>{col.render(row)}</dd>
         </div>
       ))}
     </dl>
   );
 
   const hasSections = !!sections?.length;
+  const meta = identity != null || statusBadge != null
+    ? (
+      <div className="ledger-record-panel__meta">
+        {identity != null ? <span className="ledger-record-panel__identity">{identity}</span> : null}
+        {statusBadge != null ? <span className="ledger-record-panel__badge">{statusBadge}</span> : null}
+      </div>
+    )
+    : (subtitle != null ? <div className="ledger-record-panel__subtitle">{subtitle}</div> : null);
 
   return (
     <section className="ledger-record-panel" aria-label="선택 행 상세정보">
       <header className="ledger-record-panel__header">
         <div className="ledger-record-panel__heading">
           <div className="ledger-record-panel__title">{title}</div>
-          {subtitle != null && <div className="ledger-record-panel__subtitle">{subtitle}</div>}
+          {meta}
         </div>
         <button type="button" className="ledger-record-panel__close" onClick={onClose} aria-label="상세패널 닫기">
           <X size={14} />
