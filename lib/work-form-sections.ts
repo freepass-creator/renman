@@ -17,7 +17,8 @@ export const WORK_CREATE_KINDS: WorkCreateKind[] = [
 
 const CLASSIFY: WorkFormSection = {
   title: '업무 분류', open: true,
-  fields: ['date', 'category', 'status', 'priority', 'title'],
+  // title은 quick 상단「업무 내용」에서만 — 섹션 중복 금지
+  fields: ['date', 'category', 'status', 'priority'],
 };
 
 const TARGET: WorkFormSection = {
