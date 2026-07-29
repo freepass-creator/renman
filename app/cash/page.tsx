@@ -9,7 +9,7 @@ import { useMemo, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { Plus, X, Link2, Unlink, UploadCloud, Landmark, GitMerge, CircleDollarSign } from 'lucide-react';
 import { buildCashLedger, withCmsItemRows, buildBankAccountLedger, type CashRow, type BankAccountRow } from '@/lib/finance/cash-ledger';
-import { CASH_BASIC_COLS, CASH_EXPANDED_COLS } from '@/lib/finance/cash-cols';
+import { CASH_BASIC_COLS, CASH_CARD_DETAIL_SECTIONS, CASH_EXPANDED_COLS, CASH_TX_DETAIL_SECTIONS } from '@/lib/finance/cash-cols';
 import {
   ACCOUNT_ALL_COLS, ACCOUNT_BASIC_COLS, ACCOUNT_DETAIL_SECTIONS,
 } from '@/lib/finance/account-cols';
@@ -33,7 +33,7 @@ import { resolveWriteCompany, NEED_COMPANY } from '@/lib/scope';
 import { toast } from '@/lib/toast';
 import {
   LedgerActions, LedgerCreatePanel, LedgerFilterButton, LedgerFilterFields, LedgerFilterPanel, LedgerFrame, LedgerPanelFooter, LedgerRecordPanel, Btn, Input, Select, Search, PillTabs, PeriodBar, Badge, Message, ListBox, ListRow, FilterChips,
-  C, won, type LedgerColView, type LedgerFormSection, type SheetCol,
+  C, won, type LedgerColView, type LedgerFormSection,
 } from '@/components/ui';
 import { useIsMobile } from '@/lib/use-mobile';
 import FileDrop from '@/components/FileDrop';
@@ -66,34 +66,6 @@ const CASH_TX_CREATE_SECTIONS: LedgerFormSection[] = [
 ];
 const CARD_TX_CREATE_SECTIONS: LedgerFormSection[] = [
   { title: '카드 승인정보', open: true, fields: ['txDate', 'amount', 'merchant', 'approvalNo', 'cardLast4', 'category'] },
-];
-
-const CASH_MATCH_DETAIL_COLS = CASH_EXPANDED_COLS.filter((col) =>
-  ['match', 'flowNature', 'fundNature', 'matchedContract', 'matchedSchedule', 'alert'].includes(col.key),
-);
-
-const CASH_TRANSACTION_DETAIL_COLS: SheetCol<CashRow>[] = [
-  { key: 'detailCompany', label: '회사명', render: (r) => companyDisplay(r.companyId) },
-  { key: 'detailAccountName', label: '계좌명', render: (r) => r.accountName || '—' },
-  { key: 'detailAccount', label: '계좌번호', render: (r) => r.account || '—' },
-  { key: 'detailDate', label: '거래일자', render: (r) => r.date || '—' },
-  {
-    key: 'detailFlow', label: '거래구분',
-    render: (r) => <Badge tone={r.inAmt > 0 ? 'green' : 'amber'}>{r.inAmt > 0 ? '입금' : '출금'}</Badge>,
-  },
-  {
-    key: 'detailAmount', label: '금액', align: 'r',
-    render: (r) => <span style={{ fontWeight: 800 }}>{won(r.inAmt || r.outAmt)}</span>,
-  },
-  { key: 'detailParty', label: '거래처·내용', render: (r) => [r.party, r.memo].filter(Boolean).join(' · ') || '—' },
-];
-
-const CARD_DETAIL_COLS: SheetCol<CashRow>[] = [
-  { key: 'cardName', label: '카드명', render: (r) => String(r.raw.cardName || r.accountName || '—') },
-  { key: 'cardLast4', label: '카드번호', render: (r) => r.raw.cardLast4 ? `•••• ${String(r.raw.cardLast4)}` : '—' },
-  { key: 'merchant', label: '가맹점', render: (r) => String(r.raw.merchant || r.party || '—') },
-  { key: 'approvalNo', label: '승인번호', render: (r) => String(r.raw.approvalNo || '—') },
-  { key: 'cardAmount', label: '승인금액', align: 'r', render: (r) => won(Number(r.raw.amount) || r.outAmt) },
 ];
 
 const CASH_INPUT_KINDS: CashInputKind[] = ['계좌', '계좌거래', 'CMS', '법인카드'];
@@ -807,14 +779,8 @@ export default function CashLedgerPage() {
           identity={selected.party || LEDGER_EMPTY.none}
           statusBadge={CASH_BASIC_COLS.find((c) => c.key === 'match')?.render(selected)}
           row={selected}
-          cols={CASH_TRANSACTION_DETAIL_COLS}
-          sections={[
-            { title: '거래 기본', open: true, cols: CASH_TRANSACTION_DETAIL_COLS },
-            {
-              title: selected.entity === 'card_tx' ? '카드 승인정보' : '분류·수납정보',
-              cols: selected.entity === 'card_tx' ? CARD_DETAIL_COLS : CASH_MATCH_DETAIL_COLS,
-            },
-          ]}
+          cols={CASH_EXPANDED_COLS}
+          sections={selected.entity === 'card_tx' ? CASH_CARD_DETAIL_SECTIONS : CASH_TX_DETAIL_SECTIONS}
           onClose={() => setSelected(null)}
           actions={String(selected.raw.matchedContractId || selected.raw.plate || '') ? (
             <Btn

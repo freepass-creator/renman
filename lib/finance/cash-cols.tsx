@@ -2,11 +2,11 @@
  * 재무원장 열 SSOT — 계좌 입·출금 스트림(CashRow).
  * 엑셀 추가/삭제: `자금 · 엑셀기본|엑셀전체 · +|-key` @see lib/ledger-ext.ts
  */
-import { Badge, C, type SheetCol } from '@/components/ui';
+import { Badge, C, won, type SheetCol } from '@/components/ui';
 import { companyDisplay } from '@/lib/companies';
 import { groupOfLabel, isUnclassified, kindOfLabel } from '@/lib/payments/ledger-subjects';
 import type { CashRow } from '@/lib/finance/cash-ledger';
-import { buildSheetViews, type SheetViewKeys } from '@/lib/ledger-ext';
+import { buildDetailSections, buildSheetViews, type DetailSectionDef, type SheetViewKeys } from '@/lib/ledger-ext';
 import { LEDGER_EMPTY } from '@/lib/ledger-empty';
 
 const coName = (r: CashRow) => companyDisplay(r.companyId);
@@ -153,3 +153,43 @@ export const CASH_SHEET_KEYS: SheetViewKeys = {
 const _cashViews = buildSheetViews(CASH_COL_CATALOG, CASH_SHEET_KEYS);
 export const CASH_BASIC_COLS = _cashViews.basic;
 export const CASH_EXPANDED_COLS = _cashViews.expanded;
+
+/** 거래 상세 — 시트 카탈로그 키 재사용(손롤 detail* 금지) */
+export const CASH_TX_DETAIL_DEFS: DetailSectionDef[] = [
+  {
+    title: '거래 기본',
+    open: true,
+    keys: ['co', 'acctName', 'acct', 'date', 'content', 'in', 'out'],
+  },
+  {
+    title: '분류·수납정보',
+    keys: ['cat', 'match', 'flowNature', 'fundNature', 'matchedContract', 'matchedSchedule', 'alert'],
+  },
+];
+export const CASH_TX_DETAIL_SECTIONS = buildDetailSections(CASH_EXPANDED_COLS, CASH_TX_DETAIL_DEFS);
+
+/** 카드 승인 — 원장 raw 필드(시트에 없는 키) */
+const CARD_DETAIL_CATALOG: SheetCol<CashRow>[] = [
+  ...CASH_EXPANDED_COLS,
+  { key: 'cardName', label: '카드명', render: (r) => String(r.raw.cardName || r.accountName || LEDGER_EMPTY.dash) },
+  { key: 'cardLast4', label: '카드번호', render: (r) => (r.raw.cardLast4 ? `•••• ${String(r.raw.cardLast4)}` : LEDGER_EMPTY.dash) },
+  { key: 'merchant', label: '가맹점', render: (r) => String(r.raw.merchant || r.party || LEDGER_EMPTY.dash) },
+  { key: 'approvalNo', label: '승인번호', render: (r) => String(r.raw.approvalNo || LEDGER_EMPTY.dash) },
+  {
+    key: 'cardAmount', label: '승인금액', align: 'r',
+    render: (r) => won(Number(r.raw.amount) || r.outAmt),
+  },
+];
+
+export const CASH_CARD_DETAIL_DEFS: DetailSectionDef[] = [
+  {
+    title: '거래 기본',
+    open: true,
+    keys: ['co', 'date', 'content', 'out', 'cat'],
+  },
+  {
+    title: '카드 승인정보',
+    keys: ['cardName', 'cardLast4', 'merchant', 'approvalNo', 'cardAmount', 'match', 'alert'],
+  },
+];
+export const CASH_CARD_DETAIL_SECTIONS = buildDetailSections(CARD_DETAIL_CATALOG, CASH_CARD_DETAIL_DEFS);
