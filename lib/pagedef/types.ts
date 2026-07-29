@@ -1,6 +1,6 @@
 /**
  * PageDef — «1 정의, 2 렌더러» 아키텍처의 정의 타입 (통일 규격 설계서 §4).
- *   페이지는 이 def 1개만 선언, WebPage/MobilePage 렌더러가 소비. 렌더 코드 없음.
+ *   /m은 MobilePage가 def를 소비. 웹 원장은 LedgerFrame(WebPage 폐기).
  *   도메인 데이터는 useData 훅으로 위임(도메인 로직 불변). 이 초안은 E-grid 우선 —
  *   B/A/C/D 필드(queues·sections 등)는 해당 렌더러 착수(P2) 시 확장.
  */

@@ -61,8 +61,8 @@ alwaysApply: true
 | **리스크** | 미완료 · 미납 · 만기 · 휴차 | 미완료[진행·지연] · 미납[임박·경과·독촉·내용증명] · 만기[임박·경과] · 휴차[단기·장기] |
 
 ## 지금 지켜야 (검수 2026-07 지적)
-- **페이지 손롤 집계 금지** — `app/{asset,contract,cash}/page.tsx`가 `.filter/.reduce`로 상태·통계 직접 계산 중 → 도메인 SSOT(`linkFleet`·`selectReceivables`·`lib/finance/*`)로 위임. 형제 `status/page.tsx`가 정답 패턴.
-- **고아 정리 대상**: `components/pagedef/WebPage.tsx`(웹 소비처 0 — 삭제). `FLEET_DEF`·`MobilePage`·`lib/pagedef/{types,rank,defs}`는 **/m 전용으로 유지**(삭제 금지).
+- **페이지 손롤 집계 금지** — 원장 배지/합계는 `lib/ledger-stats` SSOT. 자산·계약 이행됨 · 자금·운영도 동일. 페이지 `.filter/.reduce`로 통계 직접 계산 금지.
+- **/m PageDef**: `MobilePage`·`FLEET_DEF`·`lib/pagedef/{types,rank,defs}` 유지. ~~`WebPage`~~ 폐기(웹 소비처 0 · 삭제됨).
 
 ## 헤더 컨트롤 존 규격 (전 페이지 동일 — 누더기 금지)
 좌→우 순서 고정: `[회사 스코프] · 제목 · (검색·범위·칩) ····· [기간] [보기] [도구] │ [주액션]`

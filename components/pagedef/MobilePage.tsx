@@ -1,7 +1,7 @@
 'use client';
 /**
  * MobilePage — PageDef 모바일 렌더러 (설계서 §4.3). 현재 E-grid.
- *   MHead + 2×2 지표 + 상태그룹 Rows/ObjRow 리스트. 같은 def를 WebPage와 공유(웹=그리드/모바일=행).
+ *   MHead + 2×2 지표 + 상태그룹 Rows/ObjRow 리스트. /m 전용(웹은 LedgerFrame).
  *   기본 facet(예: 보유)만 적용 — 상세 필터(FilterSheet)는 P2.
  */
 import { useMemo } from 'react';
