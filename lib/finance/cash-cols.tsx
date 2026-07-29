@@ -11,12 +11,8 @@ import { LEDGER_EMPTY } from '@/lib/ledger-empty';
 import { workRailStyle } from '@/lib/work-rail';
 
 const coName = (r: CashRow) => companyDisplay(r.companyId);
-const content = (r: CashRow) => {
-  const a = (r.party || '').trim();
-  const b = (r.memo || '').trim();
-  if (a && b && a !== b) return `${a} · ${b}`;
-  return a || b || '';
-};
+/** 내용 = 메모(거래 설명). 상대방은 party 열. */
+const content = (r: CashRow) => (r.memo || '').trim();
 
 const matchStatus = (r: CashRow) => {
   if (r.nest === 'cms-item') return { label: '매칭완료', tone: 'green' as const };
@@ -64,6 +60,11 @@ const CASH_COL_CATALOG: SheetCol<CashRow>[] = [
     key: 'content', label: '내용', priority: 2,
     render: (r) => content(r) || <span style={{ color: C.faint }}>{LEDGER_EMPTY.dash}</span>,
     text: (r) => content(r),
+  },
+  {
+    key: 'party', label: '상대방', priority: 2,
+    render: (r) => (r.party || '').trim() || <span style={{ color: C.faint }}>{LEDGER_EMPTY.dash}</span>,
+    text: (r) => (r.party || '').trim(),
   },
   {
     key: 'cat', label: '계정과목', priority: 1,
@@ -118,7 +119,7 @@ const CASH_COL_CATALOG: SheetCol<CashRow>[] = [
     text: (r) => (r.raw.balance === '' || r.raw.balance == null ? '' : Number(r.raw.balance) || 0),
   },
   {
-    key: 'alert', label: '데이터알람', priority: 3,
+    key: 'alert', label: '데이터알람', priority: 2,
     render: (r) => {
       const alert = String(r.raw.dataAlert || '');
       if (alert) return <Badge tone="amber">{alert}</Badge>;
@@ -129,7 +130,7 @@ const CASH_COL_CATALOG: SheetCol<CashRow>[] = [
     text: (r) => String(r.raw.dataAlert || r.raw.reconciliationStatus || ''),
   },
   {
-    key: 'flowNature', label: '수지구분', align: 'c',
+    key: 'flowNature', label: '수지구분', align: 'c', priority: 2,
     render: (r) => {
       const value = kindOfLabel(r.category) || (r.inAmt > 0 ? '수입' : r.outAmt > 0 ? '지출' : LEDGER_EMPTY.dash);
       return <Badge tone={value === '수입' ? 'green' : value === '지출' ? 'amber' : 'gray'}>{value}</Badge>;
@@ -144,12 +145,12 @@ const CASH_COL_CATALOG: SheetCol<CashRow>[] = [
     text: (r) => isUnclassified(r.category) ? '미분류' : groupOfLabel(r.category),
   },
   {
-    key: 'matchedContract', label: '매칭계약',
+    key: 'matchedContract', label: '매칭계약', priority: 3,
     render: (r) => String(r.raw.matchedContractId || LEDGER_EMPTY.dash),
     text: (r) => String(r.raw.matchedContractId || ''),
   },
   {
-    key: 'matchedSchedule', label: '매칭회차', align: 'c',
+    key: 'matchedSchedule', label: '매칭회차', align: 'c', priority: 3,
     render: (r) => r.raw.matchedScheduleSeq ? `${String(r.raw.matchedScheduleSeq)}회차` : LEDGER_EMPTY.dash,
     text: (r) => String(r.raw.matchedScheduleSeq || ''),
   },
@@ -158,11 +159,14 @@ const CASH_COL_CATALOG: SheetCol<CashRow>[] = [
   { key: 'key', label: '키', render: (r) => r.recKey || LEDGER_EMPTY.dash, text: (r) => r.recKey },
 ];
 
-/** 회사 → 신원(계좌) → 내용 → 분류 → 상태(매칭) → 수치 */
+/** 회사 → 계좌 → 일자·내용·상대 → 수지·계정·매칭 → 금액·잔액·알람 */
 export const CASH_SHEET_KEYS: SheetViewKeys = {
-  basic: ['company', 'acctName', 'content', 'cat', 'flowNature', 'match', 'date', 'in', 'out', 'balance'],
+  basic: [
+    'company', 'acctName', 'date', 'content', 'party', 'flowNature', 'cat', 'match',
+    'matchedContract', 'matchedSchedule', 'in', 'out', 'balance', 'alert',
+  ],
   all: [
-    'company', 'acctName', 'acct', 'content', 'cat', 'match', 'date', 'in', 'out', 'balance', 'alert',
+    'company', 'acctName', 'acct', 'date', 'content', 'party', 'cat', 'match', 'in', 'out', 'balance', 'alert',
     'flowNature', 'fundNature', 'matchedContract', 'matchedSchedule', 'src', 'ent', 'key',
   ],
 };
@@ -176,7 +180,7 @@ export const CASH_TX_DETAIL_DEFS: DetailSectionDef[] = [
   {
     title: '거래 기본',
     open: true,
-    keys: ['company', 'acctName', 'acct', 'date', 'content', 'in', 'out', 'balance'],
+    keys: ['company', 'acctName', 'acct', 'date', 'content', 'party', 'in', 'out', 'balance'],
   },
   {
     title: '분류·수납정보',
