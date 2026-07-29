@@ -92,7 +92,7 @@ const WORK_COL_CATALOG: SheetCol<WorkLedgerRow>[] = [
     render: (r) => fmtStamp(r.updatedAt),
     text: (r) => r.updatedAt,
   },
-  { key: 'due', label: '기한', render: (r) => r.dueDate || LEDGER_EMPTY.dash, text: (r) => r.dueDate },
+  { key: 'due', label: '기한', priority: 1, render: (r) => r.dueDate || LEDGER_EMPTY.dash, text: (r) => r.dueDate },
   { key: 'amount', label: '금액', align: 'r', render: (r) => (r.amount ? money(r.amount) : LEDGER_EMPTY.dash), text: (r) => r.amount || '' },
   { key: 'source', label: '원천', render: (r) => WORK_SOURCE_LABEL[r.source], text: (r) => r.source },
 ];
@@ -118,7 +118,7 @@ const PENALTY_COL_CATALOG: SheetCol<WorkLedgerRow>[] = [
 ];
 
 export const WORK_SHEET_KEYS: SheetViewKeys = {
-  basic: ['company', 'plate', 'contractor', 'title', 'kind', 'priority', 'status', 'contractNo', 'workDate', 'assignee'],
+  basic: ['company', 'plate', 'contractor', 'title', 'kind', 'priority', 'status', 'contractNo', 'workDate', 'due', 'assignee'],
   all: [
     'company', 'plate', 'contractor', 'title', 'kind', 'priority', 'status', 'contractNo', 'workDate',
     'assignee', 'created', 'updated', 'due', 'amount', 'source',
