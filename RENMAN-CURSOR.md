@@ -70,6 +70,12 @@ curl -s -o /dev/null -w "%{http_code}" http://localhost:6006/<route>   # 200
 
 | 날짜 | 작업자 | 내용 | 상태 |
 |---|---|---|---|
+| 2026-07-29 | Cursor | 행신원 0: redesign.mdc 6칸 문법 박제 | 480a00d |
+| 2026-07-29 | Cursor | 행신원 1: work contractKey+vehicle/contract picker | 63de933 |
+| 2026-07-29 | Cursor | 행신원 2: 대상셀 분해·workRail·/contract?open= | 9ea11de |
+| 2026-07-29 | Cursor | 행신원 3: SEARCH work_item·TopSearch 3그룹·/work?open= | 139fa13 |
+| 2026-07-29 | Cursor | 행신원 4+5: risk company·assetRail·과태료 소프트삭제 | 293c059 |
+
 | 2026-07-29 | Cursor | ①영업손익 operatingProfit/ByCompany/Trend SSOT · 대시보드·pnl 소비 |
 | 2026-07-29 | Cursor | ②열라벨 선후납→납부시기(값 선납/후납 유지) |
 | 2026-07-29 | Cursor | ③업무관리 과태료 CMS집금식(버킷1줄·전용뷰·/penalty redirect) |
