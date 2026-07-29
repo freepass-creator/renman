@@ -10,7 +10,7 @@ import { TODAY } from '@/lib/dashboard-consts';
 import { useDashboardData } from '@/lib/use-dashboard-data';
 import { textMatch } from '@/lib/search-match';
 import { buildRiskSheetRows, type RiskSheetGroup, type RiskSheetRow } from '@/lib/risk-ledger';
-import { RISK_BASIC_COLS, RISK_EXPANDED_COLS } from '@/lib/risk-cols';
+import { RISK_BASIC_COLS, RISK_DETAIL_SECTIONS, RISK_EXPANDED_COLS } from '@/lib/risk-cols';
 import { LEDGER_EMPTY } from '@/lib/ledger-empty';
 import { sendNoticeCert, sendNoticeCertBulk } from '@/lib/docs/send-notice';
 import { useSession } from '@/lib/session';
@@ -160,6 +160,7 @@ export default function RiskPage() {
           statusBadge={<Badge tone={selected.badgeTone}>{selected.status}</Badge>}
           row={selected}
           cols={RISK_EXPANDED_COLS}
+          sections={RISK_DETAIL_SECTIONS}
           onClose={() => setSelected(null)}
           actions={(
             <>

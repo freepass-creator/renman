@@ -4,7 +4,7 @@
 import React from 'react';
 import { Badge, won, C, type SheetCol } from '@/components/ui';
 import type { RiskSheetRow } from './risk-ledger';
-import { buildSheetViews, type SheetViewKeys } from './ledger-ext';
+import { buildSheetViews, buildDetailSections, type DetailSectionDef, type SheetViewKeys } from './ledger-ext';
 import { LEDGER_EMPTY } from './ledger-empty';
 
 const toneColor = (tone: RiskSheetRow['tone']) => (
@@ -74,3 +74,18 @@ export const RISK_SHEET_KEYS: SheetViewKeys = {
 const views = buildSheetViews(CATALOG, RISK_SHEET_KEYS);
 export const RISK_BASIC_COLS = views.basic;
 export const RISK_EXPANDED_COLS = views.expanded;
+
+/** 리스크 상세 — `리스크 · {섹션} · ±key` */
+export const RISK_DETAIL_DEFS: DetailSectionDef[] = [
+  {
+    title: '신원·분류',
+    open: true,
+    keys: ['company', 'plate', 'customer', 'group', 'kind', 'status'],
+  },
+  {
+    title: '기한·금액',
+    keys: ['carName', 'due', 'amount'],
+  },
+];
+
+export const RISK_DETAIL_SECTIONS = buildDetailSections(RISK_EXPANDED_COLS, RISK_DETAIL_DEFS);
