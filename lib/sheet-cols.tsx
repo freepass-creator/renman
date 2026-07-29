@@ -1,8 +1,12 @@
 /**
  * 원장·현황 표 열 SSOT.
- *   표식(선두·pin): 운영/자산/계약 = 표시명 → 차량번호 · 재무 = 표시명 → 계좌번호.
- *   표시명 = companyShort(법인 short). 회사명(풀)=companyLabel 은 공문·설정용.
+ *   표식(선두·pin): 운영 = 회사명(key `co`) → 차량번호 · 재무 거래 = 회사명(key `co`) → 계좌.
+ *   key `co` = 회사 열 단축키(역할=company). 자산·계약·업무·리스크는 key `company`.
+ *   회사명(풀)=companyLabel 은 공문·설정용 · 표의 회사열은 companyDisplay/short.
  *   컬럼을 페이지마다 손롤하지 말 것 — 여기서 따다 씀.
+ *
+ *   ⚠ 아래 ASSET_COLS / CONTRACT_COLS / DEBT_COLS 는 레거시 SheetRow용.
+ *     웹 /asset·/contract 는 lib/master-ledger-cols. **신규 사용 금지.**
  */
 import React from 'react';
 import { Badge, won, C, type SheetCol } from '@/components/ui';
@@ -16,9 +20,9 @@ import { paymentTimingOf } from './schema/contract';
 const toneBadge = (t: SheetRow['tone']): 'green' | 'amber' | 'red' | 'gray' =>
   t === 'ok' ? 'green' : t === 'warn' ? 'amber' : t === 'danger' ? 'red' : 'gray';
 
-/** 자산(차량 1행) 열 — 표식=회사명→차량번호 선두 고정 · 그 뒤 소유·가동·계약·미수 */
+/** @deprecated 웹 /asset는 master-ledger-cols. 레거시 SheetRow 전용 — 신규 사용 금지. */
 export const ASSET_COLS: SheetCol<SheetRow>[] = [
-  { key: 'co', label: '표시명', pin: true, render: (r) => r.company || '—', text: (r) => r.company },
+  { key: 'co', label: '회사명', pin: true, render: (r) => r.company || '—', text: (r) => r.company },
   { key: 'plate', label: '차량번호', pin: true, render: (r) => r.plate || '—', text: (r) => r.plate },
   // 생애단계 = 카드뷰 섹션(구매예정·등록예정·보유중·처분예정·처분완료)이 엑셀에선 이 분류 열로. align center.
   { key: 'own', label: '생애단계', align: 'c', render: (r) => <Badge tone={r.ownership === '보유중' ? 'green' : r.ownership === '처분완료' ? 'gray' : 'amber'}>{r.ownership}</Badge>, text: (r) => r.ownership },
@@ -48,7 +52,7 @@ const misu = (r: ContractRow) =>
   r.net > 0 ? <span style={{ color: C.danger, fontWeight: 700 }}>{won(r.net)}</span> : '—';
 
 const CT = {
-  co: { key: 'co', label: '표시명', pin: true, render: (r) => r.company || '—', text: (r) => r.company },
+  co: { key: 'co', label: '회사명', pin: true, render: (r) => r.company || '—', text: (r) => r.company },
   plate: { key: 'plate', label: '차량번호', pin: true, render: (r) => r.plate || '—', text: (r) => r.plate },
   car: { key: 'car', label: '차명', render: (r) => r.carName || '—', text: (r) => r.carName },
   cust: { key: 'cust', label: '계약자', render: (r) => r.customer || '—', text: (r) => r.customer },
@@ -82,7 +86,7 @@ const CT = {
   phone: { key: 'phone', label: '연락처', render: (r) => r.phone || '—', text: (r) => r.phone },
 } satisfies Record<string, SheetCol<ContractRow>>;
 
-/** 계약 기준 열. */
+/** @deprecated 웹 /contract는 master-ledger-cols. 레거시 ContractRow 전용 — 신규 사용 금지. */
 export const CONTRACT_COLS: SheetCol<ContractRow>[] = [
   CT.co, CT.plate, CT.car, CT.cust,
   CT.rent, CT.dep, CT.net,
@@ -91,7 +95,7 @@ export const CONTRACT_COLS: SheetCol<ContractRow>[] = [
   CT.phone,
 ];
 
-/** 미수/채권 열 = 계약 열 + 회수 판단(연체일·미납회차)을 ⑤ 자리에 추가(앞으로 당기지 않음). */
+/** @deprecated 미수 전용 레거시 열 — 웹 /risk·/contract 미사용. 신규 사용 금지. */
 export const DEBT_COLS: SheetCol<ContractRow>[] = [
   CT.co, CT.plate, CT.car, CT.cust,
   CT.rent, CT.dep, CT.net,
@@ -131,7 +135,7 @@ export function remainSpanLabel(d: number | null): string {
 }
 const FL = {
   plate: { key: 'plate', label: '차량번호', pin: true, render: (r) => r.plate || '—', text: (r) => r.plate },
-  co: { key: 'co', label: '표시명', pin: true, render: (r) => r.company || '—', text: (r) => r.company },
+  co: { key: 'co', label: '회사명', pin: true, render: (r) => r.company || '—', text: (r) => r.company },
   status: { key: 'status', label: '차량상태', render: (r) => <Badge tone={toneBadge(r.tone)}>{r.status}</Badge>, text: (r) => r.status },
   loc: { key: 'loc', label: '현위치', render: (r) => r.location || '—', text: (r) => r.location },
   car: { key: 'car', label: '차명', render: (r) => r.carName || '—', text: (r) => r.carName },
