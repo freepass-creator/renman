@@ -175,19 +175,28 @@ const _cashViews = buildSheetViews(CASH_COL_CATALOG, CASH_SHEET_KEYS);
 export const CASH_BASIC_COLS = _cashViews.basic;
 export const CASH_EXPANDED_COLS = _cashViews.expanded;
 
-/** 거래 상세 — 시트 카탈로그 키 재사용(손롤 detail* 금지) */
+/** 거래 상세 — 시트 카탈로그 키 재사용(손롤 detail* 금지) + bank_tx.method 상세 전용 */
+const CASH_TX_DETAIL_CATALOG: SheetCol<CashRow>[] = [
+  ...CASH_EXPANDED_COLS,
+  {
+    key: 'method', label: '수단',
+    render: (r) => String(r.raw.method || '').trim() || LEDGER_EMPTY.dash,
+    text: (r) => String(r.raw.method || '').trim(),
+  },
+];
+
 export const CASH_TX_DETAIL_DEFS: DetailSectionDef[] = [
   {
     title: '거래 기본',
     open: true,
-    keys: ['company', 'acctName', 'acct', 'date', 'content', 'party', 'in', 'out', 'balance'],
+    keys: ['company', 'acctName', 'acct', 'date', 'content', 'party', 'method', 'in', 'out', 'balance'],
   },
   {
     title: '분류·수납정보',
     keys: ['cat', 'match', 'flowNature', 'fundNature', 'matchedContract', 'matchedSchedule', 'alert'],
   },
 ];
-export const CASH_TX_DETAIL_SECTIONS = buildDetailSections(CASH_EXPANDED_COLS, CASH_TX_DETAIL_DEFS);
+export const CASH_TX_DETAIL_SECTIONS = buildDetailSections(CASH_TX_DETAIL_CATALOG, CASH_TX_DETAIL_DEFS);
 
 /** 카드 승인 — 원장 raw 필드(시트에 없는 키) */
 const CARD_DETAIL_CATALOG: SheetCol<CashRow>[] = [
