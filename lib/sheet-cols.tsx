@@ -48,30 +48,30 @@ export function remainSpanLabel(d: number | null): string {
   return parts.length ? parts.join(' ') : '0일';
 }
 const FL = {
-  plate: { key: 'plate', label: '차량번호', pin: true, render: (r) => r.plate || LEDGER_EMPTY.dash, text: (r) => r.plate },
-  company: { key: 'company', label: '회사명', pin: true, render: (r) => r.company || LEDGER_EMPTY.dash, text: (r) => r.company },
-  status: { key: 'status', label: '차량상태', render: (r) => <Badge tone={toneBadge(r.tone)}>{r.status}</Badge>, text: (r) => r.status },
-  loc: { key: 'loc', label: '현위치', render: (r) => r.location || LEDGER_EMPTY.dash, text: (r) => r.location },
-  car: { key: 'car', label: '차명', render: (r) => r.carName || LEDGER_EMPTY.dash, text: (r) => r.carName },
+  plate: { key: 'plate', label: '차량번호', pin: true, priority: 1 as const, render: (r) => r.plate || LEDGER_EMPTY.dash, text: (r) => r.plate },
+  company: { key: 'company', label: '회사명', pin: true, priority: 2 as const, render: (r) => r.company || LEDGER_EMPTY.dash, text: (r) => r.company },
+  status: { key: 'status', label: '차량상태', priority: 1 as const, render: (r) => <Badge tone={toneBadge(r.tone)}>{r.status}</Badge>, text: (r) => r.status },
+  loc: { key: 'loc', label: '현위치', priority: 3 as const, render: (r) => r.location || LEDGER_EMPTY.dash, text: (r) => r.location },
+  car: { key: 'car', label: '차명', priority: 1 as const, render: (r) => r.carName || LEDGER_EMPTY.dash, text: (r) => r.carName },
   maker: { key: 'maker', label: '제조사', render: (r) => r.maker || LEDGER_EMPTY.dash, text: (r) => r.maker },
   sub: { key: 'sub', label: '세부모델', render: (r) => r.subModel || LEDGER_EMPTY.dash, text: (r) => r.subModel },
   year: { key: 'year', label: '연식', render: (r) => r.year || LEDGER_EMPTY.dash, text: (r) => r.year },
   vin: { key: 'vin', label: '차대번호', render: (r) => r.vin || LEDGER_EMPTY.dash, text: (r) => r.vin },
   acqDate: { key: 'acqDate', label: '취득일', render: (r) => ymd(r.acqDate), text: (r) => r.acqDate },
   acqPrice: { key: 'acqPrice', label: '취득가', align: 'r', render: (r) => money0(r.acqPrice), text: (r) => r.acqPrice },
-  inspect: { key: 'inspect', label: '검사만기', render: (r) => ddayCell(r.inspectionTo), text: (r) => r.inspectionTo },
+  inspect: { key: 'inspect', label: '검사만기', priority: 3 as const, render: (r) => ddayCell(r.inspectionTo), text: (r) => r.inspectionTo },
   gps: { key: 'gps', label: 'GPS', render: (r) => r.gps || LEDGER_EMPTY.dash, text: (r) => r.gps },
   loanCo: { key: 'loanCo', label: '할부사', render: (r) => r.loanCompany || LEDGER_EMPTY.dash, text: (r) => r.loanCompany },
   loanAmt: { key: 'loanAmt', label: '할부원금', align: 'r', render: (r) => money0(r.loanPrincipal), text: (r) => r.loanPrincipal },
   loanRate: { key: 'loanRate', label: '이율', align: 'r', render: (r) => r.loanRate ? `${(r.loanRate * 100).toFixed(1)}%` : LEDGER_EMPTY.dash, text: (r) => r.loanRate },
   loanMon: { key: 'loanMon', label: '할부개월', align: 'r', render: (r) => r.loanMonths || LEDGER_EMPTY.dash, text: (r) => r.loanMonths },
-  cust: { key: 'cust', label: '사용처', render: (r) => r.customer || LEDGER_EMPTY.none, text: (r) => r.customer },
+  cust: { key: 'cust', label: '사용처', priority: 1 as const, render: (r) => r.customer || LEDGER_EMPTY.none, text: (r) => r.customer },
   term: { key: 'term', label: '계약기간', align: 'r', render: (r) => r.termMonths ? `${r.termMonths}개월` : LEDGER_EMPTY.dash, text: (r) => r.termMonths },
-  phone: { key: 'phone', label: '연락처', render: (r) => r.phone || LEDGER_EMPTY.dash, text: (r) => r.phone },
-  rent: { key: 'rent', label: '대여료', align: 'r', render: (r) => money0(r.rent), text: (r) => r.rent },
-  dep: { key: 'dep', label: '보증금', align: 'r', render: (r) => money0(r.deposit), text: (r) => r.deposit },
+  phone: { key: 'phone', label: '연락처', priority: 2 as const, render: (r) => r.phone || LEDGER_EMPTY.dash, text: (r) => r.phone },
+  rent: { key: 'rent', label: '대여료', align: 'r', priority: 2 as const, render: (r) => money0(r.rent), text: (r) => r.rent },
+  dep: { key: 'dep', label: '보증금', align: 'r', priority: 3 as const, render: (r) => money0(r.deposit), text: (r) => r.deposit },
   start: { key: 'start', label: '시작', render: (r) => ymd(r.start), text: (r) => r.start },
-  end: { key: 'end', label: '만기', render: (r) => ymd(r.end), text: (r) => r.end },
+  end: { key: 'end', label: '만기', priority: 2 as const, render: (r) => ymd(r.end), text: (r) => r.end },
   dday: {
     key: 'dday', label: '반납까지', align: 'r',
     render: (r) => {
@@ -86,10 +86,10 @@ const FL = {
     text: (r) => r.dday ?? '',
   },
   insurer: { key: 'insurer', label: '보험사', render: (r) => r.insurer || LEDGER_EMPTY.dash, text: (r) => r.insurer },
-  insEnd: { key: 'insEnd', label: '보험만기', render: (r) => ddayCell(r.insEnd), text: (r) => r.insEnd },
+  insEnd: { key: 'insEnd', label: '보험만기', priority: 3 as const, render: (r) => ddayCell(r.insEnd), text: (r) => r.insEnd },
   insPrem: { key: 'insPrem', label: '보험료', align: 'r', render: (r) => money0(r.insPremium), text: (r) => r.insPremium },
   net: {
-    key: 'net', label: '미수', align: 'r',
+    key: 'net', label: '미수', align: 'r', priority: 1 as const,
     render: (r) => r.net > 0 ? <span style={{ color: C.danger, fontWeight: 700 }}>{money0(r.net)}</span> : LEDGER_EMPTY.dash,
     text: (r) => r.net,
   },
@@ -98,7 +98,7 @@ const FL = {
     render: (r) => r.overdueDays > 0 ? <span style={{ color: r.overdueDays >= 90 ? C.danger : C.warn, fontWeight: 700 }}>{r.overdueDays}일</span> : LEDGER_EMPTY.dash,
     text: (r) => r.overdueDays,
   },
-  own: { key: 'own', label: '소유', render: (r) => r.ownership || LEDGER_EMPTY.dash, text: (r) => r.ownership },
+  own: { key: 'own', label: '소유', priority: 2 as const, render: (r) => r.ownership || LEDGER_EMPTY.dash, text: (r) => r.ownership },
   util: { key: 'util', label: '가동', render: (r) => r.util || LEDGER_EMPTY.dash, text: (r) => r.util },
   loanStart: { key: 'loanStart', label: '할부시작', render: (r) => ymd(r.loanStart), text: (r) => r.loanStart },
   stage: {
@@ -113,7 +113,7 @@ const FL = {
   },
   // 인라인 경고 — 최고심각도 톤 + 건수. hover=사유. IconCount 원자.
   warn: {
-    key: 'warn', label: '경고',
+    key: 'warn', label: '경고', priority: 1 as const,
     render: (r) => {
       const ws = r.warnings;
       if (!ws.length) return <span style={{ color: C.faint }}>—</span>;
@@ -131,7 +131,7 @@ const FL = {
   },
   // 결제일 · 납부시기 — 한 셀에 합치지 않음(각각 열).
   paymentDay: {
-    key: 'paymentDay', label: '결제일', align: 'c',
+    key: 'paymentDay', label: '결제일', align: 'c', priority: 3 as const,
     render: (r) => (r.paymentDay ? `${r.paymentDay}일` : LEDGER_EMPTY.dash),
     text: (r) => (r.paymentDay ? `${r.paymentDay}일` : ''),
   },
@@ -144,9 +144,9 @@ const FL = {
     },
     text: (r) => (r.paymentDay || r.paymentTiming ? paymentTimingOf(r.paymentTiming) : ''),
   },
-  // 회차 — 도래/총(예 11/12). 계약 없으면 —.
+  // 회차 — 도래/총(예 11/12=회차/기간). 계약 없으면 —.
   round: {
-    key: 'round', label: '회차', align: 'c',
+    key: 'round', label: '회차/기간', align: 'c', priority: 2 as const,
     render: (r) => (r.roundTotal ? `${r.roundDue}/${r.roundTotal}` : LEDGER_EMPTY.dash),
     text: (r) => (r.roundTotal ? `${r.roundDue}/${r.roundTotal}` : ''),
   },
@@ -158,7 +158,7 @@ const FL = {
     text: (r) => r.rentalType,
   },
   mileage: {
-    key: 'mileage', label: '주행거리', align: 'r',
+    key: 'mileage', label: '주행거리', align: 'r', priority: 4 as const,
     render: (r) => (r.mileage ? `${r.mileage.toLocaleString('ko-KR')}km` : LEDGER_EMPTY.dash),
     text: (r) => r.mileage,
   },
@@ -188,9 +188,10 @@ const FLEET_COL_CATALOG: SheetCol<FleetRow>[] = alignCols([
 
 /** 운영 엑셀 열 — `운영 · 엑셀기본|엑셀전체 · +|-key` @see lib/ledger-ext.ts */
 export const FLEET_SHEET_KEYS: SheetViewKeys = {
-  // 설계서: 회사·차번·차명·상태·사용처·연락처·만기·반납D·회차·대여료·미수·보험만기·주행거리·경고 (대여형태 제외)
+  // 회사·차번·차명·상태·소유·사용처·연락처·현위치·대여료·보증금·결제일·회차/기간·미수·만기·검사·보험·주행·경고
   basic: [
-    'company', 'plate', 'car', 'status', 'cust', 'phone', 'end', 'dday', 'round', 'rent', 'net', 'insEnd', 'mileage', 'warn',
+    'company', 'plate', 'car', 'status', 'own', 'cust', 'phone', 'loc',
+    'rent', 'dep', 'paymentDay', 'round', 'net', 'end', 'inspect', 'insEnd', 'mileage', 'warn',
   ],
   all: [
     'company', 'plate', 'cust', 'status', 'maker', 'sub', 'year',
