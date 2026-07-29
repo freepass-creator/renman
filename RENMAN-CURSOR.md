@@ -70,6 +70,7 @@ curl -s -o /dev/null -w "%{http_code}" http://localhost:6006/<route>   # 200
 
 | 날짜 | 작업자 | 내용 | 상태 |
 |---|---|---|---|
+| 2026-07-29 | Cursor | 손익·부가세 과목표 집계 SSOT(`subject-summary`) | 3b77b1a |
 | 2026-07-29 | Cursor | 미수관리 집계 SSOT(`receivables-ledger`) · 내용증명 일괄 ghost | 83ed867 |
 | 2026-07-29 | Cursor | 단일회사 회사열 숨김(ExcelSheet) · 계약·운영·업무·자금 필터 상단 흡수 | 79c09c5 · 9fdcb21 |
 | 2026-07-29 | Cursor | 자산 세부필터 상단 흡수(`LedgerFilterSelects`) · 좌측 3분할 제거 | 5e32cde |

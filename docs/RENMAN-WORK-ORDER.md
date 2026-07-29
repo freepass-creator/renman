@@ -186,6 +186,7 @@ const { data: [cs, hs], loading } = useEntityLists(['contract', 'history']);
 | `components/ui` `LedgerFilterSelects` | 세부필터 상단 흡수(Select 줄) — 필드 적은 원장. 다수 필드=좌측 `LedgerFilterPanel` |
 | `lib/ledger-ext` · `*_SHEET_KEYS` · `*_DETAIL_DEFS` · `*_FILTER_DEFS` | **원장 항목 추가·삭제 규격(틀)** — 요청 ``시트 · 축 · +\|-key`` · 축=`엑셀기본`/`엑셀전체`/`섹션명`/`필터` · 언제든 push/splice |
 | `lib/receivables-ledger` | 미수관리 행·조치·Facet 칩 집계 SSOT (`buildReceivablesWorkbench`) · 금액 헤드라인=`selectReceivables` |
+| `lib/finance/subject-summary` | 손익·부가세 과목표 분해 (`summarizePnlSubjects`/`summarizeVatSubjects`) · 영업손익 헤드라인=`operatingProfit` |
 | `components/MigrateDataButton` | 스위치플랜 마이그레이션(본사) |
 | `components/ui` `SectionLabel` | 상세 그룹 소제목(무박스) — freepass ERP4 동기. 360 운영·자산·계약·이력 |
 | `components/ui` `Disclosure` | 접이식(할부스케줄 등) — Sec와 별개 · 제목 줄 눌러 표 인라인 펼침 |
