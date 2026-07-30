@@ -70,6 +70,7 @@ curl -s -o /dev/null -w "%{http_code}" http://localhost:6006/<route>   # 200
 
 | 날짜 | 작업자 | 내용 | 상태 |
 |---|---|---|---|
+| 2026-07-30 | Cursor | 마감5: OCR미완수기·계약bucket세분·내용증명danger·assetRail←lifecycle·보유중배지gray (4=+생성 후속·문서박제X) | tsc0 · 5면200 · 커밋분리 |
 | 2026-07-30 | Cursor | 패널과태료·헤더최소화·자산분류: penalty-intake·패널업로드·⋯메뉴·칩→☰필터·lifecycle·분류→상태 | tsc0 · 7면200 · push |
 | 2026-07-30 | Cursor | 원장 헤더 통일(자산·계약·리스크·업무·자금): 필터줄=회사·검색·`LedgerFilterButton`·기간 · 칩→패널 · ghost→`LedgerToolsMenu` | (상위 한 줄로 통합) |
 | 2026-07-30 | Cursor | 업무생성→과태료=고지서업로드 분기(kindGateway·탭전환·복귀 /work?group=과태료) | tsc0 · /work·/penalty/upload 200 |
