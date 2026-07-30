@@ -9,7 +9,8 @@ alwaysApply: true
 
 ## 웹 = LedgerFrame (원장)
 - 메뉴 IA: (상단) 대시보드 `/`·운영현황 `/status` · **처리**(리스크 `/risk`·업무 `/work`·데이터관리 `/ingest`) · **원장**(자산·계약·자금) · **시스템**. IA=`lib/nav.ts` PAGE_IA/ERP_MENU_TREE/NAV_GROUPS 동기.
-- 원장 = **마스터 표 + 더블클릭 우측 상세패널**. 틀 SSOT = `components/ui/ledger-frame.tsx`(+`ledger-filter/create/edit/record-panel`·`ledger-actions`). 데이터=`lib/master-ledgers`·`master-ledger-cols`·`ledger-ext`.
+- 원장 = **마스터 표 + 더블클릭 우측 상세패널**. 틀 SSOT = `components/ui/ledger-frame.tsx`(+`ledger-filter/create/edit/record-panel`·`ledger-actions`·`ledger-selection-bar`). 데이터=`lib/master-ledgers`·`master-ledger-cols`·`ledger-ext`.
+- **헤더에 ⋯도구 없음.** 액션 자리: 이동=좌측메뉴 · 투입=[+생성]패널 · 대량=선택 액션바 · 개별=상세패널.
 - 레거시 redirect: `/sheet`→`/asset` · `/finance`→`/cash` · `/ops`→`/` · `/desk`→`/risk`. (page.tsx는 redirect 1줄만 — 살리지 말 것)
 
 ## 모바일 = `/m` 전문 트리 (웹 축소본 아님 ★)
@@ -91,11 +92,15 @@ alwaysApply: true
 - **/m PageDef**: `MobilePage`·`FLEET_DEF`·`lib/pagedef/{types,rank,defs}` 유지. ~~`WebPage`~~ 폐기(웹 소비처 0 · 삭제됨).
 
 ## 헤더 컨트롤 존 규격 (전 페이지 동일 — 누더기 금지)
-좌→우 순서 고정: `[회사 스코프] · 제목 · (검색·범위·칩) ····· [기간] [보기] [도구] │ [주액션]`
+좌→우 순서 고정: `[회사][검색][☰필터][기간] ····· 지표 [기본/전체] [+생성]`
 - **회사 스코프**: `CompanyFilter` 원자 하나 · **프레임이 그림**(페이지에서 손롤·손 `<select>` 금지) · LedgerFrame=필터줄 첫칸 `size="sm"`(표준) · 회사무관 페이지만 숨김 · **meta에 스코프 텍스트 중복 표기 금지**.
-- **주액션(쓰기)**: 헤더 `right` 존에만 · **라벨 solid 최대 1개**(생성·저장) · 보조는 ghost `iconOnly` · 본문(Sec)·다른 곳에 두지 말 것.
+- **주액션(쓰기)**: 필터줄 맨 오른쪽 `[+생성]` · **라벨 solid 최대 1개** · 보조는 ghost `iconOnly`.
 - **버튼 size**: 헤더 컨트롤 전부 `size="sm"`.
-- **도구(tools)**: ghost `iconOnly`+`tip` (이미 준수).
+- **⋯도구 메뉴 없음** (`LedgerToolsMenu` 폐기). 액션은 «대상이 정해진 순간»에만:
+  - 페이지 이동 → **좌측 메뉴** (헤더 금지)
+  - 데이터 투입 → **[+생성] 패널** (`fileIngest` · 과태료 gateway 패턴)
+  - 여러 행 대량 실행 → 행 선택 시 **`LedgerSelectionBar`** (0건이면 미렌더)
+  - 개별 행 실행 → **상세패널 액션**
 - **범위·구분 선택**: `Select` 하나로 통일(PillTabs 혼용 지양).
 - 헤더 드롭다운은 3종만: 회사 스코프 · 기간(`PeriodBar` sm) · 보기(기본/전체).
 
