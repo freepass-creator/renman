@@ -1,35 +1,37 @@
 'use client';
 /**
  * 고지서 등록(신규 입력) — 별도 페이지. 과태료·통행료 고지서 다중 드롭 → OCR → 위반일시로 계약(임차인) 자동매칭 → 검토 → 저장.
- *   신규 입력/등록은 팝업이 아니라 전용 페이지(UIUX-SPEC). 저장 후 /work?group=과태료 복귀. /ingest/bulk와 동형.
- *   GEMINI_API_KEY 없으면 자동추출 실패 → 각 행 수기입력으로 진행(플로우 동일).
+ *   로직 SSOT = lib/penalty-intake (패널과 공유). 저장 후 /work?group=과태료 복귀.
  */
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSession } from '@/lib/session';
 import { ALL_COMPANIES, COMPANIES, companyLabel } from '@/lib/companies';
-import { normPlate } from '@/lib/plate';
 import { getStore } from '@/lib/store';
 import { type EntityRecord } from '@/lib/intake/entities';
-import { ocrBatch, mapOcrToEntity } from '@/lib/ocr-client';
-import { type CrosscheckResult } from '@/lib/ocr-crosscheck';
-import { uploadDoc, docPath } from '@/lib/storage';
-import { saveIntake } from '@/lib/intake';
 import { resolveWriteCompany, NEED_COMPANY } from '@/lib/scope';
 import { toast } from '@/lib/toast';
-import { matchPenalty } from '@/lib/penalty-match';
+import {
+  PENALTY_OCR_MAX,
+  type PenaltyIntakeRow,
+  buildPenaltySaveRecords,
+  derivePenaltyMatch,
+  isPenaltyIntakeReady,
+  makePenaltyIntakeRows,
+  ocrPenaltyFiles,
+  penaltySavedToast,
+  savePenaltyRecords,
+} from '@/lib/penalty-intake';
 import { Page, Panel, Btn, Badge, Input, Select, C, th } from '@/components/ui';
 import { WorkbenchBar } from '@/components/WorkbenchBar';
 import { Trash2 } from 'lucide-react';
 import FileDrop from '@/components/FileDrop';
 
-type Row = { id: string; fileName: string; file: File; status: 'pending' | 'done' | 'failed'; rec: EntityRecord; ocrOriginal?: unknown; crosscheck?: CrosscheckResult; error?: string };
-
 export default function PenaltyUploadPage() {
   const router = useRouter();
   const { companyId } = useSession();
   const [co, setCo] = useState(companyId === ALL_COMPANIES ? '' : companyId);
-  const [rows, setRows] = useState<Row[]>([]);
+  const [rows, setRows] = useState<PenaltyIntakeRow[]>([]);
   const [busy, setBusy] = useState(false);
   const [saving, setSaving] = useState(false);
   const [contracts, setContracts] = useState<EntityRecord[]>([]);
@@ -42,34 +44,25 @@ export default function PenaltyUploadPage() {
       .then(([cs, ps]) => { setContracts(cs); setExisting(ps); }).catch(() => {});
   }, [co]);
 
-  const derive = useCallback((rec: EntityRecord) => {
-    const plate = normPlate(rec.plate), vdate = String(rec.violationDate || '');
-    const m = matchPenalty(rec, contracts);
-    const samePlate = contracts.filter((k) => normPlate(k.plate) === plate);
-    const outOfRange = !!plate && !!vdate && samePlate.length > 0 && !m;
-    const dup = existing.some((e) =>
-      (rec.noticeNo && String(e.noticeNo) === String(rec.noticeNo)) ||
-      (plate && vdate && normPlate(e.plate) === plate && String(e.violationDate).slice(0, 10) === vdate.slice(0, 10)));
-    return { renter: m ? m.renter : null, contractNo: m ? String(m.contract.contractNo || '') : null, outOfRange, dup };
-  }, [contracts, existing]);
+  const derive = useCallback(
+    (rec: EntityRecord) => derivePenaltyMatch(rec, contracts, existing),
+    [contracts, existing],
+  );
 
   const handleFiles = useCallback(async (fileList: FileList | null) => {
     if (!fileList || !fileList.length) return;
     const incoming = Array.from(fileList);
-    const files = incoming.slice(0, 10);
-    if (incoming.length > files.length) toast('OCR는 한 번에 최대 10건까지 분석합니다.', 'info');
-    const base: Row[] = files.map((f, i) => ({ id: `pen-${Date.now()}-${i}`, fileName: f.name, file: f, status: 'pending', rec: {} }));
+    const files = incoming.slice(0, PENALTY_OCR_MAX);
+    if (incoming.length > files.length) toast(`OCR는 한 번에 최대 ${PENALTY_OCR_MAX}건까지 분석합니다.`, 'info');
+    const base = makePenaltyIntakeRows(files);
     setRows((r) => [...r, ...base]);
     setBusy(true);
-    const results = await ocrBatch(files, 'penalty');
+    const updated = await ocrPenaltyFiles(files, base);
     setRows((prev) => {
       const copy = [...prev];
-      for (let i = 0; i < files.length; i++) {
-        const idx = copy.findIndex((x) => x.id === base[i].id); if (idx < 0) continue;
-        const res = results[i];
-        copy[idx] = res.ok && res.raw
-          ? { ...copy[idx], status: 'done', rec: mapOcrToEntity('penalty', res.raw), ocrOriginal: res.ocrOriginal, crosscheck: res.crosscheck }
-          : { ...copy[idx], status: 'failed', error: res.error };
+      for (const row of updated) {
+        const idx = copy.findIndex((x) => x.id === row.id);
+        if (idx >= 0) copy[idx] = row;
       }
       return copy;
     });
@@ -80,32 +73,16 @@ export default function PenaltyUploadPage() {
     setRows((prev) => prev.map((r) => r.id === id ? { ...r, rec: { ...r.rec, [key]: val } } : r));
   const removeRow = (id: string) => setRows((prev) => prev.filter((r) => r.id !== id));
 
-  const isReady = (row: Row) =>
-    !!String(row.rec.plate || '').trim()
-    && !!String(row.rec.violationDate || '').trim()
-    && Number(row.rec.amount) > 0;
-  const ready = rows.filter((row) => isReady(row) && !derive(row.rec).dup);
+  const ready = rows.filter((row) => isPenaltyIntakeReady(row) && !derive(row.rec).dup);
   async function save() {
     if (!ready.length) return;
     const target = resolveWriteCompany(companyId, { companyId: co });
     if (!target) { toast(NEED_COMPANY, 'error'); return; }
     setSaving(true);
     try {
-      const records = await Promise.all(ready.map(async (r) => {
-        const { renter } = derive(r.rec);
-        let fileUrl = '';
-        try { fileUrl = (await uploadDoc(r.file, docPath(target, 'penalty', String(r.rec.noticeNo || r.id), r.fileName))) || ''; } catch { /* Firebase 미설정 시 스킵 */ }
-        return {
-          ...r.rec,
-          companyId: target,
-          reassignStatus: renter ? '임차인확인' : '접수',
-          ...(renter ? { driverName: renter } : {}),
-          ...(fileUrl ? { fileUrl } : {}),
-          _ocrOriginal: r.ocrOriginal,
-        };
-      }));
-      await saveIntake('penalty', target, records as EntityRecord[]);
-      toast(`과태료 ${records.length}건 등록 · ${companyLabel(target)}`, 'success');
+      const records = await buildPenaltySaveRecords(ready, target, derive);
+      await savePenaltyRecords(target, records);
+      toast(penaltySavedToast(records.length, target), 'success');
       router.push('/work?group=%EA%B3%BC%ED%83%9C%EB%A3%8C');
     } finally { setSaving(false); }
   }
@@ -159,7 +136,7 @@ export default function PenaltyUploadPage() {
                   const d = derive(r.rec);
                   const st = r.status === 'pending'
                     ? { t: '분석중', tone: 'gray' as const }
-                    : !isReady(r)
+                    : !isPenaltyIntakeReady(r)
                       ? { t: r.status === 'failed' ? '보정필요' : '확인필요', tone: 'red' as const }
                       : d.renter
                         ? { t: '매칭', tone: 'green' as const }
