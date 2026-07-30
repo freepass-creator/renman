@@ -22,10 +22,9 @@ export function assetLifecycle(status: string, disposed = false): AssetLifecycle
   return '보유중';
 }
 
-/** 보유중=초록 · 처분완료=회색. (보유중 무색화는 후속) */
-export function assetLifecycleTone(lc: AssetLifecycle): 'blue' | 'gray' | 'amber' | 'green' {
+/** 보유중=중립(gray) — 다수가 보유중이라 초록 전면칠은 정보량 0. 구매=파랑·처분예정=주황·처분완료=회색. */
+export function assetLifecycleTone(lc: AssetLifecycle): 'blue' | 'gray' | 'amber' {
   if (lc === '구매예정') return 'blue';
   if (lc === '처분예정') return 'amber';
-  if (lc === '처분완료') return 'gray';
-  return 'green';
+  return 'gray'; // 보유중 · 처분완료
 }
