@@ -20,12 +20,15 @@ export type LedgerFormSection = {
   open?: boolean;
 };
 
-/** kind 값 → 일반 폼 대신 게이트웨이(저장 금지 · 외부 등록 경로). */
+/** kind 값 → 일반 폼 대신 게이트웨이(저장 금지 · 외부/인라인 등록). */
 export type LedgerKindGateway = {
-  message: ReactNode;
-  actionLabel: string;
+  message?: ReactNode;
+  /** render 없을 때 액션 버튼. */
+  actionLabel?: string;
   href?: string;
   onAction?: () => void;
+  /** 있으면 href/actionLabel UI 대신 이 노드만(패널 내 업로드 등). */
+  render?: ReactNode;
 };
 
 function normalizedForm(fields: Field[], form: EntityRecord): EntityRecord {
@@ -266,14 +269,14 @@ export function LedgerCreatePanel({
 
         {gateway && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 4 }}>
-            <Message variant="info">{gateway.message}</Message>
-            <Btn
-              size="sm"
-              href={gateway.href}
-              onClick={gateway.onAction}
-            >
-              <UploadCloud size={14} /> {gateway.actionLabel}
-            </Btn>
+            {gateway.message != null ? <Message variant="info">{gateway.message}</Message> : null}
+            {gateway.render != null
+              ? gateway.render
+              : (gateway.actionLabel ? (
+                <Btn size="sm" href={gateway.href} onClick={gateway.onAction}>
+                  <UploadCloud size={14} /> {gateway.actionLabel}
+                </Btn>
+              ) : null)}
           </div>
         )}
       </div>
