@@ -70,6 +70,7 @@ curl -s -o /dev/null -w "%{http_code}" http://localhost:6006/<route>   # 200
 
 | 날짜 | 작업자 | 내용 | 상태 |
 |---|---|---|---|
+| 2026-07-31 | Cursor | 최종정리v2: IA상단·처리·원장·하단 · 미수메뉴제거 · risk4그룹원복 · 컴플→정합성·보증금→계약 · 체크X+rowSel우클릭 · /management3탭 · deeplink 배차/자금/ingest open=은 페이지이동만(후속) | tsc0 · 커밋분리 · push |
 | 2026-07-31 | Cursor | 지시층마감: 딥링크id SSOT·risk 컴플/보증금그룹·?group=·면허만기필드/판정·검색손님키 | tsc0 · curl200 · 데모id왕복0실패 · 브라우저로그인차단으로 육안클릭미완 · 커밋분리 |
 | 2026-07-30 | Cursor | 지시층1: work-orders·InstructionStrip→/risk · 홈오늘할일5 · section 23삭제(유지 s-repair·a-other) · ack TODO | tsc0 · /·/risk·/repair 200 |
 | 2026-07-30 | Cursor | ⋯도구폐기: redesign박제·미수/자금일보메뉴·fileIngest·SelectionBar·risk일괄·LedgerToolsMenu삭제 | tsc0 · 10면200 · 커밋분리 |
