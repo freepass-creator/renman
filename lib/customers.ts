@@ -80,12 +80,15 @@ function overdueSinceDate(today: string, overdueDays: number): string {
   return `${y}-${m}-${day}`;
 }
 
-/** 한 손님만 — 전 계약 aggregate 후 find 금지. 매칭 계약만 집계. */
+/** 한 손님만 — 전 계약 aggregate 후 find 금지. 매칭 계약만 집계.
+ *  키 = customerKey(phone||name) SSOT. 검색·면허증 _key 폴백으로 licenseNo도 허용.
+ */
 export function findCustomer(contracts: EntityRecord[], key: string, today: string): CustomerAgg | null {
   if (!key) return null;
   const matched: EntityRecord[] = [];
   for (const c of contracts) {
     if (customerKey(c.contractorName, c.contractorPhone) === key) matched.push(c);
+    else if (String(c.contractorLicenseNo || '').trim() === key) matched.push(c);
   }
   if (!matched.length) return null;
   return aggregateCustomers(matched, today)[0] || null;

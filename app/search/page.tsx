@@ -7,6 +7,7 @@ import { ENTITIES, type EntityRecord } from '@/lib/intake/entities';
 import { companyLabel } from '@/lib/companies';
 import { normPlate } from '@/lib/plate';
 import { searchEntityKeys } from '@/lib/search-match';
+import { customerKey } from '@/lib/customers';
 import { Page, Cards, Metric, EmptyState, Sec, ListBox, ListRow, C, PageLoading } from '@/components/ui';
 import { WorkbenchBar } from '@/components/WorkbenchBar';
 
@@ -16,7 +17,11 @@ function hrefFor(entityKey: string, rec: EntityRecord): string {
   const key = encodeURIComponent(String(rec._key || ''));
   const plate = String(rec.plate || '');
   if (entityKey === 'vehicle') return `/vehicle/${encodeURIComponent(plate || String(rec._key || ''))}`;
-  if (entityKey === 'customer') return `/customer/${key}`;
+  // Customer360 = customerKey(phone||name). 손님 마스터 _key(=면허)만 넘기면 못 찾음.
+  if (entityKey === 'customer') {
+    const ck = customerKey(rec.name, rec.phone) || String(rec.licenseNo || rec._key || '');
+    return `/customer/${encodeURIComponent(ck)}`;
+  }
   if (entityKey === 'work_item') return `/work?open=${key}`;
   // 세계관: 차·계약·보험·과태료는 360으로. 일반 CRUD /list 우회 최소화.
   if (plate && (entityKey === 'contract' || entityKey === 'insurance' || entityKey === 'penalty' || entityKey === 'history')) {
