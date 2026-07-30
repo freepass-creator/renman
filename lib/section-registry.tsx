@@ -1,7 +1,7 @@
 'use client';
 /**
  * 섹션 레지스트리 — /repair 등 업무 페이지용 Sec 공유물.
- * 업무지시(instruction) 합성은 lib/work-orders.ts + InstructionStrip 로 이동.
+ * 업무지시 스트립(work-orders/InstructionStrip)은 2026-07-31 제거 — 지시 노출은 홈 «오늘 할 일» 요약만.
  *
  *   · SectionCtx   = 공유 계산 묶음(useDashboardData의 D + 파생 자산)
  *   · SECTIONS     = { id, label, group, render(ctx, secProps) } 목록 (한 번만 정의)

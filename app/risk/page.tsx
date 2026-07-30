@@ -16,13 +16,11 @@ import { RISK_BASIC_COLS, RISK_DETAIL_SECTIONS, RISK_EXPANDED_COLS } from '@/lib
 import { LEDGER_EMPTY } from '@/lib/ledger-empty';
 import { latestDateOf } from '@/lib/ledger-stats';
 import { sendNoticeCert, sendNoticeCertBulk } from '@/lib/docs/send-notice';
-import { buildInstructionOrders } from '@/lib/work-orders';
 import { useSession } from '@/lib/session';
 import { toast } from '@/lib/toast';
 import { openReceivables } from '@/lib/ui-bus';
 import { useTableSelection } from '@/lib/use-table-selection';
 import { useRowSelection, useCtrlASelectAll } from '@/lib/use-row-selection';
-import { InstructionStrip } from '@/components/InstructionStrip';
 import {
   Badge, Btn, C, ContextMenu, type ContextMenuItem, LedgerFilterButton, LedgerFilterFields, LedgerFilterPanel, LedgerFrame, LedgerRecordPanel, LedgerSelectionBar, PageLoading, PeriodBar, Search,
   useConfirm, won,
@@ -42,7 +40,7 @@ function RiskLedgerInner() {
   const confirm = useConfirm();
   const searchParams = useSearchParams();
   const { companyId } = useSession();
-  const { D, contracts, vehicles, insurances, penalties, history, bankTx, loading } = useDashboardData();
+  const { contracts, vehicles, insurances, penalties, history, bankTx, loading } = useDashboardData();
   const [q, setQ] = useState('');
   const [group, setGroup] = useState<GroupFilter>('전체');
   const [range, setRange] = useState({ from: '', to: '' });
@@ -50,25 +48,10 @@ function RiskLedgerInner() {
   const [selected, setSelected] = useState<RiskSheetRow | null>(null);
   const [filterOpen, setFilterOpen] = useState(false);
   const [detailFilters, setDetailFilters] = useState(() => emptyFilterValues(RISK_FILTER_DEFS));
-  const [integrityCount, setIntegrityCount] = useState(0);
   const [ctxMenu, setCtxMenu] = useState<{ open: boolean; x: number; y: number }>({ open: false, x: 0, y: 0 });
 
   const sel = useTableSelection();
   const { clear: clearSel } = sel;
-
-  useEffect(() => {
-    let cancelled = false;
-    const plates = contracts.map((c) => String(c.plate || ''));
-    import('@/lib/integrity/doc-audit').then(({ docAuditForPlates }) => {
-      if (!cancelled) setIntegrityCount(docAuditForPlates(plates).length);
-    }).catch(() => { if (!cancelled) setIntegrityCount(0); });
-    return () => { cancelled = true; };
-  }, [contracts]);
-
-  const orders = useMemo(
-    () => buildInstructionOrders(D, { contracts, integrityCount }, 'risk'),
-    [D, contracts, integrityCount],
-  );
 
   const allRows = useMemo(
     () => buildRiskSheetRows(vehicles, contracts, insurances, penalties, history, TODAY, bankTx),
@@ -196,14 +179,6 @@ function RiskLedgerInner() {
       <LedgerFrame
         title="리스크관리"
         meta="챙길 예외·미완료·미납·만기·휴차"
-        hint={!loading ? (
-          <InstructionStrip
-            orders={orders}
-            title="지시 (무엇을 하라)"
-            desc="눌러서 이동 · 아래 표는 어느 건"
-            emptyOk
-          />
-        ) : undefined}
         filters={(
           <>
             <Search

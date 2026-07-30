@@ -3,7 +3,7 @@
  * 대시보드(/) — 관제 KPI + 오늘 할 일 요약 + 법인별 요약.
  *   셸=LedgerFrame · Sec 접기 없음 · 색=C.* 토큰.
  *   데이터=computeKPI · selectTodayWork · operatingProfit* SSOT만.
- *   지시 전체는 /risk 상단 InstructionStrip — 홈은 상위 5건 요약만.
+ *   지시 노출 = 홈 «오늘 할 일» 상위 5건 요약만(지시 스트립 UI는 사장님 지시로 제거 — 리스크 표 자체가 목록).
  */
 import { useMemo, type CSSProperties, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
