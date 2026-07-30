@@ -22,6 +22,7 @@ import {
 } from '@/lib/ledger-filter-defs';
 import { RENTAL_TYPES } from '@/lib/schema/contract';
 import { LEDGER_EMPTY } from '@/lib/ledger-empty';
+import { depositView } from '@/lib/deposit';
 
 type RentalChip = '전체' | (typeof RENTAL_TYPES)[number];
 /** 계약범위 — 전체·진행·만기임박·미납·종료 (riskLabel·net·dday 판정). */
@@ -70,6 +71,12 @@ function ContractLedgerInner() {
 
   useEffect(() => {
     const open = searchParams.get('open');
+    const depositQ = searchParams.get('deposit');
+    if (depositQ === '1') {
+      setDetailFilters((prev) => ({ ...prev, deposit: '보증금미반환' }));
+      setBucket('종료');
+      setFilterOpen(true);
+    }
     if (!open || !allRows.length) return;
     const hit = allRows.find((r) =>
       String(r.raw._key || '') === open
@@ -98,9 +105,15 @@ function ContractLedgerInner() {
   const contractFilterMatchers = useMemo(() => ({
     status: eqFilter<ReturnType<typeof contractMasterRow>>((r) => r.status),
     endReason: eqFilter<ReturnType<typeof contractMasterRow>>((r) => r.endReason),
+    deposit: (r: ReturnType<typeof contractMasterRow>, value: string) => {
+      if (!value) return true;
+      if (value === '보증금미반환') return depositView(r.raw, TODAY).pendingRefund;
+      return true;
+    },
   }), []);
   const rows = useMemo(() => searchedRows.filter((r) => {
-    if (!matchContractBucket(r, bucket)) return false;
+    const depositOnly = detailFilters.deposit === '보증금미반환';
+    if (!depositOnly && !matchContractBucket(r, bucket)) return false;
     if (rentalChip !== '전체' && r.rentalType !== rentalChip) return false;
     if (!matchLedgerFilters(r, detailFilters, contractFilterMatchers)) return false;
     const date = dateBasis === '종료일' ? (r.returnedDate || r.endDate) : (r.contractDate || r.startDate);
@@ -187,6 +200,7 @@ function ContractLedgerInner() {
               rentalType: [...RENTAL_TYPES],
               status: contractStatuses,
               endReason: endReasons,
+              deposit: ['보증금미반환'],
             }}
           />
           <label>

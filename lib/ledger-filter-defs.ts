@@ -58,6 +58,7 @@ export const CONTRACT_FILTER_DEFS: LedgerFilterFieldDef[] = [
   { key: 'rentalType', label: '대여형태' },
   { key: 'status', label: '계약상태' },
   { key: 'endReason', label: '종료사유' },
+  { key: 'deposit', label: '보증금', emptyLabel: '보증금 전체' },
 ];
 
 /** 운영현황 세부필터. */

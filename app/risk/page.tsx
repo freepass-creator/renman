@@ -31,7 +31,7 @@ import {
 
 type GroupFilter = '전체' | RiskSheetGroup;
 
-const RISK_GROUPS: RiskSheetGroup[] = ['미완료', '미납', '컴플라이언스', '만기', '보증금미반환', '휴차'];
+const RISK_GROUPS: RiskSheetGroup[] = ['미완료', '미납', '만기', '휴차'];
 
 function RiskLedgerInner() {
   const mobile = useIsMobile();
@@ -207,9 +207,7 @@ function RiskLedgerInner() {
         <span style={{ fontSize: 12.5, color: C.mute, whiteSpace: 'nowrap' }}>
           미완료 <b style={{ color: counts.미완료 ? C.danger : C.ok }}>{counts.미완료}</b>
           {' · '}미납 <b style={{ color: counts.미납 ? C.danger : C.ink }}>{counts.미납}</b>
-          {' · '}컴플 <b style={{ color: counts.컴플라이언스 ? C.danger : C.ink }}>{counts.컴플라이언스}</b>
           {' · '}만기 <b style={{ color: counts.만기 ? C.warn : C.ink }}>{counts.만기}</b>
-          {' · '}보증금 <b style={{ color: counts.보증금미반환 ? C.warn : C.ink }}>{counts.보증금미반환}</b>
           {' · '}휴차 <b>{counts.휴차}</b>
         </span>
       )}

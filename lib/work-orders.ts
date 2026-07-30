@@ -77,9 +77,8 @@ export function buildInstructionOrders(
     orders.push({
       id: 'compliance',
       n: D.compliance.length,
-      text: '법령·컴플라이언스 경고 — 무면허·무보험·면허만기 등. 리스크관리에서 확인하세요',
-      to: 'risk',
-      query: '?group=컴플라이언스',
+      text: '법령·컴플라이언스 경고 — 무면허·무보험·면허만기 등. 정합성에서 확인하세요',
+      to: 'integrity',
       danger: true,
       priority: 0,
     });
@@ -108,12 +107,15 @@ export function buildInstructionOrders(
   if (contracts.length) {
     const pend = contracts.filter((c) => depositView(c, TODAY).pendingRefund);
     if (pend.length) {
+      const firstKey = String(pend[0]._key || pend[0].contractNo || '');
       orders.push({
         id: 'deposit',
         n: pend.length,
         text: '보증금 미반환 — 종료 계약 정산(반환/충당)을 처리하세요',
-        to: 'risk',
-        query: '?group=보증금미반환',
+        to: 'contract',
+        query: firstKey
+          ? `?deposit=1&open=${encodeURIComponent(firstKey)}`
+          : '?deposit=1',
         danger: false,
         priority: 4,
       });

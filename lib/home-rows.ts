@@ -233,7 +233,7 @@ export function hrefForTodayRow(row: HomeQueueRow): string {
     case '종료미수':
     case '컴플라이언스':
     case '컴플라이언스(위험)':
-      return `/risk?open=${open}`;
+      return `/integrity?open=${open}`;
     default:
       return `/risk?open=${open}`;
   }
