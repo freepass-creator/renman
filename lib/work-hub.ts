@@ -37,6 +37,8 @@ export const PIPE = {
   asset: { href: '/asset', label: '자산관리' },
   contract: { href: '/contract', label: '계약관리' },
   sheet: { href: '/asset', label: '자산관리' },
+  risk: { href: '/risk', label: '리스크관리' },
+  integrity: { href: '/integrity', label: '정합성' },
 } as const;
 export type PipeId = keyof typeof PIPE;
 
