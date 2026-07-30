@@ -48,6 +48,26 @@ export function checkCompliance(c: EntityRecord, v: EntityRecord | null, today: 
     if (days < 0) flags.push({ code: 'inspection_expired', label: '검사 만료', severity: 'high', detail: `정기검사 만료 ${inspExp} 경과 ${-days}일 — 불법 운행` });
     else if (days <= 30) flags.push({ code: 'inspection_soon', label: '검사 임박', severity: 'med', detail: `정기검사 만료 D-${days} (${inspExp})` });
   }
+  // 운전면허 만기 — 계약 스냅샷 필드만(고객마스터 조인 안 함). 값 없으면 skip(ins_missing과 달리 «미확인»을 위반으로 만들지 않음).
+  const licExp = String(c.contractorLicenseExpiry || '').slice(0, 10);
+  if (licExp && /^\d{4}-\d{2}-\d{2}$/.test(licExp)) {
+    const days = Math.round((new Date(licExp).getTime() - new Date(today).getTime()) / 86400000);
+    if (days < 0) {
+      flags.push({
+        code: 'license_expired',
+        label: '면허 만료',
+        severity: 'high',
+        detail: `운전면허 만기 ${licExp} 경과 ${-days}일 — 위법 대여`,
+      });
+    } else if (days <= 30) {
+      flags.push({
+        code: 'license_soon',
+        label: '면허 임박',
+        severity: 'med',
+        detail: `운전면허 만기 D-${days} (${licExp})`,
+      });
+    }
+  }
   // 21세 미만 대여(표준약관 제3조)
   if (da && da < 21) {
     flags.push({ code: 'age_under21', label: '연령 미달', severity: 'med', detail: `운전자 ${da}세 (표준약관 만 21세 미만 대여 제한)` });
