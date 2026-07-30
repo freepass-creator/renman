@@ -51,9 +51,27 @@ export function computeDashboard(input: DashboardInput, today: string) {
   const overduePay = views.filter((v) => v.net > 0).sort((a, b) => b.net - a.net);
   const returnFlow = views.filter((v) => v.status === '운행' && v.dday != null && v.dday <= 7).sort((a, b) => (a.dday ?? 0) - (b.dday ?? 0));
   const expiring = [
-    ...views.filter((v) => v.status === '운행' && v.dday != null && v.dday > 7 && v.dday <= 30).map((v) => ({ plate: v.rec.plate, dday: v.dday as number, main: `${v.rec.plate} · ${v.rec.contractorName}`, sub: `계약 만기 D-${v.dday}` })),
-    ...insurances.filter((i) => { const d = dday(i.endDate); return d != null && d <= 30; }).map((i) => ({ plate: i.plate, dday: dday(i.endDate)!, main: `${i.plate} · ${i.insurer || '보험'}`, sub: `보험 만기 ${(() => { const d = dday(i.endDate)!; return d < 0 ? `${-d}일 경과` : `D-${d}`; })()}` })),
-    ...vehicles.filter((v) => { const d = dday(v.inspectionTo); return d != null && d <= 30; }).map((v) => ({ plate: v.plate, dday: dday(v.inspectionTo)!, main: `${v.plate} · ${v.carName || ''}`, sub: `검사 만기 ${(() => { const d = dday(v.inspectionTo)!; return d < 0 ? `${-d}일 경과` : `D-${d}`; })()}` })),
+    ...views.filter((v) => v.status === '운행' && v.dday != null && v.dday > 7 && v.dday <= 30).map((v) => ({
+      plate: v.rec.plate,
+      dday: v.dday as number,
+      main: `${v.rec.plate} · ${v.rec.contractorName}`,
+      sub: `계약 만기 D-${v.dday}`,
+      agendaKey: `cx:${v.rec._key || v.rec.contractNo || v.rec.plate}:${String(v.rec.endDate || '').slice(0, 10)}`,
+    })),
+    ...insurances.filter((i) => { const d = dday(i.endDate); return d != null && d <= 30; }).map((i) => ({
+      plate: i.plate,
+      dday: dday(i.endDate)!,
+      main: `${i.plate} · ${i.insurer || '보험'}`,
+      sub: `보험 만기 ${(() => { const d = dday(i.endDate)!; return d < 0 ? `${-d}일 경과` : `D-${d}`; })()}`,
+      agendaKey: `ins:${i._key || i.plate}:${i.endDate}`,
+    })),
+    ...vehicles.filter((v) => { const d = dday(v.inspectionTo); return d != null && d <= 30; }).map((v) => ({
+      plate: v.plate,
+      dday: dday(v.inspectionTo)!,
+      main: `${v.plate} · ${v.carName || ''}`,
+      sub: `검사 만기 ${(() => { const d = dday(v.inspectionTo)!; return d < 0 ? `${-d}일 경과` : `D-${d}`; })()}`,
+      agendaKey: `insp:${v._key || v.plate}:${v.inspectionTo}`,
+    })),
   ];
   const repair = rows.filter((r) => ['정비', '사고'].includes(r.status));
   const insMismatch = risks.flatMap((r) => r.flags.filter((f) => f.kind === '보험불일치').map((f) => ({ rec: r.rec, detail: f.detail })));

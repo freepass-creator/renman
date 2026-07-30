@@ -1,11 +1,19 @@
 /**
  * 홈 엑셀 행 — 미결·리스크·휴차 큐.
  * 집계는 operating-snapshot(D)만. 페이지에서 재집계 금지.
+ * open id = 목적지 원장 row id SSOT (`lib/ledger-open-ids`).
  *
  * TODO(2단계): ack/snoozeUntil — 무시·미루기 마킹. 지금은 조건 해소 전 무한 재노출.
  */
 import type { Dashboard } from './operating-snapshot';
 import { companyDisplay } from './companies';
+import {
+  penaltyOpenId,
+  riskAgendaOverOpenId,
+  riskComplianceOpenId,
+  riskReturnOverOpenId,
+  riskUnpaidOpenId,
+} from './ledger-open-ids';
 
 export type HomeQueueRow = {
   id: string;
@@ -32,11 +40,12 @@ export function buildHomePendingRows(D: Dashboard): HomeQueueRow[] {
   const rows: HomeQueueRow[] = [];
   for (const v of D.returnFlow) {
     if ((v.dday ?? 0) >= 0) continue;
+    const plate = String(v.rec.plate || '');
     rows.push({
-      id: `ret:${v.rec.plate}:${v.rec._key || v.rec.contractNo || ''}`,
+      id: riskReturnOverOpenId(plate),
       company: companyDisplay(v.rec.companyId),
       kind: '반납지남',
-      plate: String(v.rec.plate || ''),
+      plate,
       title: String(v.rec.contractorName || '계약자 미정'),
       detail: `반납예정 ${String(v.rec.endDate || '—')}`,
       dday: v.dday,
@@ -45,7 +54,8 @@ export function buildHomePendingRows(D: Dashboard): HomeQueueRow[] {
   }
   for (const d of D.doubleBooking) {
     rows.push({
-      id: `overlap:${d.plate}:${d.detail}`,
+      // risk embeds as 미완료:업무:… — 홈은 배차로 (표 open 없음)
+      id: `미완료:업무:overlap:${d.plate}`,
       company: '',
       kind: '배차충돌',
       plate: d.plate,
@@ -57,7 +67,7 @@ export function buildHomePendingRows(D: Dashboard): HomeQueueRow[] {
   }
   for (const p of D.penaltyPending) {
     rows.push({
-      id: `pen:${p.rec._key || p.rec.id || p.rec.plate}`,
+      id: penaltyOpenId(p.rec),
       company: companyDisplay(p.rec.companyId),
       kind: '과태료',
       plate: String(p.rec.plate || ''),
@@ -69,7 +79,7 @@ export function buildHomePendingRows(D: Dashboard): HomeQueueRow[] {
   }
   for (const t of D.todo) {
     rows.push({
-      id: `todo:${t.action}:${t.plate}`,
+      id: `미완료:업무:todo:${t.action}:${t.plate}`,
       company: '',
       kind: t.action,
       plate: t.plate,
@@ -81,7 +91,7 @@ export function buildHomePendingRows(D: Dashboard): HomeQueueRow[] {
   }
   for (const plate of D.ghostPlates) {
     rows.push({
-      id: `ghost:${plate}`,
+      id: `미완료:업무:ghost:${plate}`,
       company: '',
       kind: '서류미첨부',
       plate,
@@ -111,7 +121,7 @@ export function buildHomeRiskRows(D: Dashboard): HomeQueueRow[] {
   const rows: HomeQueueRow[] = [];
   for (const v of D.overduePay) {
     rows.push({
-      id: `misu:${v.rec._key || v.rec.contractNo || v.rec.plate}`,
+      id: riskUnpaidOpenId(v.rec),
       company: companyDisplay(v.rec.companyId),
       kind: v.ended ? '종료미수' : '운행중미수',
       plate: String(v.rec.plate || ''),
@@ -124,7 +134,7 @@ export function buildHomeRiskRows(D: Dashboard): HomeQueueRow[] {
   for (const c of D.compliance) {
     const high = c.flags.some((f) => f.severity === 'high');
     rows.push({
-      id: `comp:${c.rec._key || c.rec.plate}`,
+      id: riskComplianceOpenId(c.rec),
       company: companyDisplay(c.rec.companyId),
       kind: high ? '컴플라이언스(위험)' : '컴플라이언스',
       plate: String(c.rec.plate || ''),
@@ -149,11 +159,15 @@ export function buildHomeRiskRows(D: Dashboard): HomeQueueRow[] {
   }
   for (const e of D.expiring) {
     if ((e.dday ?? 0) >= 0) continue;
+    const plate = String(e.plate || '');
+    const isContract = String(e.sub || '').includes('계약');
     rows.push({
-      id: `exp:${e.plate}:${e.main}`,
+      id: isContract
+        ? riskReturnOverOpenId(plate)
+        : riskAgendaOverOpenId(e.agendaKey || `insp:${plate}`),
       company: '',
       kind: '만기경과',
-      plate: String(e.plate || ''),
+      plate,
       title: String(e.main || '만기'),
       detail: String(e.sub || ''),
       dday: e.dday,
@@ -199,7 +213,7 @@ export function selectTodayFocus(D: Dashboard, cap = 5): { count: number; rows: 
   return { count: all.length, rows: all.slice(0, cap) };
 }
 
-/** 홈 행 → 원장 딥링크 (?open= 패턴). */
+/** 홈 행 → 원장 딥링크 (?open= = 목적지 row id). */
 export function hrefForTodayRow(row: HomeQueueRow): string {
   const open = encodeURIComponent(row.id);
   switch (row.kind) {
@@ -210,10 +224,16 @@ export function hrefForTodayRow(row: HomeQueueRow): string {
     case '서류미첨부':
       return '/ingest';
     case '배차충돌':
-    case '반납지남':
       return '/dispatch';
     case '사고':
-      return '/repair';
+      return row.plate ? `/repair` : '/repair';
+    case '반납지남':
+    case '만기경과':
+    case '운행중미수':
+    case '종료미수':
+    case '컴플라이언스':
+    case '컴플라이언스(위험)':
+      return `/risk?open=${open}`;
     default:
       return `/risk?open=${open}`;
   }
