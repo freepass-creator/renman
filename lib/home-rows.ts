@@ -1,6 +1,8 @@
 /**
  * 홈 엑셀 행 — 미결·리스크·휴차 큐.
  * 집계는 operating-snapshot(D)만. 페이지에서 재집계 금지.
+ *
+ * TODO(2단계): ack/snoozeUntil — 무시·미루기 마킹. 지금은 조건 해소 전 무한 재노출.
  */
 import type { Dashboard } from './operating-snapshot';
 import { companyDisplay } from './companies';
@@ -132,6 +134,32 @@ export function buildHomeRiskRows(D: Dashboard): HomeQueueRow[] {
       amount: 0,
     });
   }
+  for (const r of D.repair) {
+    if (r.status !== '사고') continue;
+    rows.push({
+      id: `acc:${r.v._key || r.v.plate}`,
+      company: companyDisplay(r.v.companyId),
+      kind: '사고',
+      plate: String(r.v.plate || ''),
+      title: String(r.v.carName || r.v.plate || '사고'),
+      detail: '사고 처리중',
+      dday: null,
+      amount: 0,
+    });
+  }
+  for (const e of D.expiring) {
+    if ((e.dday ?? 0) >= 0) continue;
+    rows.push({
+      id: `exp:${e.plate}:${e.main}`,
+      company: '',
+      kind: '만기경과',
+      plate: String(e.plate || ''),
+      title: String(e.main || '만기'),
+      detail: String(e.sub || ''),
+      dday: e.dday,
+      amount: 0,
+    });
+  }
   return rows;
 }
 
@@ -144,4 +172,49 @@ export function buildHomeIdleRows(D: Dashboard): HomeIdleRow[] {
     status: r.status,
     customer: String(r.av?.rec?.contractorName || ''),
   }));
+}
+
+/** 급한 순: 미납경과·사고·만기경과 우선. */
+function todayUrgency(row: HomeQueueRow): number {
+  if (row.kind === '사고' || row.kind.includes('컴플라이언스(위험)')) return 0;
+  if (row.kind.includes('미수') || row.kind.includes('미납')) return 1;
+  if (row.kind === '만기경과' || row.kind === '반납지남' || (row.dday != null && row.dday < 0)) return 2;
+  if (row.kind === '배차충돌') return 3;
+  return 4;
+}
+
+/**
+ * 홈 «오늘 할 일» — 미결+리스크 합쳐 급함순 상위 cap건.
+ * 전체 지시문 쏟지 않음(요약만).
+ */
+export function selectTodayFocus(D: Dashboard, cap = 5): { count: number; rows: HomeQueueRow[] } {
+  const map = new Map<string, HomeQueueRow>();
+  for (const r of [...buildHomePendingRows(D), ...buildHomeRiskRows(D)]) {
+    if (!map.has(r.id)) map.set(r.id, r);
+  }
+  const all = [...map.values()].sort((a, b) =>
+    todayUrgency(a) - todayUrgency(b)
+    || (a.dday ?? 999) - (b.dday ?? 999)
+    || (b.amount || 0) - (a.amount || 0));
+  return { count: all.length, rows: all.slice(0, cap) };
+}
+
+/** 홈 행 → 원장 딥링크 (?open= 패턴). */
+export function hrefForTodayRow(row: HomeQueueRow): string {
+  const open = encodeURIComponent(row.id);
+  switch (row.kind) {
+    case '과태료':
+      return `/work?group=과태료&open=${open}`;
+    case '자금미분류':
+      return '/payments';
+    case '서류미첨부':
+      return '/ingest';
+    case '배차충돌':
+    case '반납지남':
+      return '/dispatch';
+    case '사고':
+      return '/repair';
+    default:
+      return `/risk?open=${open}`;
+  }
 }

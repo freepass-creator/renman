@@ -1,13 +1,14 @@
 'use client';
 /**
- * 대시보드(/) — 백지 신규. 관제 KPI + 법인별 요약.
+ * 대시보드(/) — 관제 KPI + 오늘 할 일 요약 + 법인별 요약.
  *   셸=LedgerFrame · Sec 접기 없음 · 색=C.* 토큰.
- *   데이터=computeKPI · kpiByCompany · operatingProfit* SSOT만.
+ *   데이터=computeKPI · selectTodayWork · operatingProfit* SSOT만.
+ *   지시 전체는 /risk 상단 InstructionStrip — 홈은 상위 5건 요약만.
  */
 import { useMemo, type CSSProperties, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import {
-  LedgerFrame, EmptyState, ExcelSheet, won, C, R, NUM, SPACE_GROUP_M,
+  LedgerFrame, EmptyState, ExcelSheet, Badge, won, C, R, NUM, SPACE_GROUP_M,
   type SheetCol,
 } from '@/components/ui';
 import { TODAY } from '@/lib/dashboard-consts';
@@ -17,7 +18,10 @@ import { buildCashLedger } from '@/lib/finance/cash-ledger';
 import {
   operatingProfit, operatingProfitByCompany, operatingProfitTrend,
 } from '@/lib/finance/operating-profit';
+import { useDashboardData } from '@/lib/use-dashboard-data';
 import { useEntityLists } from '@/lib/use-entity-lists';
+import { selectTodayWork } from '@/lib/snapshot/selectors';
+import { hrefForTodayRow } from '@/lib/home-rows';
 import { useIsMobile } from '@/lib/use-mobile';
 
 function Soft(loading: boolean, n: number | string): number | string {
@@ -104,9 +108,8 @@ const gridKpi: CSSProperties = {
 export default function DashboardPage() {
   const router = useRouter();
   const mobile = useIsMobile();
-  const { data: [contracts = [], vehicles = [], bankTx = [], cardTx = []], loading } = useEntityLists([
-    'contract', 'vehicle', 'bank_tx', 'card_tx',
-  ]);
+  const { D, contracts, vehicles, bankTx, loading } = useDashboardData();
+  const { data: [cardTx = []] } = useEntityLists(['card_tx']);
 
   const kpi = useMemo(() => computeKPI(contracts, vehicles, TODAY), [contracts, vehicles]);
   const byCo = useMemo(() => kpiByCompany(contracts, vehicles, TODAY, COMPANIES), [contracts, vehicles]);
@@ -115,6 +118,7 @@ export default function DashboardPage() {
   const opProfit = useMemo(() => operatingProfit(cash), [cash]);
   const profitByCo = useMemo(() => operatingProfitByCompany(cash), [cash]);
   const trend = useMemo(() => operatingProfitTrend(cash, 6, TODAY), [cash]);
+  const todayFocus = useMemo(() => selectTodayWork(D, 5), [D]);
 
   const coRows: CoRow[] = useMemo(() => byCo.map((k) => ({
     ...k,
@@ -197,6 +201,57 @@ export default function DashboardPage() {
               onClick={() => go('/cash')}
             />
           </div>
+
+          <Panel
+            title={`오늘 할 일${loading ? '' : ` · ${todayFocus.count}건`}`}
+            desc="급한 순 상위 5건 — 전체 지시는 리스크관리."
+          >
+            {loading ? (
+              <EmptyState variant="sec">…</EmptyState>
+            ) : todayFocus.count === 0 ? (
+              <EmptyState variant="ok">지금 처리할 일 없음</EmptyState>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {todayFocus.rows.map((row) => (
+                  <button
+                    key={row.id}
+                    type="button"
+                    onClick={() => go(hrefForTodayRow(row))}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap',
+                      width: '100%', textAlign: 'left',
+                      padding: '8px 10px',
+                      border: `1px solid ${C.line}`, borderRadius: R,
+                      background: C.card, cursor: 'pointer', fontFamily: 'inherit',
+                    }}
+                  >
+                    <Badge tone={row.kind.includes('미수') || row.kind === '사고' || row.kind.includes('위험') ? 'red' : 'amber'}>
+                      {row.kind}
+                    </Badge>
+                    <span style={{ flex: 1, minWidth: 0, fontSize: 13, fontWeight: 700, color: C.ink }}>
+                      {row.plate ? `${row.plate} · ` : ''}{row.title}
+                    </span>
+                    <span style={{ fontSize: 11, color: C.mute, whiteSpace: 'nowrap' }}>{row.detail}</span>
+                    {row.amount > 0 ? (
+                      <span style={{ fontSize: 12, fontWeight: 700, color: C.danger, fontFamily: NUM }}>{won(row.amount)}</span>
+                    ) : null}
+                  </button>
+                ))}
+                {todayFocus.count > todayFocus.rows.length ? (
+                  <button
+                    type="button"
+                    onClick={() => go('/risk')}
+                    style={{
+                      border: 'none', background: 'none', padding: '4px 2px',
+                      fontSize: 12, fontWeight: 700, color: C.brand, cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left',
+                    }}
+                  >
+                    전체 {todayFocus.count}건 보기 (리스크) →
+                  </button>
+                ) : null}
+              </div>
+            )}
+          </Panel>
 
           <div style={{
             display: 'grid',

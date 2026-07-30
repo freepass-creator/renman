@@ -2,7 +2,7 @@
 import { type EntityRecord } from '../intake/entities';
 import { computeContractView } from '../contract-ops';
 import type { Dashboard } from '../operating-snapshot';
-import { buildHomePendingRows, type HomeQueueRow } from '../home-rows';
+import { buildHomePendingRows, selectTodayFocus, type HomeQueueRow } from '../home-rows';
 
 export type ReceivablesSnapshot = {
   /** 운행중+반납 미수 합(max(0,net)) */
@@ -68,4 +68,14 @@ export type PendingWorkSnapshot = {
 export function selectPendingWork(D: Dashboard): PendingWorkSnapshot {
   const rows = buildHomePendingRows(D);
   return { count: rows.length, rows };
+}
+
+export type TodayFocusSnapshot = {
+  count: number;
+  rows: HomeQueueRow[];
+};
+
+/** 홈 «오늘 할 일» — selectTodayFocus SSOT. */
+export function selectTodayWork(D: Dashboard, cap = 5): TodayFocusSnapshot {
+  return selectTodayFocus(D, cap);
 }
