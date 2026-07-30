@@ -1,9 +1,9 @@
 'use client';
 /**
- * 대시보드(/) — 관제 KPI + 오늘 할 일 요약 + 법인별 요약.
- *   셸=LedgerFrame · Sec 접기 없음 · 색=C.* 토큰.
- *   데이터=computeKPI · selectTodayWork · operatingProfit* SSOT만.
- *   지시 노출 = 홈 «오늘 할 일» 상위 5건 요약만(지시 스트립 UI는 사장님 지시로 제거 — 리스크 표 자체가 목록).
+ * 대시보드(/) — 메인=관제 KPI·법인별·손익추이, 우측 패널=«할 일·미점검» 시점별.
+ *   셸=LedgerFrame(body+sidePanel — 원장과 동일 2분할 규격) · Sec 접기 없음 · 색=C.* 토큰.
+ *   데이터=computeKPI · selectTodayPanel · operatingProfit* SSOT만.
+ *   지시 노출 = 우측 패널(경과→오늘→이번 주→이번 달→상시 미점검, 클릭=딥링크). 접기·닫기 없음.
  */
 import { useMemo, type CSSProperties, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
@@ -20,8 +20,8 @@ import {
 } from '@/lib/finance/operating-profit';
 import { useDashboardData } from '@/lib/use-dashboard-data';
 import { useEntityLists } from '@/lib/use-entity-lists';
-import { selectTodayWork } from '@/lib/snapshot/selectors';
-import { hrefForTodayRow } from '@/lib/home-rows';
+import { selectTodayPanel } from '@/lib/snapshot/selectors';
+import { hrefForTodayRow, type DueBucket, type HomeQueueRow } from '@/lib/home-rows';
 import { useIsMobile } from '@/lib/use-mobile';
 
 function Soft(loading: boolean, n: number | string): number | string {
@@ -99,6 +99,55 @@ function Panel({ title, desc, children }: { title: string; desc: string; childre
 
 type CoRow = KPI & { company: string; profit: number };
 
+/* ── 우측 «할 일·미점검» 패널 — 시점별 버킷. 원장 상세패널과 같은 클래스·위계. ── */
+
+const BUCKET_TONE: Record<DueBucket, 'red' | 'amber' | 'gray'> = {
+  경과: 'red', 오늘: 'amber', '이번 주': 'amber', '이번 달': 'gray', 상시: 'gray',
+};
+const BUCKET_LABEL: Record<DueBucket, string> = {
+  경과: '경과 (기한 지남)', 오늘: '오늘', '이번 주': '이번 주', '이번 달': '이번 달', 상시: '상시 미점검',
+};
+const BUCKET_CAP = 12;
+
+function rowTone(row: HomeQueueRow): 'red' | 'amber' | 'gray' {
+  if ((row.dday != null && row.dday < 0) || row.kind === '사고' || row.kind.includes('위험') || row.kind.includes('미수')) return 'red';
+  if (row.dday == null) return 'gray';
+  return 'amber';
+}
+
+function TodoRow({ row, onGo }: { row: HomeQueueRow; onGo: (href: string) => void }) {
+  const overdue = row.dday != null && row.dday < 0;
+  return (
+    <button
+      type="button"
+      onClick={() => onGo(hrefForTodayRow(row))}
+      style={{
+        display: 'flex', flexDirection: 'column', gap: 3, width: '100%', textAlign: 'left',
+        padding: '7px 9px', border: `1px solid ${C.line}`, borderRadius: R,
+        background: overdue ? 'var(--danger-tint)' : C.card, cursor: 'pointer', fontFamily: 'inherit',
+      }}
+    >
+      <span style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+        <Badge tone={rowTone(row)}>{row.kind}</Badge>
+        <span style={{
+          flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+          fontSize: 12.5, fontWeight: 700, color: C.ink,
+        }}>
+          {row.plate ? `${row.plate} · ` : ''}{row.title}
+        </span>
+      </span>
+      <span style={{ display: 'flex', alignItems: 'baseline', gap: 8, fontSize: 11, color: C.mute }}>
+        <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {row.detail}
+        </span>
+        {row.amount > 0 ? (
+          <span style={{ fontWeight: 700, color: C.danger, fontFamily: NUM, whiteSpace: 'nowrap' }}>{won(row.amount)}</span>
+        ) : null}
+      </span>
+    </button>
+  );
+}
+
 const gridKpi: CSSProperties = {
   display: 'grid',
   gridTemplateColumns: 'repeat(5, minmax(0, 1fr))',
@@ -118,7 +167,7 @@ export default function DashboardPage() {
   const opProfit = useMemo(() => operatingProfit(cash), [cash]);
   const profitByCo = useMemo(() => operatingProfitByCompany(cash), [cash]);
   const trend = useMemo(() => operatingProfitTrend(cash, 6, TODAY), [cash]);
-  const todayFocus = useMemo(() => selectTodayWork(D, 5), [D]);
+  const todayPanel = useMemo(() => selectTodayPanel(D), [D]);
 
   const coRows: CoRow[] = useMemo(() => byCo.map((k) => ({
     ...k,
@@ -151,8 +200,51 @@ export default function DashboardPage() {
   return (
     <LedgerFrame
       title="대시보드"
-      meta="한눈 지표"
+      meta="한눈 지표 · 우측 = 할 일·미점검"
       showColView={false}
+      sidePanel={(
+        <section className="ledger-record-panel" aria-label="할 일·미점검">
+          <header className="ledger-record-panel__header">
+            <div className="ledger-record-panel__heading">
+              <div className="ledger-record-panel__title">할 일·미점검</div>
+              {!loading && (
+                <div className="ledger-record-panel__meta">
+                  <Badge tone={todayPanel.count > 0 ? 'red' : 'green'}>{todayPanel.count}건</Badge>
+                </div>
+              )}
+            </div>
+          </header>
+          <div className="ledger-record-panel__body" style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: 10 }}>
+            {loading ? (
+              <EmptyState variant="sec">…</EmptyState>
+            ) : todayPanel.count === 0 ? (
+              <EmptyState variant="ok">오늘 챙길 일이 없습니다</EmptyState>
+            ) : (
+              todayPanel.groups.map((g) => (
+                <div key={g.bucket} style={{ marginBottom: 14 }}>
+                  <div style={{
+                    display: 'flex', alignItems: 'center', gap: 6, padding: '2px 2px 7px',
+                    fontSize: 11.5, fontWeight: 600, color: g.bucket === '경과' ? C.danger : C.mute,
+                  }}>
+                    {BUCKET_LABEL[g.bucket]}
+                    <Badge tone={BUCKET_TONE[g.bucket]}>{g.rows.length}</Badge>
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    {g.rows.slice(0, BUCKET_CAP).map((row) => (
+                      <TodoRow key={row.id} row={row} onGo={go} />
+                    ))}
+                    {g.rows.length > BUCKET_CAP ? (
+                      <span style={{ fontSize: 11, color: C.faint, padding: '1px 2px' }}>
+                        외 {g.rows.length - BUCKET_CAP}건 — 해당 원장에서 확인
+                      </span>
+                    ) : null}
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </section>
+      )}
       body={(
         <div style={{
           display: 'flex', flexDirection: 'column', gap: SPACE_GROUP_M,
@@ -201,57 +293,6 @@ export default function DashboardPage() {
               onClick={() => go('/cash')}
             />
           </div>
-
-          <Panel
-            title={`오늘 할 일${loading ? '' : ` · ${todayFocus.count}건`}`}
-            desc="급한 순 상위 5건 — 전체 지시는 리스크관리."
-          >
-            {loading ? (
-              <EmptyState variant="sec">…</EmptyState>
-            ) : todayFocus.count === 0 ? (
-              <EmptyState variant="ok">지금 처리할 일 없음</EmptyState>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                {todayFocus.rows.map((row) => (
-                  <button
-                    key={row.id}
-                    type="button"
-                    onClick={() => go(hrefForTodayRow(row))}
-                    style={{
-                      display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap',
-                      width: '100%', textAlign: 'left',
-                      padding: '8px 10px',
-                      border: `1px solid ${C.line}`, borderRadius: R,
-                      background: C.card, cursor: 'pointer', fontFamily: 'inherit',
-                    }}
-                  >
-                    <Badge tone={row.kind.includes('미수') || row.kind === '사고' || row.kind.includes('위험') ? 'red' : 'amber'}>
-                      {row.kind}
-                    </Badge>
-                    <span style={{ flex: 1, minWidth: 0, fontSize: 13, fontWeight: 700, color: C.ink }}>
-                      {row.plate ? `${row.plate} · ` : ''}{row.title}
-                    </span>
-                    <span style={{ fontSize: 11, color: C.mute, whiteSpace: 'nowrap' }}>{row.detail}</span>
-                    {row.amount > 0 ? (
-                      <span style={{ fontSize: 12, fontWeight: 700, color: C.danger, fontFamily: NUM }}>{won(row.amount)}</span>
-                    ) : null}
-                  </button>
-                ))}
-                {todayFocus.count > todayFocus.rows.length ? (
-                  <button
-                    type="button"
-                    onClick={() => go('/risk')}
-                    style={{
-                      border: 'none', background: 'none', padding: '4px 2px',
-                      fontSize: 12, fontWeight: 700, color: C.brand, cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left',
-                    }}
-                  >
-                    전체 {todayFocus.count}건 보기 (리스크) →
-                  </button>
-                ) : null}
-              </div>
-            )}
-          </Panel>
 
           <div style={{
             display: 'grid',

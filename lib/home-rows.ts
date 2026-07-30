@@ -186,6 +186,86 @@ export function buildHomeIdleRows(D: Dashboard): HomeIdleRow[] {
   }));
 }
 
+/** 다가오는 만기·반납 — D.expiring(계약 D8~30·보험/검사 ≤30)·returnFlow(D0~7)의 미래분.
+ *  경과분은 pending/risk 빌더가 담당(중복 없음). 레코드 딥링크 대신 /risk?group=만기 페이지 링크. */
+export function buildHomeUpcomingRows(D: Dashboard): HomeQueueRow[] {
+  const rows: HomeQueueRow[] = [];
+  for (const v of D.returnFlow) {
+    const dd = v.dday ?? null;
+    if (dd == null || dd < 0) continue;
+    const plate = String(v.rec.plate || '');
+    rows.push({
+      id: `up:ret:${plate}:${String(v.rec.endDate || '')}`,
+      company: companyDisplay(v.rec.companyId),
+      kind: '반납임박',
+      plate,
+      title: String(v.rec.contractorName || '계약자 미정'),
+      detail: `반납예정 ${String(v.rec.endDate || '—')} · D-${dd}`,
+      dday: dd,
+      amount: Number(v.net) || 0,
+    });
+  }
+  for (const e of D.expiring) {
+    const dd = e.dday ?? null;
+    if (dd == null || dd < 0) continue;
+    rows.push({
+      id: `up:${e.agendaKey || `exp:${e.plate}`}`,
+      company: '',
+      kind: '만기임박',
+      plate: String(e.plate || ''),
+      title: String(e.main || '만기'),
+      detail: String(e.sub || ''),
+      dday: dd,
+      amount: 0,
+    });
+  }
+  return rows;
+}
+
+/** 시점 버킷 — 홈 패널·추후 리스크/업무 공용. 손롤 분기 금지, 이 함수만. */
+export type DueBucket = '경과' | '오늘' | '이번 주' | '이번 달' | '상시';
+export const DUE_BUCKETS: DueBucket[] = ['경과', '오늘', '이번 주', '이번 달', '상시'];
+export function dueBucketOf(dday: number | null): DueBucket {
+  if (dday == null) return '상시';
+  if (dday < 0) return '경과';
+  if (dday === 0) return '오늘';
+  if (dday <= 7) return '이번 주';
+  return '이번 달';
+}
+
+export type TodayBucketGroup = { bucket: DueBucket; rows: HomeQueueRow[] };
+
+/**
+ * 홈 우측 패널 «할 일·미점검» — 미결+리스크+다가오는 만기를 시점별로.
+ * 경과 → 오늘 → 이번 주 → 이번 달 → 상시 미점검. 빈 버킷은 제외.
+ */
+export function selectTodayPanel(D: Dashboard): { count: number; groups: TodayBucketGroup[] } {
+  const map = new Map<string, HomeQueueRow>();
+  for (const r of [...buildHomePendingRows(D), ...buildHomeRiskRows(D), ...buildHomeUpcomingRows(D)]) {
+    if (!map.has(r.id)) map.set(r.id, r);
+  }
+  const byBucket = new Map<DueBucket, HomeQueueRow[]>();
+  for (const r of map.values()) {
+    const b = dueBucketOf(r.dday);
+    const list = byBucket.get(b) || [];
+    list.push(r);
+    byBucket.set(b, list);
+  }
+  let count = 0;
+  const groups: TodayBucketGroup[] = [];
+  for (const b of DUE_BUCKETS) {
+    const list = byBucket.get(b);
+    if (!list?.length) continue;
+    list.sort((a, x) =>
+      todayUrgency(a) - todayUrgency(x)
+      || (a.dday ?? 999) - (x.dday ?? 999)
+      || (x.amount || 0) - (a.amount || 0));
+    count += list.length;
+    groups.push({ bucket: b, rows: list });
+  }
+  return { count, groups };
+}
+
 /** 급한 순: 미납경과·사고·만기경과 우선. */
 function todayUrgency(row: HomeQueueRow): number {
   if (row.kind === '사고' || row.kind.includes('컴플라이언스(위험)')) return 0;
@@ -225,14 +305,20 @@ export function hrefForTodayRow(row: HomeQueueRow): string {
       return '/dispatch';
     case '사고':
       return row.plate ? `/repair` : '/repair';
+    case '컴플라이언스':
+    case '컴플라이언스(위험)':
+      // 컴플라이언스는 리스크 표에 없음(4그룹 원복) → 정합성 페이지가 담당.
+      return `/integrity?open=${open}`;
+    case '반납임박':
+    case '만기임박':
+      // 미래분(D8~30 포함)은 개별 레코드가 리스크 표에 없을 수 있어 페이지 링크.
+      return '/risk?group=만기';
     case '반납지남':
     case '만기경과':
     case '운행중미수':
     case '종료미수':
-    case '컴플라이언스':
-    case '컴플라이언스(위험)':
-      return `/integrity?open=${open}`;
     default:
+      // 리스크 표 row id SSOT와 일치 — 그 건이 바로 열림.
       return `/risk?open=${open}`;
   }
 }

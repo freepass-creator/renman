@@ -79,3 +79,6 @@ export type TodayFocusSnapshot = {
 export function selectTodayWork(D: Dashboard, cap = 5): TodayFocusSnapshot {
   return selectTodayFocus(D, cap);
 }
+
+/** 홈 우측 패널 «할 일·미점검» 시점별 — home-rows selectTodayPanel SSOT. */
+export { selectTodayPanel, type TodayBucketGroup, type DueBucket } from '../home-rows';
