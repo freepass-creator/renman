@@ -1,11 +1,12 @@
 'use client';
 /**
  * 리스크관리 — 예외 통합 원장 (LedgerFrame).
- * 데이터 = lib/risk-ledger SSOT. 칩: 전체·미완료·미납·만기·휴차.
- * 상세 = RISK_DETAIL_SECTIONS · 미납 조치(내용증명).
- * 대량 = 행 선택 → LedgerSelectionBar「내용증명 일괄」(⋯도구 없음).
+ *   상단 = 지시(무엇을 하라 · buildInstructionOrders) · 표 = 어느 건(risk-ledger).
+ *   대량 = 행 선택 → LedgerSelectionBar「내용증명 일괄».
+ * TODO(2단계): ack/snoozeUntil — 지시 무시·미루기.
  */
-import { useMemo, useState } from 'react';
+import { Suspense, useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { TODAY } from '@/lib/dashboard-consts';
 import { useDashboardData } from '@/lib/use-dashboard-data';
 import { textMatch } from '@/lib/search-match';
@@ -14,10 +15,12 @@ import { RISK_BASIC_COLS, RISK_DETAIL_SECTIONS, RISK_EXPANDED_COLS } from '@/lib
 import { LEDGER_EMPTY } from '@/lib/ledger-empty';
 import { latestDateOf } from '@/lib/ledger-stats';
 import { sendNoticeCert, sendNoticeCertBulk } from '@/lib/docs/send-notice';
+import { buildInstructionOrders } from '@/lib/work-orders';
 import { useSession } from '@/lib/session';
 import { toast } from '@/lib/toast';
+import { InstructionStrip } from '@/components/InstructionStrip';
 import {
-  Badge, Btn, C, LedgerFilterButton, LedgerFilterFields, LedgerFilterPanel, LedgerFrame, LedgerRecordPanel, LedgerSelectionBar, PeriodBar, Search,
+  Badge, Btn, C, LedgerFilterButton, LedgerFilterFields, LedgerFilterPanel, LedgerFrame, LedgerRecordPanel, LedgerSelectionBar, PageLoading, PeriodBar, Search,
   useConfirm, won,
   type LedgerColView,
 } from '@/components/ui';
@@ -28,11 +31,12 @@ import {
 
 type GroupFilter = '전체' | RiskSheetGroup;
 
-export default function RiskPage() {
+function RiskLedgerInner() {
   const mobile = useIsMobile();
   const confirm = useConfirm();
+  const searchParams = useSearchParams();
   const { companyId } = useSession();
-  const { contracts, vehicles, insurances, penalties, history, bankTx, loading } = useDashboardData();
+  const { D, contracts, vehicles, insurances, penalties, history, bankTx, loading } = useDashboardData();
   const [q, setQ] = useState('');
   const [group, setGroup] = useState<GroupFilter>('전체');
   const [range, setRange] = useState({ from: '', to: '' });
@@ -41,6 +45,21 @@ export default function RiskPage() {
   const [noticeSel, setNoticeSel] = useState<Set<string>>(() => new Set());
   const [filterOpen, setFilterOpen] = useState(false);
   const [detailFilters, setDetailFilters] = useState(() => emptyFilterValues(RISK_FILTER_DEFS));
+  const [integrityCount, setIntegrityCount] = useState(0);
+
+  useEffect(() => {
+    let cancelled = false;
+    const plates = contracts.map((c) => String(c.plate || ''));
+    import('@/lib/integrity/doc-audit').then(({ docAuditForPlates }) => {
+      if (!cancelled) setIntegrityCount(docAuditForPlates(plates).length);
+    }).catch(() => { if (!cancelled) setIntegrityCount(0); });
+    return () => { cancelled = true; };
+  }, [contracts]);
+
+  const orders = useMemo(
+    () => buildInstructionOrders(D, { contracts, integrityCount }, 'risk'),
+    [D, contracts, integrityCount],
+  );
 
   const allRows = useMemo(
     () => buildRiskSheetRows(vehicles, contracts, insurances, penalties, history, TODAY, bankTx),
@@ -58,6 +77,21 @@ export default function RiskPage() {
     }
     return true;
   }), [searched, group, range.from, range.to]);
+
+  useEffect(() => {
+    const open = searchParams.get('open');
+    if (!open || !allRows.length) return;
+    const hit = allRows.find((r) =>
+      r.id === open
+      || r.id === decodeURIComponent(open)
+      || r.plate === open
+      || r.contractKey === open,
+    );
+    if (hit) {
+      setSelected(hit);
+      if (hit.group) setGroup(hit.group);
+    }
+  }, [searchParams, allRows]);
 
   const latest = useMemo(() => latestDateOf(allRows, (r) => r.dueDate, TODAY), [allRows]);
   const counts = useMemo(() => countRiskSheetGroups(searched), [searched]);
@@ -108,6 +142,14 @@ export default function RiskPage() {
     <LedgerFrame
       title="리스크관리"
       meta="챙길 예외·미완료·미납·만기·휴차"
+      hint={!loading ? (
+        <InstructionStrip
+          orders={orders}
+          title="지시 (무엇을 하라)"
+          desc="눌러서 이동 · 아래 표는 어느 건"
+          emptyOk
+        />
+      ) : undefined}
       filters={(
         <>
           <Search
@@ -204,5 +246,13 @@ export default function RiskPage() {
         />
       ) : null}
     />
+  );
+}
+
+export default function RiskPage() {
+  return (
+    <Suspense fallback={<PageLoading />}>
+      <RiskLedgerInner />
+    </Suspense>
   );
 }
