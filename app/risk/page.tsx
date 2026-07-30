@@ -31,6 +31,8 @@ import {
 
 type GroupFilter = '전체' | RiskSheetGroup;
 
+const RISK_GROUPS: RiskSheetGroup[] = ['미완료', '미납', '컴플라이언스', '만기', '보증금미반환', '휴차'];
+
 function RiskLedgerInner() {
   const mobile = useIsMobile();
   const confirm = useConfirm();
@@ -78,6 +80,15 @@ function RiskLedgerInner() {
     return true;
   }), [searched, group, range.from, range.to]);
 
+  // ?group= · ?open= — 지시 스트립·홈 딥링크. group SSOT = RiskSheetGroup.
+  useEffect(() => {
+    const g = searchParams.get('group');
+    if (g && (RISK_GROUPS as string[]).includes(g)) {
+      setGroup(g as RiskSheetGroup);
+      setDetailFilters((prev) => ({ ...prev, group: g }));
+    }
+  }, [searchParams]);
+
   useEffect(() => {
     const open = searchParams.get('open');
     if (!open || !allRows.length) return;
@@ -89,7 +100,10 @@ function RiskLedgerInner() {
     );
     if (hit) {
       setSelected(hit);
-      if (hit.group) setGroup(hit.group);
+      if (hit.group) {
+        setGroup(hit.group);
+        setDetailFilters((prev) => ({ ...prev, group: hit.group }));
+      }
     }
   }, [searchParams, allRows]);
 
@@ -184,7 +198,7 @@ function RiskLedgerInner() {
               setDetailFilters((prev) => ({ ...prev, [key]: value }));
             }}
             options={{
-              group: ['미완료', '미납', '만기', '휴차'],
+              group: RISK_GROUPS,
             }}
           />
         </LedgerFilterPanel>
@@ -193,7 +207,9 @@ function RiskLedgerInner() {
         <span style={{ fontSize: 12.5, color: C.mute, whiteSpace: 'nowrap' }}>
           미완료 <b style={{ color: counts.미완료 ? C.danger : C.ok }}>{counts.미완료}</b>
           {' · '}미납 <b style={{ color: counts.미납 ? C.danger : C.ink }}>{counts.미납}</b>
+          {' · '}컴플 <b style={{ color: counts.컴플라이언스 ? C.danger : C.ink }}>{counts.컴플라이언스}</b>
           {' · '}만기 <b style={{ color: counts.만기 ? C.warn : C.ink }}>{counts.만기}</b>
+          {' · '}보증금 <b style={{ color: counts.보증금미반환 ? C.warn : C.ink }}>{counts.보증금미반환}</b>
           {' · '}휴차 <b>{counts.휴차}</b>
         </span>
       )}

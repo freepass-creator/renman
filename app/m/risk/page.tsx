@@ -9,7 +9,7 @@ import { LEDGER_EMPTY } from '@/lib/ledger-empty';
 import { Rows, ObjRow, EmptyState, PageLoading, FilterChips, C } from '@/components/ui';
 import { MHead } from '@/components/m/MHead';
 
-const GROUPS: RiskSheetGroup[] = ['미완료', '미납', '만기', '휴차'];
+const GROUPS: RiskSheetGroup[] = ['미완료', '미납', '컴플라이언스', '만기', '보증금미반환', '휴차'];
 type GroupFilter = '전체' | RiskSheetGroup;
 
 export default function MRisk() {
@@ -30,7 +30,7 @@ export default function MRisk() {
 
   return (
     <>
-      <MHead title="리스크" sub="미완료 · 미납 · 만기 · 휴차" color={C.danger} />
+      <MHead title="리스크" sub="미완료 · 미납 · 컴플 · 만기 · 보증금 · 휴차" color={C.danger} />
       {loading ? <PageLoading />
         : (
           <div style={{ padding: '12px 14px 24px', display: 'flex', flexDirection: 'column', gap: 16 }}>

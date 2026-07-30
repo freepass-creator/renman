@@ -67,7 +67,8 @@ export function buildInstructionOrders(
       id: 'unpaid',
       n: D.overduePay.length,
       text: '미납(미수) — 미수관리·리스크에서 회수 조치(시동제어·내용증명 등)하세요',
-      to: 'receivables',
+      to: 'risk',
+      query: '?group=미납',
       danger: true,
       priority: 0,
     });
@@ -76,9 +77,9 @@ export function buildInstructionOrders(
     orders.push({
       id: 'compliance',
       n: D.compliance.length,
-      text: '법령·컴플라이언스 경고 — 무면허·무보험 등. 리스크관리에서 확인하세요',
+      text: '법령·컴플라이언스 경고 — 무면허·무보험·면허만기 등. 리스크관리에서 확인하세요',
       to: 'risk',
-      query: '?group=미완료',
+      query: '?group=컴플라이언스',
       danger: true,
       priority: 0,
     });
@@ -112,6 +113,7 @@ export function buildInstructionOrders(
         n: pend.length,
         text: '보증금 미반환 — 종료 계약 정산(반환/충당)을 처리하세요',
         to: 'risk',
+        query: '?group=보증금미반환',
         danger: false,
         priority: 4,
       });

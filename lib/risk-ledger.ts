@@ -13,6 +13,12 @@ import { computeContractView } from '@/lib/contract-ops';
 import { selectReceivables } from '@/lib/snapshot/selectors';
 import { computeDashboard } from '@/lib/operating-snapshot';
 import { buildHomePendingRows } from '@/lib/home-rows';
+import { checkCompliance } from '@/lib/compliance';
+import { depositView } from '@/lib/deposit';
+import { normPlate } from '@/lib/plate';
+import {
+  riskComplianceOpenId, riskDepositOpenId, riskUnpaidOpenId,
+} from '@/lib/ledger-open-ids';
 import { companyShort } from '@/lib/companies';
 import type { BadgeTone } from '@/components/ui/misc';
 import type { RailTone } from '@/components/ui';
@@ -23,7 +29,7 @@ import { workRailStyle } from '@/lib/work-rail';
 /** 만기 칩 경계 — D≤이 값(경과 포함은 미완료, 임박만 만기). buildAgenda 임박과 동일. */
 export const RISK_DDAY_BOUND = 7;
 
-export type RiskSheetGroup = '미완료' | '미납' | '만기' | '휴차';
+export type RiskSheetGroup = '미완료' | '미납' | '만기' | '휴차' | '컴플라이언스' | '보증금미반환';
 export type RiskTone = 'danger' | 'warn' | 'brand' | 'mute';
 
 export type RiskSheetRow = {
@@ -56,9 +62,13 @@ const GROUP_TONE: Record<RiskSheetGroup, { tone: RiskTone; badgeTone: BadgeTone 
   미납: { tone: 'danger', badgeTone: 'red' },
   만기: { tone: 'warn', badgeTone: 'amber' },
   휴차: { tone: 'mute', badgeTone: 'gray' },
+  컴플라이언스: { tone: 'danger', badgeTone: 'red' },
+  보증금미반환: { tone: 'warn', badgeTone: 'amber' },
 };
 
-const GROUP_RANK: Record<RiskSheetGroup, number> = { 미완료: 0, 미납: 1, 만기: 2, 휴차: 3 };
+const GROUP_RANK: Record<RiskSheetGroup, number> = {
+  미완료: 0, 미납: 1, 컴플라이언스: 2, 만기: 3, 보증금미반환: 4, 휴차: 5,
+};
 
 function ddayLabel(d: number | null): string {
   if (d == null) return LEDGER_EMPTY.dash;
@@ -187,7 +197,7 @@ export function buildRiskSheetRows(
     const plate = String(v.rec.plate || '');
     const fr = plate ? byPlate.get(plate) : undefined;
     push(rowOf('미납', {
-      id: `미납:${v.rec._key || v.rec.contractNo || plate}`,
+      id: riskUnpaidOpenId(v.rec),
       kind: v.ended ? '반환미수' : '미납',
       ...companyOf(fr, v.rec),
       plate,
@@ -199,6 +209,63 @@ export function buildRiskSheetRows(
       amount: v.net,
       status: v.ended ? '반환미수' : '미납',
       contractKey: String(v.rec._key || ''),
+    }));
+  }
+
+  // ── 컴플라이언스 — checkCompliance SSOT (새 판정 금지) ──
+  const vehByPlate = new Map(vehicles.map((vv) => [normPlate(vv.plate), vv]));
+  const complianceRows = contracts
+    .map((c) => {
+      const v = computeContractView(c, today);
+      if (v.status !== '운행') return null;
+      const flags = checkCompliance(c, vehByPlate.get(normPlate(c.plate)) || null, today);
+      if (!flags.length) return null;
+      return { rec: c, view: v, flags };
+    })
+    .filter(Boolean) as { rec: EntityRecord; view: ReturnType<typeof computeContractView>; flags: ReturnType<typeof checkCompliance> }[];
+  complianceRows.sort((a, b) =>
+    (b.flags.some((f) => f.severity === 'high') ? 1 : 0) - (a.flags.some((f) => f.severity === 'high') ? 1 : 0));
+  for (const x of complianceRows) {
+    const plate = String(x.rec.plate || '');
+    const fr = plate ? byPlate.get(plate) : undefined;
+    const top = x.flags.find((f) => f.severity === 'high') || x.flags[0];
+    push(rowOf('컴플라이언스', {
+      id: riskComplianceOpenId(x.rec),
+      kind: top.label,
+      ...companyOf(fr, x.rec),
+      plate,
+      customer: String(x.rec.contractorName || LEDGER_EMPTY.none),
+      phone: phoneOf(fr, String(x.rec.contractorPhone || '')),
+      carName: fr ? carNameOf(fr) : String(x.rec.carName || LEDGER_EMPTY.dash),
+      due: top.detail || LEDGER_EMPTY.dash,
+      dueDate: '',
+      amount: 0,
+      status: top.severity === 'high' ? '위험' : '주의',
+      contractKey: String(x.rec._key || ''),
+    }));
+  }
+
+  // ── 보증금 미반환 — depositView SSOT ──
+  const depositPend = contracts
+    .map((c) => ({ c, d: depositView(c, today) }))
+    .filter((x) => x.d.pendingRefund)
+    .sort((a, b) => String(b.c.returnedDate || '').localeCompare(String(a.c.returnedDate || '')));
+  for (const { c, d } of depositPend) {
+    const plate = String(c.plate || '');
+    const fr = plate ? byPlate.get(plate) : undefined;
+    push(rowOf('보증금미반환', {
+      id: riskDepositOpenId(c),
+      kind: '보증금미반환',
+      ...companyOf(fr, c),
+      plate,
+      customer: String(c.contractorName || LEDGER_EMPTY.none),
+      phone: phoneOf(fr, String(c.contractorPhone || '')),
+      carName: fr ? carNameOf(fr) : String(c.carName || LEDGER_EMPTY.dash),
+      due: String(c.returnedDate || '').slice(0, 10) || LEDGER_EMPTY.dash,
+      dueDate: String(c.returnedDate || '').slice(0, 10),
+      amount: d.refund || d.addCharge || d.deposit,
+      status: d.addCharge > 0 ? '추가청구' : '반환대기',
+      contractKey: String(c._key || ''),
     }));
   }
 
@@ -245,9 +312,11 @@ export function buildRiskSheetRows(
   const dash = computeDashboard({ contracts, vehicles, insurances, penalties, bankTx }, today);
   for (const p of buildHomePendingRows(dash)) {
     if (p.kind === '반납지남') continue;
+    // 홈이 이미 목적지 id(미완료:…)를 쓰면 그대로, 아니면 업무 접두.
+    const id = p.id.startsWith('미완료:') ? p.id : `미완료:업무:${p.id}`;
     const fr = p.plate ? byPlate.get(p.plate) : undefined;
     push(rowOf('미완료', {
-      id: `미완료:업무:${p.id}`,
+      id,
       kind: p.kind,
       ...companyOf(fr),
       plate: p.plate,
@@ -288,7 +357,9 @@ export function buildRiskSheetRows(
 export type RiskGroupCounts = Record<'전체' | RiskSheetGroup, number>;
 
 export function countRiskSheetGroups(rows: RiskSheetRow[]): RiskGroupCounts {
-  const counts: RiskGroupCounts = { 전체: rows.length, 미완료: 0, 미납: 0, 만기: 0, 휴차: 0 };
+  const counts: RiskGroupCounts = {
+    전체: rows.length, 미완료: 0, 미납: 0, 만기: 0, 휴차: 0, 컴플라이언스: 0, 보증금미반환: 0,
+  };
   for (const r of rows) counts[r.group]++;
   return counts;
 }
