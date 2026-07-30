@@ -6,9 +6,9 @@ import {
 import { paymentTimingOf } from './schema/contract';
 import { workRailStyle } from './work-rail';
 import { LEDGER_EMPTY } from './ledger-empty';
-import { assetLifecycleTone } from './domain/asset-lifecycle';
+import { assetLifecycle, assetLifecycleTone } from './domain/asset-lifecycle';
 import {
-  OUT, VEHICLE_BUY_PLAN, VEHICLE_DISPOSE_PLAN, VEHICLE_REG_PLAN, VEHICLE_REPAIR,
+  VEHICLE_IDLE, VEHICLE_REPAIR,
   isContractEndedStatus,
 } from './domain/status';
 import { dday } from './dashboard-consts';
@@ -23,25 +23,18 @@ const numberOrNull = (v: number | null, suffix = '') => (
   v == null ? LEDGER_EMPTY.dash : `${v.toLocaleString('ko-KR')}${suffix}`
 );
 
-/** rail 전용 보강 — domain 집합 밖 표시값(도메인 분류/집계는 건드리지 않음). */
-const RAIL_BUY = new Set(['발주', '상품', '상품대기', '상품화']);
-const RAIL_DISPOSE_PLAN = new Set(['매물', '상담', '매각계약']);
-const RAIL_DISPOSE_DONE = new Set(['폐차', '전손', '반납']);
-const RAIL_IDLE = new Set(['휴차', '유휴', '대기', '연장대기', '종료대기']);
-
 /**
- * 자산 원장 rail — 생애주기 4분류(함대 fleetRail·차종 비재사용).
- * 구매예정=brand · 보유(운행=none/정비=warn/사고=danger/휴차=warn) · 처분예정=warn · 처분완료=mute.
+ * 자산 원장 rail — `assetLifecycle` 판정 SSOT → 톤 매핑.
+ * 구매예정=brand · 처분예정=warn · 처분완료=mute · 보유중=가동상태(사고 danger · 정비/휴차 warn · 운행 none).
  */
 export function assetRail(r: Pick<AssetMasterRow, 'disposed' | 'status'>): RailTone {
   const s = String(r.status || '');
-  if (r.disposed || OUT.has(s) || RAIL_DISPOSE_DONE.has(s)) return 'mute';
-  if (VEHICLE_DISPOSE_PLAN.has(s) || RAIL_DISPOSE_PLAN.has(s)) return 'warn';
-  if (VEHICLE_BUY_PLAN.has(s) || VEHICLE_REG_PLAN.has(s) || RAIL_BUY.has(s)) return 'brand';
+  const lc = assetLifecycle(s, r.disposed);
+  if (lc === '처분완료') return 'mute';
+  if (lc === '처분예정') return 'warn';
+  if (lc === '구매예정') return 'brand';
   if (s === '사고') return 'danger';
-  if (VEHICLE_REPAIR.has(s)) return 'warn';
-  if (s === '운행') return 'none';
-  if (RAIL_IDLE.has(s)) return 'warn';
+  if (VEHICLE_REPAIR.has(s) || VEHICLE_IDLE.has(s)) return 'warn';
   return 'none';
 }
 
