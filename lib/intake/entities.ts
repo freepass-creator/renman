@@ -249,6 +249,7 @@ export const ENTITIES: Record<string, Entity> = {
       { key: 'contractorPhone', label: '연락처', type: 'text', ocrFrom: 'contractor_phone' },
       { key: 'contractorBirth', label: '생년월일', type: 'date', ocrFrom: 'contractor_birth', note: '만나이 산출 → 운전자 연령·보험 허용연령 대조. 주민번호는 저장하지 않음' },
       { key: 'contractorLicenseNo', label: '면허번호', type: 'text', ocrFrom: 'contractor_license_no' },
+      { key: 'contractorLicenseExpiry', label: '면허만기', type: 'date', manual: true, note: '대여 시점 스냅샷. 계약서 OCR에 만기 키 없음 → 수기' },
       { key: 'contractorAddress', label: '주소', type: 'text', ocrFrom: 'contractor_address' },
       { key: 'plate', label: '차량번호', type: 'text', ocrFrom: 'car_number' },
       { key: 'carName', label: '차종', type: 'text', ocrFrom: 'car_name' },

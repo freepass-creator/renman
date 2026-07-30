@@ -318,6 +318,7 @@ const CONTRACT_COL_CATALOG: SheetCol<ContractMasterRow>[] = [
   C0.plate, C0.carName, C0.contractDate, C0.startDate, C0.endDate,
   C0.monthlyRent, C0.deposit, C0.paymentDay, C0.paymentTiming, C0.paymentMethod, C0.risk, C0.net, C0.alert,
   cx('contractorBirth', '생년월일', { date: true }), cx('contractorLicenseNo', '면허번호'),
+  cx('contractorLicenseExpiry', '면허만기', { date: true }),
   cx('licenseType', '면허종별'), cx('contractorAddress', '주소'),
   cx('rentalMonths', '대여기간', { num: '개월', align: 'r', priority: 3 }), cx('annualMileageLimit', '연주행한도', { num: 'km', align: 'r' }),
   cx('deliveredDate', '인도일', { date: true }), cx('returnScheduledDate', '반납예정일', { date: true }),
@@ -385,7 +386,7 @@ export const CONTRACT_SHEET_KEYS: SheetViewKeys = {
     'company', 'contractNo', 'status', 'rentalType', 'contractorName', 'contractorPhone',
     'plate', 'carName', 'contractDate', 'startDate', 'endDate',
     'monthlyRent', 'deposit', 'paymentDay', 'paymentTiming', 'paymentMethod', 'riskLabel', 'net', 'alert',
-    'contractorBirth', 'contractorLicenseNo', 'licenseType', 'contractorAddress',
+    'contractorBirth', 'contractorLicenseNo', 'contractorLicenseExpiry', 'licenseType', 'contractorAddress',
     'rentalMonths', 'annualMileageLimit', 'mileageOut', 'returnMileage', 'overMileageRate',
     'drivenKm', 'allowedKm', 'excessKm', 'overMileageFee', 'overMileageBasis',
     'deliveredDate', 'returnScheduledDate', 'returnedDate',
@@ -416,7 +417,7 @@ export const CONTRACT_DETAIL_DEFS: DetailSectionDef[] = [
   {
     title: '계약자',
     keys: [
-      'contractorName', 'contractorPhone', 'contractorBirth', 'contractorLicenseNo', 'licenseType', 'contractorAddress',
+      'contractorName', 'contractorPhone', 'contractorBirth', 'contractorLicenseNo', 'contractorLicenseExpiry', 'licenseType', 'contractorAddress',
     ],
   },
   {

@@ -90,7 +90,7 @@ export type ContractMasterRow = {
   raw: EntityRecord;
   companyId: string; company: string; contractNo: string; status: string; rentalType: string; ended: boolean;
   contractDate: string; contractorName: string; contractorPhone: string; contractorBirth: string;
-  contractorLicenseNo: string; contractorAddress: string; licenseType: string;
+  contractorLicenseNo: string; contractorLicenseExpiry: string; contractorAddress: string; licenseType: string;
   plate: string; carName: string; rentalMonths: number; startDate: string; endDate: string;
   deliveredDate: string; returnScheduledDate: string; returnedDate: string;
   pickupPlace: string; returnPlace: string; annualMileageLimit: number;
@@ -123,6 +123,7 @@ export function contractMasterRow(raw: EntityRecord, today: string): ContractMas
     status: view.status, rentalType: rentalTypeOf(raw), ended: view.ended, contractDate: str(raw.contractDate),
     contractorName: str(raw.contractorName), contractorPhone: str(raw.contractorPhone),
     contractorBirth: str(raw.contractorBirth), contractorLicenseNo: str(raw.contractorLicenseNo),
+    contractorLicenseExpiry: str(raw.contractorLicenseExpiry),
     contractorAddress: str(raw.contractorAddress), licenseType: str(raw.licenseType),
     plate: str(raw.plate), carName: str(raw.carName), rentalMonths: num(raw.rentalMonths),
     startDate: view.startDate, endDate: view.endDate, deliveredDate: str(raw.deliveredDate),
