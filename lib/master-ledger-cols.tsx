@@ -6,6 +6,7 @@ import {
 import { paymentTimingOf } from './schema/contract';
 import { workRailStyle } from './work-rail';
 import { LEDGER_EMPTY } from './ledger-empty';
+import { assetLifecycleTone } from './domain/asset-lifecycle';
 import {
   OUT, VEHICLE_BUY_PLAN, VEHICLE_DISPOSE_PLAN, VEHICLE_REG_PLAN, VEHICLE_REPAIR,
   isContractEndedStatus,
@@ -76,6 +77,11 @@ const A = {
     render: (r) => <Badge tone={assetStatusTone(r)}>{r.status}</Badge>,
     text: (r) => r.status,
   },
+  lifecycle: {
+    key: 'lifecycle', label: '자산분류', align: 'c', priority: 1,
+    render: (r) => <Badge tone={assetLifecycleTone(r.lifecycle)}>{r.lifecycle}</Badge>,
+    text: (r) => r.lifecycle,
+  },
   carName: { key: 'carName', label: '차명', priority: 1, render: (r) => dash(r.carName), text: (r) => r.carName },
   maker: { key: 'maker', label: '제조사', priority: 3, render: (r) => dash(r.maker), text: (r) => r.maker },
   modelLine: { key: 'modelLine', label: '모델', priority: 2, render: (r) => dash(r.modelLine), text: (r) => r.modelLine },
@@ -98,7 +104,7 @@ const ax = (key: keyof AssetMasterRow, label: string, opts?: { date?: boolean; m
 
 /** 자산 열 카탈로그 — 새 항목은 여기 정의 후 SHEET_KEYS / DETAIL_DEFS에 key만. */
 const ASSET_COL_CATALOG: SheetCol<AssetMasterRow>[] = [
-  A.company, A.assetCode, A.plate, A.status, A.carName, A.maker, A.modelLine,
+  A.company, A.assetCode, A.plate, A.carName, A.lifecycle, A.status, A.maker, A.modelLine,
   A.subModel, A.trim, A.modelYear, A.yearMonth, A.vin, A.ownerName, A.firstReg, A.inspectionTo, A.mileage,
   ax('documentNo', '문서확인번호'), ax('certIssueDate', '등록증발급일', { date: true }),
   ax('vehicleType', '차종'), ax('usage', '용도', { priority: 3 }), ax('typeNumber', '형식'), ax('engineType', '원동기형식'),
@@ -159,14 +165,14 @@ const ASSET_COL_CATALOG: SheetCol<AssetMasterRow>[] = [
  * @see lib/ledger-ext.ts
  */
 export const ASSET_SHEET_KEYS: SheetViewKeys = {
-  // 회사·차번·차명·상태·제조사·모델·연식·용도·소유자·취득일·취득가·할부사·잔여할부·주행·보험만기·검사만료
+  // 회사·차번·차명·자산분류·상태·제조사·모델·연식·용도·소유자·취득일·취득가·할부사·잔여할부·주행·보험만기·검사만료
   basic: [
-    'company', 'plate', 'carName', 'status', 'maker', 'modelLine', 'modelYear', 'usage', 'ownerName',
+    'company', 'plate', 'carName', 'lifecycle', 'status', 'maker', 'modelLine', 'modelYear', 'usage', 'ownerName',
     'acquisitionDate', 'acquisitionPrice', 'loanCompany', 'loanRemainingPrincipal', 'mileage',
     'insuranceExpiryDate', 'inspectionTo',
   ],
   all: [
-    'company', 'assetCode', 'plate', 'status', 'carName', 'maker', 'modelLine',
+    'company', 'assetCode', 'plate', 'carName', 'lifecycle', 'status', 'maker', 'modelLine',
     'subModel', 'trim', 'modelYear', 'yearMonth', 'vin', 'ownerName', 'firstReg', 'inspectionTo', 'mileage',
     'documentNo', 'certIssueDate', 'vehicleType', 'usage', 'typeNumber', 'engineType',
     'ownerBizNo', 'useAddress', 'approvalNumber',
@@ -188,11 +194,11 @@ export const ASSET_SHEET_KEYS: SheetViewKeys = {
 /** 정비비 함대 랭킹 보기 — 기존 maint 계산 재사용. */
 export const ASSET_MAINT_SHEET_KEYS: SheetViewKeys = {
   basic: [
-    'company', 'plate', 'carName', 'status',
+    'company', 'plate', 'carName', 'lifecycle', 'status',
     'maintCost', 'maintVsAvg', 'maintCount', 'maintLastDate', 'mileage',
   ],
   all: [
-    'company', 'plate', 'carName', 'status', 'maker', 'modelLine',
+    'company', 'plate', 'carName', 'lifecycle', 'status', 'maker', 'modelLine',
     'maintCost', 'maintVsAvg', 'maintCount', 'maintLastDate', 'mileage', 'acquisitionPrice',
   ],
 };
@@ -214,7 +220,7 @@ export const ASSET_DETAIL_DEFS: DetailSectionDef[] = [
   {
     title: '등록·상태',
     open: true,
-    keys: ['company', 'assetCode', 'plate', 'status', 'carName', 'mileage'],
+    keys: ['company', 'assetCode', 'plate', 'lifecycle', 'status', 'carName', 'mileage'],
   },
   {
     title: '등록증정보',

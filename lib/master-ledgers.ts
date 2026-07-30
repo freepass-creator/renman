@@ -2,6 +2,7 @@ import { companyShort } from './companies';
 import { computeContractView } from './contract-ops';
 import type { EntityRecord } from './intake/entities';
 import { OUT } from './domain/status';
+import { assetLifecycle, type AssetLifecycle } from './domain/asset-lifecycle';
 import { computeOverMileage } from './domain/over-mileage';
 import { contractRisks } from './risk-ops';
 import { rentalTypeOf, paymentTimingOf } from './schema/contract';
@@ -19,6 +20,7 @@ export type AssetMasterRow = {
   raw: EntityRecord;
   companyId: string; company: string;
   assetCode: string; plate: string; status: string; disposed: boolean;
+  lifecycle: AssetLifecycle;
   documentNo: string; certIssueDate: string; firstReg: string;
   vehicleType: string; usage: string; carName: string; maker: string;
   modelLine: string; subModel: string; variant: string; trim: string; modelYear: string;
@@ -50,6 +52,7 @@ export function assetMasterRow(raw: EntityRecord): AssetMasterRow {
   return {
     raw, companyId, company: companyShort(companyId),
     assetCode: str(raw.assetCode), plate: str(raw.plate), status, disposed: OUT.has(status),
+    lifecycle: assetLifecycle(status, OUT.has(status)),
     documentNo: str(raw.documentNo), certIssueDate: str(raw.certIssueDate), firstReg: str(raw.firstReg),
     vehicleType: str(raw.vehicleType), usage: str(raw.usage), carName: str(raw.carName),
     maker: str(raw.maker), modelLine: str(raw.modelLine), subModel: str(raw.subModel),

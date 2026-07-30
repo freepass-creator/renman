@@ -166,8 +166,8 @@ export const CASH_SHEET_KEYS: SheetViewKeys = {
     'matchedContract', 'matchedSchedule', 'in', 'out', 'balance', 'alert',
   ],
   all: [
-    'company', 'acctName', 'acct', 'date', 'content', 'party', 'cat', 'match', 'in', 'out', 'balance', 'alert',
-    'flowNature', 'fundNature', 'matchedContract', 'matchedSchedule', 'src', 'ent', 'key',
+    'company', 'acctName', 'acct', 'date', 'content', 'party', 'flowNature', 'cat', 'match', 'in', 'out', 'balance', 'alert',
+    'fundNature', 'matchedContract', 'matchedSchedule', 'src', 'ent', 'key',
   ],
 };
 
