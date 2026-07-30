@@ -51,6 +51,7 @@ export function LedgerCreatePanel({
   fallbackKind = '기타',
   kindGateways,
   onKindChange,
+  fileIngest,
   initial,
   quick,
   prefix,
@@ -70,6 +71,8 @@ export function LedgerCreatePanel({
   kindGateways?: Record<string, LedgerKindGateway>;
   /** kindField 값 변경 콜백(탭 전환 등). */
   onKindChange?: (kind: string) => void;
+  /** 파일·OCR 대량 투입 진입(헤더 ⋯ 대신 [+생성] 패널). */
+  fileIngest?: { label: string; onClick: () => void };
   initial?: EntityRecord;
   /** 회사만으로도 저장하되 아래 상세 입력은 선택적으로 유지한다. */
   quick?: boolean;
@@ -232,6 +235,17 @@ export function LedgerCreatePanel({
               </label>
             </div>
           )
+        )}
+
+        {fileIngest && !gateway && (
+          <Message variant="info">
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+              여러 건은 파일로 한 번에 담을 수 있습니다.
+              <Btn size="sm" variant="ghost" onClick={fileIngest.onClick}>
+                <UploadCloud size={14} /> {fileIngest.label}
+              </Btn>
+            </span>
+          </Message>
         )}
 
         {quick && !gateway && (
