@@ -11,7 +11,7 @@ import { fleetMaintRanking } from '@/lib/asset-econ';
 import { useEntityLists } from '@/lib/use-entity-lists';
 import { textMatch } from '@/lib/search-match';
 import {
-  Btn, C, FilterChips, LedgerActions, LedgerCreatePanel, LedgerEditPanel, LedgerFilterSelects, LedgerFrame, LedgerRecordPanel, PeriodBar, PillTabs, Search, Select,
+  Btn, C, LedgerActions, LedgerCreatePanel, LedgerEditPanel, LedgerFilterButton, LedgerFilterFields, LedgerFilterPanel, LedgerFrame, LedgerRecordPanel, LedgerToolsMenu, PeriodBar, PillTabs, Search, Select,
   type LedgerFormSection,
 } from '@/components/ui';
 import { useIsMobile } from '@/lib/use-mobile';
@@ -22,7 +22,7 @@ import { latestDateOf, summarizeAssetLedgerStats } from '@/lib/ledger-stats';
 import { MigrateDataButton } from '@/components/MigrateDataButton';
 import { openIngest } from '@/lib/ui-bus';
 import {
-  ASSET_FILTER_DEFS, emptyFilterValues, eqFilter, matchLedgerFilters,
+  ASSET_FILTER_DEFS, countActiveFilters, emptyFilterValues, eqFilter, matchLedgerFilters,
 } from '@/lib/ledger-filter-defs';
 import { LEDGER_EMPTY } from '@/lib/ledger-empty';
 type AssetOwnershipScope = '보유자산' | '처분자산' | '전체자산';
@@ -69,6 +69,7 @@ export default function AssetLedgerPage() {
   const [dateBasis, setDateBasis] = useState<AssetDateBasis>('취득일');
   const [range, setRange] = useState({ from: '', to: '' });
   const [detailFilters, setDetailFilters] = useState(() => emptyFilterValues(ASSET_FILTER_DEFS));
+  const [filterOpen, setFilterOpen] = useState(false);
   const [sheetView, setSheetView] = useState<AssetSheetView>('기본');
   const [selected, setSelected] = useState<ReturnType<typeof assetMasterRow> | null>(null);
   const [creating, setCreating] = useState(false);
@@ -129,6 +130,15 @@ export default function AssetLedgerPage() {
     [searchedRows, fleet],
   );
 
+  const filterCount = countActiveFilters(
+    {
+      ...detailFilters,
+      pool: ownershipScope === '보유자산' ? '' : ownershipScope,
+      quick: ownershipScope === '보유자산' ? (quickFilter || '') : ownershipScope === '전체자산' ? (allAssetQuickFilter || '') : '',
+    },
+    ASSET_FILTER_DEFS,
+  );
+
   const sheetCols = sheetView === '정비비'
     ? ASSET_MAINT_BASIC_COLS
     : sheetView === '기본'
@@ -151,65 +161,88 @@ export default function AssetLedgerPage() {
           }}
         ><Plus size={14} /> {creating ? '생성 취소' : '자산 생성'}</Btn>
       </LedgerActions>}
-      tools={<LedgerActions aria-label="워크플로">
-        <Btn size="sm" variant="ghost" iconOnly tip="등록증·자료 투입 — 데이터관리" onClick={() => openIngest('vehicle')}>
-          <UploadCloud size={14} />
-        </Btn>
-      </LedgerActions>}
+      tools={<LedgerToolsMenu items={[
+        { key: 'ingest', label: '등록증·자료 투입 (데이터관리)', onClick: () => openIngest('vehicle') },
+      ]} />}
       filters={<>
-        <Search size="sm" placeholder="차량번호·VIN·차명·소유자·상태" value={q} onChange={(e) => setQ(e.target.value)} style={{ width: mobile ? '100%' : 300 }} />
-        <LedgerFilterSelects
-          defs={ASSET_FILTER_DEFS}
-          values={detailFilters}
-          onChange={(key, value) => setDetailFilters((prev) => ({ ...prev, [key]: value }))}
-          options={{ status: assetStatuses, maker: assetMakers }}
-        />
-        <Select
+        <Search
           size="sm"
-          aria-label="자산 범위"
-          value={ownershipScope}
-          onChange={(event) => {
-            const next = event.target.value as AssetOwnershipScope;
-            setOwnershipScope(next);
-            setDateBasis(next === '처분자산' ? '처분일' : '취득일');
-            if (next !== '보유자산') setQuickFilter(null);
-            setAllAssetQuickFilter(null);
-          }}
-        >
-          <option value="보유자산">보유자산</option>
-          <option value="처분자산">처분자산</option>
-          <option value="전체자산">전체자산</option>
-        </Select>
-        {ownershipScope === '처분자산' && (
-          <Select size="sm" aria-label="자산 날짜 기준" value={dateBasis} onChange={(event) => setDateBasis(event.target.value as AssetDateBasis)}>
-            <option value="취득일">취득일 기준</option>
-            <option value="처분일">처분일 기준</option>
-          </Select>
-        )}
-        {ownershipScope === '보유자산' && (
-          <FilterChips
-            allowOff
-            value={quickFilter}
-            onChange={setQuickFilter}
-            options={ASSET_QUICK_FILTERS.map((filter) => ({ key: filter, label: ASSET_QUICK_FILTER_LABEL[filter] }))}
-          />
-        )}
-        {ownershipScope === '전체자산' && (
-          <FilterChips
-            allowOff
-            value={allAssetQuickFilter}
-            onChange={(next) => {
-              setAllAssetQuickFilter(next);
-              setDateBasis(next === '처분' ? '처분일' : '취득일');
-            }}
-            options={[
-              { key: '보유', label: '보유' },
-              { key: '처분', label: '처분' },
-            ]}
-          />
-        )}
+          placeholder="차량번호·VIN·차명·소유자·상태"
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          style={{ width: mobile ? 160 : 280, flexShrink: 0 }}
+        />
+        <LedgerFilterButton open={filterOpen} count={filterCount} onClick={() => setFilterOpen((o) => !o)} />
         <PeriodBar latest={latest} initial="전체" size="sm" onRange={setRange} />
       </>}
+      filterPanel={filterOpen ? (
+        <LedgerFilterPanel
+          title="자산 필터"
+          onReset={() => {
+            setDetailFilters(emptyFilterValues(ASSET_FILTER_DEFS));
+            setOwnershipScope('보유자산');
+            setQuickFilter(null);
+            setAllAssetQuickFilter(null);
+            setDateBasis('취득일');
+          }}
+          onClose={() => setFilterOpen(false)}
+        >
+          <LedgerFilterFields
+            defs={ASSET_FILTER_DEFS}
+            values={{
+              ...detailFilters,
+              pool: ownershipScope === '전체자산' ? '' : ownershipScope,
+              quick: ownershipScope === '보유자산' ? (quickFilter || '') : ownershipScope === '전체자산' ? (allAssetQuickFilter || '') : '',
+            }}
+            onChange={(key, value) => {
+              if (key === 'pool') {
+                const next = (value || '전체자산') as AssetOwnershipScope;
+                setOwnershipScope(next);
+                setDateBasis(next === '처분자산' ? '처분일' : '취득일');
+                if (next !== '보유자산') setQuickFilter(null);
+                setAllAssetQuickFilter(null);
+                setDetailFilters((prev) => ({ ...prev, pool: value }));
+                return;
+              }
+              if (key === 'quick') {
+                if (ownershipScope === '전체자산') {
+                  const next = (value || null) as AllAssetQuickFilter | null;
+                  setAllAssetQuickFilter(next);
+                  setDateBasis(next === '처분' ? '처분일' : '취득일');
+                } else {
+                  setQuickFilter((value || null) as AssetQuickFilter | null);
+                }
+                setDetailFilters((prev) => ({ ...prev, quick: value }));
+                return;
+              }
+              setDetailFilters((prev) => ({ ...prev, [key]: value }));
+            }}
+            options={{
+              pool: ['보유자산', '처분자산'],
+              quick: ownershipScope === '보유자산'
+                ? ASSET_QUICK_FILTERS.map((filter) => ({ value: filter, label: ASSET_QUICK_FILTER_LABEL[filter] }))
+                : ownershipScope === '전체자산'
+                  ? [{ value: '보유', label: '보유' }, { value: '처분', label: '처분' }]
+                  : [],
+              status: assetStatuses,
+              maker: assetMakers,
+            }}
+          />
+          {ownershipScope === '처분자산' && (
+            <label>
+              <span style={{ display: 'block', fontSize: 12, fontWeight: 800, marginBottom: 6 }}>날짜 기준</span>
+              <Select
+                value={dateBasis}
+                onChange={(event) => setDateBasis(event.target.value as AssetDateBasis)}
+                style={{ width: '100%' }}
+              >
+                <option value="취득일">취득일 기준</option>
+                <option value="처분일">처분일 기준</option>
+              </Select>
+            </label>
+          )}
+        </LedgerFilterPanel>
+      ) : null}
       stats={<span style={{ fontSize: 12.5, color: C.mute }}>보유 <b>{held}</b> · 계약중 <b style={{ color: C.ok }}>{contracted}</b> · 휴차 <b style={{ color: C.warn }}>{idle}</b> · 매각대기 <b>{salePending}</b> · 처분 <b>{disposed}</b></span>}
       showColView={false}
       colView={sheetView === '기본' ? '기본' : '전체'}

@@ -1,15 +1,15 @@
 'use client';
 
 import { Suspense, useEffect, useMemo, useState } from 'react';
-import { Plus, UploadCloud, FileText, Trash2 } from 'lucide-react';
+import { Plus, FileText, Trash2 } from 'lucide-react';
 import { useEntityLists } from '@/lib/use-entity-lists';
 import { textMatch } from '@/lib/search-match';
 import { companyDisplay } from '@/lib/companies';
 import type { EntityRecord } from '@/lib/intake/entities';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
-  Badge, Btn, C, FilterChips, LedgerActions, LedgerCreatePanel, LedgerFilterSelects, LedgerFrame, LedgerRecordPanel, PageLoading, Search, won,
-  PeriodBar, Select, useConfirm, type LedgerColView,
+  Badge, Btn, C, LedgerActions, LedgerCreatePanel, LedgerFilterButton, LedgerFilterFields, LedgerFilterPanel, LedgerFrame, LedgerRecordPanel, LedgerToolsMenu, PageLoading, Search, won,
+  PeriodBar, useConfirm, type LedgerColView,
 } from '@/components/ui';
 import { useSession } from '@/lib/session';
 import { commitRemove } from '@/lib/commit';
@@ -18,7 +18,7 @@ import { toast } from '@/lib/toast';
 import { useIsMobile } from '@/lib/use-mobile';
 import { todayKST } from '@/lib/contracts/dates';
 import {
-  WORK_FILTER_DEFS, emptyFilterValues, eqFilter, matchLedgerFilters,
+  WORK_FILTER_DEFS, countActiveFilters, emptyFilterValues, eqFilter, matchLedgerFilters,
 } from '@/lib/ledger-filter-defs';
 import {
   PENALTY_KINDS, PENALTY_PROCESSES,
@@ -58,6 +58,7 @@ function WorkLedgerInner() {
   const [colView, setColView] = useState<LedgerColView>('기본');
   const [group, setGroup] = useState<WorkGroupFilter>(() => parseWorkGroup(searchParams.get('group')));
   const [detailFilters, setDetailFilters] = useState(() => emptyFilterValues(WORK_FILTER_DEFS));
+  const [filterOpen, setFilterOpen] = useState(false);
   const [range, setRange] = useState({ from: '', to: '' });
   const [selected, setSelected] = useState<WorkLedgerRow | null>(null);
   const [creating, setCreating] = useState(false);
@@ -328,79 +329,97 @@ function WorkLedgerInner() {
     ? (colView === '기본' ? PENALTY_BASIC_COLS : PENALTY_ALL_COLS)
     : (colView === '기본' ? WORK_BASIC_COLS : WORK_ALL_COLS);
 
+  const workFilterDefs = WORK_FILTER_DEFS.filter((def) => (
+    penaltyMode
+      ? def.key === 'group' || def.key === 'penProcess' || def.key === 'penKind'
+      : def.key === 'group' || def.key === 'status' || def.key === 'assignee' || def.key === 'source'
+  ));
+  const filterCount = countActiveFilters(
+    {
+      ...detailFilters,
+      group: group === '전체' ? '' : group,
+      penProcess: penProcess || '',
+      penKind: penKind || '',
+    },
+    workFilterDefs,
+  );
+
   return (
     <LedgerFrame
       title="업무관리"
       meta="일정·상담·정비·사고·과태료·문서와 처리 이력"
       right={<LedgerActions aria-label="쓰기">
-        {penaltyMode ? (
-          <>
-            <Btn size="sm" variant="ghost" href="/penalty/upload"><UploadCloud size={14} /> 대량 업로드</Btn>
-            {matchedDocs > 0 && (
-              <Btn size="sm" variant="ghost" href="/penalty/docs"><FileText size={14} /> 변경부과 공문</Btn>
-            )}
-          </>
-        ) : (
-          <Btn
-            size="sm"
-            variant="solid"
-            aria-pressed={creating}
-            onClick={() => {
-              setSelected(null);
-              setCreating((open) => !open);
-            }}
-          ><Plus size={14} /> {creating ? '취소' : '업무 생성'}</Btn>
-        )}
+        <Btn
+          size="sm"
+          variant="solid"
+          aria-pressed={creating}
+          onClick={() => {
+            setSelected(null);
+            setCreating((open) => !open);
+          }}
+        ><Plus size={14} /> {creating ? '취소' : '업무 생성'}</Btn>
       </LedgerActions>}
+      tools={<LedgerToolsMenu items={[
+        ...(penaltyMode ? [
+          { key: 'penalty-upload', label: '대량 업로드', href: '/penalty/upload' },
+          ...(matchedDocs > 0 ? [{ key: 'penalty-docs', label: '변경부과 공문', href: '/penalty/docs' }] : []),
+        ] : []),
+      ]} />}
       filters={<>
         <Search
           size="sm"
           placeholder={penaltyMode ? '차번·실운전자·위반·상태' : '구분·차량·계약자·내용·상태·담당자'}
           value={q}
           onChange={(e) => setQ(e.target.value)}
-          style={{ width: mobile ? '100%' : 250 }}
+          style={{ width: mobile ? 160 : 280, flexShrink: 0 }}
         />
-        {!penaltyMode && (
-          <LedgerFilterSelects
-            defs={WORK_FILTER_DEFS}
-            values={detailFilters}
-            onChange={(key, value) => setDetailFilters((prev) => ({ ...prev, [key]: value }))}
+        <LedgerFilterButton open={filterOpen} count={filterCount} onClick={() => setFilterOpen((o) => !o)} />
+        <PeriodBar latest={latest} initial="월간" size="sm" onRange={setRange} />
+      </>}
+      filterPanel={filterOpen ? (
+        <LedgerFilterPanel
+          title="업무 필터"
+          onReset={() => {
+            setDetailFilters(emptyFilterValues(WORK_FILTER_DEFS));
+            setPenProcess(null);
+            setPenKind(null);
+          }}
+          onClose={() => setFilterOpen(false)}
+        >
+          <LedgerFilterFields
+            defs={workFilterDefs}
+            values={{
+              ...detailFilters,
+              group: group === '전체' ? '' : group,
+              penProcess: penProcess || '',
+              penKind: penKind || '',
+            }}
+            onChange={(key, value) => {
+              if (key === 'group') {
+                setGroupAndUrl((value || '전체') as WorkGroupFilter);
+                return;
+              }
+              if (key === 'penProcess') {
+                setPenProcess((value || null) as PenaltyProcess | null);
+                return;
+              }
+              if (key === 'penKind') {
+                setPenKind((value || null) as PenaltyKind | null);
+                return;
+              }
+              setDetailFilters((prev) => ({ ...prev, [key]: value }));
+            }}
             options={{
+              group: WORK_GROUPS.filter((g) => g !== '전체'),
               status: statuses,
               assignee: assignees,
               source: sources.map((value) => ({ value, label: WORK_SOURCE_LABEL[value] })),
+              penProcess: PENALTY_PROCESSES.map((k) => ({ value: k, label: `${k}${processCounts[k] ? ` (${processCounts[k]})` : ''}` })),
+              penKind: PENALTY_KINDS.map((k) => ({ value: k, label: `${k}${kindCounts[k] ? ` (${kindCounts[k]})` : ''}` })),
             }}
           />
-        )}
-        <Select size="sm" aria-label="업무 구분" value={group} onChange={(e) => setGroupAndUrl(e.target.value as WorkGroupFilter)}>
-          {WORK_GROUPS.map((key) => <option key={key} value={key}>{key}</option>)}
-        </Select>
-        {penaltyMode && (
-          <>
-            <FilterChips
-              value={penProcess}
-              onChange={setPenProcess}
-              allowOff
-              options={PENALTY_PROCESSES.map((k) => ({
-                key: k,
-                label: k,
-                count: processCounts[k],
-              }))}
-            />
-            <FilterChips
-              value={penKind}
-              onChange={setPenKind}
-              allowOff
-              options={PENALTY_KINDS.map((k) => ({
-                key: k,
-                label: k,
-                count: kindCounts[k],
-              }))}
-            />
-          </>
-        )}
-        <PeriodBar latest={latest} initial="월간" size="sm" onRange={setRange} />
-      </>}
+        </LedgerFilterPanel>
+      ) : null}
       stats={<span style={{ fontSize: 12.5, color: C.mute }}>
         {penaltyMode
           ? <>과태료 <b>{rowTotal}</b> · 미매칭 <b style={{ color: C.danger }}>{unmatchedPenalty}</b></>

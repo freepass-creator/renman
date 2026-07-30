@@ -7,7 +7,7 @@
  */
 import { useMemo, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { Plus, X, Link2, Unlink, UploadCloud, Landmark, GitMerge, CircleDollarSign } from 'lucide-react';
+import { Plus, X, Link2, Unlink, UploadCloud } from 'lucide-react';
 import { buildCashLedger, withCmsItemRows, buildBankAccountLedger, type CashRow, type BankAccountRow } from '@/lib/finance/cash-ledger';
 import { CASH_BASIC_COLS, CASH_CARD_DETAIL_SECTIONS, CASH_EXPANDED_COLS, CASH_TX_DETAIL_SECTIONS, cashRail, cashRailStyle } from '@/lib/finance/cash-cols';
 import {
@@ -33,13 +33,14 @@ import { useSession } from '@/lib/session';
 import { resolveWriteCompany, NEED_COMPANY } from '@/lib/scope';
 import { toast } from '@/lib/toast';
 import {
-  LedgerActions, LedgerCreatePanel, LedgerFilterSelects, LedgerFrame, LedgerPanelFooter, LedgerRecordPanel, Btn, Input, Select, Search, PillTabs, PeriodBar, Badge, Message, ListBox, ListRow, FilterChips,
+  LedgerActions, LedgerCreatePanel, LedgerFilterButton, LedgerFilterFields, LedgerFilterPanel, LedgerFrame, LedgerPanelFooter, LedgerRecordPanel, LedgerToolsMenu, Btn, Input, Select, Search, PillTabs, PeriodBar, Badge, Message, ListBox, ListRow,
   C, won, type LedgerColView, type LedgerFormSection,
 } from '@/components/ui';
 import { useIsMobile } from '@/lib/use-mobile';
 import FileDrop from '@/components/FileDrop';
 import {
-  CASH_ACCOUNT_FILTER_DEFS, CASH_TX_FILTER_DEFS, emptyFilterValues, eqFilter, matchLedgerFilters,
+  CASH_ACCOUNT_FILTER_DEFS, CASH_TX_FILTER_DEFS, countActiveFilters, emptyFilterValues, eqFilter, matchLedgerFilters,
+  type LedgerFilterFieldDef,
 } from '@/lib/ledger-filter-defs';
 import { LEDGER_EMPTY } from '@/lib/ledger-empty';
 
@@ -52,7 +53,6 @@ type BulkInputSource = '파일' | '링크' | '텍스트';
 const amt = (n: number) => (n ? won(n) : '—');
 /** 표 DOM 폭주 방지 — 24·25 CMS미연결 수백건이면 페이지가 죽음 */
 const ROW_DISPLAY_CAP = 200;
-const CASH_SEARCH_WIDTH = 280;
 
 const CMS_DEP_BG = 'color-mix(in srgb, var(--brand) 10%, var(--bg-card))';
 
@@ -310,6 +310,7 @@ export default function CashLedgerPage() {
   const [q, setQ] = useState('');
   const [accountFilters, setAccountFilters] = useState(() => emptyFilterValues(CASH_ACCOUNT_FILTER_DEFS));
   const [txFilters, setTxFilters] = useState(() => emptyFilterValues(CASH_TX_FILTER_DEFS));
+  const [filterOpen, setFilterOpen] = useState(false);
   // PeriodBar의 effect를 기다리면 첫 프레임이 전체 기간으로 계산되어 행 제한 경고가 번쩍인다.
   // 화면에 표시할 기본 월간 범위를 같은 기준일로 첫 렌더부터 적용한다.
   const [range, setRange] = useState<{ from: string; to: string }>(() => periodRange(latest, '월간'));
@@ -432,60 +433,91 @@ export default function CashLedgerPage() {
     reload();
   }, [reload]);
 
-  const ledgerQuickFilters = (
-    <>
-      {(ledgerKind === '입출금내역' || ledgerKind === '계좌관리') && (
-        <FilterChips
-          allowOff
-          value={flow === '전체' ? null : flow}
-          onChange={(v) => setFlow(v ?? '전체')}
-          options={[
-            { key: '입금', label: '입금' },
-            { key: '출금', label: '출금' },
-          ]}
-        />
-      )}
-      {ledgerKind === 'CMS 원천내역' && (
-        <FilterChips
-          allowOff
-          value={sourceQuickFilter}
-          onChange={setSourceQuickFilter}
-          options={[
-            { key: '정산완료', label: '정산완료' },
-            { key: '미정산', label: '미정산' },
-          ]}
-        />
-      )}
-      {ledgerKind === '법인카드 원천내역' && (
-        <FilterChips
-          allowOff
-          value={sourceQuickFilter}
-          onChange={setSourceQuickFilter}
-          options={[
-            { key: '승인', label: '승인' },
-            { key: '취소', label: '취소' },
-          ]}
-        />
-      )}
-      {ledgerKind === '계좌관리' && (
-        <FilterChips
-          value={accountStatusFilter}
-          onChange={(v) => setAccountStatusFilter(v ?? '전체')}
-          options={[
-            { key: '전체', label: '전체' },
-            { key: '사용중', label: '사용중' },
-            { key: '휴면', label: '휴면' },
-          ]}
-        />
-      )}
-      <FilterChips
-        allowOff
-        value={unclassifiedOnly ? '미분류' : null}
-        onChange={(v) => setUnclassifiedOnly(v === '미분류')}
-        options={[{ key: '미분류', label: '미분류', count: unclN }]}
-      />
-    </>
+  const showFlowFilter = ledgerKind === '입출금내역' || ledgerKind === '계좌관리';
+  const showSourceQuick = ledgerKind === 'CMS 원천내역' || ledgerKind === '법인카드 원천내역';
+  const cashFilterDefs: LedgerFilterFieldDef[] = ledgerKind === '계좌관리'
+    ? [
+      ...CASH_ACCOUNT_FILTER_DEFS,
+      ...CASH_TX_FILTER_DEFS.filter((d) => d.key === 'flow' || d.key === 'unclassified'),
+    ]
+    : CASH_TX_FILTER_DEFS.filter((d) => {
+      if (d.key === 'flow') return showFlowFilter;
+      if (d.key === 'sourceQuick') return showSourceQuick;
+      return true;
+    });
+  const cashFilterValues = {
+    accountStatus: accountStatusFilter === '전체' ? '' : accountStatusFilter,
+    accountType: accountFilters.accountType,
+    flow: flow === '전체' ? '' : flow,
+    sourceQuick: sourceQuickFilter ?? '',
+    unclassified: unclassifiedOnly ? '예' : '',
+    category: txFilters.category,
+    match: txFilters.match,
+  };
+  const cashFilterCount = countActiveFilters(
+    { ...cashFilterValues, accountStatus: accountStatusFilter === '사용중' ? '' : cashFilterValues.accountStatus },
+    cashFilterDefs,
   );
+  const onCashFilterChange = (key: string, value: string) => {
+    if (key === 'accountStatus') {
+      setAccountStatusFilter((value || '전체') as AccountStatusFilter);
+      setAccountFilters((prev) => ({ ...prev, accountStatus: value }));
+      return;
+    }
+    if (key === 'accountType') {
+      setAccountFilters((prev) => ({ ...prev, accountType: value }));
+      return;
+    }
+    if (key === 'flow') {
+      setFlow((value || '전체') as Flow);
+      setTxFilters((prev) => ({ ...prev, flow: value }));
+      return;
+    }
+    if (key === 'sourceQuick') {
+      setSourceQuickFilter((value || null) as SourceQuickFilter);
+      setTxFilters((prev) => ({ ...prev, sourceQuick: value }));
+      return;
+    }
+    if (key === 'unclassified') {
+      setUnclassifiedOnly(value === '예');
+      setTxFilters((prev) => ({ ...prev, unclassified: value }));
+      return;
+    }
+    setTxFilters((prev) => ({ ...prev, [key]: value }));
+  };
+  const cashFilterPanel = filterOpen ? (
+    <LedgerFilterPanel
+      title="자금 필터"
+      onReset={() => {
+        setAccountFilters(emptyFilterValues(CASH_ACCOUNT_FILTER_DEFS));
+        setTxFilters(emptyFilterValues(CASH_TX_FILTER_DEFS));
+        setFlow('전체');
+        setUnclassifiedOnly(false);
+        setSourceQuickFilter(null);
+        setAccountStatusFilter('전체');
+      }}
+      onClose={() => setFilterOpen(false)}
+    >
+      <label>
+        <span style={{ display: 'block', fontSize: 12, fontWeight: 800, marginBottom: 6 }}>원장 선택</span>
+        {ledgerKindControl}
+      </label>
+      <LedgerFilterFields
+        defs={cashFilterDefs}
+        values={cashFilterValues}
+        onChange={onCashFilterChange}
+        options={{
+          accountStatus: ['사용중', '휴면'],
+          accountType: accountTypes,
+          flow: ['입금', '출금'],
+          sourceQuick: ledgerKind === 'CMS 원천내역' ? ['정산완료', '미정산'] : ['승인', '취소'],
+          unclassified: [{ value: '예', label: '미분류만' }],
+          category: cashCategories,
+          match: matchStatuses,
+        }}
+      />
+    </LedgerFilterPanel>
+  ) : null;
 
   const singleKindTabs = (
     <div style={{ marginBottom: 12 }}>
@@ -550,32 +582,11 @@ export default function CashLedgerPage() {
     </LedgerActions>
   );
   const dayLoopTools = (
-    <LedgerActions aria-label="워크플로">
-      <Btn size="sm" variant="ghost" iconOnly tip="통장 담기 — 데이터관리" onClick={() => openIngest('bank_tx')}>
-        <Landmark size={14} />
-      </Btn>
-      <Btn size="sm" variant="ghost" iconOnly tip="매칭 — 입금·계약 연결" onClick={() => openPayments()}>
-        <GitMerge size={14} />
-      </Btn>
-      <Btn size="sm" variant="ghost" iconOnly tip="미수 회수" onClick={() => openReceivables()}>
-        <CircleDollarSign size={14} />
-      </Btn>
-    </LedgerActions>
-  );
-  const cashFilterSelects = ledgerKind === '계좌관리' ? (
-    <LedgerFilterSelects
-      defs={CASH_ACCOUNT_FILTER_DEFS}
-      values={accountFilters}
-      onChange={(key, value) => setAccountFilters((prev) => ({ ...prev, [key]: value }))}
-      options={{ accountType: accountTypes }}
-    />
-  ) : (
-    <LedgerFilterSelects
-      defs={CASH_TX_FILTER_DEFS}
-      values={txFilters}
-      onChange={(key, value) => setTxFilters((prev) => ({ ...prev, [key]: value }))}
-      options={{ category: cashCategories, match: matchStatuses }}
-    />
+    <LedgerToolsMenu items={[
+      { key: 'ingest', label: '통장 담기 (데이터관리)', onClick: () => openIngest('bank_tx') },
+      { key: 'match', label: '매칭 (입금·계약 연결)', onClick: () => openPayments() },
+      { key: 'receivables', label: '미수 회수', onClick: () => openReceivables() },
+    ]} />
   );
 
   if (ledgerKind === '계좌관리') {
@@ -594,18 +605,12 @@ export default function CashLedgerPage() {
             placeholder="회사·은행·계좌번호·계좌명·등록자"
             value={q}
             onChange={(event) => setQ(event.target.value)}
-            style={{ width: mobile ? '100%' : CASH_SEARCH_WIDTH }}
+            style={{ width: mobile ? 160 : 280, flexShrink: 0 }}
           />
-          <LedgerFilterSelects
-            defs={CASH_ACCOUNT_FILTER_DEFS}
-            values={accountFilters}
-            onChange={(key, value) => setAccountFilters((prev) => ({ ...prev, [key]: value }))}
-            options={{ accountType: accountTypes }}
-          />
-          {ledgerKindControl}
-          {ledgerQuickFilters}
+          <LedgerFilterButton open={filterOpen} count={cashFilterCount} onClick={() => setFilterOpen((o) => !o)} />
           <PeriodBar latest={latest} initial="월간" size="sm" onRange={onRange} />
         </>}
+        filterPanel={cashFilterPanel}
         stats={<span style={{ fontSize: 12.5, color: C.mute }}>전체 <b>{accountTotal}</b> · 사용중 <b style={{ color: C.ok }}>{activeAccounts}</b></span>}
         loading={accountLoading}
         empty="등록된 계좌가 없습니다. 「신규 계좌」에서 등록하세요."
@@ -696,14 +701,13 @@ export default function CashLedgerPage() {
             placeholder="회사·계좌·상대·과목·내용"
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            style={{ width: mobile ? '100%' : CASH_SEARCH_WIDTH }}
+            style={{ width: mobile ? 160 : 280, flexShrink: 0 }}
           />
-          {cashFilterSelects}
-          {ledgerKindControl}
-          {ledgerQuickFilters}
+          <LedgerFilterButton open={filterOpen} count={cashFilterCount} onClick={() => setFilterOpen((o) => !o)} />
           <PeriodBar latest={latest} initial="월간" size="sm" onRange={onRange} />
         </>
       }
+      filterPanel={cashFilterPanel}
       hint={
         rowMore > 0 ? (
           <Message variant="warning">

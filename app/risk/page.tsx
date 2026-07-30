@@ -5,7 +5,6 @@
  * 상세 = RISK_DETAIL_SECTIONS · 미납 조치(내용증명·일괄).
  */
 import { useMemo, useState } from 'react';
-import { FileWarning } from 'lucide-react';
 import { TODAY } from '@/lib/dashboard-consts';
 import { useDashboardData } from '@/lib/use-dashboard-data';
 import { textMatch } from '@/lib/search-match';
@@ -17,11 +16,14 @@ import { sendNoticeCert, sendNoticeCertBulk } from '@/lib/docs/send-notice';
 import { useSession } from '@/lib/session';
 import { toast } from '@/lib/toast';
 import {
-  Badge, Btn, C, FilterChips, LedgerActions, LedgerFrame, LedgerRecordPanel, PeriodBar, Search,
+  Badge, Btn, C, LedgerFilterButton, LedgerFilterFields, LedgerFilterPanel, LedgerFrame, LedgerRecordPanel, LedgerToolsMenu, PeriodBar, Search,
   useConfirm, won,
   type LedgerColView,
 } from '@/components/ui';
 import { useIsMobile } from '@/lib/use-mobile';
+import {
+  RISK_FILTER_DEFS, countActiveFilters, emptyFilterValues,
+} from '@/lib/ledger-filter-defs';
 
 type GroupFilter = '전체' | RiskSheetGroup;
 
@@ -36,6 +38,8 @@ export default function RiskPage() {
   const [colView, setColView] = useState<LedgerColView>('기본');
   const [selected, setSelected] = useState<RiskSheetRow | null>(null);
   const [noticeSel, setNoticeSel] = useState<Set<string>>(() => new Set());
+  const [filterOpen, setFilterOpen] = useState(false);
+  const [detailFilters, setDetailFilters] = useState(() => emptyFilterValues(RISK_FILTER_DEFS));
 
   const allRows = useMemo(
     () => buildRiskSheetRows(vehicles, contracts, insurances, penalties, history, TODAY, bankTx),
@@ -56,6 +60,10 @@ export default function RiskPage() {
 
   const latest = useMemo(() => latestDateOf(allRows, (r) => r.dueDate, TODAY), [allRows]);
   const counts = useMemo(() => countRiskSheetGroups(searched), [searched]);
+  const filterCount = countActiveFilters(
+    { ...detailFilters, group: group === '전체' ? '' : group },
+    RISK_FILTER_DEFS,
+  );
 
   const unpaidRows = useMemo(() => rows.filter((r) => r.group === '미납' && r.contractKey), [rows]);
   const noticeTargets = unpaidRows.filter((r) => noticeSel.has(r.id));
@@ -88,25 +96,12 @@ export default function RiskPage() {
       title="리스크관리"
       meta="챙길 예외·미완료·미납·만기·휴차"
       tools={(
-        <LedgerActions aria-label="문서">
-          {(group === '미납' || group === '전체') && unpaidRows.length > 0 && (
-            <Btn
-              size="sm"
-              variant="ghost"
-              onClick={() => setNoticeSel(new Set(unpaidRows.map((r) => r.id)))}
-            >
-              미납 전체선택
-            </Btn>
-          )}
-          <Btn
-            size="sm"
-            variant="ghost"
-            disabled={noticeTargets.length === 0}
-            onClick={() => void sendBulk()}
-          >
-            <FileWarning size={14} /> 내용증명 일괄{noticeTargets.length ? ` (${noticeTargets.length})` : ''}
-          </Btn>
-        </LedgerActions>
+        <LedgerToolsMenu items={[
+          ...((group === '미납' || group === '전체') && unpaidRows.length > 0 ? [
+            { key: 'select-unpaid', label: '미납 전체선택', onClick: () => setNoticeSel(new Set(unpaidRows.map((r) => r.id))) },
+          ] : []),
+          { key: 'notice-bulk', label: `내용증명 일괄${noticeTargets.length ? ` (${noticeTargets.length})` : ''}`, onClick: () => void sendBulk() },
+        ]} />
       )}
       filters={(
         <>
@@ -115,22 +110,38 @@ export default function RiskPage() {
             placeholder="구분·차번·대상·차명·상태"
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            style={{ width: mobile ? '100%' : 240 }}
+            style={{ width: mobile ? 160 : 280, flexShrink: 0 }}
           />
-          <FilterChips
-            value={group}
-            onChange={(v) => { if (v) setGroup(v); }}
-            options={[
-              { key: '전체' as const, label: '전체', count: counts.전체 || undefined },
-              { key: '미완료' as const, label: '미완료', count: counts.미완료 || undefined, countTone: 'danger' },
-              { key: '미납' as const, label: '미납', count: counts.미납 || undefined, countTone: 'danger' },
-              { key: '만기' as const, label: '만기', count: counts.만기 || undefined, countTone: 'warn' },
-              { key: '휴차' as const, label: '휴차', count: counts.휴차 || undefined },
-            ]}
-          />
+          <LedgerFilterButton open={filterOpen} count={filterCount} onClick={() => setFilterOpen((o) => !o)} />
           <PeriodBar latest={latest || TODAY} initial="전체" size="sm" onRange={setRange} />
         </>
       )}
+      filterPanel={filterOpen ? (
+        <LedgerFilterPanel
+          title="리스크 필터"
+          onReset={() => {
+            setDetailFilters(emptyFilterValues(RISK_FILTER_DEFS));
+            setGroup('전체');
+          }}
+          onClose={() => setFilterOpen(false)}
+        >
+          <LedgerFilterFields
+            defs={RISK_FILTER_DEFS}
+            values={{ ...detailFilters, group: group === '전체' ? '' : group }}
+            onChange={(key, value) => {
+              if (key === 'group') {
+                setGroup((value || '전체') as GroupFilter);
+                setDetailFilters((prev) => ({ ...prev, group: value }));
+                return;
+              }
+              setDetailFilters((prev) => ({ ...prev, [key]: value }));
+            }}
+            options={{
+              group: ['미완료', '미납', '만기', '휴차'],
+            }}
+          />
+        </LedgerFilterPanel>
+      ) : null}
       stats={(
         <span style={{ fontSize: 12.5, color: C.mute, whiteSpace: 'nowrap' }}>
           미완료 <b style={{ color: counts.미완료 ? C.danger : C.ok }}>{counts.미완료}</b>

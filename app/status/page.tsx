@@ -1,10 +1,9 @@
 'use client';
 /**
  * 운영현황 — 차량 1대=1행 통합 원장 (LedgerFrame 규격).
- * 기본 스코프 = isVehicleHeld(실물 보유). 필터 = 검색 + 칩1군 + 기간.
+ * 기본 스코프 = isVehicleHeld(실물 보유). 필터줄 = 검색·☰필터·기간.
  */
 import { useMemo, useState } from 'react';
-import { Car, CalendarClock, FileText } from 'lucide-react';
 import { TODAY } from '@/lib/dashboard-consts';
 import { isVehicleHeld, linkFleet } from '@/lib/domain/model';
 import { buildFleetRows, fleetRail, statusRank, type FleetRow } from '@/lib/sheet-rows';
@@ -14,22 +13,18 @@ import { workRailStyle } from '@/lib/work-rail';
 import { useEntityLists } from '@/lib/use-entity-lists';
 import { textMatch } from '@/lib/search-match';
 import {
-  Btn, C, FilterChips, LedgerActions, LedgerFrame, LedgerRecordPanel,
-  PeriodBar, Search, won,
+  C, LedgerFilterButton, LedgerFilterFields, LedgerFilterPanel, LedgerFrame, LedgerRecordPanel,
+  LedgerToolsMenu, PeriodBar, Search, won,
   type LedgerColView,
 } from '@/components/ui';
 import { useIsMobile } from '@/lib/use-mobile';
 import { LEDGER_EMPTY } from '@/lib/ledger-empty';
+import {
+  FLEET_FILTER_DEFS, countActiveFilters, emptyFilterValues, matchLedgerFilters,
+} from '@/lib/ledger-filter-defs';
 
 type ScopeChip = '전체' | '운행' | '정비' | '휴차' | '리스크';
-
-const SCOPE_OPTS: { key: ScopeChip; label: string }[] = [
-  { key: '전체', label: '전체' },
-  { key: '운행', label: '운행' },
-  { key: '정비', label: '정비' },
-  { key: '휴차', label: '휴차' },
-  { key: '리스크', label: '리스크' },
-];
+const SCOPE_OPTS = ['전체', '운행', '정비', '휴차', '리스크'] as const;
 
 export default function StatusPage() {
   const mobile = useIsMobile();
@@ -39,6 +34,8 @@ export default function StatusPage() {
   const [range, setRange] = useState({ from: '', to: '' });
   const [colView, setColView] = useState<LedgerColView>('기본');
   const [selected, setSelected] = useState<FleetRow | null>(null);
+  const [filterOpen, setFilterOpen] = useState(false);
+  const [detailFilters, setDetailFilters] = useState(() => emptyFilterValues(FLEET_FILTER_DEFS));
 
   const allRows = useMemo(() => {
     const fleet = linkFleet(vs, cs, TODAY);
@@ -46,7 +43,6 @@ export default function StatusPage() {
       .sort((a, b) => statusRank(a) - statusRank(b) || a.plate.localeCompare(b.plate, 'ko'));
   }, [vs, cs, ins, hs]);
 
-  /** 기본 스코프 = 보유(실물). 검색은 이 안에서. */
   const heldRows = useMemo(() => allRows.filter(isVehicleHeld), [allRows]);
 
   const searched = useMemo(() => heldRows.filter((r) =>
@@ -58,10 +54,12 @@ export default function StatusPage() {
     [heldRows],
   );
 
+  const activeScope = (detailFilters.scope || scope || '전체') as ScopeChip;
+
   const rows = useMemo(() => searched.filter((r) => {
-    if (scope === '운행' || scope === '정비' || scope === '휴차') {
-      if (r.util !== scope) return false;
-    } else if (scope === '리스크') {
+    if (activeScope === '운행' || activeScope === '정비' || activeScope === '휴차') {
+      if (r.util !== activeScope) return false;
+    } else if (activeScope === '리스크') {
       if (!(r.net > 0 || r.warnings.length > 0 || (r.dday != null && r.dday < 0))) return false;
     }
     if (range.from || range.to) {
@@ -71,40 +69,73 @@ export default function StatusPage() {
       if (range.from && e && e < range.from) return false;
       if (range.to && s && s > range.to) return false;
     }
-    return true;
-  }), [searched, scope, range.from, range.to]);
+    return matchLedgerFilters(r, detailFilters, {
+      scope: () => true,
+      contract: (row, v) => (v === '있음' ? !!row.customer : v === '없음' ? !row.customer : true),
+      warn: (row, v) => (v === '있음' ? row.warnings.length > 0 : v === '없음' ? row.warnings.length === 0 : true),
+    });
+  }), [searched, activeScope, range.from, range.to, detailFilters]);
 
   const { heldN, utilPct, netSum, inspSoon } = useMemo(
     () => summarizeFleetStatusStats(searched, rows),
     [searched, rows],
   );
 
+  const filterCount = countActiveFilters(
+    { ...detailFilters, scope: activeScope === '전체' ? '' : activeScope },
+    FLEET_FILTER_DEFS,
+  );
+
   return (
     <LedgerFrame
       title="운영현황"
       meta="차량 1대=1행·자산+계약+미수·조회 전용"
-      tools={<LedgerActions aria-label="워크플로">
-        <Btn size="sm" variant="ghost" iconOnly tip="자산 원장" href="/asset"><Car size={14} /></Btn>
-        <Btn size="sm" variant="ghost" iconOnly tip="계약 원장" href="/contract"><FileText size={14} /></Btn>
-        <Btn size="sm" variant="ghost" iconOnly tip="리스크관리" href="/risk"><CalendarClock size={14} /></Btn>
-      </LedgerActions>}
+      tools={<LedgerToolsMenu items={[
+        { key: 'asset', label: '자산 원장', href: '/asset' },
+        { key: 'contract', label: '계약 원장', href: '/contract' },
+        { key: 'risk', label: '리스크관리', href: '/risk' },
+      ]} />}
       filters={<>
         <Search
           size="sm"
           placeholder="회사·차량·차명·계약자·상태"
           value={q}
           onChange={(e) => setQ(e.target.value)}
-          style={{ width: mobile ? '100%' : 280 }}
+          style={{ width: mobile ? 160 : 280, flexShrink: 0 }}
         />
-        <FilterChips
-          value={scope}
-          onChange={(v) => setScope(v ?? '전체')}
-          options={SCOPE_OPTS}
-        />
+        <LedgerFilterButton open={filterOpen} count={filterCount} onClick={() => setFilterOpen((o) => !o)} />
         <PeriodBar latest={latest} initial="전체" size="sm" onRange={setRange} />
       </>}
+      filterPanel={filterOpen ? (
+        <LedgerFilterPanel
+          title="운영 필터"
+          onReset={() => {
+            setDetailFilters(emptyFilterValues(FLEET_FILTER_DEFS));
+            setScope('전체');
+          }}
+          onClose={() => setFilterOpen(false)}
+        >
+          <LedgerFilterFields
+            defs={FLEET_FILTER_DEFS}
+            values={{ ...detailFilters, scope: activeScope === '전체' ? '' : activeScope }}
+            onChange={(key, value) => {
+              if (key === 'scope') {
+                setScope((value || '전체') as ScopeChip);
+                setDetailFilters((prev) => ({ ...prev, scope: value }));
+                return;
+              }
+              setDetailFilters((prev) => ({ ...prev, [key]: value }));
+            }}
+            options={{
+              scope: SCOPE_OPTS.filter((s) => s !== '전체'),
+              contract: ['있음', '없음'],
+              warn: ['있음', '없음'],
+            }}
+          />
+        </LedgerFilterPanel>
+      ) : null}
       stats={
-        <span style={{ fontSize: 12.5, color: C.mute, whiteSpace: 'nowrap', display: 'inline-flex', gap: 12, flexWrap: 'wrap' }}>
+        <span style={{ fontSize: 12.5, color: C.mute, whiteSpace: 'nowrap', display: 'inline-flex', gap: 12 }}>
           <span>보유 <b style={{ color: C.ink }}>{heldN}</b></span>
           <span>가동률 <b style={{ color: utilPct >= 70 ? 'var(--green-text)' : utilPct < 50 ? C.warn : C.ink }}>{utilPct}%</b></span>
           {netSum > 0 && <span>미수 <b style={{ color: C.danger }}>{won(netSum)}</b></span>}

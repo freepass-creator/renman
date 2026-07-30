@@ -10,7 +10,7 @@ import { latestDateOf, summarizeContractLedgerStats } from '@/lib/ledger-stats';
 import { useEntityList } from '@/lib/use-entity-lists';
 import { textMatch } from '@/lib/search-match';
 import {
-  Badge, Btn, C, FilterChips, LedgerActions, LedgerCreatePanel, LedgerEditPanel, LedgerFilterSelects, LedgerFrame, LedgerRecordPanel, PageLoading, PeriodBar, Search, Select, won,
+  Badge, Btn, C, LedgerActions, LedgerCreatePanel, LedgerEditPanel, LedgerFilterButton, LedgerFilterFields, LedgerFilterPanel, LedgerFrame, LedgerRecordPanel, LedgerToolsMenu, PageLoading, PeriodBar, Search, Select, won,
   type LedgerColView, type LedgerFormSection,
 } from '@/components/ui';
 import { useIsMobile } from '@/lib/use-mobile';
@@ -18,16 +18,13 @@ import { MigrateDataButton } from '@/components/MigrateDataButton';
 import { openIngest, openReceivables } from '@/lib/ui-bus';
 import { sendNoticeCert } from '@/lib/docs/send-notice';
 import {
-  CONTRACT_FILTER_DEFS, emptyFilterValues, eqFilter, matchLedgerFilters,
+  CONTRACT_FILTER_DEFS, countActiveFilters, emptyFilterValues, eqFilter, matchLedgerFilters,
 } from '@/lib/ledger-filter-defs';
 import { RENTAL_TYPES } from '@/lib/schema/contract';
 import { LEDGER_EMPTY } from '@/lib/ledger-empty';
 
-const RENTAL_CHIP_OPTS = [
-  { key: '전체' as const, label: '전체' },
-  ...RENTAL_TYPES.map((t) => ({ key: t, label: t })),
-];
-type RentalChip = (typeof RENTAL_CHIP_OPTS)[number]['key'];
+type RentalChip = '전체' | (typeof RENTAL_TYPES)[number];
+type ContractBucket = '계약유지' | '계약종료' | '전체' | '리스크';
 
 const CONTRACT_CREATE_SECTIONS: LedgerFormSection[] = [
   { title: '계약 기본', open: true, fields: ['contractNo', 'status', 'rentalType', 'contractDate', 'plate', 'carName'] },
@@ -48,6 +45,7 @@ function ContractLedgerInner() {
   const [rentalChip, setRentalChip] = useState<RentalChip>('전체');
   const [range, setRange] = useState({ from: '', to: '' });
   const [detailFilters, setDetailFilters] = useState(() => emptyFilterValues(CONTRACT_FILTER_DEFS));
+  const [filterOpen, setFilterOpen] = useState(false);
   const [colView, setColView] = useState<LedgerColView>('기본');
   const [selected, setSelected] = useState<ReturnType<typeof contractMasterRow> | null>(null);
   const [creating, setCreating] = useState(false);
@@ -104,6 +102,16 @@ function ContractLedgerInner() {
     [searchedRows],
   );
 
+  const activeBucket: ContractBucket = riskOnly ? '리스크' : scope;
+  const filterCount = countActiveFilters(
+    {
+      ...detailFilters,
+      bucket: activeBucket === '전체' ? '' : activeBucket,
+      rentalType: rentalChip === '전체' ? '' : rentalChip,
+    },
+    CONTRACT_FILTER_DEFS,
+  );
+
   return (
     <LedgerFrame
       title="계약관리"
@@ -120,44 +128,76 @@ function ContractLedgerInner() {
           }}
         ><Plus size={14} /> {creating ? '생성 취소' : '계약 생성'}</Btn>
       </LedgerActions>}
-      tools={<LedgerActions aria-label="워크플로">
-        <Btn size="sm" variant="ghost" iconOnly tip="계약서·자료 투입 — 데이터관리" onClick={() => openIngest('contract')}>
-          <UploadCloud size={14} />
-        </Btn>
-        <Btn size="sm" variant="ghost" iconOnly tip="미수 회수" onClick={() => openReceivables()}>
-          <CircleDollarSign size={14} />
-        </Btn>
-      </LedgerActions>}
+      tools={<LedgerToolsMenu items={[
+        { key: 'ingest', label: '계약서·자료 투입 (데이터관리)', onClick: () => openIngest('contract') },
+        { key: 'receivables', label: '미수 회수', onClick: () => openReceivables() },
+      ]} />}
       filters={<>
-        <Search size="sm" placeholder="회사·계약번호·차량·계약자·상태·리스크·알람" value={q} onChange={(e) => setQ(e.target.value)} style={{ width: mobile ? '100%' : 300 }} />
-        <LedgerFilterSelects
-          defs={CONTRACT_FILTER_DEFS}
-          values={detailFilters}
-          onChange={(key, value) => setDetailFilters((prev) => ({ ...prev, [key]: value }))}
-          options={{ status: contractStatuses, endReason: endReasons }}
+        <Search
+          size="sm"
+          placeholder="회사·계약번호·차량·계약자·상태·리스크·알람"
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          style={{ width: mobile ? 160 : 280, flexShrink: 0 }}
         />
-        <Select size="sm" aria-label="계약 원장 선택" value={scope} onChange={(event) => setScope(event.target.value as typeof scope)}>
-          <option value="계약유지">유지계약 원장</option>
-          <option value="계약종료">종료계약 원장</option>
-          <option value="전체">전체계약 원장</option>
-        </Select>
-        <Select size="sm" aria-label="계약 날짜 기준" value={dateBasis} onChange={(event) => setDateBasis(event.target.value as typeof dateBasis)}>
-          <option value="계약일">계약일 기준</option>
-          <option value="종료일">종료일 기준</option>
-        </Select>
-        <FilterChips
-          allowOff
-          value={riskOnly ? '리스크' : null}
-          onChange={(v) => setRiskOnly(v === '리스크')}
-          options={[{ key: '리스크', label: '리스크' }]}
-        />
-        <FilterChips
-          value={rentalChip}
-          onChange={(v) => setRentalChip(v ?? '전체')}
-          options={RENTAL_CHIP_OPTS}
-        />
+        <LedgerFilterButton open={filterOpen} count={filterCount} onClick={() => setFilterOpen((o) => !o)} />
         <PeriodBar latest={latest} initial="전체" size="sm" onRange={setRange} />
       </>}
+      filterPanel={filterOpen ? (
+        <LedgerFilterPanel
+          title="계약 필터"
+          onReset={() => {
+            setDetailFilters(emptyFilterValues(CONTRACT_FILTER_DEFS));
+            setScope('계약유지');
+            setRiskOnly(false);
+            setRentalChip('전체');
+            setDateBasis('계약일');
+          }}
+          onClose={() => setFilterOpen(false)}
+        >
+          <LedgerFilterFields
+            defs={CONTRACT_FILTER_DEFS}
+            values={{
+              ...detailFilters,
+              bucket: activeBucket === '전체' ? '' : activeBucket,
+              rentalType: rentalChip === '전체' ? '' : rentalChip,
+            }}
+            onChange={(key, value) => {
+              if (key === 'bucket') {
+                const next = (value || '전체') as ContractBucket;
+                if (next === '리스크') {
+                  setRiskOnly(true);
+                  setScope('전체');
+                } else {
+                  setRiskOnly(false);
+                  setScope(next);
+                }
+                setDetailFilters((prev) => ({ ...prev, bucket: value }));
+                return;
+              }
+              if (key === 'rentalType') {
+                setRentalChip((value || '전체') as RentalChip);
+                setDetailFilters((prev) => ({ ...prev, rentalType: value }));
+                return;
+              }
+              setDetailFilters((prev) => ({ ...prev, [key]: value }));
+            }}
+            options={{
+              bucket: ['계약유지', '계약종료', '리스크'],
+              rentalType: [...RENTAL_TYPES],
+              status: contractStatuses,
+              endReason: endReasons,
+            }}
+          />
+          <label>
+            <span style={{ display: 'block', fontSize: 12, fontWeight: 800, marginBottom: 6 }}>날짜 기준</span>
+            <Select value={dateBasis} onChange={(event) => setDateBasis(event.target.value as typeof dateBasis)} style={{ width: '100%' }}>
+              <option value="계약일">계약일 기준</option>
+              <option value="종료일">종료일 기준</option>
+            </Select>
+          </label>
+        </LedgerFilterPanel>
+      ) : null}
       stats={<span style={{ fontSize: 12.5, color: C.mute }}>유지 <b style={{ color: C.ok }}>{active}</b> · 리스크 <b style={{ color: C.danger }}>{riskCount}건</b>{riskDebtSum > 0 ? <> · 미수 {won(riskDebtSum)}</> : null} · 종료 리스크 <b>{endedRiskCount}건</b>{endedRiskDebtSum > 0 ? <> · 미수 {won(endedRiskDebtSum)}</> : null}</span>}
       colView={colView}
       onColView={setColView}
