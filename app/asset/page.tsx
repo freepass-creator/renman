@@ -11,7 +11,7 @@ import { fleetMaintRanking } from '@/lib/asset-econ';
 import { useEntityLists } from '@/lib/use-entity-lists';
 import { textMatch } from '@/lib/search-match';
 import {
-  Btn, C, LedgerActions, LedgerCreatePanel, LedgerEditPanel, LedgerFilterButton, LedgerFilterFields, LedgerFilterPanel, LedgerFrame, LedgerRecordPanel, LedgerToolsMenu, PeriodBar, PillTabs, Search, Select,
+  Btn, C, LedgerActions, LedgerCreatePanel, LedgerEditPanel, LedgerFilterButton, LedgerFilterFields, LedgerFilterPanel, LedgerFrame, LedgerRecordPanel, PeriodBar, PillTabs, Search, Select,
   type LedgerFormSection,
 } from '@/components/ui';
 import { useIsMobile } from '@/lib/use-mobile';
@@ -161,9 +161,6 @@ export default function AssetLedgerPage() {
           }}
         ><Plus size={14} /> {creating ? '생성 취소' : '자산 생성'}</Btn>
       </LedgerActions>}
-      tools={<LedgerToolsMenu items={[
-        { key: 'ingest', label: '등록증·자료 투입 (데이터관리)', onClick: () => openIngest('vehicle') },
-      ]} />}
       filters={<>
         <Search
           size="sm"
@@ -284,6 +281,7 @@ export default function AssetLedgerPage() {
           title="자산 생성"
           sections={ASSET_CREATE_SECTIONS}
           initial={{ status: '등록대기' }}
+          fileIngest={{ label: '파일로 투입 (데이터관리)', onClick: () => openIngest('vehicle') }}
           onClose={() => setCreating(false)}
         />
       ) : selected && editing ? (

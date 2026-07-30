@@ -14,7 +14,7 @@ import { useEntityLists } from '@/lib/use-entity-lists';
 import { textMatch } from '@/lib/search-match';
 import {
   C, LedgerFilterButton, LedgerFilterFields, LedgerFilterPanel, LedgerFrame, LedgerRecordPanel,
-  LedgerToolsMenu, PeriodBar, Search, won,
+  PeriodBar, Search, won,
   type LedgerColView,
 } from '@/components/ui';
 import { useIsMobile } from '@/lib/use-mobile';
@@ -90,11 +90,6 @@ export default function StatusPage() {
     <LedgerFrame
       title="운영현황"
       meta="차량 1대=1행·자산+계약+미수·조회 전용"
-      tools={<LedgerToolsMenu items={[
-        { key: 'asset', label: '자산 원장', href: '/asset' },
-        { key: 'contract', label: '계약 원장', href: '/contract' },
-        { key: 'risk', label: '리스크관리', href: '/risk' },
-      ]} />}
       filters={<>
         <Search
           size="sm"

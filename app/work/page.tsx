@@ -8,7 +8,7 @@ import { companyDisplay } from '@/lib/companies';
 import type { EntityRecord } from '@/lib/intake/entities';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
-  Badge, Btn, C, LedgerActions, LedgerCreatePanel, LedgerFilterButton, LedgerFilterFields, LedgerFilterPanel, LedgerFrame, LedgerRecordPanel, LedgerToolsMenu, PageLoading, Search, won,
+  Badge, Btn, C, LedgerActions, LedgerCreatePanel, LedgerFilterButton, LedgerFilterFields, LedgerFilterPanel, LedgerFrame, LedgerRecordPanel, PageLoading, Search, won,
   PeriodBar, useConfirm, type LedgerColView,
 } from '@/components/ui';
 import { useSession } from '@/lib/session';
@@ -359,12 +359,6 @@ function WorkLedgerInner() {
           }}
         ><Plus size={14} /> {creating ? '취소' : '업무 생성'}</Btn>
       </LedgerActions>}
-      tools={<LedgerToolsMenu items={[
-        ...(penaltyMode ? [
-          { key: 'penalty-upload', label: '대량 업로드', href: '/penalty/upload' },
-          ...(matchedDocs > 0 ? [{ key: 'penalty-docs', label: '변경부과 공문', href: '/penalty/docs' }] : []),
-        ] : []),
-      ]} />}
       filters={<>
         <Search
           size="sm"

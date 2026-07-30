@@ -18,7 +18,7 @@ import { latestDateOf, summarizeAccountLedgerStats, summarizeCashTxStats } from 
 import { useCashLedgerLists } from '@/lib/use-cash-ledger-lists';
 import { useEntityList } from '@/lib/use-entity-lists';
 import { textMatch } from '@/lib/search-match';
-import { notifySaved, openIngest, openPayments, openReceivables, openCar } from '@/lib/ui-bus';
+import { notifySaved, openIngest, openCar } from '@/lib/ui-bus';
 import { MigrateDataButton } from '@/components/MigrateDataButton';
 import { companyDisplay } from '@/lib/companies';
 import { TODAY } from '@/lib/dashboard-consts';
@@ -33,7 +33,7 @@ import { useSession } from '@/lib/session';
 import { resolveWriteCompany, NEED_COMPANY } from '@/lib/scope';
 import { toast } from '@/lib/toast';
 import {
-  LedgerActions, LedgerCreatePanel, LedgerFilterButton, LedgerFilterFields, LedgerFilterPanel, LedgerFrame, LedgerPanelFooter, LedgerRecordPanel, LedgerToolsMenu, Btn, Input, Select, Search, PillTabs, PeriodBar, Badge, Message, ListBox, ListRow,
+  LedgerActions, LedgerCreatePanel, LedgerFilterButton, LedgerFilterFields, LedgerFilterPanel, LedgerFrame, LedgerPanelFooter, LedgerRecordPanel, Btn, Input, Select, Search, PillTabs, PeriodBar, Badge, Message, ListBox, ListRow,
   C, won, type LedgerColView, type LedgerFormSection,
 } from '@/components/ui';
 import { useIsMobile } from '@/lib/use-mobile';
@@ -581,13 +581,6 @@ export default function CashLedgerPage() {
       </Btn>
     </LedgerActions>
   );
-  const dayLoopTools = (
-    <LedgerToolsMenu items={[
-      { key: 'ingest', label: '통장 담기 (데이터관리)', onClick: () => openIngest('bank_tx') },
-      { key: 'match', label: '매칭 (입금·계약 연결)', onClick: () => openPayments() },
-      { key: 'receivables', label: '미수 회수', onClick: () => openReceivables() },
-    ]} />
-  );
 
   if (ledgerKind === '계좌관리') {
     const { total: accountTotal, active: activeAccounts } = summarizeAccountLedgerStats(accountRows);
@@ -596,7 +589,6 @@ export default function CashLedgerPage() {
         title="자금관리"
         meta="계좌·입출금·CMS"
         right={createActions}
-        tools={dayLoopTools}
         colView={colView}
         onColView={setColView}
         filters={<>
@@ -633,6 +625,7 @@ export default function CashLedgerPage() {
             sections={ACCOUNT_CREATE_SECTIONS}
             initial={{ status: '사용중', importMethod: '수기' }}
             prefix={singleKindTabs}
+            fileIngest={{ label: '통장 담기 (데이터관리)', onClick: () => openIngest('bank_tx') }}
             onClose={() => setCreating(null)}
           />
         ) : selectedAccount ? (
@@ -691,7 +684,6 @@ export default function CashLedgerPage() {
       title="자금관리"
       meta={ledgerMeta}
       right={createActions}
-      tools={dayLoopTools}
       colView={colView}
       onColView={setColView}
       filters={
@@ -755,6 +747,7 @@ export default function CashLedgerPage() {
           sections={singleKind === '법인카드' ? CARD_TX_CREATE_SECTIONS : CASH_TX_CREATE_SECTIONS}
           initial={{ txDate: new Date().toISOString().slice(0, 10), method: singleKind === 'CMS' ? 'CMS' : '계좌' }}
           prefix={singleKindTabs}
+          fileIngest={{ label: '통장 담기 (데이터관리)', onClick: () => openIngest('bank_tx') }}
           onClose={() => setCreating(null)}
         />
       ) : selected?.nest === 'cms-dep' ? (

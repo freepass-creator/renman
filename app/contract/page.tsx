@@ -10,7 +10,7 @@ import { latestDateOf, summarizeContractLedgerStats } from '@/lib/ledger-stats';
 import { useEntityList } from '@/lib/use-entity-lists';
 import { textMatch } from '@/lib/search-match';
 import {
-  Badge, Btn, C, LedgerActions, LedgerCreatePanel, LedgerEditPanel, LedgerFilterButton, LedgerFilterFields, LedgerFilterPanel, LedgerFrame, LedgerRecordPanel, LedgerToolsMenu, PageLoading, PeriodBar, Search, Select, won,
+  Badge, Btn, C, LedgerActions, LedgerCreatePanel, LedgerEditPanel, LedgerFilterButton, LedgerFilterFields, LedgerFilterPanel, LedgerFrame, LedgerRecordPanel, PageLoading, PeriodBar, Search, Select, won,
   type LedgerColView, type LedgerFormSection,
 } from '@/components/ui';
 import { useIsMobile } from '@/lib/use-mobile';
@@ -140,10 +140,6 @@ function ContractLedgerInner() {
           }}
         ><Plus size={14} /> {creating ? '생성 취소' : '계약 생성'}</Btn>
       </LedgerActions>}
-      tools={<LedgerToolsMenu items={[
-        { key: 'ingest', label: '계약서·자료 투입 (데이터관리)', onClick: () => openIngest('contract') },
-        { key: 'receivables', label: '미수 회수', onClick: () => openReceivables() },
-      ]} />}
       filters={<>
         <Search
           size="sm"
@@ -231,6 +227,7 @@ function ContractLedgerInner() {
           title="계약 생성"
           sections={CONTRACT_CREATE_SECTIONS}
           initial={{ status: '대기', paymentTiming: '선납' }}
+          fileIngest={{ label: '파일로 투입 (데이터관리)', onClick: () => openIngest('contract') }}
           onClose={() => setCreating(false)}
         />
       ) : selected && editing ? (

@@ -2,7 +2,8 @@
 /**
  * 리스크관리 — 예외 통합 원장 (LedgerFrame).
  * 데이터 = lib/risk-ledger SSOT. 칩: 전체·미완료·미납·만기·휴차.
- * 상세 = RISK_DETAIL_SECTIONS · 미납 조치(내용증명·일괄).
+ * 상세 = RISK_DETAIL_SECTIONS · 미납 조치(내용증명).
+ * 대량 = 행 선택 → LedgerSelectionBar「내용증명 일괄」(⋯도구 없음).
  */
 import { useMemo, useState } from 'react';
 import { TODAY } from '@/lib/dashboard-consts';
@@ -16,7 +17,7 @@ import { sendNoticeCert, sendNoticeCertBulk } from '@/lib/docs/send-notice';
 import { useSession } from '@/lib/session';
 import { toast } from '@/lib/toast';
 import {
-  Badge, Btn, C, LedgerFilterButton, LedgerFilterFields, LedgerFilterPanel, LedgerFrame, LedgerRecordPanel, LedgerToolsMenu, PeriodBar, Search,
+  Badge, Btn, C, LedgerFilterButton, LedgerFilterFields, LedgerFilterPanel, LedgerFrame, LedgerRecordPanel, LedgerSelectionBar, PeriodBar, Search,
   useConfirm, won,
   type LedgerColView,
 } from '@/components/ui';
@@ -65,8 +66,11 @@ export default function RiskPage() {
     RISK_FILTER_DEFS,
   );
 
-  const unpaidRows = useMemo(() => rows.filter((r) => r.group === '미납' && r.contractKey), [rows]);
-  const noticeTargets = unpaidRows.filter((r) => noticeSel.has(r.id));
+  const unpaidSelectable = useMemo(
+    () => rows.filter((r) => r.group === '미납' && r.contractKey),
+    [rows],
+  );
+  const noticeTargets = unpaidSelectable.filter((r) => noticeSel.has(r.id));
 
   const contractByKey = useMemo(() => {
     const m = new Map(contracts.map((c) => [String(c._key || ''), c]));
@@ -91,18 +95,19 @@ export default function RiskPage() {
     setNoticeSel(new Set());
   }
 
+  function toggleSelect(key: string) {
+    setNoticeSel((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }
+
   return (
     <LedgerFrame
       title="리스크관리"
       meta="챙길 예외·미완료·미납·만기·휴차"
-      tools={(
-        <LedgerToolsMenu items={[
-          ...((group === '미납' || group === '전체') && unpaidRows.length > 0 ? [
-            { key: 'select-unpaid', label: '미납 전체선택', onClick: () => setNoticeSel(new Set(unpaidRows.map((r) => r.id))) },
-          ] : []),
-          { key: 'notice-bulk', label: `내용증명 일괄${noticeTargets.length ? ` (${noticeTargets.length})` : ''}`, danger: true, onClick: () => void sendBulk() },
-        ]} />
-      )}
       filters={(
         <>
           <Search
@@ -159,6 +164,25 @@ export default function RiskPage() {
       rowKey={(r) => r.id}
       selectedRowKey={selected?.id ?? null}
       rowStyle={(r) => riskRailStyle(riskRail(r))}
+      selectedKeys={noticeSel}
+      onToggleSelect={(key) => toggleSelect(key)}
+      rowSelectable={(r) => r.group === '미납' && !!r.contractKey}
+      selectionBar={(
+        <LedgerSelectionBar
+          count={noticeSel.size}
+          onSelectAll={() => setNoticeSel(new Set(unpaidSelectable.map((r) => r.id)))}
+          onClear={() => setNoticeSel(new Set())}
+        >
+          <Btn
+            size="sm"
+            variant="danger"
+            disabled={!noticeTargets.length}
+            onClick={() => { void sendBulk(); }}
+          >
+            내용증명 일괄{noticeTargets.length ? ` (${noticeTargets.length})` : ''}
+          </Btn>
+        </LedgerSelectionBar>
+      )}
       onRowDoubleClick={(r) => setSelected(r)}
       onCloseDetail={() => setSelected(null)}
       sidePanel={selected ? (
@@ -173,21 +197,7 @@ export default function RiskPage() {
           actions={(
             <>
               {selected.group === '미납' && selected.contractKey && (
-                <>
-                  <Btn size="sm" variant="danger" onClick={() => void sendOne(selected)}>내용증명</Btn>
-                  <Btn
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => setNoticeSel((prev) => {
-                      const next = new Set(prev);
-                      if (next.has(selected.id)) next.delete(selected.id);
-                      else next.add(selected.id);
-                      return next;
-                    })}
-                  >
-                    {noticeSel.has(selected.id) ? '일괄 선택 해제' : '일괄 선택'}
-                  </Btn>
-                </>
+                <Btn size="sm" variant="danger" onClick={() => void sendOne(selected)}>내용증명</Btn>
               )}
             </>
           )}
