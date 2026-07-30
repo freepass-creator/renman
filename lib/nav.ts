@@ -3,16 +3,18 @@
  * 앱 IA SSOT — 메뉴 → 페이지 → 잡기(입력) → 보기.
  * 데이터 층 = lib/domain/layers · 티어 = lib/tier.
  *
- * 2026-07 IA (최종):
+ * 2026-07 IA (사장님 확정 — 임의 변경·추가 금지):
  *   (상단) 대시보드 · 운영현황
- *   처리 = 리스크관리 · 업무관리 · 미수관리 · 자금일보 · 데이터관리
- *   원장 = 자산 · 계약 · 자금
- *   시스템 = 설정 · 데이터 마이그레이션(hqOnly)
- *   /desk → /risk (레거시). PAGE_IA · ERP_MENU_TREE · NAV_GROUPS 동기.
+ *   (처리) 리스크관리 · 업무관리 · 자금일보 · 데이터관리
+ *   (원장) 자산관리 · 계약관리 · 자금관리
+ *   (하단) 경영관리 · 개발도구 · 설정
+ *   미수관리(/receivables) = 메뉴 비노출 · 페이지 존치(리스크 미납 액션으로 진입)
+ *   PAGE_IA · ERP_MENU_TREE · NAV_GROUPS 동기.
  */
 import {
   Table2, Wallet, Settings, Database, ListTodo,
-  CarFront, FileText, LayoutDashboard, Upload, TriangleAlert, HandCoins, ArrowLeftRight, type LucideIcon,
+  CarFront, FileText, LayoutDashboard, Upload, TriangleAlert, ArrowLeftRight,
+  Building2, type LucideIcon,
 } from 'lucide-react';
 import type { Tier } from './tier';
 import type { AssetKind, DataLayer } from './domain/layers';
@@ -47,22 +49,24 @@ export const PAGE_IA: PageIA[] = [
   { href: '/status', label: '운영현황', role: 'view', layer: 'mixed', tier: '라이트', view: '차량 1대=1행 통합원장 · LedgerFrame', grab: 'none', grabHow: '—' },
 
   // ── 처리 ──
-  { href: '/risk', label: '리스크관리', role: 'hub', layer: 'mixed', tier: '라이트', view: 'risk-ledger · LedgerFrame · 미완료·미납·만기·휴차(+일정 어김·임박)', grab: 'none', grabHow: '—' },
+  { href: '/risk', label: '리스크관리', role: 'hub', layer: 'mixed', tier: '라이트', view: 'risk-ledger · LedgerFrame · 미완료·미납·만기·휴차', grab: 'none', grabHow: '—' },
   { href: '/work', label: '업무관리', role: 'work', layer: 'event', tier: '라이트', view: '정비·일정·과태료·상담 통합', grab: 'context', grabHow: '행·생성' },
-  { href: '/receivables', label: '미수관리', role: 'work', layer: 'event', tier: '라이트', view: '회수 큐', grab: 'context', grabHow: '연락·독촉' },
   { href: '/payments', label: '자금일보', role: 'work', layer: 'event', tier: '라이트', view: '입금↔계약 매칭', grab: 'none', grabHow: '매칭·분류' },
   { href: '/ingest', label: '데이터관리', role: 'input', layer: 'mixed', tier: '라이트', view: 'OCR·엑셀·직접 투입', grab: 'batch', grabHow: '담기' },
 
   // ── 원장 ──
   { href: '/asset', label: '자산관리', role: 'view', layer: 'ledger', tier: '라이트', assetKind: 'physical', view: '차량 1대=1행 · 더블클릭 상세패널', grab: 'both', grabHow: '생성·패널수정 · 마이그레이션' },
-  { href: '/contract', label: '계약관리', role: 'view', layer: 'ledger', tier: '라이트', assetKind: 'contract', view: '계약 1건=1행 · 더블클릭 상세패널 · 리스크(불이행)', grab: 'both', grabHow: '생성·패널수정 · 리스크 CTA' },
+  { href: '/contract', label: '계약관리', role: 'view', layer: 'ledger', tier: '라이트', assetKind: 'contract', view: '계약 1건=1행 · 더블클릭 상세패널', grab: 'both', grabHow: '생성·패널수정' },
   { href: '/cash', label: '자금관리', role: 'view', layer: 'ledger', tier: '라이트', assetKind: 'cash', view: '계좌+입출금 · CMS매칭', grab: 'batch', grabHow: '단건·대량 입력 · 담기' },
 
-  // ── 시스템 ──
+  // ── 하단 ──
+  { href: '/management', label: '경영관리', role: 'system', layer: 'system', tier: '라이트', view: '법인·계좌·임대차 · LedgerFrame 탭', grab: 'none', grabHow: '—' },
+  { href: '/dev/data', label: '개발도구', role: 'system', layer: 'system', tier: '라이트', view: '스위치플랜 반영·백엔드', grab: 'none', grabHow: '본사 전용' },
   { href: '/settings', label: '설정', role: 'system', layer: 'system', tier: '라이트', view: '계정·초기화면', grab: 'none', grabHow: '—' },
-  { href: '/dev/data', label: '데이터 마이그레이션', role: 'system', layer: 'system', tier: '라이트', view: '스위치플랜 반영·백엔드', grab: 'none', grabHow: '본사 전용' },
 
   // ── 딥링크 (메뉴 비노출 · URL 유지) ──
+  { href: '/receivables', label: '미수관리(딥링크)', role: 'work', layer: 'event', tier: '라이트', view: '회수 큐 — 리스크 미납 액션으로 진입', grab: 'context', grabHow: '연락·독촉' },
+  { href: '/integrity', label: '정합성(딥링크)', role: 'view', layer: 'mixed', tier: '라이트', view: '컴플라이언스·데이터 점검', grab: 'none', grabHow: '—' },
   { href: '/penalty', label: '과태료(딥링크)', role: 'work', layer: 'event', tier: '라이트', view: '→업무관리 과태료', grab: 'both', grabHow: '매칭' },
   { href: '/dispatch', label: '배차(딥링크)', role: 'work', layer: 'event', tier: '스탠다드', view: '출고·반납', grab: 'context', grabHow: '위저드' },
   { href: '/vehicle/[plate]', label: '차량상세', role: 'view', layer: 'ledger', tier: '라이트', assetKind: 'physical', view: '자산 패널「차량 상세」→ 축소 수순', grab: 'context', grabHow: '그자리 편집' },
@@ -91,6 +95,7 @@ export type NavGroup = { title: string; items: NavItem[] };
 /**
  * ERP 메뉴 정보구조 SSOT.
  * 처리 = 예외·사건·투입 · 원장 = 확정 현재 상태 · 상태·기간은 메뉴가 아니라 필터/views.
+ * ★메뉴·그룹 추가는 사장님 승인 필요.
  */
 export type MenuView = {
   id: string;
@@ -128,7 +133,6 @@ export const ERP_MENU_TREE: ErpMenuNode[] = [
     children: [
       { id: 'risk', label: '리스크관리', href: '/risk', icon: TriangleAlert },
       { id: 'work', label: '업무관리', href: '/work', icon: ListTodo },
-      { id: 'receivables', label: '미수관리', href: '/receivables', icon: HandCoins },
       { id: 'payments', label: '자금일보', href: '/payments', icon: ArrowLeftRight },
       { id: 'ingest', label: '데이터관리', href: '/ingest', icon: Upload },
     ],
@@ -145,13 +149,14 @@ export const ERP_MENU_TREE: ErpMenuNode[] = [
     ],
   },
   {
-    id: 'system',
-    label: '시스템',
-    href: '/settings',
-    icon: Settings,
+    id: 'bottom',
+    label: '하단',
+    href: '/management',
+    icon: Building2,
     children: [
+      { id: 'management', label: '경영관리', href: '/management', icon: Building2 },
+      { id: 'dev-tools', label: '개발도구', href: '/dev/data', icon: Database, hqOnly: true },
       { id: 'settings', label: '설정', href: '/settings', icon: Settings },
-      { id: 'dev-tools', label: '데이터 마이그레이션', href: '/dev/data', icon: Database, hqOnly: true },
     ],
   },
 ];
@@ -165,7 +170,6 @@ export const NAV_GROUPS: NavGroup[] = [
   { title: '처리', items: [
     { href: '/risk', label: '리스크관리', icon: TriangleAlert, tier: '라이트' },
     { href: '/work', label: '업무관리', icon: ListTodo, tier: '라이트' },
-    { href: '/receivables', label: '미수관리', icon: HandCoins, tier: '라이트' },
     { href: '/payments', label: '자금일보', icon: ArrowLeftRight, tier: '라이트' },
     { href: '/ingest', label: '데이터관리', icon: Upload, tier: '라이트' },
   ] },
@@ -174,9 +178,10 @@ export const NAV_GROUPS: NavGroup[] = [
     { href: '/contract', label: '계약관리', icon: FileText, tier: '라이트' },
     { href: '/cash', label: '자금관리', icon: Wallet, tier: '라이트' },
   ] },
-  { title: '시스템', items: [
+  { title: '하단', items: [
+    { href: '/management', label: '경영관리', icon: Building2, tier: '라이트' },
+    { href: '/dev/data', label: '개발도구', icon: Database, tier: '라이트', hqOnly: true },
     { href: '/settings', label: '설정', icon: Settings, tier: '라이트' },
-    { href: '/dev/data', label: '데이터 마이그레이션', icon: Database, tier: '라이트', hqOnly: true },
   ] },
 ];
 
