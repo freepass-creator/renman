@@ -193,6 +193,20 @@ const PENALTY_COL_CATALOG: SheetCol<WorkLedgerRow>[] = [
   { key: 'due', label: '납기', priority: 2, render: (r) => r.dueDate || LEDGER_EMPTY.dash, text: (r) => r.dueDate },
 ];
 
+/** 상세 전용 — 시트 basic에 안 넣음. */
+const PENALTY_DETAIL_CATALOG: SheetCol<WorkLedgerRow>[] = [
+  ...PENALTY_COL_CATALOG,
+  {
+    key: 'fileUrl', label: '고지서 원본',
+    render: (r) => {
+      const url = String(r.raw?.fileUrl || '').trim();
+      if (!url) return LEDGER_EMPTY.dash;
+      return <a href={url} target="_blank" rel="noreferrer" style={{ color: C.accent, fontWeight: 700 }}>원본 열기</a>;
+    },
+    text: (r) => String(r.raw?.fileUrl || '').trim(),
+  },
+];
+
 export const WORK_SHEET_KEYS: SheetViewKeys = {
   basic: ['company', 'plate', 'contractor', 'title', 'kind', 'priority', 'status', 'contractNo', 'workDate', 'due', 'assignee'],
   all: [
@@ -246,10 +260,10 @@ export const WORK_DETAIL_DEFS: DetailSectionDef[] = [
 
 export const PENALTY_DETAIL_DEFS: DetailSectionDef[] = [
   { title: '고지서', open: true, keys: ['violationDate', 'plate', 'amount', 'driver', 'status'] },
-  { title: '부가', keys: ['ptype', 'title', 'company', 'due'] },
+  { title: '부가', keys: ['ptype', 'title', 'company', 'due', 'fileUrl'] },
 ];
 
 export const WORK_DETAIL_SECTIONS = buildDetailSections(WORK_DETAIL_CATALOG, WORK_DETAIL_DEFS);
-export const PENALTY_DETAIL_SECTIONS = buildDetailSections(PENALTY_ALL_COLS, PENALTY_DETAIL_DEFS);
+export const PENALTY_DETAIL_SECTIONS = buildDetailSections(PENALTY_DETAIL_CATALOG, PENALTY_DETAIL_DEFS);
 
 export { workStatusTone };
