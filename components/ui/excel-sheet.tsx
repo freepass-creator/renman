@@ -139,7 +139,8 @@ function FilterPop<T>({ col, x, y, rows, sel, onSel, sort, onSort, onClose }: {
 export function ExcelSheet<T>({
   cols, rows, onRow, onRowDoubleClick, rowKey, selectedRowKey,
   onFiltered, mode = 'excel', fit = false, rowStyle, rowClickable,
-  selectedKeys, onToggleSelect, rowSelectable,
+  selectedKeys,
+  onRowMouseDown, onRowClickEvent, onRowContextMenu,
 }: {
   cols: SheetCol<T>[];
   rows: T[];
@@ -161,11 +162,14 @@ export function ExcelSheet<T>({
   rowStyle?: (row: T) => React.CSSProperties | undefined;
   /** false면 클릭 비활성(하위 장식행). 기본 true. */
   rowClickable?: (row: T) => boolean;
-  /** 다중 선택(체크). onToggleSelect 있으면 체크열 표시. */
+  /** 다중 선택 하이라이트(--bg-selected). 체크박스 없음. */
   selectedKeys?: ReadonlySet<string>;
-  onToggleSelect?: (key: string, row: T) => void;
-  /** false면 체크 비활성. 기본 true(선택 모드일 때). */
-  rowSelectable?: (row: T) => boolean;
+  /** jpkerp5 rowSel — Shift 텍스트선택 방지. */
+  onRowMouseDown?: (e: React.MouseEvent, row: T, index: number) => void;
+  /** jpkerp5 rowSel — 클릭=단일·Shift=범위·Ctrl=토글. 있으면 onRow보다 우선. */
+  onRowClickEvent?: (e: React.MouseEvent, row: T, index: number) => void;
+  /** 우클릭 메뉴. */
+  onRowContextMenu?: (e: React.MouseEvent, row: T, index: number) => void;
 }) {
   const mobile = useIsMobile();
   const { scopeAll } = useSession();
@@ -205,42 +209,23 @@ export function ExcelSheet<T>({
 
   React.useEffect(() => { onFiltered?.(view); }, [view, onFiltered]);
 
-  const selectMode = !!onToggleSelect && !!rowKey;
-  const canSelect = (r: T) => (rowSelectable ? rowSelectable(r) : true);
-
   if (mobile || mode === 'card') {
-    // 목록 = 그룹 카드 규격(Cards): 모바일=한 그룹 박스+구분선 행 / 데스크톱 카드뷰=그리드. 개별 박스 흩뿌림 금지.
-    // danger 행 = rowStyle 배경 틴트만(표와 동일). 좌측 점/레일 금지.
+    // 목록 = 그룹 카드 규격(Cards). 체크박스 없음.
     return (
       <Cards>
         {view.map((r, i) => {
           const key = rowKey?.(r, i) ?? String(i);
-          const checked = !!selectedKeys?.has(key);
-          const selectable = selectMode && canSelect(r);
+          const multi = !!selectedKeys?.has(key);
           return (
             <div key={key} style={{ display: 'flex', alignItems: 'stretch', gap: 8 }}>
-              {selectMode ? (
-                <label
-                  style={{
-                    display: 'grid', placeItems: 'center', flex: '0 0 auto', paddingLeft: 4,
-                    opacity: selectable ? 1 : 0.35, cursor: selectable ? 'pointer' : 'default',
-                  }}
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <input
-                    type="checkbox"
-                    checked={checked}
-                    disabled={!selectable}
-                    aria-label="행 선택"
-                    onChange={() => { if (selectable) onToggleSelect?.(key, r); }}
-                  />
-                </label>
-              ) : null}
               <div style={{ flex: 1, minWidth: 0 }}>
                 <ObjCard
                   title={visibleCols[0]?.render(r)}
                   fields={visibleCols.slice(1, 5).map((c) => [c.label, c.render(r)] as [React.ReactNode, React.ReactNode])}
-                  style={rowStyle?.(r)}
+                  style={{
+                    ...rowStyle?.(r),
+                    ...(multi ? { background: 'var(--bg-selected)' } : null),
+                  }}
                   onClick={(onRowDoubleClick || onRow) ? () => {
                     haptic.tap();
                     (onRowDoubleClick || onRow)?.(r);
@@ -282,9 +267,6 @@ export function ExcelSheet<T>({
         }}>
           <thead>
             <tr>
-              {selectMode ? (
-                <th style={{ ...thXC, width: 36, minWidth: 36, maxWidth: 36 }} aria-label="선택" />
-              ) : null}
               {visibleCols.map((c, colIndex) => {
                 const base = c.pin ? thXPin : c.align === 'r' ? thXR : c.align === 'c' ? thXC : thX;
                 const canFilter = !!c.text;
@@ -315,15 +297,13 @@ export function ExcelSheet<T>({
             {view.map((r, i) => {
               const custom = rowStyle?.(r);
               const rowId = rowKey?.(r, i) ?? String(i);
-              const clickable = (onRow || onRowDoubleClick) ? (rowClickable ? rowClickable(r) : true) : false;
-              const selected = selectedRowKey != null && rowId === selectedRowKey;
-              const checked = !!selectedKeys?.has(rowId);
-              const selectable = selectMode && canSelect(r);
+              const hasClick = !!(onRow || onRowClickEvent || onRowDoubleClick);
+              const clickable = hasClick ? (rowClickable ? rowClickable(r) : true) : false;
+              const selected = (selectedRowKey != null && rowId === selectedRowKey)
+                || !!selectedKeys?.has(rowId);
               const bg = custom?.background
                 ? String(custom.background)
                 : (i % 2 ? C.zebra : C.card);
-              // 고정(pin) 칸은 가로스크롤 시 뒤 내용을 가려야 해서 «자기 배경»이 필요하다.
-              // 그래서 행 배경만 바꾸면 그 칸만 호버가 안 먹는다 → hover 행은 여기서 함께 계산한다.
               const rowBg = selected
                 ? 'var(--bg-selected)'
                 : (hover === i && clickable ? C.hover : bg);
@@ -332,13 +312,20 @@ export function ExcelSheet<T>({
                   key={rowId}
                   aria-selected={selected || undefined}
                   tabIndex={clickable ? 0 : undefined}
-                  title={onRowDoubleClick ? (onRow ? '클릭=선택 · 더블클릭=상세 · 다시 더블클릭=닫기' : '더블클릭=상세 · 다시 더블클릭=닫기') : undefined}
-                  onClick={clickable && onRow ? () => {
+                  title={onRowDoubleClick ? '클릭=선택 · 더블클릭=상세 · 우클릭=메뉴' : undefined}
+                  onMouseDown={onRowMouseDown ? (e) => onRowMouseDown(e, r, i) : undefined}
+                  onContextMenu={onRowContextMenu ? (e) => onRowContextMenu(e, r, i) : undefined}
+                  onClick={clickable ? (e) => {
+                    if (onRowClickEvent) {
+                      onRowClickEvent(e, r, i);
+                      if (!onRowDoubleClick) onRow?.(r);
+                      return;
+                    }
+                    if (!onRow) return;
                     if (!onRowDoubleClick) {
                       onRow(r);
                       return;
                     }
-                    // 더블클릭과 충돌 없이: 매 click마다 선택 예약 갱신, dblclick이 예약을 취소한다.
                     if (clickTimer.current) clearTimeout(clickTimer.current);
                     clickTimer.current = setTimeout(() => {
                       onRow(r);
@@ -371,21 +358,6 @@ export function ExcelSheet<T>({
                   onMouseEnter={() => setHover(i)}
                   onMouseLeave={() => setHover((h) => (h === i ? null : h))}
                 >
-                  {selectMode ? (
-                    <td
-                      style={{ ...tdXC, width: 36, minWidth: 36, maxWidth: 36, background: rowBg }}
-                      onClick={(e) => e.stopPropagation()}
-                      onDoubleClick={(e) => e.stopPropagation()}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={checked}
-                        disabled={!selectable}
-                        aria-label="행 선택"
-                        onChange={() => { if (selectable) onToggleSelect?.(rowId, r); }}
-                      />
-                    </td>
-                  ) : null}
                   {visibleCols.map((c, colIndex) => {
                     const base = c.pin ? { ...tdXPin, background: rowBg } : c.align === 'r' ? tdXR : c.align === 'c' ? tdXC : tdX;
                     return (

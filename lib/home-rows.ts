@@ -160,11 +160,9 @@ export function buildHomeRiskRows(D: Dashboard): HomeQueueRow[] {
   for (const e of D.expiring) {
     if ((e.dday ?? 0) >= 0) continue;
     const plate = String(e.plate || '');
-    const isContract = String(e.sub || '').includes('계약');
+    // expiring dday<0 = 보험·검사만(계약 만기경과 dday≤7은 returnFlow). agendaKey SSOT.
     rows.push({
-      id: isContract
-        ? riskReturnOverOpenId(plate)
-        : riskAgendaOverOpenId(e.agendaKey || `insp:${plate}`),
+      id: riskAgendaOverOpenId(e.agendaKey || `insp:${plate}`),
       company: '',
       kind: '만기경과',
       plate,

@@ -30,7 +30,8 @@ export function LedgerFrame<R>({
   loading, empty,
   cols, rows, rowKey, onRow, onRowDoubleClick, onCloseDetail, selectedRowKey,
   rowStyle, rowClickable,
-  selectedKeys, onToggleSelect, rowSelectable,
+  selectedKeys,
+  onRowMouseDown, onRowClickEvent, onRowContextMenu,
   selectionBar,
   detail, sidePanel, filterPanel,
   icon,
@@ -67,10 +68,11 @@ export function LedgerFrame<R>({
   selectedRowKey?: string | null;
   rowStyle?: (r: R) => React.CSSProperties | undefined;
   rowClickable?: (r: R) => boolean;
-  /** 다중 선택(체크) — ExcelSheet로 전달. */
+  /** 다중 선택 하이라이트(체크박스 없음). */
   selectedKeys?: ReadonlySet<string>;
-  onToggleSelect?: (key: string, row: R) => void;
-  rowSelectable?: (row: R) => boolean;
+  onRowMouseDown?: (e: React.MouseEvent, row: R, index: number) => void;
+  onRowClickEvent?: (e: React.MouseEvent, row: R, index: number) => void;
+  onRowContextMenu?: (e: React.MouseEvent, row: R, index: number) => void;
   /** 표 위 선택 액션바(`LedgerSelectionBar`). 0건이면 페이지가 null. */
   selectionBar?: ReactNode;
   detail?: ReactNode;
@@ -180,8 +182,12 @@ export function LedgerFrame<R>({
                 rowStyle={rowStyle}
                 rowClickable={rowClickable}
                 selectedKeys={selectedKeys}
-                onToggleSelect={onToggleSelect}
-                rowSelectable={rowSelectable}
+                onRowMouseDown={onRowMouseDown}
+                onRowClickEvent={onRowClickEvent ? (e, row, idx) => {
+                  if (rowKey) setPickedKey(rowKey(row));
+                  onRowClickEvent(e, row, idx);
+                } : undefined}
+                onRowContextMenu={onRowContextMenu}
               />
             )}
           </div>
