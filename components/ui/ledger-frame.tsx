@@ -130,8 +130,8 @@ export function LedgerFrame<R>({
       )}
 
       <div style={{
-        display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8, flexShrink: 0,
-        padding: '8px 0 10px',
+        display: 'flex', flexWrap: 'nowrap', alignItems: 'center', gap: 8, flexShrink: 0,
+        padding: '8px 0 10px', overflowX: 'auto',
       }}>
         {companySlot ?? <CompanyFilter size="sm" />}
         {filters}

@@ -46,18 +46,23 @@ export function eqFilter<T>(get: (row: T) => string): (row: T, value: string) =>
 
 /** 자산 세부필터 — 추가 요청 시 여기 push. */
 export const ASSET_FILTER_DEFS: LedgerFilterFieldDef[] = [
+  { key: 'pool', label: '자산범위' },
+  { key: 'quick', label: '빠른필터' },
   { key: 'status', label: '차량상태' },
   { key: 'maker', label: '제조사' },
 ];
 
 /** 계약 세부필터. */
 export const CONTRACT_FILTER_DEFS: LedgerFilterFieldDef[] = [
+  { key: 'bucket', label: '계약범위' },
+  { key: 'rentalType', label: '대여형태' },
   { key: 'status', label: '계약상태' },
   { key: 'endReason', label: '종료사유' },
 ];
 
 /** 운영현황 세부필터. */
 export const FLEET_FILTER_DEFS: LedgerFilterFieldDef[] = [
+  { key: 'scope', label: '가동·리스크' },
   { key: 'contract', label: '계약' },
   { key: 'warn', label: '경고' },
 ];
@@ -69,18 +74,30 @@ export const AGENDA_FILTER_DEFS: LedgerFilterFieldDef[] = [
 
 /** 업무 세부필터. */
 export const WORK_FILTER_DEFS: LedgerFilterFieldDef[] = [
+  { key: 'group', label: '업무구분' },
+  { key: 'penProcess', label: '과태료 처리' },
+  { key: 'penKind', label: '과태료 유형' },
   { key: 'status', label: '상태' },
   { key: 'assignee', label: '담당자', emptyLabel: '담당자 전체' },
   { key: 'source', label: '원천' },
 ];
 
+/** 리스크 세부필터. */
+export const RISK_FILTER_DEFS: LedgerFilterFieldDef[] = [
+  { key: 'group', label: '리스크 구분' },
+];
+
 /** 자금·계좌 세부필터. */
 export const CASH_ACCOUNT_FILTER_DEFS: LedgerFilterFieldDef[] = [
+  { key: 'accountStatus', label: '계좌상태' },
   { key: 'accountType', label: '계좌구분' },
 ];
 
 /** 자금·거래 세부필터. */
 export const CASH_TX_FILTER_DEFS: LedgerFilterFieldDef[] = [
+  { key: 'flow', label: '수지구분' },
+  { key: 'sourceQuick', label: '원천필터' },
+  { key: 'unclassified', label: '미분류만' },
   { key: 'category', label: '계정과목' },
   { key: 'match', label: '매칭상태' },
 ];
