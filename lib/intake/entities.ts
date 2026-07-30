@@ -306,6 +306,20 @@ export const ENTITIES: Record<string, Entity> = {
       { key: 'memo', label: '메모', type: 'text' },
     ],
   },
+  /** 사업장 임대차 — 경영관리. 최소 필드. 만기 D-30은 dday 헬퍼로 표기(새 엔진 금지). */
+  lease: {
+    key: 'lease', label: '임대차계약', layer: ENTITY_LAYER.lease, source: '원장 직접입력', idFrom: 'leaseNo',
+    fields: [
+      { key: 'leaseNo', label: '계약번호', type: 'text', required: true, manual: true },
+      { key: 'landlord', label: '임대인', type: 'text', required: true, manual: true },
+      { key: 'address', label: '소재지', type: 'text', required: true, manual: true },
+      { key: 'deposit', label: '보증금(원)', type: 'number', manual: true },
+      { key: 'monthlyRent', label: '월세(원)', type: 'number', manual: true },
+      { key: 'startDate', label: '시작일', type: 'date', manual: true },
+      { key: 'endDate', label: '만기일', type: 'date', required: true, manual: true },
+      { key: 'memo', label: '메모', type: 'text', manual: true },
+    ],
+  },
   bank_tx: {
     key: 'bank_tx', label: '계좌 거래', layer: ENTITY_LAYER.bank_tx, source: '은행 거래내역(엑셀/CSV)', idFrom: 'txKey', keyFields: ['txDate', 'amount', 'withdraw', 'counterparty'],
     fields: [

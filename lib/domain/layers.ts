@@ -48,6 +48,7 @@ export const ENTITY_LAYER: Record<string, DataLayer> = {
   contract: 'ledger',  // 계약(무형) — 성립=자산 생성, 이벤트 아님
   insurance: 'ledger', // 보험 권리·증권 = 계약성 자산
   bank_account: 'ledger', // 계좌 자체 = 자금자산 원장
+  lease: 'ledger',        // 임대차(사업장) 계약 = 무형 원장
   bank_tx: 'ledger',   // 자금 원장 줄
   card_tx: 'ledger',
   customer: 'ledger',  // 계약에 묶인 거래상대(얇은 원장)
@@ -67,6 +68,7 @@ export const ENTITY_ASSET_KIND: Partial<Record<string, AssetKind>> = {
   contract: 'contract',
   insurance: 'contract',
   bank_account: 'cash',
+  lease: 'contract',
   bank_tx: 'cash',
   card_tx: 'cash',
   customer: 'party',
