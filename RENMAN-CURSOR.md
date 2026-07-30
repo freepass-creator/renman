@@ -70,6 +70,7 @@ curl -s -o /dev/null -w "%{http_code}" http://localhost:6006/<route>   # 200
 
 | 날짜 | 작업자 | 내용 | 상태 |
 |---|---|---|---|
+| 2026-07-30 | Cursor | 지시층1: work-orders·InstructionStrip→/risk · 홈오늘할일5 · section 23삭제(유지 s-repair·a-other) · ack TODO | tsc0 · /·/risk·/repair 200 |
 | 2026-07-30 | Cursor | ⋯도구폐기: redesign박제·미수/자금일보메뉴·fileIngest·SelectionBar·risk일괄·LedgerToolsMenu삭제 | tsc0 · 10면200 · 커밋분리 |
 | 2026-07-30 | Cursor | 마감5: OCR미완수기·계약bucket세분·내용증명danger·assetRail←lifecycle·보유중배지gray (4=+생성 후속·문서박제X) | tsc0 · 5면200 · 커밋분리 |
 | 2026-07-30 | Cursor | 패널과태료·헤더최소화·자산분류: penalty-intake·패널업로드·⋯메뉴·칩→☰필터·lifecycle·분류→상태 | tsc0 · 7면200 · push |
