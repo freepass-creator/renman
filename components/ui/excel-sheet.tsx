@@ -139,6 +139,7 @@ function FilterPop<T>({ col, x, y, rows, sel, onSel, sort, onSort, onClose }: {
 export function ExcelSheet<T>({
   cols, rows, onRow, onRowDoubleClick, rowKey, selectedRowKey,
   onFiltered, mode = 'excel', fit = false, rowStyle, rowClickable,
+  selectedKeys, onToggleSelect, rowSelectable,
 }: {
   cols: SheetCol<T>[];
   rows: T[];
@@ -160,6 +161,11 @@ export function ExcelSheet<T>({
   rowStyle?: (row: T) => React.CSSProperties | undefined;
   /** false면 클릭 비활성(하위 장식행). 기본 true. */
   rowClickable?: (row: T) => boolean;
+  /** 다중 선택(체크). onToggleSelect 있으면 체크열 표시. */
+  selectedKeys?: ReadonlySet<string>;
+  onToggleSelect?: (key: string, row: T) => void;
+  /** false면 체크 비활성. 기본 true(선택 모드일 때). */
+  rowSelectable?: (row: T) => boolean;
 }) {
   const mobile = useIsMobile();
   const { scopeAll } = useSession();
@@ -199,23 +205,51 @@ export function ExcelSheet<T>({
 
   React.useEffect(() => { onFiltered?.(view); }, [view, onFiltered]);
 
+  const selectMode = !!onToggleSelect && !!rowKey;
+  const canSelect = (r: T) => (rowSelectable ? rowSelectable(r) : true);
+
   if (mobile || mode === 'card') {
     // 목록 = 그룹 카드 규격(Cards): 모바일=한 그룹 박스+구분선 행 / 데스크톱 카드뷰=그리드. 개별 박스 흩뿌림 금지.
     // danger 행 = rowStyle 배경 틴트만(표와 동일). 좌측 점/레일 금지.
     return (
       <Cards>
-        {view.map((r, i) => (
-          <ObjCard
-            key={rowKey?.(r, i) ?? i}
-            title={visibleCols[0]?.render(r)}
-            fields={visibleCols.slice(1, 5).map((c) => [c.label, c.render(r)] as [React.ReactNode, React.ReactNode])}
-            style={rowStyle?.(r)}
-            onClick={(onRowDoubleClick || onRow) ? () => {
-              haptic.tap();
-              (onRowDoubleClick || onRow)?.(r);
-            } : undefined}
-          />
-        ))}
+        {view.map((r, i) => {
+          const key = rowKey?.(r, i) ?? String(i);
+          const checked = !!selectedKeys?.has(key);
+          const selectable = selectMode && canSelect(r);
+          return (
+            <div key={key} style={{ display: 'flex', alignItems: 'stretch', gap: 8 }}>
+              {selectMode ? (
+                <label
+                  style={{
+                    display: 'grid', placeItems: 'center', flex: '0 0 auto', paddingLeft: 4,
+                    opacity: selectable ? 1 : 0.35, cursor: selectable ? 'pointer' : 'default',
+                  }}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    disabled={!selectable}
+                    aria-label="행 선택"
+                    onChange={() => { if (selectable) onToggleSelect?.(key, r); }}
+                  />
+                </label>
+              ) : null}
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <ObjCard
+                  title={visibleCols[0]?.render(r)}
+                  fields={visibleCols.slice(1, 5).map((c) => [c.label, c.render(r)] as [React.ReactNode, React.ReactNode])}
+                  style={rowStyle?.(r)}
+                  onClick={(onRowDoubleClick || onRow) ? () => {
+                    haptic.tap();
+                    (onRowDoubleClick || onRow)?.(r);
+                  } : undefined}
+                />
+              </div>
+            </div>
+          );
+        })}
       </Cards>
     );
   }
@@ -248,6 +282,9 @@ export function ExcelSheet<T>({
         }}>
           <thead>
             <tr>
+              {selectMode ? (
+                <th style={{ ...thXC, width: 36, minWidth: 36, maxWidth: 36 }} aria-label="선택" />
+              ) : null}
               {visibleCols.map((c, colIndex) => {
                 const base = c.pin ? thXPin : c.align === 'r' ? thXR : c.align === 'c' ? thXC : thX;
                 const canFilter = !!c.text;
@@ -280,6 +317,8 @@ export function ExcelSheet<T>({
               const rowId = rowKey?.(r, i) ?? String(i);
               const clickable = (onRow || onRowDoubleClick) ? (rowClickable ? rowClickable(r) : true) : false;
               const selected = selectedRowKey != null && rowId === selectedRowKey;
+              const checked = !!selectedKeys?.has(rowId);
+              const selectable = selectMode && canSelect(r);
               const bg = custom?.background
                 ? String(custom.background)
                 : (i % 2 ? C.zebra : C.card);
@@ -332,6 +371,21 @@ export function ExcelSheet<T>({
                   onMouseEnter={() => setHover(i)}
                   onMouseLeave={() => setHover((h) => (h === i ? null : h))}
                 >
+                  {selectMode ? (
+                    <td
+                      style={{ ...tdXC, width: 36, minWidth: 36, maxWidth: 36, background: rowBg }}
+                      onClick={(e) => e.stopPropagation()}
+                      onDoubleClick={(e) => e.stopPropagation()}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        disabled={!selectable}
+                        aria-label="행 선택"
+                        onChange={() => { if (selectable) onToggleSelect?.(rowId, r); }}
+                      />
+                    </td>
+                  ) : null}
                   {visibleCols.map((c, colIndex) => {
                     const base = c.pin ? { ...tdXPin, background: rowBg } : c.align === 'r' ? tdXR : c.align === 'c' ? tdXC : tdX;
                     return (

@@ -7,11 +7,10 @@
  *   클릭 = 행 선택 · 더블클릭 = 상세패널 열기 · 같은 행/패널 재더블클릭 = 닫기.
  *
  *   버튼 자리 (왼쪽→오른쪽):
- *     필터줄 = 회사(또는 companySlot) · 검색 · 세부필터(Select 흡수 or 좌측패널 버튼) · 범위 · 빠른칩 · 기간
- *     ※ 필드 적은 원장 = `LedgerFilterSelects`로 상단 흡수(3분할 회피). 다수 필드는 좌측 `filterPanel`.
- *     우측클러스터 = stats · view(또는 기본/전체) · tools(워크플로 ghost)
- *     Page.right = 쓰기(생성·입력) — zone당 solid 1 · Btn sm
- *   필터줄에 액션(담기·매칭·생성) 금지. 워크플로는 맨 우측.
+ *     필터줄 = 회사(또는 companySlot) · 검색 · ☰필터 · 기간 ····· 지표 · 보기 · [+생성]
+ *     ※ ⋯도구 메뉴 없음. 대량액션=선택 액션바 · 투입=[+생성]패널 · 이동=좌측메뉴 · 개별=상세패널.
+ *     필드 적은 원장 = `LedgerFilterSelects`로 상단 흡수(3분할 회피). 다수 필드는 좌측 `filterPanel`.
+ *     Page.right / 필터줄 right = 쓰기(생성·입력) — zone당 solid 1 · Btn sm
  */
 import React, { type ReactNode } from 'react';
 import type { LucideIcon } from 'lucide-react';
@@ -31,14 +30,16 @@ export function LedgerFrame<R>({
   loading, empty,
   cols, rows, rowKey, onRow, onRowDoubleClick, onCloseDetail, selectedRowKey,
   rowStyle, rowClickable,
+  selectedKeys, onToggleSelect, rowSelectable,
+  selectionBar,
   detail, sidePanel, filterPanel,
   icon,
 }: {
   title: string;
   meta?: ReactNode;
-  /** 페이지 쓰기 CTA — 생성/입력만. solid 1개 원칙. 제목줄 오른쪽. */
+  /** 페이지 쓰기 CTA — 생성/입력만. solid 1개 원칙. 필터줄 맨 오른쪽. */
   right?: ReactNode;
-  /** 워크플로 CTA — 담기·매칭·OCR 등. 전부 ghost. 필터줄 맨 우측(보기 다음). */
+  /** @deprecated ⋯도구 메뉴 폐기. 새 코드에서 쓰지 말 것. */
   tools?: ReactNode;
   hint?: ReactNode;
   filters?: ReactNode;
@@ -66,6 +67,12 @@ export function LedgerFrame<R>({
   selectedRowKey?: string | null;
   rowStyle?: (r: R) => React.CSSProperties | undefined;
   rowClickable?: (r: R) => boolean;
+  /** 다중 선택(체크) — ExcelSheet로 전달. */
+  selectedKeys?: ReadonlySet<string>;
+  onToggleSelect?: (key: string, row: R) => void;
+  rowSelectable?: (row: R) => boolean;
+  /** 표 위 선택 액션바(`LedgerSelectionBar`). 0건이면 페이지가 null. */
+  selectionBar?: ReactNode;
   detail?: ReactNode;
   sidePanel?: ReactNode;
   filterPanel?: ReactNode;
@@ -139,7 +146,7 @@ export function LedgerFrame<R>({
         {stats}
         {viewControl}
         {tools}
-        {right}{/* 주액션(생성/등록) — 표 바로 위 도구 줄 맨 오른쪽(도구 옆). 제목 줄엔 두지 않음. */}
+        {right}{/* 주액션(생성/등록) — 필터줄 맨 오른쪽. ⋯도구 없음. */}
       </div>
 
       <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
@@ -154,6 +161,7 @@ export function LedgerFrame<R>({
             </aside>
           )}
           <div className="ledger-workspace__sheet">
+            {selectionBar}
             {loading ? (
               <PageLoading />
             ) : body != null ? (
@@ -171,6 +179,9 @@ export function LedgerFrame<R>({
                 fit={colView === '기본'}
                 rowStyle={rowStyle}
                 rowClickable={rowClickable}
+                selectedKeys={selectedKeys}
+                onToggleSelect={onToggleSelect}
+                rowSelectable={rowSelectable}
               />
             )}
           </div>
