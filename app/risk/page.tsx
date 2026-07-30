@@ -100,7 +100,7 @@ export default function RiskPage() {
           ...((group === '미납' || group === '전체') && unpaidRows.length > 0 ? [
             { key: 'select-unpaid', label: '미납 전체선택', onClick: () => setNoticeSel(new Set(unpaidRows.map((r) => r.id))) },
           ] : []),
-          { key: 'notice-bulk', label: `내용증명 일괄${noticeTargets.length ? ` (${noticeTargets.length})` : ''}`, onClick: () => void sendBulk() },
+          { key: 'notice-bulk', label: `내용증명 일괄${noticeTargets.length ? ` (${noticeTargets.length})` : ''}`, danger: true, onClick: () => void sendBulk() },
         ]} />
       )}
       filters={(
