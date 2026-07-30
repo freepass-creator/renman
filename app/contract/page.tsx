@@ -3,7 +3,7 @@
 import { Suspense, useEffect, useMemo, useState } from 'react';
 import { CircleDollarSign, Pencil, Plus, UploadCloud } from 'lucide-react';
 import { useSearchParams } from 'next/navigation';
-import { TODAY } from '@/lib/dashboard-consts';
+import { TODAY, dday } from '@/lib/dashboard-consts';
 import { contractMasterRow } from '@/lib/master-ledgers';
 import { CONTRACT_DETAIL_SECTIONS, CONTRACT_MASTER_BASIC_COLS, CONTRACT_MASTER_EXPANDED_COLS, contractRail, contractRailStyle } from '@/lib/master-ledger-cols';
 import { latestDateOf, summarizeContractLedgerStats } from '@/lib/ledger-stats';
@@ -24,7 +24,22 @@ import { RENTAL_TYPES } from '@/lib/schema/contract';
 import { LEDGER_EMPTY } from '@/lib/ledger-empty';
 
 type RentalChip = '전체' | (typeof RENTAL_TYPES)[number];
-type ContractBucket = '계약유지' | '계약종료' | '전체' | '리스크';
+/** 계약범위 — 전체·진행·만기임박·미납·종료 (riskLabel·net·dday 판정). */
+type ContractBucket = '전체' | '진행' | '만기임박' | '미납' | '종료';
+const CONTRACT_BUCKETS: ContractBucket[] = ['진행', '만기임박', '미납', '종료'];
+
+function matchContractBucket(r: ReturnType<typeof contractMasterRow>, bucket: ContractBucket): boolean {
+  if (bucket === '전체') return true;
+  if (bucket === '종료') return r.ended;
+  if (bucket === '미납') return r.net > 0 || r.unpaidCount > 0 || r.riskLabel.includes('미수');
+  if (bucket === '만기임박') {
+    if (r.ended) return false;
+    const d = dday(r.endDate);
+    return d != null && d >= 0 && d <= 30;
+  }
+  // 진행 = 종료 아닌 유지 계약
+  return !r.ended;
+}
 
 const CONTRACT_CREATE_SECTIONS: LedgerFormSection[] = [
   { title: '계약 기본', open: true, fields: ['contractNo', 'status', 'rentalType', 'contractDate', 'plate', 'carName'] },
@@ -39,9 +54,8 @@ function ContractLedgerInner() {
   const searchParams = useSearchParams();
   const { rows: contracts, loading } = useEntityList('contract');
   const [q, setQ] = useState('');
-  const [scope, setScope] = useState<'계약유지' | '계약종료' | '전체'>('계약유지');
+  const [bucket, setBucket] = useState<ContractBucket>('진행');
   const [dateBasis, setDateBasis] = useState<'계약일' | '종료일'>('계약일');
-  const [riskOnly, setRiskOnly] = useState(false);
   const [rentalChip, setRentalChip] = useState<RentalChip>('전체');
   const [range, setRange] = useState({ from: '', to: '' });
   const [detailFilters, setDetailFilters] = useState(() => emptyFilterValues(CONTRACT_FILTER_DEFS));
@@ -66,7 +80,7 @@ function ContractLedgerInner() {
       setCreating(false);
       setEditing(false);
       setSelected(hit);
-      if (hit.ended) setScope('전체');
+      if (hit.ended) setBucket('종료');
     }
   }, [searchParams, allRows]);
 
@@ -86,15 +100,14 @@ function ContractLedgerInner() {
     endReason: eqFilter<ReturnType<typeof contractMasterRow>>((r) => r.endReason),
   }), []);
   const rows = useMemo(() => searchedRows.filter((r) => {
-    if (!(scope === '전체' || (scope === '계약유지' ? !r.ended : r.ended))) return false;
-    if (riskOnly && !r.atRisk) return false;
+    if (!matchContractBucket(r, bucket)) return false;
     if (rentalChip !== '전체' && r.rentalType !== rentalChip) return false;
     if (!matchLedgerFilters(r, detailFilters, contractFilterMatchers)) return false;
     const date = dateBasis === '종료일' ? (r.returnedDate || r.endDate) : (r.contractDate || r.startDate);
     if (range.from && (!date || date < range.from)) return false;
     if (range.to && (!date || date > range.to)) return false;
     return true;
-  }), [searchedRows, scope, riskOnly, rentalChip, detailFilters, contractFilterMatchers, dateBasis, range.from, range.to]);
+  }), [searchedRows, bucket, rentalChip, detailFilters, contractFilterMatchers, dateBasis, range.from, range.to]);
   const contractStatuses = useMemo(() => [...new Set(allRows.map((r) => r.status).filter(Boolean))].sort(), [allRows]);
   const endReasons = useMemo(() => [...new Set(allRows.map((r) => r.endReason).filter(Boolean))].sort(), [allRows]);
   const { active, riskCount, riskDebtSum, endedRiskCount, endedRiskDebtSum } = useMemo(
@@ -102,11 +115,10 @@ function ContractLedgerInner() {
     [searchedRows],
   );
 
-  const activeBucket: ContractBucket = riskOnly ? '리스크' : scope;
   const filterCount = countActiveFilters(
     {
       ...detailFilters,
-      bucket: activeBucket === '전체' ? '' : activeBucket,
+      bucket: bucket === '전체' ? '' : bucket,
       rentalType: rentalChip === '전체' ? '' : rentalChip,
     },
     CONTRACT_FILTER_DEFS,
@@ -148,8 +160,7 @@ function ContractLedgerInner() {
           title="계약 필터"
           onReset={() => {
             setDetailFilters(emptyFilterValues(CONTRACT_FILTER_DEFS));
-            setScope('계약유지');
-            setRiskOnly(false);
+            setBucket('진행');
             setRentalChip('전체');
             setDateBasis('계약일');
           }}
@@ -159,19 +170,12 @@ function ContractLedgerInner() {
             defs={CONTRACT_FILTER_DEFS}
             values={{
               ...detailFilters,
-              bucket: activeBucket === '전체' ? '' : activeBucket,
+              bucket: bucket === '전체' ? '' : bucket,
               rentalType: rentalChip === '전체' ? '' : rentalChip,
             }}
             onChange={(key, value) => {
               if (key === 'bucket') {
-                const next = (value || '전체') as ContractBucket;
-                if (next === '리스크') {
-                  setRiskOnly(true);
-                  setScope('전체');
-                } else {
-                  setRiskOnly(false);
-                  setScope(next);
-                }
+                setBucket((value || '전체') as ContractBucket);
                 setDetailFilters((prev) => ({ ...prev, bucket: value }));
                 return;
               }
@@ -183,7 +187,7 @@ function ContractLedgerInner() {
               setDetailFilters((prev) => ({ ...prev, [key]: value }));
             }}
             options={{
-              bucket: ['계약유지', '계약종료', '리스크'],
+              bucket: CONTRACT_BUCKETS,
               rentalType: [...RENTAL_TYPES],
               status: contractStatuses,
               endReason: endReasons,
