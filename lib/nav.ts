@@ -5,14 +5,14 @@
  *
  * 2026-07 IA (최종):
  *   (상단) 대시보드 · 운영현황
- *   처리 = 리스크관리 · 업무관리 · 데이터관리
+ *   처리 = 리스크관리 · 업무관리 · 미수관리 · 자금일보 · 데이터관리
  *   원장 = 자산 · 계약 · 자금
  *   시스템 = 설정 · 데이터 마이그레이션(hqOnly)
  *   /desk → /risk (레거시). PAGE_IA · ERP_MENU_TREE · NAV_GROUPS 동기.
  */
 import {
   Table2, Wallet, Settings, Database, ListTodo,
-  CarFront, FileText, LayoutDashboard, Upload, TriangleAlert, type LucideIcon,
+  CarFront, FileText, LayoutDashboard, Upload, TriangleAlert, HandCoins, ArrowLeftRight, type LucideIcon,
 } from 'lucide-react';
 import type { Tier } from './tier';
 import type { AssetKind, DataLayer } from './domain/layers';
@@ -49,6 +49,8 @@ export const PAGE_IA: PageIA[] = [
   // ── 처리 ──
   { href: '/risk', label: '리스크관리', role: 'hub', layer: 'mixed', tier: '라이트', view: 'risk-ledger · LedgerFrame · 미완료·미납·만기·휴차(+일정 어김·임박)', grab: 'none', grabHow: '—' },
   { href: '/work', label: '업무관리', role: 'work', layer: 'event', tier: '라이트', view: '정비·일정·과태료·상담 통합', grab: 'context', grabHow: '행·생성' },
+  { href: '/receivables', label: '미수관리', role: 'work', layer: 'event', tier: '라이트', view: '회수 큐', grab: 'context', grabHow: '연락·독촉' },
+  { href: '/payments', label: '자금일보', role: 'work', layer: 'event', tier: '라이트', view: '입금↔계약 매칭', grab: 'none', grabHow: '매칭·분류' },
   { href: '/ingest', label: '데이터관리', role: 'input', layer: 'mixed', tier: '라이트', view: 'OCR·엑셀·직접 투입', grab: 'batch', grabHow: '담기' },
 
   // ── 원장 ──
@@ -61,8 +63,6 @@ export const PAGE_IA: PageIA[] = [
   { href: '/dev/data', label: '데이터 마이그레이션', role: 'system', layer: 'system', tier: '라이트', view: '스위치플랜 반영·백엔드', grab: 'none', grabHow: '본사 전용' },
 
   // ── 딥링크 (메뉴 비노출 · URL 유지) ──
-  { href: '/payments', label: '자금일보(딥링크)', role: 'work', layer: 'event', tier: '라이트', view: '입금매칭 — /cash에서 진입', grab: 'none', grabHow: '매칭·분류' },
-  { href: '/receivables', label: '미수관리(딥링크)', role: 'work', layer: 'event', tier: '라이트', view: '회수 큐 — 계약/자금 CTA', grab: 'context', grabHow: '연락' },
   { href: '/penalty', label: '과태료(딥링크)', role: 'work', layer: 'event', tier: '라이트', view: '→업무관리 과태료', grab: 'both', grabHow: '매칭' },
   { href: '/dispatch', label: '배차(딥링크)', role: 'work', layer: 'event', tier: '스탠다드', view: '출고·반납', grab: 'context', grabHow: '위저드' },
   { href: '/vehicle/[plate]', label: '차량상세', role: 'view', layer: 'ledger', tier: '라이트', assetKind: 'physical', view: '자산 패널「차량 상세」→ 축소 수순', grab: 'context', grabHow: '그자리 편집' },
@@ -128,6 +128,8 @@ export const ERP_MENU_TREE: ErpMenuNode[] = [
     children: [
       { id: 'risk', label: '리스크관리', href: '/risk', icon: TriangleAlert },
       { id: 'work', label: '업무관리', href: '/work', icon: ListTodo },
+      { id: 'receivables', label: '미수관리', href: '/receivables', icon: HandCoins },
+      { id: 'payments', label: '자금일보', href: '/payments', icon: ArrowLeftRight },
       { id: 'ingest', label: '데이터관리', href: '/ingest', icon: Upload },
     ],
   },
@@ -163,6 +165,8 @@ export const NAV_GROUPS: NavGroup[] = [
   { title: '처리', items: [
     { href: '/risk', label: '리스크관리', icon: TriangleAlert, tier: '라이트' },
     { href: '/work', label: '업무관리', icon: ListTodo, tier: '라이트' },
+    { href: '/receivables', label: '미수관리', icon: HandCoins, tier: '라이트' },
+    { href: '/payments', label: '자금일보', icon: ArrowLeftRight, tier: '라이트' },
     { href: '/ingest', label: '데이터관리', icon: Upload, tier: '라이트' },
   ] },
   { title: '원장', items: [
