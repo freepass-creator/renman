@@ -95,24 +95,90 @@ export function moneyStatusOf(input: MoneyStatusInput): MoneyStatus {
 }
 
 /**
- * 자금분류 — «뭐로 입금됐는가». 행 문법 4번 칸.
- * 계정과목(무슨 돈인가)과 다른 축이며, 절대 같은 칸에 담지 않는다.
+ * 자금분류 — «뭐로 입금·출금됐는가». 행 문법 4번 칸.
+ *
+ * ★근거는 사장님이 실제로 쓰는 자금일보 실데이터다
+ *   (`26년_스위치플랜_자금일보.xlsx` 4계좌 2,837건 · 「적요」 컬럼 33종).
+ *   적요는 은행이 찍는 «거래 채널 코드»다 — BZ뱅크(938) · FB자금(292) · FB이체(281) ·
+ *   타행MB(265) · CM보험(209) · 타행IB(176) · BZ수수(165) · 타행FB(124) · FB자동(106) ·
+ *   CMS지(67) · 타행PC(64) · FB통신(24) · 타행CD(21) · 통지CC(14) · 카드결(11) …
+ *
+ *   33종을 그대로 필터·집계에 쓰면 흩어져서 못 쓴다 → «묶음»이 자금분류이고,
+ *   원문 적요는 별도 「적요」 칸에 그대로 남긴다(근거 보존 · 정보 손실 없음).
+ *   계정과목(무슨 돈인가)과는 다른 축이며 절대 같은 칸에 담지 않는다.
  */
-export const MONEY_CLASS = ['계좌이체', 'CMS', '법인카드', '현금', '기타'] as const;
+export const MONEY_CLASS = ['이체', '자동이체', 'CD·ATM', '카드', '수수료', '현금', '기타'] as const;
 export type MoneyClass = (typeof MONEY_CLASS)[number];
 
 /** 배지 톤 — 분류는 신호가 아니므로 중립. 색 신호는 자금상태 배지가 담당한다. */
 export const MONEY_CLASS_TONE: Record<MoneyClass, 'gray' | 'blue'> = {
-  계좌이체: 'gray', CMS: 'blue', 법인카드: 'gray', 현금: 'gray', 기타: 'gray',
+  이체: 'gray', 자동이체: 'blue', 'CD·ATM': 'gray', 카드: 'gray', 수수료: 'gray', 현금: 'gray', 기타: 'gray',
 };
 
-export function moneyClassOf(input: { isCms?: boolean; isCard?: boolean; source?: unknown }): MoneyClass {
-  if (input.isCms) return 'CMS';
-  if (input.isCard) return '법인카드';
-  const src = String(input.source || '');
+/**
+ * 적요(은행 채널 코드) → 자금분류. 실데이터 33종 전수 기준.
+ * 새 적요가 나타나면 '기타'로 떨어지고 화면에서 눈에 띈다(조용히 삼키지 않는다).
+ */
+const CLASS_BY_JEOKYO: Record<string, MoneyClass> = {
+  // 인터넷·모바일·펌뱅킹 이체
+  BZ뱅크: '이체', FB이체: '이체', FB자금: '이체', 타행IB: '이체', 타행FB: '이체',
+  타행MB: '이체', 타행PC: '이체', OP이체: '이체', 모바일: '이체', 타행환: '이체', 입금: '이체',
+  'E-신한은행': '이체',
+  // 자동이체·자동집금(CMS)
+  CMS지: '자동이체', 통지CC: '자동이체', FB자동: '자동이체', CM보험: '자동이체',
+  FB통신: '자동이체', 통신: '자동이체', 의보: '자동이체', 연금: '자동이체', 지로: '자동이체',
+  국세: '자동이체', 조합비: '자동이체',
+  // CD·ATM
+  타행CD: 'CD·ATM', 효성CD: 'CD·ATM', CD송금: 'CD·ATM', CD이체: 'CD·ATM',
+  // 카드
+  카드결: '카드', 금결PG: '카드', NH카드대금: '카드',
+  // 수수료·이자
+  BZ수수: '수수료', 수수료: '수수료', 이자: '수수료', 서비스: '수수료',
+  // 현금
+  현금: '현금',
+};
+
+export function moneyClassOf(input: {
+  /** 은행 적요(원문). 실데이터의 「적요」 컬럼. */
+  jeokyo?: unknown;
+  /** 적요가 없는 경로(수동 수납 등)의 수단 문자열. */
+  source?: unknown;
+  isCms?: boolean;
+  isCard?: boolean;
+}): MoneyClass {
+  const j = String(input.jeokyo || '').trim();
+  if (j && CLASS_BY_JEOKYO[j]) return CLASS_BY_JEOKYO[j];
+  if (input.isCms) return '자동이체';
+  if (input.isCard) return '카드';
+  const src = String(input.source || '').trim();
   if (src === '현금') return '현금';
-  if (src === 'CMS') return 'CMS';
-  if (src === '카드') return '법인카드';
-  if (src === '계좌' || src === '이체' || src === '') return '계좌이체';
+  if (src === 'CMS') return '자동이체';
+  if (src === '카드') return '카드';
+  if (src === '계좌' || src === '이체' || src === '') return '이체';
   return '기타';
+}
+
+/**
+ * 계정과목 표기 정규화 — 실데이터 65종에 같은 뜻 다른 표기가 섞여 있다.
+ *   「오입금 반환」·「착오입금 반환」·「착오입금반환」·「오입금 환급」 이 각각 별개 값이고
+ *   「차량매각 대금」/「차량매각대금」, 「증비불가잡손실」/「증빙불가」, 「할부금」/「할부금 상환」도 갈라져 있다.
+ * 정규화하지 않으면 집계가 흩어져 손익·자금계획이 틀린다.
+ * ★원문은 버리지 않는다 — 화면·엑셀에는 정규화 값을 쓰고 원문은 상세에서 확인할 수 있게 남긴다.
+ */
+const SUBJECT_ALIASES: Record<string, string> = {
+  '착오입금 반환': '오입금 반환', 착오입금반환: '오입금 반환', '오입금 환급': '오입금 반환',
+  '과입금 환급': '오입금 반환', 착오입금: '오입금', '계약취소반환': '오입금 반환',
+  '착오출금 환급': '착오출금 반환', '착오출금 반환': '착오출금 반환',
+  차량매각대금: '차량매각 대금',
+  증비불가잡손실: '증빙불가', 증빙불가: '증빙불가',
+  '할부금 상환': '할부금',
+  '보험료 반환': '보험료 환급', '보험료 수취': '보험료 환급',
+  '세금 환급': '세금 환급',
+};
+
+/** 계정과목 원문 → 정규화 라벨. 모르는 값은 원문 그대로(조용히 버리지 않는다). */
+export function normalizeSubject(raw: unknown): string {
+  const v = String(raw || '').trim();
+  if (!v) return '';
+  return SUBJECT_ALIASES[v] || v;
 }

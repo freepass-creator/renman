@@ -11,7 +11,7 @@
 ```
 git log --oneline -8          # e9d77d8 부터 f74b3d8 까지 규격 커밋 7건이 새로 들어왔다
 npx tsc --noEmit              # 0 이어야 함
-npx vitest run                # 235 통과여야 함 (tests/row-grammar.test.ts 58건이 규격 게이트)
+npx vitest run                # 248 통과여야 함 (row-grammar 58건 + money-status 13건이 규격 게이트)
 ```
 
 **내가 이미 고쳐놓은 네 파일 — 덮어쓰지 마라:**
@@ -19,7 +19,9 @@ npx vitest run                # 235 통과여야 함 (tests/row-grammar.test.ts 
   결과적으로 직원 탭도 `회사명·이름·이메일·직원분류·직원상태` 로 규격 4·5 슬롯에 맞았다.
 - `lib/master-ledger-cols.tsx` 의 `SCHEDULE_SHEET_KEYS` — 분류·상태가 6·7번이던 것을 **4·5번**으로 옮겼다.
 - `lib/master-ledger-cols.tsx` 의 `label: '대여형태'` → `'계약분류'`.
-- `lib/finance/cash-cols.tsx` 의 `'계정과목'`→`'자금분류'`, `'매칭상태'`→`'자금상태'`.
+- `lib/finance/cash-cols.tsx` — 4번 「자금분류」(수단) · 5번 「자금상태」(매칭) · 6번 「계정과목」.
+  ★내가 한 번 계정과목 라벨을 「자금분류」로 바꿨다가 **되돌렸다** — 「어떻게 들어왔나」와 「무슨 돈인가」를
+    한 칸에 섞은 것이었다. 정의는 `lib/finance/money-status.ts` 가 유일한 정의처다.
 
 **내가 잡고 있어서 손대면 안 되는 파일** (필요한 변경은 나에게 «요청»으로 남겨라):
 `lib/store.ts` · `lib/company-master.ts` · `lib/finance/period-lock.ts` · `firestore.rules` ·
@@ -74,8 +76,9 @@ const mine = contracts.filter((c) => inPlateAliases(aliases, c.plate));
 
 ## 5. 상태 신호는 **배지 색으로만**
 
-`lib/work-rail.ts` 의 `workRailStyle` 은 항상 `undefined` 를 반환한다. 좌측 레일·행 배경 틴트·점 표시를
-되살리지 마라. 그리고 **분류·상태 둘 다 배지**가 자산관리 형태다(리스크는 분류=배지·구분=평문으로 맞췄다).
+좌측 레일·행 배경 틴트·점 표시를 되살리지 마라 — 마커 계열은 **파일째로 제거됐다**
+(`lib/work-rail.ts` 는 이제 존재하지 않는다). 좌측 고정 칸에 무엇을 넣든 행이 쌓이면 세로선처럼 보여서
+사장님이 전면 폐기를 확정했다. 그리고 **분류·상태 둘 다 배지**가 자산관리 형태다(리스크는 분류=배지·구분=평문으로 맞췄다).
 배지가 3개 이상 나란히 오면 무엇이 신호인지 흐려진다.
 
 ## 6. 회계마감 — **새 자금 쓰기 경로를 만들지 마라**
@@ -116,4 +119,18 @@ const mine = contracts.filter((c) => inPlateAliases(aliases, c.plate));
 
 미커밋 39개 파일을 **오더 단위로 쪼개서** 커밋해라(계정콘솔 / 엑셀 / 회차원장 / 자산공백).
 한 커밋에 다 넣으면 문제가 생겼을 때 어느 오더를 되돌려야 하는지 알 수 없다.
-커밋 전 게이트: `npx tsc --noEmit`=0 · `npx vitest run`=235 이상 · 건드린 라우트 200.
+커밋 전 게이트: `npx tsc --noEmit`=0 · `npx vitest run`=248 이상 · 건드린 라우트 200.
+
+### ★커밋 전 반드시 고칠 것 3건 (내가 직접 확인함)
+
+1. **`app/api/staff/reset-password/route.ts` — 감사로그 누락.** 4종 중 이것만 `writeStaffAudit` 호출이 0이다
+   (role·delete 는 각 2회). 비밀번호 재설정 링크는 **계정 탈취 자격증명**인데 누가 누구 것을 발급했는지
+   흔적이 없다. `generatePasswordResetLink` 전에 `getUserByEmail` 로 uid 를 얻고, 링크를 반환하기 **전에**
+   감사로그를 남겨라.
+2. **`components/StaffConsole.tsx` — 죽은 두 번째 콘솔.** `/admin` 에서 제거됐는데 파일이 남아 있고
+   import 하는 곳이 0이다. 안에 구(舊) email 기반 `/api/staff/suspend` 호출이 살아 있어 되살리면
+   새 안전장치(uid 경유·마지막 hq 잠금)를 우회한다. **삭제하라.**
+3. **`app/contract/page.tsx` — 회차 「할인·납부완료일·수단」 3열이 도달 불가.**
+   `SCHEDULE_LEDGER_ALL_COLS` 를 import 만 하고 쓰지 않는다. 회차 모드는 항상 `colView='기본'` 이라
+   `SCHEDULE_SHEET_KEYS.all` 의 `discount·paidAt·method` 가 화면에도 엑셀에도 안 나온다
+   (보이는 cols 만 내보내므로). 열보기를 살리거나 3열을 `basic` 으로 올려라.

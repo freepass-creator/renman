@@ -33,6 +33,10 @@ const moneyStatus = (r: CashRow): MoneyStatus => moneyStatusOf({
 
 /* 자금분류 = «뭐로 입금됐는가». 계정과목(무슨 돈인가)과 다른 축 — 같은 칸에 담지 않는다. */
 const moneyClass = (r: CashRow): MoneyClass => moneyClassOf({
+  // 적요(은행 채널 코드) — 스키마에 전용 필드가 없어 counterparty 를 폴백으로 본다.
+  //   ★bank_tx.counterparty 라벨이 「거래상대/적요」로 두 값을 한 칸에 섞고 있다(스키마 결함).
+  //     전용 필드 신설은 커서 오더(docs/CURSOR-ORDER-daily-ledger.md)로 넘겼다.
+  jeokyo: r.raw.jeokyo || r.raw.counterparty,
   isCms: r.nest === 'cms-item' || r.nest === 'cms-pending' || r.nest === 'cms-dep',
   isCard: !!r.raw.approvalNo || !!r.raw.cardNo,
   source: r.raw.method || r.raw.source,
