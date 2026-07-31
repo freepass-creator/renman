@@ -53,17 +53,38 @@ if (configuredProject && configuredProject !== expectedProject) {
   );
 }
 
-const adminKey = String(env.FIREBASE_ADMIN_KEY || '').trim();
+/**
+ * 서비스 계정 — 런타임(lib/api-auth.ts)과 «같은 해석»이어야 한다.
+ *   FIREBASE_ADMIN_KEY(인라인 JSON) 우선 · 없으면 FIREBASE_ADMIN_KEY_FILE(JSON 경로).
+ * 예전엔 인라인만 인정해서, 파일 방식으로 정상 동작하는 로컬에서 배포가 영구 차단됐다
+ * (= 규칙 수정이 배포되지 못하고 로컬 파일에만 남는 사고 원인).
+ */
+function readAdminKey(): { json: string; from: string } | null {
+  const inline = String(env.FIREBASE_ADMIN_KEY || '').trim();
+  if (inline) return { json: inline, from: 'FIREBASE_ADMIN_KEY' };
+  const keyFile = String(env.FIREBASE_ADMIN_KEY_FILE || '').trim();
+  if (!keyFile) return null;
+  const abs = path.isAbsolute(keyFile) ? keyFile : path.join(root, keyFile);
+  if (!fs.existsSync(abs)) {
+    failures.push(`FIREBASE_ADMIN_KEY_FILE 경로에 파일이 없음: ${keyFile}`);
+    return null;
+  }
+  return { json: fs.readFileSync(abs, 'utf8'), from: `FIREBASE_ADMIN_KEY_FILE(${path.basename(abs)})` };
+}
+
+const adminKey = readAdminKey();
 if (!adminKey) {
-  failures.push('FIREBASE_ADMIN_KEY 누락: API 인증 및 Custom Claims 설정에 필요');
+  if (!String(env.FIREBASE_ADMIN_KEY_FILE || '').trim()) {
+    failures.push('FIREBASE_ADMIN_KEY 또는 FIREBASE_ADMIN_KEY_FILE 누락: API 인증 및 Custom Claims 설정에 필요');
+  }
 } else {
   try {
-    const parsed = JSON.parse(adminKey);
+    const parsed = JSON.parse(adminKey.json);
     if (parsed.project_id !== expectedProject || !parsed.client_email || !parsed.private_key) {
-      failures.push('FIREBASE_ADMIN_KEY가 대상 프로젝트의 유효한 서비스 계정 JSON이 아님');
+      failures.push(`서비스 계정이 대상 프로젝트의 유효한 JSON이 아님 — ${adminKey.from}`);
     }
   } catch {
-    failures.push('FIREBASE_ADMIN_KEY가 올바른 JSON 형식이 아님');
+    failures.push(`서비스 계정이 올바른 JSON 형식이 아님 — ${adminKey.from}`);
   }
 }
 

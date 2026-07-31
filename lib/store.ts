@@ -15,6 +15,7 @@ import {
 } from './audit';
 import { newId } from './domain/ids';
 import { assertMoneyMutable, ensurePeriodLocksHydrated } from './finance/period-lock';
+import { normPlate } from './plate';
 import { assertNoLockConflict, peelExpectedUpdatedAt } from './lock-conflict';
 import { withTimeout } from './async';
 
@@ -32,6 +33,31 @@ export interface StoreAdapter {
   remove(entityKey: string, companyId: string, key: string, reason?: string): Promise<void>;   // #6 소프트삭제
   listDeleted(entityKey: string, companyId: string): Promise<EntityRecord[]>;
   restore(entityKey: string, companyId: string, key: string): Promise<void>;
+}
+
+/**
+ * 차량번호 변경 이력 승계 — 임판(12가3456 임시) → 정식번호 전환이 신차의 기본 흐름이다.
+ *
+ * 왜 필요한가: 계약·정비·과태료·보험은 차량을 «번호»로 찾는다(lib/plate.ts vehicleMatchesPlate).
+ *   번호를 바꾸면 옛 번호로 걸려 있던 모든 건이 그 차에서 떨어져 나가고, 재투입하면 문서ID가
+ *   `{회사}__{번호}`라서 같은 차가 2대로 갈라진다. vehicleMatchesPlate는 이미 plateHistory를
+ *   폴백으로 보는데 «그 이력을 쌓는 코드»가 없었다(읽기만 존재) → 여기서 쌓는다.
+ *   오픈 후 데이터가 붙은 뒤에는 수동 병합밖에 없어 사실상 복구 불가.
+ */
+function carryPlateHistory(
+  entityKey: string,
+  before: EntityRecord | null,
+  patch: EntityRecord,
+): EntityRecord {
+  if (entityKey !== 'vehicle' || !before) return {};
+  if (!('plate' in patch)) return {};
+  const oldPlate = String(before.plate ?? '');
+  const newPlate = String(patch.plate ?? '');
+  if (!oldPlate || !newPlate || normPlate(oldPlate) === normPlate(newPlate)) return {};
+  const prior = Array.isArray(before.plateHistory) ? before.plateHistory.map((h) => String(h)) : [];
+  // 이미 이력에 있으면(번호 원복 등) 중복 적재하지 않는다.
+  if (prior.some((h) => normPlate(h) === normPlate(oldPlate))) return {};
+  return { plateHistory: [...prior, oldPlate] };
 }
 
 function naturalKey(entityKey: string, rec: EntityRecord): string {
@@ -148,8 +174,24 @@ class FirestoreAdapter implements StoreAdapter {
     const db = getFirestore(getFirebaseApp()!);
     const col = collection(db, entityKey);
     const seen = new Set<string>();
+    /* 차량 별칭(번호변경 이력) → 기존 문서 _key.
+       차량 자연키가 plate이므로 번호를 바꾼 차를 재투입하면 «새 차»로 저장돼 같은 차가 2대로 갈라진다
+       (임판→정식번호는 신차의 기본 흐름). plateHistory를 별칭으로 보고 같은 차로 인식한다. */
+    const plateAliases = new Set<string>();
     // dedup: 같은 회사·자연키 존재 확인. audit_logs는 id 유니크(무한증가) → 스캔 생략.
-    if (entityKey !== AUDIT_COLL) {
+    if (entityKey === 'vehicle') {
+      // 차량은 항상 전량 스캔 — 별칭(옛 번호)까지 봐야 하므로 문서ID 단건 확인으로는 부족하다.
+      const snap = await withTimeout(getDocs(query(col, where('companyId', '==', companyId))));
+      snap.forEach((d) => {
+        const r = d.data() as EntityRecord;
+        if (r._key) seen.add(String(r._key));
+        const hist = Array.isArray(r.plateHistory) ? r.plateHistory : [];
+        for (const cand of [r.plate, ...hist]) {
+          const n = normPlate(cand);
+          if (n) plateAliases.add(n);
+        }
+      });
+    } else if (entityKey !== AUDIT_COLL) {
       if (records.length > 5) {
         // 대량(import): 컬렉션 1회 스캔으로 기존 자연키 수집(N건에 read 1회).
         const snap = await withTimeout(getDocs(query(col, where('companyId', '==', companyId))));
@@ -170,6 +212,8 @@ class FirestoreAdapter implements StoreAdapter {
     for (const rec of records) {
       const key = persistKeyOf(entityKey, rec);
       if (key && seen.has(key)) { duplicates++; continue; }
+      // ★번호변경 이력에 걸린 같은 차 — 새 문서를 만들지 않는다(차량이 2대로 갈라지는 것 차단).
+      if (entityKey === 'vehicle' && plateAliases.has(normPlate(rec.plate))) { duplicates++; continue; }
       const id = key ? firestoreDocId(companyId, key) : `${companyId}__${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
       // Firestore는 undefined 필드를 거부 → 저장 전 제거(실파서 등 undefined 섞인 레코드도 안전).
       pending.push({ id, data: pruneUndefined(stampPersist(entityKey, companyId, rec, key, 'system')) });
@@ -348,7 +392,8 @@ class AuditingStore implements StoreAdapter {
     if (entityKey === AUDIT_COLL) return this.base.update(entityKey, companyId, key, patch);
     const before = await this.base.get(entityKey, companyId, key);
     assertMoneyMutable(entityKey, companyId, before as Record<string, unknown> | null, patch as Record<string, unknown>);
-    await this.base.update(entityKey, companyId, key, { ...patch, ...stampUpdateFields() });
+    const carried = carryPlateHistory(entityKey, before, patch);
+    await this.base.update(entityKey, companyId, key, { ...patch, ...carried, ...stampUpdateFields() });
     void this.writeLog(companyId, { action: 'update', entityType: entityKey, entityId: key, label: this.label(entityKey, key, '수정'), before: beforeSubset(before, patch), after: patch });
   }
 
