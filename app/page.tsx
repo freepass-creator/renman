@@ -122,28 +122,22 @@ function TodoRow({ row, onGo }: { row: HomeQueueRow; onGo: (href: string) => voi
       type="button"
       onClick={() => onGo(hrefForTodayRow(row))}
       style={{
-        display: 'flex', flexDirection: 'column', gap: 3, width: '100%', textAlign: 'left',
-        padding: '7px 9px', border: `1px solid ${C.line}`, borderRadius: R,
+        display: 'flex', alignItems: 'center', gap: 7, width: '100%', textAlign: 'left',
+        padding: '6px 9px', border: `1px solid ${C.line}`, borderRadius: R,
         background: overdue ? 'var(--danger-tint)' : C.card, cursor: 'pointer', fontFamily: 'inherit',
       }}
     >
-      <span style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
-        <Badge tone={rowTone(row)}>{row.kind}</Badge>
-        <span style={{
-          flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-          fontSize: 12.5, fontWeight: 700, color: C.ink,
-        }}>
-          {row.plate ? `${row.plate} · ` : ''}{row.title}
-        </span>
+      <Badge tone={rowTone(row)}>{row.kind}</Badge>
+      <span style={{
+        flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+        fontSize: 12.5, fontWeight: 700, color: C.ink,
+      }}>
+        {row.plate ? `${row.plate} · ` : ''}{row.title}
       </span>
-      <span style={{ display: 'flex', alignItems: 'baseline', gap: 8, fontSize: 11, color: C.mute }}>
-        <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-          {row.detail}
-        </span>
-        {row.amount > 0 ? (
-          <span style={{ fontWeight: 700, color: C.danger, fontFamily: NUM, whiteSpace: 'nowrap' }}>{won(row.amount)}</span>
-        ) : null}
-      </span>
+      <span style={{ fontSize: 10.5, color: C.mute, whiteSpace: 'nowrap' }}>{row.detail}</span>
+      {row.amount > 0 ? (
+        <span style={{ fontSize: 11.5, fontWeight: 700, color: C.danger, fontFamily: NUM, whiteSpace: 'nowrap' }}>{won(row.amount)}</span>
+      ) : null}
     </button>
   );
 }
@@ -229,7 +223,7 @@ export default function DashboardPage() {
                     {BUCKET_LABEL[g.bucket]}
                     <Badge tone={BUCKET_TONE[g.bucket]}>{g.rows.length}</Badge>
                   </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
                     {g.rows.slice(0, BUCKET_CAP).map((row) => (
                       <TodoRow key={row.id} row={row} onGo={go} />
                     ))}
@@ -297,7 +291,8 @@ export default function DashboardPage() {
 
           <div style={{
             display: 'grid',
-            gridTemplateColumns: mobile ? '1fr' : 'minmax(0, 1.6fr) minmax(240px, 1fr)',
+            // 3:2 = KPI 타일 5열의 3번째/4번째 경계와 정렬(gap 12 동일)
+            gridTemplateColumns: mobile ? '1fr' : 'minmax(0, 3fr) minmax(240px, 2fr)',
             gap: 12,
           }}>
             <Panel title="법인별 요약" desc="보유·가동·미수·영업손익 — 같은 KPI SSOT.">
