@@ -87,7 +87,13 @@ async function persistRemote(companyId: string, m: CompanyMaster, at = new Date(
     await setDoc(doc(getFirestore(getFirebaseApp()!), COLL, companyId), {
       companyId, master: m, updatedAt: at,
     });
-  } catch (e) { console.warn('법인 마스터 원격 저장 실패', e); }
+  } catch (e) {
+    // ★조용히 삼키면 «저장됐다»는 거짓 신호가 남는다 — 이 값은 대외문서에 인쇄되므로
+    //   다른 PC에서 공란으로 나가는 사고로 직결된다. 사용자에게 반드시 알린다.
+    console.warn('법인 마스터 원격 저장 실패', e);
+    const { toast } = await import('./toast');
+    toast('법인 정보 서버 저장 실패 — 이 PC에만 남았습니다. 다시 저장하세요(대외문서가 공란으로 인쇄될 수 있음)', 'error');
+  }
 }
 
 /* ── 원격 하이드레이트 ────────────────────────────────────────────

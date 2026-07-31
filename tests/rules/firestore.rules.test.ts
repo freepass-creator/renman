@@ -188,10 +188,16 @@ describe('법인 마스터(company_master) — 본사만 쓰기, 범용 우회 �
   test('타 법인 마스터는 읽을 수 없다', async () => {
     await assertFails(getDoc(doc(staffB(), 'company_master', 'C1')));
   });
-  test('법인 직원은 마스터를 쓸 수 없다 — 대외문서에 인쇄되는 법인 신원이므로', async () => {
-    await assertFails(setDoc(doc(staffA(), 'company_master', 'C1'), { companyId: 'C1', master: { ceo: '가짜대표' } }));
+  test('자기 법인 마스터는 쓸 수 있다 — 화면 권한(자기 법인 관리 가능)과 일치해야 한다', async () => {
+    await assertSucceeds(setDoc(doc(staffA(), 'company_master', 'C1'), { companyId: 'C1', master: { ceo: '박용호' } }));
   });
-  test('본사는 쓸 수 있다', async () => {
-    await assertSucceeds(setDoc(doc(hq(), 'company_master', 'C1'), { companyId: 'C1', master: { ceo: '박용호' } }));
+  test('타 법인 마스터는 쓸 수 없다', async () => {
+    await assertFails(setDoc(doc(staffB(), 'company_master', 'C1'), { companyId: 'C1', master: { ceo: '가짜대표' } }));
+  });
+  test('companyId 필드가 문서 경로와 다르면 거부(다른 회사로 위장 저장 차단)', async () => {
+    await assertFails(setDoc(doc(staffA(), 'company_master', 'C1'), { companyId: 'C2', master: { ceo: '가짜대표' } }));
+  });
+  test('본사는 어느 법인이든 쓸 수 있다', async () => {
+    await assertSucceeds(setDoc(doc(hq(), 'company_master', 'C2'), { companyId: 'C2', master: { ceo: '박용호' } }));
   });
 });

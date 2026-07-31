@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getFirestore } from 'firebase-admin/firestore';
+import { getFirestore, type Firestore } from 'firebase-admin/firestore';
 import { requireAuth, getAdminApp } from '@/lib/api-auth';
 import { ENTITIES } from '@/lib/intake/entities';
 import { enforceApiRateLimit } from '@/lib/api-rate-limit';
@@ -23,6 +23,30 @@ function docIdBelongsTo(id: string, companyId: string): boolean {
   // Firestore 문서 ID 제약은 «1,500바이트» — UTF-16 길이로 재면 한글 키를 잘못 통과시킨다.
   if (Buffer.byteLength(id, 'utf8') > 1_500) return false;
   return true;
+}
+
+/**
+ * 회계마감 — 서버 쓰기 경로의 마감월 차단.
+ *
+ * 왜 여기가 필요한가: 이 라우트는 Admin SDK라 firestore.rules를 우회한다. 규칙에는
+ *   자금거래 update·delete 마감 가드가 있지만, «생성»(대량 임포트 포함)은 전부 이 라우트를 타므로
+ *   규칙이 발동하지 않는다 → 마감한 달에 거래를 새로 밀어넣어 결산을 사후에 바꿀 수 있었다.
+ *   마감의 의미는 «그 달의 숫자가 더 이상 변하지 않는다»이므로 유입도 막아야 한다.
+ * 막힐 때는 어느 달이 막혔는지 알려준다 — 실무자가 «마감 해제 후 재투입»을 선택할 수 있게.
+ */
+const MONEY_ENTITIES = new Set(['bank_tx', 'card_tx']);
+
+async function closedMonthsOf(db: Firestore, companyId: string): Promise<Set<string>> {
+  try {
+    const snap = await db.collection('period_locks').doc(companyId).get();
+    if (!snap.exists) return new Set();
+    const map = (snap.data() as { map?: Record<string, unknown> } | undefined)?.map;
+    if (!map || typeof map !== 'object') return new Set();
+    return new Set(Object.keys(map).filter((ym) => /^\d{4}-\d{2}$/.test(ym)));
+  } catch {
+    // 마감 정보를 못 읽으면 통과시키지 않는다 — 마감을 모르는 채 쓰는 것이 더 위험하다.
+    throw new Error('period-lock-unreadable');
+  }
 }
 
 export async function GET(req: Request, ctx: { params: Promise<{ entity: string }> }) {
@@ -74,6 +98,16 @@ export async function POST(req: Request, ctx: { params: Promise<{ entity: string
   }
 
   const db = getFirestore(getAdminApp());
+  // 마감월 유입 차단 — 자금거래만(다른 엔티티는 마감 대상이 아니다).
+  let closed: Set<string> = new Set();
+  if (MONEY_ENTITIES.has(entity)) {
+    try {
+      closed = await closedMonthsOf(db, companyId);
+    } catch {
+      return NextResponse.json({ error: '회계마감 정보를 읽을 수 없어 자금거래를 저장하지 않았습니다 — 잠시 후 다시 시도하세요' }, { status: 503 });
+    }
+  }
+  const blockedMonths = new Set<string>();
   const batch = db.batch();
   for (const item of docs) {
     const id = String(item.id || '');
@@ -85,7 +119,19 @@ export async function POST(req: Request, ctx: { params: Promise<{ entity: string
     if (!docIdBelongsTo(id, companyId)) {
       return NextResponse.json({ error: 'document id must belong to companyId' }, { status: 400 });
     }
+    if (closed.size > 0) {
+      const ym = String(data.txDate || '').slice(0, 7);
+      if (ym && closed.has(ym)) { blockedMonths.add(ym); continue; }
+    }
     batch.set(db.collection(entity).doc(id), data);
+  }
+  // ★일부만 저장하고 성공을 돌려주면 «넣었는데 없다»가 된다 → 마감월이 섞여 있으면 전량 거부.
+  if (blockedMonths.size > 0) {
+    const months = [...blockedMonths].sort().join(', ');
+    return NextResponse.json({
+      error: `마감된 기간(${months})의 자금거래가 포함되어 저장하지 않았습니다 — 설정에서 해당 월 마감을 해제한 뒤 다시 투입하세요`,
+      blockedMonths: [...blockedMonths].sort(),
+    }, { status: 409 });
   }
   await batch.commit();
   return NextResponse.json({ saved: docs.length });

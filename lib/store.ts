@@ -236,6 +236,14 @@ class FirestoreAdapter implements StoreAdapter {
           body: JSON.stringify({ companyId, docs: pending.slice(i, i + CHUNK) }),
         });
         if (!res.ok) {
+          /* ★«정당한 거부»와 «일시적 실패»를 구분한다.
+             서버가 규칙 위반(400 격리·409 회계마감·403 권한)으로 거부한 것을 직접 경로로 폴백하면
+             그 검증을 통째로 우회한다 — 특히 생성은 firestore.rules에 마감 가드가 없어 그대로 통과한다.
+             거부는 그대로 실패시켜 사용자에게 사유를 보여주고, 네트워크·5xx만 직접 경로로 넘긴다. */
+          if (res.status === 400 || res.status === 403 || res.status === 409) {
+            const body = await res.json().catch(() => null) as { error?: string } | null;
+            throw new Error(body?.error || `서버가 저장을 거부했습니다 (${res.status})`);
+          }
           allOk = false;
           console.warn(`Firestore save(${entityKey}) 서버 저장 실패 (${res.status}) — 직접 저장 경로로 전환`);
           break;

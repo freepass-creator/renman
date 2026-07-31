@@ -57,10 +57,14 @@ service cloud.firestore {
     }
 
     // 법인 마스터 — 대외문서(내용증명·과태료 공문·거래사실확인서)에 인쇄되는 법인 신원.
-    //   위조되면 회사 명의 문서가 잘못 나가므로 쓰기는 본사만. 소속 법인은 읽기.
+    //   ★쓰기 = 본사 또는 «자기 법인». 화면 권한(app/company/[id] allowed = isOperator || scope === id)과
+    //     일치시킨다. 규칙만 본사로 좁히면 법인 사용자의 저장이 조용히 거부돼
+    //     «저장됐다고 믿는데 로컬에만 남는» 상태가 된다(내가 고치려던 문제가 형태만 바꿔 재발).
+    //   다른 회사 문서는 여전히 불가. companyId 필드도 문서 경로와 일치해야 한다.
     match /company_master/{companyId} {
       allow read: if isSignedIn() && tenantOK(companyId);
-      allow write: if isHQ();
+      allow write: if isSignedIn() && tenantOK(companyId)
+                   && request.resource.data.companyId == companyId;
     }
 
     // 회계기간 마감 — 본사 쓰기, 소속 법인 읽기.
