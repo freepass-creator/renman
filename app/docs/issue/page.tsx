@@ -20,6 +20,7 @@ import {
   DOC_CATEGORIES, DOC_PRINT_CSS, type DocCategory,
 } from '@/lib/doc-templates';
 import { todayKST } from '@/lib/contracts/dates';
+import { sanitizeDocHtml } from '@/lib/docs/sanitize-html';
 
 const today = todayKST;
 
@@ -102,7 +103,8 @@ export default function DocIssuePage() {
           docNo, templateId: template.id, templateTitle: template.title, category: template.category,
           targetType: template.target, targetName: targetScope?.name || '',
           data: fieldData, issuerCompanyName: companyLabel(issuerId),
-          bodyHtml: previewBody,
+          // ★저장물 자체를 새니타이즈 — 재인쇄·외부 소비 어디서든 실행 가능한 코드가 남지 않게.
+          bodyHtml: sanitizeDocHtml(previewBody),
           issuedAt: new Date().toISOString(), issuedBy: user.name,
         }],
       });
