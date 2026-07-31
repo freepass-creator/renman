@@ -74,7 +74,7 @@ if (limited) return limited;
 
 ```
 npx tsc --noEmit                       # 0
-npx vitest run                         # 현재 153 통과 — 줄지 않아야 함
+npx vitest run                         # 현재 156 통과 — 줄지 않아야 함
 npm run test:rules                     # 현재 36 통과 (audit_logs 규칙 건드리면 여기서 잡힘)
 curl -s -o /dev/null -w "%{http_code}" http://localhost:6006/management    # 200
 ```
@@ -84,7 +84,7 @@ curl -s -o /dev/null -w "%{http_code}" http://localhost:6006/management    # 200
 - `npm run build` 실행 금지(dev 6006 상시 사용 중).
 - 좌측 메뉴·그룹 추가·리스크 그룹 변경 금지(확정 스펙, 사장님 승인 필요).
 - `--brand: #1B2A4A` 남색 유지 — 파랑으로 바꾸지 마라.
-- 다음 파일은 지금 내가 잡고 있으니 손대지 마라: `lib/store.ts`, `lib/company-master.ts`, `lib/finance/period-lock.ts`, `firestore.rules`, `app/api/entities/[entity]/route.ts`, `lib/payments/duplicate-cash.ts`.
+- 다음 파일은 지금 내가 잡고 있으니 손대지 마라: `lib/store.ts`, `lib/company-master.ts`, `lib/finance/period-lock.ts`, `firestore.rules`, `app/api/entities/[entity]/route.ts`, `lib/payments/duplicate-cash.ts`, `components/vehicle-detail/useVehicleDetail.ts`, `app/settings/page.tsx`.
 - `app/api/staff/suspend/route.ts` 는 **uid 확장만** 하고 기존 안전장치(자기 계정 정지 금지 · `revokeRefreshTokens`)를 제거하지 마라.
 
 ## 참고 원본 (jpkerp5)
