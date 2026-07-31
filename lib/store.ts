@@ -14,7 +14,7 @@ import {
   stampCreateFields, stampUpdateFields, stampDeleteFields, stampRestoreFields,
 } from './audit';
 import { newId } from './domain/ids';
-import { assertMoneyMutable } from './finance/period-lock';
+import { assertMoneyMutable, ensurePeriodLocksHydrated } from './finance/period-lock';
 import { assertNoLockConflict, peelExpectedUpdatedAt } from './lock-conflict';
 import { withTimeout } from './async';
 
@@ -231,6 +231,9 @@ class FirestoreAdapter implements StoreAdapter {
   }
   async list(entityKey: string, companyId: string): Promise<EntityRecord[]> {
     if (typeof window !== 'undefined') {
+      // 회계마감 원격 캐시 채우기(회사당 1회, await 안 함) — 마감 가드가 읽는 localStorage가
+      // 새 기기·시크릿창에서 비어 «마감 없음»으로 보이는 것을 막는다. 서버 강제는 firestore.rules.
+      void ensurePeriodLocksHydrated(companyId);
       try {
         const { apiAuthHeaders } = await import('./api-headers');
         const headers = await apiAuthHeaders();

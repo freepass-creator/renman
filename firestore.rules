@@ -60,6 +60,30 @@ service cloud.firestore {
       allow write: if isHQ();
     }
 
+    // ── 회계기간 마감(period_locks) 서버 강제 ─────────────────────────────
+    // 왜 여기인가: 클라이언트 가드(lib/finance/period-lock.ts)는 localStorage를 보므로
+    //   «설정 페이지를 한 번도 안 연 기기·새 브라우저»에서는 마감이 아예 없는 것으로 보인다.
+    //   마감은 결산 무결성 장치라 «기기에 따라 달라지는 가드»는 가드가 아니다 → 경계에서 강제한다.
+    // 본사도 막는다 — 마감월을 고치려면 «마감 해제» 또는 신규 분개(전기오류수정)를 타야 한다.
+    function isMoneyColl(coll) { return coll == 'bank_tx' || coll == 'card_tx'; }
+    function closedMap(companyId) {
+      return exists(/databases/$(database)/documents/period_locks/$(companyId))
+        ? get(/databases/$(database)/documents/period_locks/$(companyId)).data.get('map', {})
+        : {};
+    }
+    function ymOf(data) {
+      return data.get('txDate', '').size() >= 7 ? data.get('txDate', '')[0:7] : '';
+    }
+    function ymOpen(companyId, ym) { return ym == '' || !(ym in closedMap(companyId)); }
+    // 수정: 원래 월도, 옮겨갈 월도 열려 있어야 한다(마감월 밖으로 빼내는 것도 차단).
+    function moneyUpdatable(coll, companyId) {
+      return !isMoneyColl(coll)
+        || (ymOpen(companyId, ymOf(resource.data)) && ymOpen(companyId, ymOf(request.resource.data)));
+    }
+    function moneyDeletable(coll, companyId) {
+      return !isMoneyColl(coll) || ymOpen(companyId, ymOf(resource.data));
+    }
+
     // 업무 데이터(vehicle·contract·payment·bank_tx…) — 법인 격리. businessColl()로 민감 컬렉션(users·period_locks·audit_logs)은 절대 여기 안 걸림 → 범용 OR 우회 차단.
     match /{coll}/{docId} {
       allow read: if isSignedIn() && businessColl(coll) && tenantOK(resource.data.companyId);
@@ -72,9 +96,10 @@ service cloud.firestore {
       // 수정: 소유 법인이거나 본사. companyId(테넌트)는 불변 — 법인 사용자가 자기 문서를 남의 회사로 이동 금지(본사만 재배정 가능).
       allow update: if isSignedIn() && businessColl(coll)
                     && tenantOK(resource.data.companyId)
-                    && (isHQ() || request.resource.data.companyId == resource.data.companyId);
+                    && (isHQ() || request.resource.data.companyId == resource.data.companyId)
+                    && moneyUpdatable(coll, resource.data.companyId);
       // 하드삭제=본사만. 일반 삭제는 soft-delete(deletedAt=update)로 → 휴지통·감사 보존.
-      allow delete: if businessColl(coll) && isHQ();
+      allow delete: if businessColl(coll) && isHQ() && moneyDeletable(coll, resource.data.companyId);
     }
   }
 }

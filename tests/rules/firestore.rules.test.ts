@@ -41,7 +41,14 @@ beforeEach(async () => {
     await setDoc(doc(db, 'users', 'staffB'), { role: '법인', companyId: 'C2' });
     await setDoc(doc(db, 'contracts', 'c1'), { companyId: 'C1', status: '운행', renter: '홍길동' });
     await setDoc(doc(db, 'contracts', 'c2'), { companyId: 'C2', status: '운행', renter: '김철수' });
-    await setDoc(doc(db, 'period_locks', 'C1'), { companyId: 'C1', month: '2026-06' });
+    await setDoc(doc(db, 'period_locks', 'C1'), {
+      companyId: 'C1', month: '2026-06',
+      map: { '2026-06': { closedAt: '2026-07-01T00:00:00Z', closedBy: 'hq' } },
+    });
+    // 자금거래 — 마감월(2026-06) / 미마감월(2026-07)
+    await setDoc(doc(db, 'bank_tx', 'C1__t-closed'), { companyId: 'C1', txDate: '2026-06-15', amount: 1000 });
+    await setDoc(doc(db, 'bank_tx', 'C1__t-open'),   { companyId: 'C1', txDate: '2026-07-15', amount: 1000 });
+    await setDoc(doc(db, 'bank_tx', 'C2__t-open'),   { companyId: 'C2', txDate: '2026-06-15', amount: 1000 });
     await setDoc(doc(db, 'audit_logs', 'a1'), { companyId: 'C1', byUid: 'staffA', action: 'update' });
   });
 });
@@ -144,5 +151,32 @@ describe('Custom Claims 권한 경계', () => {
   test('HQ Claim은 users 문서 없이도 전 법인 조회가 가능하다', async () => {
     await assertSucceeds(getDoc(doc(claimsOnlyHq(), 'contracts', 'c1')));
     await assertSucceeds(getDoc(doc(claimsOnlyHq(), 'contracts', 'c2')));
+  });
+});
+
+describe('회계마감 서버 강제 — 마감월 자금거래는 아무도 못 고친다', () => {
+  test('마감월(2026-06) bank_tx 수정 — 소속 법인도 거부', async () => {
+    await assertFails(updateDoc(doc(staffA(), 'bank_tx', 'C1__t-closed'), { amount: 9_999 }));
+  });
+  test('마감월 bank_tx 수정 — 본사도 거부(마감 해제를 타야 한다)', async () => {
+    await assertFails(updateDoc(doc(hq(), 'bank_tx', 'C1__t-closed'), { amount: 9_999 }));
+  });
+  test('마감월 bank_tx 하드삭제 — 본사도 거부', async () => {
+    await assertFails(deleteDoc(doc(hq(), 'bank_tx', 'C1__t-closed')));
+  });
+  test('미마감월(2026-07) bank_tx 수정은 통과', async () => {
+    await assertSucceeds(updateDoc(doc(staffA(), 'bank_tx', 'C1__t-open'), { amount: 2_000 }));
+  });
+  test('미마감월 거래를 마감월로 옮기는 것도 거부(마감월 유입 차단)', async () => {
+    await assertFails(updateDoc(doc(staffA(), 'bank_tx', 'C1__t-open'), { txDate: '2026-06-20' }));
+  });
+  test('마감월 거래를 미마감월로 빼내는 것도 거부(마감월 유출 차단)', async () => {
+    await assertFails(updateDoc(doc(staffA(), 'bank_tx', 'C1__t-closed'), { txDate: '2026-07-20' }));
+  });
+  test('마감은 법인별 — C2는 period_locks 문서가 없으므로 같은 월도 수정 가능', async () => {
+    await assertSucceeds(updateDoc(doc(staffB(), 'bank_tx', 'C2__t-open'), { amount: 2_000 }));
+  });
+  test('마감과 무관한 컬렉션(contracts)은 영향 없음', async () => {
+    await assertSucceeds(updateDoc(doc(staffA(), 'contracts', 'c1'), { renter: '홍길동2' }));
   });
 });
