@@ -23,6 +23,8 @@ import FileDrop from '@/components/FileDrop';
 import { WorkbenchBar } from '@/components/WorkbenchBar';
 import { toast } from '@/lib/toast';
 import { getStore } from '@/lib/store';
+import { crossCheckDocuments, crossCheckSummary } from '@/lib/integrity/doc-crosscheck';
+import { TODAY } from '@/lib/dashboard-consts';
 import { buildAtomicEvent } from '@/lib/domain/atomic-event';
 
 type DocKind = 'vehicle' | 'insurance';
@@ -47,6 +49,7 @@ export default function BulkMatchPage() {
   const [files, setFiles] = useState<File[]>([]);
   const [rows, setRows] = useState<Row[] | null>(null);
   const [busy, setBusy] = useState(false);
+  const [crossMsg, setCrossMsg] = useState('');   // 투입 후 서류 검증 결과 요약
 
   const byPlate = useMemo(() => {
     const m = new Map<string, EntityRecord>();
@@ -75,6 +78,32 @@ export default function BulkMatchPage() {
     } catch (e) {
       toast('OCR 실패: ' + (e as Error).message, 'error');
     } finally { setBusy(false); }
+  };
+
+  /**
+   * 투입 후 교차검증 — 저장된 데이터를 다시 읽어 규칙 5종을 돌린다.
+   * 화면을 옮기지 않고 결과만 알린다(연속 투입 중일 수 있다).
+   */
+  const runCrossCheck = async (target: string) => {
+    try {
+      const store = getStore();
+      const [vehicles, insurances, contracts, bankTx] = await Promise.all([
+        store.list('vehicle', target),
+        store.list('insurance', target).catch(() => [] as EntityRecord[]),
+        store.list('contract', target).catch(() => [] as EntityRecord[]),
+        store.list('bank_tx', target).catch(() => [] as EntityRecord[]),
+      ]);
+      const found = crossCheckDocuments({ vehicles, insurances, contracts, bankTx, today: TODAY });
+      const summary = crossCheckSummary(found);
+      setCrossMsg(summary ? `서류 검증 — ${summary}` : '서류 검증 — 이상 없음');
+      if (summary) {
+        const high = found.filter((f) => f.sev === 'high').length;
+        toast(`서류 검증: ${summary}${high ? ` · 위험 ${high}건` : ''} — 정합성에서 확인하세요`, 'info');
+      }
+    } catch {
+      // 검증 실패가 투입을 되돌리지는 않는다. 다만 «검증했다»고 말해서도 안 된다.
+      setCrossMsg('서류 검증을 실행하지 못했습니다 — 정합성 화면에서 직접 확인하세요');
+    }
   };
 
   const commit = async () => {
@@ -127,6 +156,10 @@ export default function BulkMatchPage() {
         plateSkipped ? 'info' : 'success',
       );
       reset();
+      /* ★투입 직후 서류 교차검증 — 올린 서류가 데이터와 어긋나면 바로 알려준다
+         (사장님: 「올렸을때 저런거 검증도 해줘야지」). 저장 성공 후에만 실행한다.
+         검증의 상주 소비처는 정합성 화면이고 같은 SSOT를 쓰므로 숫자가 어긋날 수 없다. */
+      void runCrossCheck(target);
     } catch (e) {
       toast('반영 실패: ' + (e as Error).message, 'error');
     } finally { setBusy(false); }
@@ -174,6 +207,16 @@ export default function BulkMatchPage() {
         ]} />
       } />}
     >
+      {/* 투입 후 서류 검증 결과 — 토스트는 사라지므로 상주 표시가 필요하다.
+          이상이 있으면 정합성 화면으로 바로 갈 수 있게 링크를 붙인다. */}
+      {crossMsg && (
+        <Panel title="서류 검증">
+          <div style={{ padding: '10px 16px', fontSize: 12.5, lineHeight: 1.7, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+            <span style={{ color: crossMsg.includes('이상 없음') ? C.ok : C.danger, fontWeight: 700 }}>{crossMsg}</span>
+            {!crossMsg.includes('이상 없음') && <Btn size="sm" variant="ghost" href="/integrity">정합성에서 보기 →</Btn>}
+          </div>
+        </Panel>
+      )}
       <Panel title={`${KIND[kind].label} 대량 업로드`}>
         <p style={{ fontSize: 12.5, color: C.mute, margin: '0 0 10px', lineHeight: 1.6 }}>
           여러 장을 한 번에 올리면 OCR로 <b>번호판</b>을 읽어 기존 차량과 자동으로 맞춥니다. 검토 후 <b>반영</b>하면 원장에 upsert.

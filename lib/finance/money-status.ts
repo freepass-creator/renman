@@ -147,7 +147,12 @@ export function moneyClassOf(input: {
   isCard?: boolean;
 }): MoneyClass {
   const j = String(input.jeokyo || '').trim();
-  if (j && CLASS_BY_JEOKYO[j]) return CLASS_BY_JEOKYO[j];
+  if (j) {
+    /* 적요가 있으면 그것이 근거다 — 은행이 찍은 값이므로 source 추측보다 정확하다.
+       ★모르는 적요는 «기타»로 떨어뜨린다. source 폴백으로 흘려보내면 «이체»로 조용히 분류돼
+         새 채널 코드가 생긴 사실이 묻힌다(실데이터 33종이므로 새 값이 나올 수 있다). */
+    return CLASS_BY_JEOKYO[j] || '기타';
+  }
   if (input.isCms) return '자동이체';
   if (input.isCard) return '카드';
   const src = String(input.source || '').trim();

@@ -18,6 +18,7 @@ import { textMatch } from '@/lib/search-match';
 import { CheckCircle2 } from 'lucide-react';
 import { TODAY, dday } from '@/lib/dashboard-consts';
 import { useEntityLists } from '@/lib/use-entity-lists';
+import { crossCheckDocuments } from '@/lib/integrity/doc-crosscheck';
 import { checkCompliance } from '@/lib/compliance';
 import { computeContractView } from '@/lib/contract-ops';
 import { normPlate } from '@/lib/plate';
@@ -34,7 +35,7 @@ type RiskItem = {
   co: unknown;
 };
 
-const RISK_ENTITIES = ['vehicle', 'contract', 'insurance', 'penalty'] as const;
+const RISK_ENTITIES = ['vehicle', 'contract', 'insurance', 'penalty', 'bank_tx'] as const;
 
 function dataChecks(data: Record<string, EntityRecord[]>): RiskItem[] {
   const out: RiskItem[] = [];
@@ -113,7 +114,7 @@ function IntegrityInner() {
   const { companyId, scopeAll } = useSession();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { data: [vehicles = [], contracts = [], insurance = [], penalty = []], loading } = useEntityLists(RISK_ENTITIES);
+  const { data: [vehicles = [], contracts = [], insurance = [], penalty = [], bankTx = []], loading } = useEntityLists(RISK_ENTITIES);
   const [facets, setFacets] = useState<Set<string>>(new Set());
   const [q, setQ] = useState('');
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -134,9 +135,22 @@ function IntegrityInner() {
         co: r.rec.companyId,
       })));
     const compliance = complianceItems(contracts, vehicles);
-    const all = [...compliance, ...base, ...dataChecks(data)].sort((a, b) => (a.sev === b.sev ? 0 : a.sev === 'high' ? -1 : 1));
+    /* 서류 교차검증 — 등록증·보험증권·계약서를 올리는 순간 결과가 갱신된다(정적 JSON 아님).
+       기존 items 파이프라인에 합류시키므로 요약 카드·필터·표·검색이 그대로 작동한다. */
+    const cross: RiskItem[] = crossCheckDocuments({
+      vehicles, insurances: insurance, contracts, bankTx, today: TODAY,
+    }).map((c) => ({
+      id: `서류:${c.kind}:${c.plate}`,
+      sev: c.sev === 'high' ? 'high' as Sev : 'mid' as Sev,
+      kind: c.kind,
+      target: c.plate,
+      detail: `${c.detail} — ${c.evidence.join(' · ')}`,
+      href: c.plate ? `/vehicle/${encodeURIComponent(c.plate)}` : '/asset',
+      co: c.companyId,
+    }));
+    const all = [...compliance, ...cross, ...base, ...dataChecks(data)].sort((a, b) => (a.sev === b.sev ? 0 : a.sev === 'high' ? -1 : 1));
     return { items: all, unpaidTotal: selectReceivables(contracts, TODAY).total };
-  }, [vehicles, contracts, insurance, penalty]);
+  }, [vehicles, contracts, insurance, penalty, bankTx]);
 
   useEffect(() => {
     const open = searchParams.get('open');
@@ -160,7 +174,9 @@ function IntegrityInner() {
   const compCount = items.filter((it) => it.id.startsWith('컴플라이언스:')).length;
 
   const counts = useMemo(() => {
-    const kinds = ['필수누락', '만기', '고아', '날짜역전', '미납', '보험불일치', '반납지남', '면허 만료', '면허 미확인', '무보험 운행'];
+    const kinds = ['필수누락', '만기', '고아', '날짜역전', '미납', '보험불일치', '반납지남', '면허 만료', '면허 미확인', '무보험 운행',
+      // 서류 교차검증 5종 — 업로드한 서류와 데이터가 어긋난 것
+      '번호오기입', '정체불명', '무보험', '서류미비', '차종불일치'];
     const c: Record<string, number> = { 위험: 0, 주의: 0 };
     for (const k of kinds) c[k] = 0;
     for (const it of items) {

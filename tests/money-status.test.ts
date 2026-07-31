@@ -66,22 +66,43 @@ describe('자금상태 — 6단계 정의', () => {
 });
 
 describe('자금분류 = «뭐로 입금됐는가» — 계정과목과 다른 축', () => {
-  test('분류 목록·톤이 대응', () => {
-    expect(MONEY_CLASS).toHaveLength(5);
+  test('분류 목록·톤이 대응 — 실데이터 적요 33종을 7분류로 묶었다', () => {
+    expect([...MONEY_CLASS]).toEqual(['이체', '자동이체', 'CD·ATM', '카드', '수수료', '현금', '기타']);
     for (const c of MONEY_CLASS) expect(MONEY_CLASS_TONE[c]).toBeTruthy();
   });
 
-  test('CMS·카드 플래그가 source 보다 우선', () => {
-    expect(moneyClassOf({ isCms: true, source: '계좌' })).toBe('CMS');
-    expect(moneyClassOf({ isCard: true, source: '계좌' })).toBe('법인카드');
+  test('★적요(은행 채널 코드)가 분류를 결정한다 — 실데이터 상위 값', () => {
+    expect(moneyClassOf({ jeokyo: 'BZ뱅크' })).toBe('이체');      // 938건
+    expect(moneyClassOf({ jeokyo: 'FB자금' })).toBe('이체');      // 292건
+    expect(moneyClassOf({ jeokyo: '타행MB' })).toBe('이체');      // 265건
+    expect(moneyClassOf({ jeokyo: 'CM보험' })).toBe('자동이체');  // 209건
+    expect(moneyClassOf({ jeokyo: 'CMS지' })).toBe('자동이체');   // 67건
+    expect(moneyClassOf({ jeokyo: 'BZ수수' })).toBe('수수료');    // 165건
+    expect(moneyClassOf({ jeokyo: '효성CD' })).toBe('CD·ATM');
+    expect(moneyClassOf({ jeokyo: '카드결' })).toBe('카드');
+    expect(moneyClassOf({ jeokyo: '현금' })).toBe('현금');
   });
 
-  test('source 문자열 해석', () => {
+  test('모르는 적요는 «기타»로 떨어져 화면에서 눈에 띈다(조용히 삼키지 않는다)', () => {
+    expect(moneyClassOf({ jeokyo: '처음보는적요' })).toBe('기타');
+  });
+
+  test('적요가 없으면(수동 수납 등) CMS·카드 플래그 → source 순으로 본다', () => {
+    expect(moneyClassOf({ isCms: true, source: '계좌' })).toBe('자동이체');
+    expect(moneyClassOf({ isCard: true, source: '계좌' })).toBe('카드');
+  });
+
+  test('source 문자열 해석 — 적요가 없을 때의 폴백', () => {
     expect(moneyClassOf({ source: '현금' })).toBe('현금');
-    expect(moneyClassOf({ source: '계좌' })).toBe('계좌이체');
-    expect(moneyClassOf({ source: '이체' })).toBe('계좌이체');
-    expect(moneyClassOf({ source: '' })).toBe('계좌이체');   // 통장 거래 기본
+    expect(moneyClassOf({ source: '계좌' })).toBe('이체');
+    expect(moneyClassOf({ source: '이체' })).toBe('이체');
+    expect(moneyClassOf({ source: '' })).toBe('이체');   // 통장 거래 기본
     expect(moneyClassOf({ source: '알수없는것' })).toBe('기타');
+  });
+
+  test('적요가 source 보다 우선한다 — 은행이 찍은 값이 근거다', () => {
+    expect(moneyClassOf({ jeokyo: 'CMS지', source: '계좌' })).toBe('자동이체');
+    expect(moneyClassOf({ jeokyo: 'BZ수수', source: '현금' })).toBe('수수료');
   });
 
   test('★분류가 달라도 상태 판정은 같다 — 두 축이 섞이면 안 된다', () => {
@@ -89,13 +110,14 @@ describe('자금분류 = «뭐로 입금됐는가» — 계정과목과 다른 �
     expect(moneyStatusOf(base)).toBe('미매칭');
     // 자금분류(수단)는 moneyStatusOf 의 입력이 아니다.
     expect(moneyClassOf({ source: '현금' })).toBe('현금');
-    expect(moneyClassOf({ isCms: true })).toBe('CMS');
+    expect(moneyClassOf({ isCms: true })).toBe('자동이체');
     expect(moneyStatusOf(base)).toBe('미매칭');
   });
 
   test('계정과목은 «무슨 돈인가»로 남는다 — 자금분류와 별개 칸', () => {
-    // 같은 수단(계좌이체)이라도 계정과목은 여러 가지일 수 있다.
-    expect(moneyClassOf({ source: '계좌' })).toBe('계좌이체');
+    // 같은 경로(이체)라도 계정과목은 여러 가지일 수 있다 — 실데이터에서 BZ뱅크 938건이
+    // 대여료·자금이동·보험료·할부금 등 온갖 과목에 걸쳐 있었다.
+    expect(moneyClassOf({ jeokyo: 'BZ뱅크' })).toBe('이체');
     expect(moneyStatusOf({ category: '대여료수입', inAmount: 100 })).toBe('미매칭');
     expect(moneyStatusOf({ category: '보험료', outAmount: 100 })).toBe('해당없음');
   });
