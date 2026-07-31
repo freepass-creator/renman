@@ -34,7 +34,11 @@
   --bg-card:     #ffffff;
   --bg-header:   #f4f4f5;  /* 테이블 thead 배경 */
   --ledger-head-h: 36px;   /* 원장 Page 타이틀 · 엑셀 thead · 좌/우 패널 헤더 공통 */
-  --ledger-row-h: 44px;    /* 엑셀 데이터 행 · TwoLineCell 수용 (헤더와 별도) */
+  /* 엑셀 데이터 행 — jpkerp5·freepasserp4 와 동일한 30px.
+     ★44px 였던 이유는 «TwoLineCell(2줄 셀) 수용»이었는데 표에서 2줄 셀을 폐기했으므로 근거가 없다.
+       B2B 원장은 한 화면에 많이 보이는 게 가독성이다(행을 키우면 오히려 훑기 어렵다).
+       배지는 데스크톱 18px·모바일 22px 이므로 셀 패딩 5px 를 더해도 30px 안에 들어간다. */
+  --ledger-row-h: 30px;
   --cell-sub-fs: 11px;     /* 2줄셀 sub · 트리 하위행 서브텍스트 */
   --ledger-foot-h: 36px;   /* 원장 좌/우 패널 하단바(초기화·수정·저장) — 헤더와 동일 높이 */
   --bg-sunken:   #f4f4f5;
@@ -1443,6 +1447,12 @@ input[type="radio"]:disabled {
   background: #e6f4ea;
   color: #137333;
 }
+/* 모바일 표 — 배지가 22px(데스크톱 18px)라서 30px 행에는 잘린다. 행만 34px로 올린다.
+   폰트·패딩은 키우지 않는다(B2B 조밀 원칙). */
+@media (max-width: 768px) {
+  :root { --ledger-row-h: 34px; }
+}
+
 @media (max-width: 768px) {
   .fp-login .login-page {
     align-items: stretch;

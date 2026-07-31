@@ -107,3 +107,28 @@ describe('표에서는 2줄 셀(TwoLineCell)을 쓰지 않는다', () => {
     expect({ 위반파일: offenders }).toMatchObject({ 위반파일: [] });
   });
 });
+
+describe('표 행 높이 — jpkerp5·freepasserp4 와 같은 30px', () => {
+  /* 44px 였던 이유는 2줄 셀 수용이었고, 2줄 셀을 폐기했으므로 근거가 없다.
+     B2B 원장은 한 화면에 많이 보이는 것이 가독성이다 — 행이 커지면 오히려 훑기 어렵다. */
+  test('--ledger-row-h 가 30px', async () => {
+    const { readFileSync } = await import('node:fs');
+    const css = readFileSync('app/globals.css', 'utf8');
+    const m = css.match(/--ledger-row-h:\s*(\d+)px/);
+    expect(m?.[1]).toBe('30');
+  });
+
+  test('데스크톱 30px 가 배지(18px)+패딩을 수용한다', async () => {
+    const { EXCEL_PAD_Y } = await import('@/components/ui/tokens');
+    expect(18 + EXCEL_PAD_Y * 2).toBeLessThanOrEqual(30);
+  });
+
+  test('모바일은 34px — 배지가 22px 라 30px 에는 잘린다', async () => {
+    const { readFileSync } = await import('node:fs');
+    const { EXCEL_PAD_Y } = await import('@/components/ui/tokens');
+    const css = readFileSync('app/globals.css', 'utf8');
+    // 모바일 분기가 존재해야 한다(없으면 배지가 잘린 채 나간다).
+    expect(css).toMatch(/--ledger-row-h:\s*34px/);
+    expect(22 + EXCEL_PAD_Y * 2).toBeLessThanOrEqual(34);
+  });
+});
