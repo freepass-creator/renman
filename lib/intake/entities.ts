@@ -264,7 +264,11 @@ export const ENTITIES: Record<string, Entity> = {
       { key: 'overMileageRateForeign', label: '초과주행 단가·수입(원/km)', type: 'number', ocrFrom: 'excess_mileage_fee_foreign' },
       { key: 'overMileageRate', label: '초과주행 단가(직접지정)', type: 'number', manual: true, note: '비우면 계약서 단가(국산/수입) 자동 선택' },
       { key: 'monthlyRent', label: '월대여료(원)', type: 'number', manual: true, note: '계약서 표기 없으면 직접입력' },
-      { key: 'deposit', label: '보증금(원)', type: 'number', manual: true },
+      { key: 'deposit', label: '보증금(원)', type: 'number', manual: true, note: '계약서상 청구 보증금' },
+      // 실수령액 — 청구액과 다를 수 있다(분납·일부수령·미수령). 비어 있으면 «모름»이며
+      // 0으로 간주하지 않는다(보증금 안내 문자·반납정산이 틀린 금액을 쓰지 않도록).
+      { key: 'depositReceived', label: '보증금 실수령(원)', type: 'number', manual: true, note: '실제로 받은 금액. 비우면 미확인' },
+      { key: 'depositReceivedDate', label: '보증금 수령일', type: 'date', manual: true },
       // ── 표준약관·법정 필수기재(자동차대여 표준약관·여객자동차법 정합) ──
       { key: 'licenseType', label: '면허종별', type: 'text', ocrFrom: 'license_type', note: '1종/2종 보통 등' },
       { key: 'pickupPlace', label: '인수장소', type: 'text', manual: true },

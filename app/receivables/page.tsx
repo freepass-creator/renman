@@ -80,7 +80,13 @@ export default function ReceivablesPage() {
     name: String(r.rec.contractorName || ''), plate: String(r.rec.plate || ''),
     phone: String(r.rec.contractorPhone || ''), contractNo: String(r.rec.contractNo || ''),
     unpaidAmount: r.v.net, unpaidSeqCount: r.v.count, currentSeq: r.v.count, monthlyRent: r.v.monthlyRent,
-    depositDue: Number(r.rec.deposit || 0), depositReceived: 0, depositUnreceived: 0, depositRefund: r.v.refund,
+    depositDue: Number(r.rec.deposit || 0), depositRefund: r.v.refund,
+    // ★보증금 실수령액은 아직 기록하는 곳이 없다 → null(모름). 0으로 채우면
+    //   '미수령 0원'·'0원 입금 확인' 같은 틀린 문자가 고객에게 발송된다.
+    depositReceived: r.rec.depositReceived == null ? null : Number(r.rec.depositReceived),
+    depositUnreceived: r.rec.depositReceived == null
+      ? null
+      : Math.max(0, Number(r.rec.deposit || 0) - Number(r.rec.depositReceived || 0)),
   }));
   const smsCount = recipients.filter((r) => r.phone).length;
 

@@ -18,10 +18,17 @@ export type NotifyRecipient = {
   contractKey: string; companyId: string;
   name: string; plate: string; phone: string; contractNo?: string;
   unpaidAmount: number; unpaidSeqCount: number; currentSeq: number; monthlyRent: number;
-  depositDue: number; depositReceived: number; depositUnreceived: number; depositRefund: number;
+  depositDue: number; depositRefund: number;
+  /**
+   * 보증금 «실수령액». null = 기록이 없어 모른다는 뜻 — 0원으로 위장해서는 안 된다.
+   * 0으로 채우면 '미수령 0원'·'0원 입금 확인' 같은 사실과 다른 문자가 고객에게 발송된다.
+   */
+  depositReceived: number | null;
+  depositUnreceived: number | null;
 };
 
-const TEMPLATES: { label: string; body: string }[] = [
+/** needsDeposit=true 인 템플릿은 «보증금 실수령액»이 기록된 계약에만 쓸 수 있다. */
+const TEMPLATES: { label: string; body: string; needsDeposit?: boolean }[] = [
   { label: '미납 1차 안내', body: '[렌터카매니저] {{고객명}} 님, {{차량번호}} 미수금 {{미수금}} ({{미납회차}}). 금일 중 입금 부탁드립니다.' },
   { label: '미납 2차 독촉', body: '[렌터카매니저] {{고객명}} 님, {{차량번호}} 미수금 {{미수금}} ({{미납회차}}) 미납이 계속되어 시동제어 등 조치가 진행될 수 있습니다. 즉시 입금 또는 연락 부탁드립니다.' },
   { label: '시동제어 예고', body: '[렌터카매니저] {{고객명}} 님, {{차량번호}} 미납 누적으로 시동제어가 곧 시행됩니다. 입금 또는 회신 부탁드립니다.' },
@@ -31,9 +38,9 @@ const TEMPLATES: { label: string; body: string }[] = [
   { label: '반납 임박', body: '[렌터카매니저] {{고객명}} 님, {{차량번호}} 차량 반납 예정일이 임박했습니다. 일정 확인 부탁드립니다.' },
   { label: '정기점검 안내', body: '[렌터카매니저] {{고객명}} 님, {{차량번호}} 차량 정기점검 일정 안내드립니다. 가까운 영업소 방문 부탁드립니다.' },
   { label: '대여료 청구', body: '[렌터카매니저] {{고객명}} 님, {{차량번호}} {{이번회차}} 대여료 {{월대여료}} 결제일이 도래했습니다. 입금 부탁드립니다.' },
-  { label: '보증금 입금 안내', body: '[렌터카매니저] {{고객명}} 님, {{차량번호}} 계약 보증금 {{보증금}} 입금 부탁드립니다 (미수령 {{보증금미수령}}). 입금 후 출고 일정 안내드리겠습니다.' },
-  { label: '보증금 입금 확인', body: '[렌터카매니저] {{고객명}} 님, {{차량번호}} 보증금 {{보증금수령}} 입금 확인되었습니다. 출고 일정 별도 안내드리겠습니다.' },
-  { label: '반납 정산 안내', body: '[렌터카매니저] {{고객명}} 님, {{차량번호}} 반납 정산 — 보증금 {{보증금수령}} 중 차감액 제외 후 환불 {{보증금환불}} 예정입니다. 환불계좌 확인 부탁드립니다.' },
+  { label: '보증금 입금 안내', body: '[렌터카매니저] {{고객명}} 님, {{차량번호}} 계약 보증금 {{보증금}} 입금 부탁드립니다 (미수령 {{보증금미수령}}). 입금 후 출고 일정 안내드리겠습니다.' , needsDeposit: true },
+  { label: '보증금 입금 확인', body: '[렌터카매니저] {{고객명}} 님, {{차량번호}} 보증금 {{보증금수령}} 입금 확인되었습니다. 출고 일정 별도 안내드리겠습니다.' , needsDeposit: true },
+  { label: '반납 정산 안내', body: '[렌터카매니저] {{고객명}} 님, {{차량번호}} 반납 정산 — 보증금 {{보증금수령}} 중 차감액 제외 후 환불 {{보증금환불}} 예정입니다. 환불계좌 확인 부탁드립니다.' , needsDeposit: true },
   { label: '직접 입력', body: '' },
 ];
 
@@ -47,8 +54,8 @@ function fill(body: string, r: NotifyRecipient): string {
     .replace(/\{\{이번회차\}\}/g, `${r.currentSeq}회차`)
     .replace(/\{\{월대여료\}\}/g, won(r.monthlyRent))
     .replace(/\{\{보증금\}\}/g, won(r.depositDue))
-    .replace(/\{\{보증금수령\}\}/g, won(r.depositReceived))
-    .replace(/\{\{보증금미수령\}\}/g, won(r.depositUnreceived))
+    .replace(/\{\{보증금수령\}\}/g, r.depositReceived == null ? '(미확인)' : won(r.depositReceived))
+    .replace(/\{\{보증금미수령\}\}/g, r.depositUnreceived == null ? '(미확인)' : won(r.depositUnreceived))
     .replace(/\{\{보증금환불\}\}/g, won(r.depositRefund));
 }
 const today = todayKST;
@@ -67,11 +74,16 @@ export function NotifyDialog({ recipients, onClose, onSent }: {
 
   const targets = useMemo(() => recipients.filter((r) => r.phone), [recipients]);
   const isLong = body.length > 90;
+  /* 보증금 실수령액이 기록되지 않은 대상 — 보증금 문구가 든 문자는 이 대상에게 보낼 수 없다.
+     ★ERP가 «모르는 값을 0으로» 인쇄해 고객에게 틀린 안내를 보내는 것을 막는다. */
+  const depositUnknown = useMemo(() => targets.filter((r) => r.depositReceived == null).length, [targets]);
+  const usesDeposit = /\{\{보증금(수령|미수령)\}\}/.test(body);
+  const depositBlocked = usesDeposit && depositUnknown > 0;
 
   function applyTemplate(i: number) { setIdx(i); setBody(TEMPLATES[i].body); }
 
   async function send() {
-    if (!body.trim() || targets.length === 0) return;
+    if (!body.trim() || targets.length === 0 || depositBlocked) return;
     setBusy(true); setResult('');
     const label = TEMPLATES[idx].label;
     let sent = 0, failed = 0, mocked = 0;
@@ -112,9 +124,14 @@ export function NotifyDialog({ recipients, onClose, onSent }: {
   return (
     <Modal title="문자 발송" meta={`${targets.length}건`} width={860} onClose={onClose}
       footer={<>
-        <Btn onClick={send} disabled={busy || !body.trim() || targets.length === 0}>{busy ? '발송 중…' : `${targets.length}건 발송`}</Btn>
+        <Btn onClick={send} disabled={busy || !body.trim() || targets.length === 0 || depositBlocked}>{busy ? '발송 중…' : `${targets.length}건 발송`}</Btn>
         <Btn variant="ghost" onClick={onClose}>닫기</Btn>
         {result && <span style={{ fontSize: 12, color: result.startsWith('발송 완료') ? C.ok : C.warn }}>{result}</span>}
+        {depositBlocked && !result && (
+          <span style={{ fontSize: 12, color: C.danger }}>
+            보증금 실수령액이 기록되지 않은 대상 {depositUnknown}건 — 이 문구로는 발송할 수 없습니다(0원으로 잘못 안내됨)
+          </span>
+        )}
         <span style={{ flex: 1 }} />
         <span style={{ fontSize: 11, color: C.faint }}>예상비용 {targets.length * (isLong ? 25 : 10)}원 ({isLong ? 'LMS 25' : 'SMS 10'}원 × {targets.length})</span>
       </>}>
@@ -140,7 +157,15 @@ export function NotifyDialog({ recipients, onClose, onSent }: {
           <div>
             <div style={lbl}>템플릿</div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: mobile ? 8 : 6 }}>
-              {TEMPLATES.map((t, i) => <button key={t.label} type="button" data-ui="toggle" style={toggleStyle(idx === i, 'sm', mobile)} onClick={() => applyTemplate(i)} aria-pressed={idx === i}>{t.label}</button>)}
+              {TEMPLATES.map((t, i) => {
+                const locked = !!t.needsDeposit && depositUnknown > 0;
+                return (
+                  <button key={t.label} type="button" data-ui="toggle" disabled={locked}
+                    title={locked ? '보증금 실수령액이 기록되지 않아 사용할 수 없습니다' : undefined}
+                    style={{ ...toggleStyle(idx === i, 'sm', mobile), ...(locked ? { opacity: 0.45, cursor: 'not-allowed' } : {}) }}
+                    onClick={() => applyTemplate(i)} aria-pressed={idx === i}>{t.label}{locked ? ' 🔒' : ''}</button>
+                );
+              })}
             </div>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>

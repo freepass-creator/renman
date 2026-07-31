@@ -46,7 +46,7 @@ const CONTRACT_CREATE_SECTIONS: LedgerFormSection[] = [
   { title: '계약 기본', open: true, fields: ['contractNo', 'status', 'rentalType', 'contractDate', 'plate', 'carName'] },
   { title: '계약자', fields: ['contractorName', 'contractorPhone', 'contractorBirth', 'contractorLicenseNo', 'contractorLicenseExpiry', 'licenseType', 'contractorAddress'] },
   { title: '기간·인도', fields: ['startDate', 'endDate', 'rentalMonths', 'annualMileageLimit', 'pickupPlace', 'returnPlace'] },
-  { title: '요금·납부', fields: ['monthlyRent', 'deposit', 'reservationFee', 'paymentDay', 'paymentTiming', 'lateFeeRate', 'earlyTerminationRate', 'overMileageRate'] },
+  { title: '요금·납부', fields: ['monthlyRent', 'deposit', 'depositReceived', 'depositReceivedDate', 'reservationFee', 'paymentDay', 'paymentTiming', 'lateFeeRate', 'earlyTerminationRate', 'overMileageRate'] },
   { title: '보험·특약', fields: ['driverAgeMin', 'insuranceAge', 'cdw', 'deductible', 'superCover', 'additionalDrivers', 'withDriver'] },
 ];
 
