@@ -117,7 +117,7 @@ function rowTone(row: HomeQueueRow): 'red' | 'amber' | 'gray' {
 }
 
 function TodoRow({ row, onGo, first }: { row: HomeQueueRow; onGo: (href: string) => void; first?: boolean }) {
-  const overdue = row.dday != null && row.dday < 0;
+  // 상태 신호 = 배지 색으로만(사장님 확정) — 행 배경 틴트 없음.
   return (
     <button
       type="button"
@@ -125,7 +125,7 @@ function TodoRow({ row, onGo, first }: { row: HomeQueueRow; onGo: (href: string)
       style={{
         display: 'flex', alignItems: 'center', gap: 7, width: '100%', textAlign: 'left',
         padding: '7px 10px', border: 'none', borderTop: first ? 'none' : `1px solid ${C.line2}`,
-        background: overdue ? 'var(--danger-tint)' : 'transparent', cursor: 'pointer', fontFamily: 'inherit',
+        background: 'transparent', cursor: 'pointer', fontFamily: 'inherit',
       }}
     >
       <Badge tone={rowTone(row)}>{row.kind}</Badge>

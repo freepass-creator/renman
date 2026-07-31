@@ -26,10 +26,10 @@ export function workRail(r: {
 }
 
 /**
- * ExcelSheet rowStyle용 — danger만 `--danger-tint` 배경.
- * warn/mute/none = 배지만(배경 없음). 좌측 점·inset 선 금지.
+ * ExcelSheet rowStyle용 — 2026-07-31 사장님 확정: 상태 신호는 «배지 색으로만».
+ * 행 배경 틴트·좌측 점·inset 선 전부 금지 → 항상 undefined.
+ * (분류/상태 컬럼+배지가 신호를 담당. 시그니처는 유지 — 원장 배선 무변경.)
  */
-export function workRailStyle(tone: RailTone): CSSProperties | undefined {
-  if (tone !== 'danger') return undefined;
-  return { background: 'var(--danger-tint)' };
+export function workRailStyle(_tone: RailTone): CSSProperties | undefined {
+  return undefined;
 }
