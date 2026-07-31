@@ -190,7 +190,7 @@ const FLEET_COL_CATALOG: SheetCol<FleetRow>[] = alignCols([
 export const FLEET_SHEET_KEYS: SheetViewKeys = {
   // 회사·차번·차명·소유(분류)·상태·사용처·연락처·현위치·대여료·보증금·결제일·회차/기간·미수·만기·검사·보험·주행·경고
   basic: [
-    'company', 'plate', 'car', 'own', 'status', 'cust', 'phone', 'loc',
+    'company', 'plate', 'car', 'own', 'status', 'cust', 'loc', 'phone',
     'rent', 'dep', 'paymentDay', 'round', 'net', 'end', 'inspect', 'insEnd', 'mileage', 'warn',
   ],
   all: [

@@ -42,8 +42,8 @@ const AGENDA_COL_CATALOG: SheetCol<AgendaItem>[] = [
 ];
 
 export const AGENDA_SHEET_KEYS: SheetViewKeys = {
-  basic: ['company', 'plate', 'title', 'kind', 'status', 'date', 'dday'],
-  all: ['company', 'plate', 'title', 'kind', 'status', 'date', 'dday', 'companyId', 'key'],
+  basic: ['company', 'plate', 'kind', 'status', 'title', 'date', 'dday'],
+  all: ['company', 'plate', 'kind', 'status', 'title', 'date', 'dday', 'companyId', 'key'],
 };
 
 const _agendaViews = buildSheetViews(AGENDA_COL_CATALOG, AGENDA_SHEET_KEYS);

@@ -84,15 +84,20 @@ const CATALOG: SheetCol<RiskSheetRow>[] = [
 ];
 
 /**
- * 회사 → 신원(차번·계약자·연락처) → 리스크내용 → 리스크구분 → 리스크분류 → 리스크상태 → 수치·기한
+ * ★열 순서는 «자산관리»가 기준이다(사장님 확정 — 전 화면 통일):
+ *     회사(1) · 식별자(2) · 이름(3) · 분류(4) · 상태(5) · 나머지
+ *   자산관리 = company · plate · carName · 자산분류 · 자산상태 · …
+ *   리스크   = company · plate · 계약자 · 리스크분류 · 리스크상태 · 리스크구분 · 내용 · 기한 · 금액 · 연락처
+ *   어느 페이지를 가도 같은 위치에 같은 성격의 칸이 있어야 한다(안정감).
+ *   내용·연락처·차명 같은 부가 정보는 분류·상태 뒤로 밀어낸다.
  *
  * ★「리스크구분」(미완료·미납·만기·휴차)을 기본뷰에 넣는다. 여러 구분이 한 표에 섞여 나열되므로
  *   행에 없으면 «이 행이 어느 그룹인지» 알 수 없다(상단 칩은 건수만 보여준다).
  *   구분→분류→상태를 «연속 블록»으로 둬서 분류 바로 뒤에 상태가 오는 규격을 지킨다.
  */
 export const RISK_SHEET_KEYS: SheetViewKeys = {
-  basic: ['company', 'plate', 'customer', 'phone', 'subject', 'group', 'kind', 'status', 'due', 'amount'],
-  all: ['company', 'plate', 'customer', 'phone', 'carName', 'subject', 'group', 'kind', 'status', 'due', 'amount'],
+  basic: ['company', 'plate', 'customer', 'kind', 'status', 'group', 'subject', 'due', 'amount', 'phone'],
+  all: ['company', 'plate', 'customer', 'kind', 'status', 'group', 'subject', 'due', 'amount', 'carName', 'phone'],
 };
 
 const views = buildSheetViews(CATALOG, RISK_SHEET_KEYS);

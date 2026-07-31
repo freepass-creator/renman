@@ -71,7 +71,7 @@ const ACCOUNT_COL_CATALOG: SheetCol<BankAccountRow>[] = [
 
 /** 회사 → 신원(은행·계좌) → 상태 → 수치 */
 export const ACCOUNT_SHEET_KEYS: SheetViewKeys = {
-  basic: ['company', 'bank', 'alias', 'holder', 'type', 'status', 'totalIn', 'totalOut', 'currentBalance'],
+  basic: ['company', 'bank', 'holder', 'type', 'status', 'alias', 'totalIn', 'totalOut', 'currentBalance'],
   all: [
     'company', 'bank', 'account', 'alias', 'holder', 'type', 'status',
     'totalIn', 'totalOut', 'currentBalance', 'createdAt', 'createdBy',

@@ -208,16 +208,16 @@ const PENALTY_DETAIL_CATALOG: SheetCol<WorkLedgerRow>[] = [
 ];
 
 export const WORK_SHEET_KEYS: SheetViewKeys = {
-  basic: ['company', 'plate', 'contractor', 'title', 'kind', 'status', 'priority', 'contractNo', 'workDate', 'due', 'assignee'],
+  basic: ['company', 'plate', 'contractor', 'kind', 'status', 'priority', 'title', 'contractNo', 'workDate', 'due', 'assignee'],
   all: [
-    'company', 'plate', 'contractor', 'title', 'kind', 'status', 'priority', 'contractNo', 'workDate',
+    'company', 'plate', 'contractor', 'kind', 'status', 'priority', 'title', 'contractNo', 'workDate',
     'assignee', 'created', 'updated', 'due', 'amount', 'source',
   ],
 };
 
 export const PENALTY_SHEET_KEYS: SheetViewKeys = {
-  basic: ['company', 'plate', 'driver', 'title', 'ptype', 'status', 'violationDate', 'amount'],
-  all: ['company', 'plate', 'driver', 'title', 'ptype', 'status', 'violationDate', 'amount', 'due'],
+  basic: ['company', 'plate', 'driver', 'ptype', 'status', 'title', 'violationDate', 'amount'],
+  all: ['company', 'plate', 'driver', 'ptype', 'status', 'title', 'violationDate', 'amount', 'due'],
 };
 
 const _workViews = buildSheetViews(WORK_COL_CATALOG, WORK_SHEET_KEYS);
