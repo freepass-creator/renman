@@ -18,7 +18,8 @@ export type CrossCheckKind =
   | '정체불명'     // 거래는 있는데 차량·서류 어디에도 없는 번호
   | '무보험'       // 보유 차량인데 유효 보험이 없다(해지만 있는 경우 포함)
   | '서류미비'     // 등록증·보험증권·계약서 중 없는 것
-  | '차종불일치';  // 같은 차의 차명이 서류·마스터·거래에서 다르다
+  | '차종불일치'   // 같은 차의 차명이 서류·마스터·거래에서 다르다
+  | '대여료불일치'; // 계약 월대여료와 실입금이 «일정하게» 다르다 — 재조정 미반영 의심
 
 export type CrossCheckSev = 'high' | 'med' | 'low';
 
@@ -257,13 +258,58 @@ export function crossCheckDocuments(input: CrossCheckInput): CrossCheckItem[] {
     });
   }
 
+  /* ── ⑥ 대여료불일치 — 계약 월대여료와 실입금이 «일정하게» 다르다 ──────
+     실계약 99장 × 자금일보 대조에서 5대 나왔다. 부족액이 매번 같았다:
+       365주3303 −90,000(23회) · 325구9443 −70,000(13회) · 350수9623 −100,000(4회) …
+     23회를 같은 금액으로 꾸준히 냈다면 미납이 아니라 «대여료를 재조정했는데 계약서·계약 레코드가
+     갱신되지 않은 것»이다(계약서 제4조에 서면합의 재조정 조항이 있다).
+     ★그대로 두면 ERP가 계약 금액으로 미수를 계산해 정상 납부 고객에게 매달 미수가 쌓이고
+       독촉·내용증명이 나간다. «미납»과 «재조정 미반영»은 조치가 정반대다.
+     오탐을 막기 위해 3회 이상 · 금액이 서로 같을 때만 본다(분납·연체합납은 금액이 흔들린다). */
+  const rentPays = new Map<string, number[]>();
+  for (const t of bankTx) {
+    if (String(t.category || '') !== '대여료') continue;
+    const n = normPlate(t.plate);
+    const amt = Number(t.amount) || 0;
+    if (!n || amt <= 0) continue;
+    const arr = rentPays.get(n);
+    if (arr) arr.push(amt); else rentPays.set(n, [amt]);
+  }
+  for (const c of contracts) {
+    if (c.returnedDate) continue;
+    const n = normPlate(c.plate);
+    const rent = Number(c.monthlyRent) || 0;
+    if (!n || rent <= 0) continue;
+    const amts = rentPays.get(n);
+    if (!amts || amts.length < 3) continue;
+    if (amts.some((a) => a === rent)) continue;          // 계약 금액과 같은 입금이 한 번이라도 있으면 정상
+    const uniq = [...new Set(amts)];
+    if (uniq.length !== 1) continue;                      // 금액이 흔들리면 분납·연체합납 → 이 규칙 대상 아님
+    const actual = uniq[0];
+    const gap = actual - rent;
+    const v = fleet.find((x) => normPlate(x.plate) === n);
+    out.push({
+      companyId: String(c.companyId || v?.companyId || ''),
+      plate: String(c.plate || n),
+      kind: '대여료불일치',
+      sev: 'high',
+      detail: `계약 월대여료 ${rent.toLocaleString('ko-KR')}원인데 실입금이 ${amts.length}회 모두 `
+        + `${actual.toLocaleString('ko-KR')}원(${gap > 0 ? '+' : ''}${gap.toLocaleString('ko-KR')}) `
+        + '— 재조정 미반영으로 보입니다. 계약 금액을 고치지 않으면 미수가 잘못 쌓입니다',
+      evidence: [
+        `계약: ${String(c.contractorName || '계약자 미기재')} · 월 ${rent.toLocaleString('ko-KR')}원`,
+        `실입금 ${amts.length}회 전부 ${actual.toLocaleString('ko-KR')}원`,
+      ],
+    });
+  }
+
   return out.sort((a, b) => SEV_RANK[a.sev] - SEV_RANK[b.sev] || a.plate.localeCompare(b.plate, 'ko'));
 }
 
 /** 종류별 건수 — 요약 카드·투입 후 안내에 쓴다. */
 export function crossCheckCounts(items: CrossCheckItem[]): Record<CrossCheckKind, number> {
   const base: Record<CrossCheckKind, number> = {
-    번호오기입: 0, 정체불명: 0, 무보험: 0, 서류미비: 0, 차종불일치: 0,
+    번호오기입: 0, 정체불명: 0, 무보험: 0, 서류미비: 0, 차종불일치: 0, 대여료불일치: 0,
   };
   for (const it of items) base[it.kind] += 1;
   return base;

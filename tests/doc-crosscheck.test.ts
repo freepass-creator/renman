@@ -284,8 +284,89 @@ describe('집계·요약 — 투입 직후 안내', () => {
     expect(s).toContain('서류미비');
   });
 
-  test('종류별 카운트는 5종 전부 키를 갖는다', () => {
+  test('종류별 카운트는 6종 전부 키를 갖는다', () => {
     const c = crossCheckCounts([]);
-    expect(Object.keys(c).sort()).toEqual(['무보험', '번호오기입', '서류미비', '정체불명', '차종불일치'].sort());
+    expect(Object.keys(c).sort())
+      .toEqual(['무보험', '번호오기입', '서류미비', '정체불명', '차종불일치', '대여료불일치'].sort());
+  });
+});
+
+describe('대여료불일치 — «미납»과 «재조정 미반영»은 조치가 정반대다', () => {
+  const rentTx = (plate: string, amount: number, n: number) =>
+    Array.from({ length: n }, () => ({ plate, companyId: 'switchplan', category: '대여료', amount }));
+
+  test('★실데이터 케이스: 23회 전부 870,000 인데 계약은 960,000', () => {
+    const items = crossCheckDocuments({
+      vehicles: [CLEAN('365주3303')],
+      insurances: [INS('365주3303')],
+      contracts: [{ plate: '365주3303', companyId: 'switchplan', contractorName: '이은규', monthlyRent: 960_000 }],
+      bankTx: rentTx('365주3303', 870_000, 23),
+      today: TODAY,
+    });
+    const m = items.filter((i) => i.kind === '대여료불일치');
+    expect(m).toHaveLength(1);
+    expect(m[0].sev).toBe('high');
+    expect(m[0].detail).toContain('23회');
+    expect(m[0].detail).toContain('-90,000');
+    expect(m[0].evidence.join(' ')).toContain('이은규');
+  });
+
+  test('계약 금액과 같은 입금이 한 번이라도 있으면 정상 — 잡지 않는다', () => {
+    const items = crossCheckDocuments({
+      vehicles: [CLEAN('123가4567')],
+      insurances: [INS('123가4567')],
+      contracts: [{ plate: '123가4567', companyId: 'switchplan', monthlyRent: 500_000 }],
+      bankTx: [...rentTx('123가4567', 500_000, 1), ...rentTx('123가4567', 300_000, 3)],
+      today: TODAY,
+    });
+    expect(items.filter((i) => i.kind === '대여료불일치')).toHaveLength(0);
+  });
+
+  test('금액이 흔들리면 분납·연체합납이므로 이 규칙 대상이 아니다', () => {
+    const items = crossCheckDocuments({
+      vehicles: [CLEAN('120라5445')],
+      insurances: [INS('120라5445')],
+      contracts: [{ plate: '120라5445', companyId: 'switchplan', monthlyRent: 540_000 }],
+      bankTx: [
+        ...rentTx('120라5445', 200_000, 2),
+        ...rentTx('120라5445', 130_000, 2),
+        ...rentTx('120라5445', 340_000, 1),
+      ],
+      today: TODAY,
+    });
+    expect(items.filter((i) => i.kind === '대여료불일치')).toHaveLength(0);
+  });
+
+  test('3회 미만이면 판단하지 않는다(우연일 수 있다)', () => {
+    const items = crossCheckDocuments({
+      vehicles: [CLEAN('123가4567')],
+      insurances: [INS('123가4567')],
+      contracts: [{ plate: '123가4567', companyId: 'switchplan', monthlyRent: 500_000 }],
+      bankTx: rentTx('123가4567', 400_000, 2),
+      today: TODAY,
+    });
+    expect(items.filter((i) => i.kind === '대여료불일치')).toHaveLength(0);
+  });
+
+  test('계정과목이 «대여료»가 아닌 입금은 세지 않는다', () => {
+    const items = crossCheckDocuments({
+      vehicles: [CLEAN('123가4567')],
+      insurances: [INS('123가4567')],
+      contracts: [{ plate: '123가4567', companyId: 'switchplan', monthlyRent: 500_000 }],
+      bankTx: Array.from({ length: 5 }, () => ({ plate: '123가4567', companyId: 'switchplan', category: '보증금', amount: 400_000 })),
+      today: TODAY,
+    });
+    expect(items.filter((i) => i.kind === '대여료불일치')).toHaveLength(0);
+  });
+
+  test('반납된 계약은 대상이 아니다', () => {
+    const items = crossCheckDocuments({
+      vehicles: [CLEAN('123가4567')],
+      insurances: [INS('123가4567')],
+      contracts: [{ plate: '123가4567', companyId: 'switchplan', monthlyRent: 500_000, returnedDate: '2026-05-01' }],
+      bankTx: rentTx('123가4567', 400_000, 5),
+      today: TODAY,
+    });
+    expect(items.filter((i) => i.kind === '대여료불일치')).toHaveLength(0);
   });
 });
