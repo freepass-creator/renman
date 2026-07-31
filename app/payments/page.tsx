@@ -14,6 +14,7 @@ import { companyLabel } from '@/lib/companies';
 import { type EntityRecord } from '@/lib/intake/entities';
 import { buildMatchContract, computeContractView } from '@/lib/contract-ops';
 import { autoMatchAll, type AutoMatchResult } from '@/lib/payments/receipt-match';
+import { findDuplicateCashPayment } from '@/lib/payments/duplicate-cash';
 import { findCmsMatchCandidates, buildSettlementPatches, type CmsMatchCandidate } from '@/lib/payments/cms-matching';
 import { toast } from '@/lib/toast';
 import type { BankTransaction } from '@/lib/payments/types';
@@ -30,6 +31,7 @@ import { WorkPipe } from '@/components/WorkPipe';
 import { TODAY } from '@/lib/dashboard-consts';
 import { useEntityLists } from '@/lib/use-entity-lists';
 import { useSecOrder } from '@/lib/use-sec-order';
+import { useConfirm } from '@/components/ui/confirm';
 
 const CONF_TONE: Record<string, BadgeTone> = { high: 'green', medium: 'amber', low: 'gray' };
 const EMPTY = new Set<string>();
@@ -61,6 +63,7 @@ export default function PaymentsPage() {
   const { companyId, scopeAll } = useSession();
   // work hub back only — no sibling tabs
   const { data: [cs = [], txs = []], loading, error: loadError, reload } = useEntityLists(['contract', 'bank_tx']);
+  const confirm = useConfirm();
   const [results, setResults] = useState<AutoMatchResult[] | null>(null);
   const [cmsResults, setCmsResults] = useState<CmsMatchCandidate[] | null>(null);
   const [cmsSel, setCmsSel] = useState<Set<string>>(new Set());
@@ -98,8 +101,15 @@ export default function PaymentsPage() {
     const matchCs = cs.map((r) => buildMatchContract(r, TODAY));
     const res = autoMatchAll(pending, matchCs);
     setResults(res);
-    setSel(new Set(res.map((r) => r.tx.id)));
-    setMsg(res.length === 0 ? '자동매칭 제안 없음 — 이름·금액 일치 입금이 없습니다(수동 검토).' : '');
+    // ★현장수납과 겹치는 제안은 기본 선택에서 뺀다 — 그대로 적용하면 같은 돈이 두 번 차감된다.
+    //   («일괄 적용»이 기본 전체선택이므로 여기서 빼지 않으면 사람이 볼 기회 없이 통과한다.)
+    const dupIds = new Set(
+      res.filter((r) => findDuplicateCashPayment(csByKey.get(r.candidate.contract.id), r.tx)).map((r) => r.tx.id),
+    );
+    setSel(new Set(res.filter((r) => !dupIds.has(r.tx.id)).map((r) => r.tx.id)));
+    setMsg(res.length === 0
+      ? '자동매칭 제안 없음 — 이름·금액 일치 입금이 없습니다(수동 검토).'
+      : dupIds.size ? `중복 입금 의심 ${dupIds.size}건은 선택에서 제외했습니다 — 현장수납과 같은 돈인지 확인 후 개별 선택하세요.` : '');
   }
 
   function runCms() {
@@ -223,6 +233,15 @@ export default function PaymentsPage() {
     if (!trec || trec.matchedContractId) { toast('이미 처리된 입금', 'info'); return; }
     const existing = Array.isArray(crec._payments) ? (crec._payments as Array<Record<string, unknown>>) : [];
     if (existing.some((p) => p.txId === t.id)) { toast('이미 연결됨', 'info'); return; }
+    // ★현장에서 현금·카드로 이미 받아 기록한 돈일 수 있다 — 연결하면 미수가 두 번 차감된다.
+    const dup = findDuplicateCashPayment(crec, { txDate: t.txDate, amount: t.amount });
+    if (dup && !(await confirm({
+      title: '중복 입금 의심',
+      message: `${dup.message}
+
+그래도 이 입금을 계약에 연결할까요?`,
+      confirmLabel: '연결', danger: true,
+    }))) return;
     const mc = buildMatchContract(crec, TODAY);
     const unpaid = (mc.schedules ?? []).filter((s: { status: string }) => s.status !== '완료') as Array<{ seq: number }>;
     const seq = unpaid.length ? unpaid[0].seq : existing.length + 1;
