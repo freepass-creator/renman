@@ -377,14 +377,41 @@ describe('연령구간 상승 — 고객이 더 내고 있을 수 있다', () =>
   });
   const base = { vehicles: [CLEAN('325구9443')], insurances: [INS('325구9443')], today: TODAY };
 
-  test('★실데이터 케이스: 계약 시 만 24세 구간 → 현재 만 26세', () => {
+  test('★사장님 지적 케이스: 21세 구간 계약 → 26세 = 구간 2개 통과', () => {
+    // 2000-03-01 생 → 2026-07-31 기준 만 26세. 계약서 최소운전연령 만 21세.
+    const items = crossCheckDocuments({
+      ...base, contracts: [C({ driverAgeMin: 21, contractorBirth: '2000-03-01' })],
+    });
+    const m = items.filter((i) => i.kind === '연령구간상승');
+    expect(m).toHaveLength(1);
+    expect(m[0].detail).toContain('구간 2개 통과');
+    expect(m[0].detail).toContain('만24→만26');
+    // 만 26세 도달 = 2026-03-01 → 2026-07-31 기준 4개월 경과(6개월 미만이므로 low)
+    expect(m[0].detail).toContain('2026-03-01에 도달');
+    expect(m[0].detail).toContain('4개월 경과');
+    expect(m[0].sev).toBe('low');
+  });
+
+  test('★넘은 지 6개월 넘으면 주의로 올린다 — 그만큼 고객이 더 냈다', () => {
+    // 1999-12-15 생 → 만 26세 도달 2025-12-15 → 2026-07-31 기준 7개월 경과
+    const items = crossCheckDocuments({
+      ...base, contracts: [C({ driverAgeMin: 24, contractorBirth: '1999-12-15' })],
+    });
+    const m = items.filter((i) => i.kind === '연령구간상승');
+    expect(m[0].sev).toBe('med');
+    expect(m[0].detail).toContain('7개월 경과');
+    expect(m[0].evidence.join(' ')).toContain('이전 구간 요율로 청구 중');
+  });
+
+  test('실데이터 케이스: 325구9443 최정훈 — 계약 시 만 24세 구간 → 현재 만 26세', () => {
     // 99년 12월생 → 2026-07-31 기준 만 26세. 계약서 최소운전연령 만 24세.
+    // 만 26세 도달이 2025-12-15 = 7개월 경과이므로 med(위 «6개월» 테스트와 같은 근거).
     const items = crossCheckDocuments({
       ...base, contracts: [C({ driverAgeMin: 24, contractorBirth: '1999-12-15' })],
     });
     const m = items.filter((i) => i.kind === '연령구간상승');
     expect(m).toHaveLength(1);
-    expect(m[0].sev).toBe('low');
+    expect(m[0].sev).toBe('med');
     expect(m[0].detail).toContain('만 24세 이상');
     expect(m[0].detail).toContain('만 26세');
     expect(m[0].evidence.join(' ')).toContain('최정훈');

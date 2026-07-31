@@ -44,6 +44,15 @@ function inFleet(v: EntityRecord): boolean {
   return !OUT_STATUSES.has(String(v.status || '')) && !v.deletedAt;
 }
 
+/** 두 날짜(YYYY-MM-DD) 사이 개월 수 — 소급 조정 범위 산정용. */
+function monthsBetween(from: string, to: string): number {
+  const a = from.slice(0, 10); const b = to.slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(a) || !/^\d{4}-\d{2}-\d{2}$/.test(b)) return 0;
+  let m = (Number(b.slice(0, 4)) - Number(a.slice(0, 4))) * 12 + (Number(b.slice(5, 7)) - Number(a.slice(5, 7)));
+  if (b.slice(8) < a.slice(8)) m -= 1;
+  return m;
+}
+
 /** 차명 비교용 정규화 — 「벤츠E클」/「E250」처럼 표기가 달라도 포함관계면 같은 것으로 본다. */
 function modelKey(s: unknown): string {
   return String(s || '').toLowerCase().replace(/[^0-9a-z가-힣]/g, '');
@@ -334,20 +343,36 @@ export function crossCheckDocuments(input: CrossCheckInput): CrossCheckItem[] {
     // 지금 나이가 도달한 가장 높은 구간
     const bandNow = AGE_BANDS.filter((b) => ageNow >= b).pop() || 0;
     if (bandNow <= bandAtSign) continue;
+    /* 넘은 구간이 여럿일 수 있다 — 21세 계약이 26세가 되면 24·26 두 구간을 지났다(사장님 확인).
+       그리고 «언제 넘었는지»를 계산한다: 그 구간에 도달한 생일 = 생년 + 구간나이.
+       그래야 «언제부터 깎아줘야 했나»(소급 조정 범위)를 알 수 있다 — 이게 없으면 알려도 조치를 못 한다. */
+    const crossed = AGE_BANDS.filter((b) => b > bandAtSign && ageNow >= b);
+    const birth = String(c.contractorBirth || '').slice(0, 10);
+    const crossedAt = birth
+      ? `${String(Number(birth.slice(0, 4)) + bandNow).padStart(4, '0')}${birth.slice(4)}`
+      : '';
+    const monthsSince = crossedAt ? Math.max(0, monthsBetween(crossedAt, today)) : 0;
     const n = normPlate(c.plate);
     const v = fleet.find((x) => normPlate(x.plate) === n);
     out.push({
       companyId: String(c.companyId || v?.companyId || ''),
       plate: String(c.plate || n),
       kind: '연령구간상승',
-      // 돈이 잘못 계산되는 것은 아니므로 low — 다만 고객이 더 내고 있을 수 있다.
-      sev: 'low',
+      /* 넘은 지 오래됐으면 그만큼 «고객이 더 낸 기간»이 길다 → 6개월 넘으면 주의로 올린다.
+         돈 계산이 틀린 것은 아니지만 방치하면 신뢰 문제가 된다. */
+      sev: monthsSince >= 6 ? 'med' : 'low',
       detail: `계약 당시 「만 ${bandAtSign}세 이상」 구간이었는데 현재 만 ${ageNow}세로 `
-        + `「만 ${bandNow}세 이상」 구간입니다 — 보험료 인하 여지가 있습니다`,
+        + `「만 ${bandNow}세 이상」 구간입니다`
+        + (crossed.length > 1 ? ` (구간 ${crossed.length}개 통과: ${crossed.map((b) => `만${b}`).join('→')})` : '')
+        + (crossedAt ? ` — ${crossedAt}에 도달, ${monthsSince}개월 경과` : '')
+        + ' — 보험료 인하 여지가 있습니다',
       evidence: [
         `계약자: ${String(c.contractorName || '계약자 미기재')} · 현재 만 ${ageNow}세`,
         `계약서 최소운전연령: 만 ${bandAtSign}세 이상`,
-        '보험 재산정 후 월대여료를 조정할 수 있습니다(자동차보험 연령 구간: 21·24·26·30·35세)',
+        crossedAt
+          ? `만 ${bandNow}세 도달 ${crossedAt} · ${monthsSince}개월째 이전 구간 요율로 청구 중일 수 있음`
+          : '도달 시점 불명(생년월일 확인 필요)',
+        '보험 재산정 후 월대여료 조정 · 소급 조정 범위를 함께 정하세요(자동차보험 구간: 21·24·26·30·35세)',
       ],
     });
   }
