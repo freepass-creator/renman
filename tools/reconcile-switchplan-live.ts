@@ -279,7 +279,18 @@ async function main() {
     }
     const oldPayments = Array.isArray(target._payments) ? target._payments as Rec[] : [];
     const archivedPayments = Array.isArray(target._historicalPayments) ? target._historicalPayments as Rec[] : [];
-    if (oldPayments.length) historicalPaymentArchives++;
+    // 보증금충당·synthetic·청구겨냥 수납은 보존(R6) — carry 이중차감 방지를 위한 개시전 수납만 아카이브.
+    const isKeepPayment = (p: Rec) => {
+      if (p.synthetic === true) return true;
+      if (String(p.kind || '') === 'deposit-offset') return true;
+      if (p.chargeKind) return true;
+      const text = `${String(p.memo || '')}${String(p.subject || '')}`.replace(/\s/g, '');
+      if (text.includes('보증금충당') || text.includes('보증금상계')) return true;
+      return false;
+    };
+    const toArchive = oldPayments.filter((p) => !isKeepPayment(p));
+    const toKeep = oldPayments.filter((p) => isKeepPayment(p));
+    if (toArchive.length) historicalPaymentArchives++;
     contractRecon.push({
       docId: s(target._docId),
       patch: {
@@ -289,11 +300,11 @@ async function main() {
         dataAlert: alerts.length ? alerts.join(' · ') : null,
         sourceOrigin: BIZ,
         reconciledAt: new Date().toISOString(),
-        ...(oldPayments.length ? {
-          _historicalPayments: [...archivedPayments, ...oldPayments],
-          _payments: [],
+        ...(toArchive.length ? {
+          _historicalPayments: [...archivedPayments, ...toArchive],
+          _payments: toKeep,
           historicalPaymentsArchivedAt: new Date().toISOString(),
-          historicalPaymentsArchiveReason: '사업현황 carry에 이미 반영된 개시 전 수납 — 이중차감 방지',
+          historicalPaymentsArchiveReason: '사업현황 carry에 이미 반영된 개시 전 수납 — 이중차감 방지(충당·정산 entry 보존)',
         } : {}),
       },
     });
