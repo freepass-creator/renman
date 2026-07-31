@@ -272,6 +272,58 @@ export function OcrCrosscheck({ result }: { result?: CrosscheckResult | null }) 
  *   · ok    미결/리스크 큐가 비어 있음 = 정상. 초록 체크(홈·업무).
  */
 export type EmptyVariant = 'page' | 'sheet' | 'sec' | 'ok';
+/**
+ * 조회 실패 상태 — «데이터 0건»과 반드시 구분해야 한다.
+ *   실패를 빈 목록으로 보여주면 리스크 화면이 «위험 없음»으로 위장돼 거짓 안심을 준다(QA 중요).
+ *   variant='sheet' = 원장 표 자리를 채우는 카드(EmptyState와 동일 규격), 'sec' = 섹션 안 한 줄.
+ */
+export function ErrorState({
+  message, onRetry, variant = 'sheet',
+}: {
+  message: string;
+  onRetry?: () => void;
+  variant?: 'sheet' | 'sec';
+}) {
+  const retry = onRetry ? (
+    <button
+      type="button"
+      onClick={onRetry}
+      style={{
+        marginTop: variant === 'sec' ? 0 : 10, marginLeft: variant === 'sec' ? 8 : 0,
+        border: `1px solid ${C.line}`, borderRadius: R, background: C.card,
+        padding: '4px 10px', fontSize: 12, fontWeight: 700, color: C.ink,
+        cursor: 'pointer', fontFamily: 'inherit',
+      }}
+    >
+      다시 시도
+    </button>
+  ) : null;
+
+  if (variant === 'sec') {
+    return (
+      <div role="alert" style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12.5, color: C.danger, padding: '2px 0' }}>
+        <AlertTriangle size={13} strokeWidth={2.5} /> {message}{retry}
+      </div>
+    );
+  }
+  return (
+    <div role="alert" style={{
+      flex: 1, alignSelf: 'stretch', width: '100%', minHeight: 0,
+      display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+      padding: '28px 24px', textAlign: 'center',
+      border: `1px solid ${C.danger}`, borderRadius: R, background: 'var(--danger-tint)',
+      fontSize: 13, lineHeight: 1.55, color: C.ink, boxSizing: 'border-box',
+    }}>
+      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7, fontWeight: 700, color: C.danger }}>
+        <AlertTriangle size={15} strokeWidth={2.5} /> 데이터를 불러오지 못했습니다
+      </span>
+      <span style={{ marginTop: 6, color: C.mute, fontSize: 12.5 }}>{message}</span>
+      <span style={{ marginTop: 4, color: C.faint, fontSize: 11.5 }}>※ 목록이 비어 보이는 것은 «없음»이 아니라 «못 읽음»입니다.</span>
+      {retry}
+    </div>
+  );
+}
+
 export function EmptyState({ children, variant = 'page' }: { children: React.ReactNode; variant?: EmptyVariant }) {
   if (variant === 'ok') {
     return (

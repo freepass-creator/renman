@@ -6,7 +6,7 @@
  */
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useSession } from './session';
-import { getStore, listsCached } from './store';
+import { getStore, listErrorFor, listsCached, subscribeListErrors } from './store';
 import { withTimeout } from './async';
 import { type EntityRecord } from './intake/entities';
 import { computeDashboard } from './operating-snapshot';
@@ -26,6 +26,7 @@ export function useDashboardData() {
   const [penalties, setPenalties] = useState<EntityRecord[]>([]);
   const [inbox, setInbox] = useState<EntityRecord[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [tick, setTick] = useState(0);
   const loadedCompany = useRef<string | null>(null);
 
@@ -43,11 +44,15 @@ export function useDashboardData() {
       .then(([cs, vs, ins, bt, hs, ps, ib]) => {
         if (cancelled) return;
         setContracts(cs); setVehicles(vs); setInsurances(ins); setBankTx(bt); setHistory(hs); setPenalties(ps); setInbox(ib);
+        // store.list는 실패해도 빈 배열로 resolve → 지표 0이 «문제 없음»으로 위장되지 않게 실패를 표면화.
+        setError(listErrorFor(DASH_KEYS, companyId));
         setLoading(false); loadedCompany.current = companyId;
       })
-      .catch(() => { if (!cancelled) setLoading(false); });
+      .catch((e) => { if (!cancelled) { setError((e as Error).message || '조회 실패'); setLoading(false); } });
     return () => { cancelled = true; };
   }, [companyId, tick]);
+
+  useEffect(() => subscribeListErrors(() => setError(listErrorFor(DASH_KEYS, companyId))), [companyId]);
 
   useEffect(() => {
     function onSaved() { setTick((t) => t + 1); }
@@ -57,5 +62,5 @@ export function useDashboardData() {
 
   const D = useMemo(() => computeDashboard({ contracts, vehicles, insurances, penalties, bankTx }, TODAY), [contracts, vehicles, insurances, penalties, bankTx]);
 
-  return { D, contracts, vehicles, insurances, bankTx, history, penalties, inbox, loading };
+  return { D, contracts, vehicles, insurances, bankTx, history, penalties, inbox, loading, error };
 }

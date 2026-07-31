@@ -40,7 +40,7 @@ function RiskLedgerInner() {
   const confirm = useConfirm();
   const searchParams = useSearchParams();
   const { companyId } = useSession();
-  const { contracts, vehicles, insurances, penalties, history, bankTx, loading } = useDashboardData();
+  const { contracts, vehicles, insurances, penalties, history, bankTx, loading, error: loadError } = useDashboardData();
   const [q, setQ] = useState('');
   const [group, setGroup] = useState<GroupFilter>('전체');
   const [range, setRange] = useState({ from: '', to: '' });
@@ -229,6 +229,7 @@ function RiskLedgerInner() {
         colView={colView}
         onColView={setColView}
         loading={loading}
+        error={loadError}
         empty={group === '전체' ? '지금 챙길 위험이 없습니다' : `${group} 없음`}
         cols={colView === '기본' ? RISK_BASIC_COLS : RISK_EXPANDED_COLS}
         rows={rows}

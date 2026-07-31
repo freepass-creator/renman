@@ -284,7 +284,7 @@ export default function CashLedgerPage() {
   const mobile = useIsMobile();
   const router = useRouter();
   const { companyId } = useSession();
-  const { bank, card, loading, reload } = useCashLedgerLists();
+  const { bank, card, loading, error: loadError, reload } = useCashLedgerLists();
   const { rows: accountRecords, loading: accountLoading } = useEntityList('bank_account');
 
   const allRows = useMemo(() => {
@@ -603,6 +603,8 @@ export default function CashLedgerPage() {
         filterPanel={cashFilterPanel}
         stats={<span style={{ fontSize: 12.5, color: C.mute }}>전체 <b>{accountTotal}</b> · 사용중 <b style={{ color: C.ok }}>{activeAccounts}</b></span>}
         loading={accountLoading}
+        error={loadError}
+        onRetry={reload}
         empty="등록된 계좌가 없습니다. 「신규 계좌」에서 등록하세요."
         cols={colView === '기본' ? ACCOUNT_BASIC_COLS : ACCOUNT_ALL_COLS}
         rows={accountRows}

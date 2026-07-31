@@ -53,7 +53,7 @@ const CONTRACT_CREATE_SECTIONS: LedgerFormSection[] = [
 function ContractLedgerInner() {
   const mobile = useIsMobile();
   const searchParams = useSearchParams();
-  const { rows: contracts, loading } = useEntityList('contract');
+  const { rows: contracts, loading, error: loadError } = useEntityList('contract');
   const [q, setQ] = useState('');
   const [bucket, setBucket] = useState<ContractBucket>('진행');
   const [dateBasis, setDateBasis] = useState<'계약일' | '종료일'>('계약일');
@@ -216,6 +216,7 @@ function ContractLedgerInner() {
       colView={colView}
       onColView={setColView}
       loading={loading}
+      error={loadError}
       empty={<>
         등록된 계약이 없습니다. 계약서는 데이터관리에서 담으세요.
         <div style={{ marginTop: 14, display: 'flex', justifyContent: 'center', gap: 8 }}>

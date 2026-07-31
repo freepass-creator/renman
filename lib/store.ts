@@ -375,6 +375,37 @@ class AuditingStore implements StoreAdapter {
 // 모듈 레벨 인메모리 캐시 — list 결과(Promise)를 재사용해 재조회·화면 전환을 즉시로.
 // 저장/수정/삭제 시 해당 엔티티 캐시만 무효화(다음 list에서 신선하게 재조회). 세션 한정(새로고침 시 초기화).
 const _listCache = new Map<string, Promise<EntityRecord[]>>();
+
+/**
+ * ★조회 실패 레지스트리 — list()는 화면을 깨뜨리지 않기 위해 실패 시 빈 배열로 resolve한다.
+ *   그런데 그러면 «로드 실패»가 «데이터 0건(문제 없음)»으로 위장돼, 리스크 화면이 «위험 없음»으로
+ *   보이는 거짓 안심이 생긴다(QA 중요). 그래서 실패 사실을 여기 남기고 훅·UI가 읽어 오류로 표시한다.
+ *   합본(__ALL__)에서 일부 법인만 실패한 경우도 기록 — 부분 합계를 완전한 것처럼 보여주지 않기 위해.
+ */
+const _listErrors = new Map<string, string>();
+const LIST_ERROR_EVENT = 'jpk:list-error';
+
+function markListError(ck: string, message: string) {
+  _listErrors.set(ck, message);
+  if (typeof window !== 'undefined') window.dispatchEvent(new Event(LIST_ERROR_EVENT));
+}
+function clearListError(ck: string) {
+  if (!_listErrors.delete(ck)) return;
+  if (typeof window !== 'undefined') window.dispatchEvent(new Event(LIST_ERROR_EVENT));
+}
+
+/** 주어진 엔티티들 중 조회가 실패한 게 있으면 사용자용 메시지, 없으면 null. */
+export function listErrorFor(keys: readonly string[], companyId: string): string | null {
+  const hits = keys.map((k) => _listErrors.get(`${k}::${companyId}`)).filter(Boolean);
+  return hits.length ? String(hits[0]) : null;
+}
+
+/** 조회 실패 상태 변화 구독(훅에서 사용). */
+export function subscribeListErrors(fn: () => void): () => void {
+  if (typeof window === 'undefined') return () => {};
+  window.addEventListener(LIST_ERROR_EVENT, fn);
+  return () => window.removeEventListener(LIST_ERROR_EVENT, fn);
+}
 const _listValueCache = new Map<string, EntityRecord[]>();
 function _invalidate(entityKey: string) {
   for (const k of [..._listCache.keys()]) if (k.startsWith(entityKey + '::')) _listCache.delete(k);
@@ -407,16 +438,32 @@ class DispatchStore implements StoreAdapter {
     const ck = `${entityKey}::${companyId}`;
     let p = _listCache.get(ck);
     if (!p) {
+      const failedCompanies: string[] = [];
       const raw = this.all(companyId)
-        ? Promise.all(COMPANIES.map((c) => this.base.list(entityKey, c).catch(() => []))).then((a) => a.flat())
+        ? Promise.all(COMPANIES.map((c) => this.base.list(entityKey, c).catch((e) => {
+            // 합본에서 일부 법인만 실패 → 부분 합계를 완전한 것처럼 보여주지 않도록 기록.
+            console.error(`list(${entityKey}) ${c} 실패:`, (e as Error).message);
+            failedCompanies.push(c);
+            return [] as EntityRecord[];
+          }))).then((a) => a.flat())
         : this.base.list(entityKey, companyId);
       // hang 방지 — 미결 Promise가 캐시에 남으면 PageLoading 영구. 실패·타임아웃은 캐시 제거→재시도.
       p = withTimeout(raw, 15_000, `store.list ${entityKey}`)
-        .then((rows) => { _listValueCache.set(ck, rows); return rows; })
+        .then((rows) => {
+          if (failedCompanies.length) {
+            markListError(ck, `일부 법인 조회 실패(${failedCompanies.join('·')}) — 합계가 불완전합니다`);
+            _listCache.delete(ck);   // 재조회 가능하게(부분 결과를 캐시로 굳히지 않음)
+          } else {
+            clearListError(ck);
+            _listValueCache.set(ck, rows);
+          }
+          return rows;
+        })
         .catch((e) => {
           console.error(e);
           _listCache.delete(ck);
           _listValueCache.delete(ck);
+          markListError(ck, `조회 실패 — ${(e as Error).message || '네트워크·권한 확인'}`);
           return [] as EntityRecord[];
         });
       _listCache.set(ck, p);

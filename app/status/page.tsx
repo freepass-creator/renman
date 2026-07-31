@@ -27,7 +27,7 @@ const SCOPE_OPTS = ['전체', '운행', '정비', '휴차', '리스크'] as cons
 
 export default function StatusPage() {
   const mobile = useIsMobile();
-  const { data: [vs = [], cs = [], ins = [], hs = []], loading } = useEntityLists(['vehicle', 'contract', 'insurance', 'history']);
+  const { data: [vs = [], cs = [], ins = [], hs = []], loading, error: loadError } = useEntityLists(['vehicle', 'contract', 'insurance', 'history']);
   const [q, setQ] = useState('');
   const [scope, setScope] = useState<ScopeChip>('전체');
   const [range, setRange] = useState({ from: '', to: '' });
@@ -139,6 +139,7 @@ export default function StatusPage() {
       colView={colView}
       onColView={setColView}
       loading={loading}
+      error={loadError}
       empty="표시할 차량이 없습니다."
       cols={colView === '기본' ? FLEET_BASIC_COLS : FLEET_EXPANDED_COLS}
       rows={rows}

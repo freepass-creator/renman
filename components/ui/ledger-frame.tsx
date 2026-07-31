@@ -17,7 +17,7 @@ import type { LucideIcon } from 'lucide-react';
 import { Page } from './layout';
 import { ExcelSheet, type SheetCol } from './excel-sheet';
 import { CompanyFilter, PillTabs } from './controls';
-import { EmptyState, Message, PageLoading } from './misc';
+import { EmptyState, ErrorState, Message, PageLoading } from './misc';
 import { C } from './tokens';
 
 export type LedgerColView = '기본' | '전체';
@@ -27,7 +27,7 @@ export function LedgerFrame<R>({
   filters, stats,
   colView, onColView, showColView = true,
   view, companySlot, body,
-  loading, empty,
+  loading, empty, error, onRetry,
   cols, rows, rowKey, onRow, onRowDoubleClick, onCloseDetail, selectedRowKey,
   rowClickable,
   selectedKeys,
@@ -58,6 +58,9 @@ export function LedgerFrame<R>({
   body?: ReactNode;
   loading?: boolean;
   empty?: ReactNode;
+  /** 조회 실패 메시지 — 있으면 표 자리에 오류 상태(«0건»으로 위장 금지). */
+  error?: string | null;
+  onRetry?: () => void;
   cols?: SheetCol<R>[];
   rows?: R[];
   rowKey?: (r: R) => string;
@@ -165,6 +168,9 @@ export function LedgerFrame<R>({
             {selectionBar}
             {loading ? (
               <PageLoading />
+            ) : error ? (
+              // ★실패를 «항목 없음»으로 보여주지 않는다 — 거짓 안심 방지(QA 중요).
+              <ErrorState message={error} onRetry={onRetry} />
             ) : body != null ? (
               body
             ) : !sheetRows.length ? (

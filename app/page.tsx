@@ -9,7 +9,7 @@ import { useMemo, type CSSProperties, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import { ChevronRight } from 'lucide-react';
 import {
-  LedgerFrame, EmptyState, ExcelSheet, Badge, PageLoading, won, C, R, NUM,
+  LedgerFrame, EmptyState, ErrorState, ExcelSheet, Badge, PageLoading, won, C, R, NUM,
   type SheetCol,
 } from '@/components/ui';
 import { TODAY } from '@/lib/dashboard-consts';
@@ -152,7 +152,7 @@ const gridKpi: CSSProperties = {
 export default function DashboardPage() {
   const router = useRouter();
   const mobile = useIsMobile();
-  const { D, contracts, vehicles, bankTx, loading } = useDashboardData();
+  const { D, contracts, vehicles, bankTx, loading, error: loadError } = useDashboardData();
   const { data: [cardTx = []] } = useEntityLists(['card_tx']);
 
   const kpi = useMemo(() => computeKPI(contracts, vehicles, TODAY), [contracts, vehicles]);
@@ -250,6 +250,8 @@ export default function DashboardPage() {
           display: 'flex', flexDirection: 'column', gap: 12,
           padding: mobile ? '0 0 24px' : '0 0 28px',
         }}>
+          {/* ★조회 실패를 지표 «0»으로 위장하지 않는다 — 거짓 안심 방지(QA 중요). */}
+          {loadError ? <ErrorState variant="sec" message={`${loadError} — 아래 지표는 불완전합니다`} /> : null}
           <div style={{
             ...gridKpi,
             gridTemplateColumns: mobile ? 'repeat(2, minmax(0, 1fr))' : 'repeat(5, minmax(0, 1fr))',

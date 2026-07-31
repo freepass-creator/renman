@@ -49,7 +49,7 @@ function WorkLedgerInner() {
   const searchParams = useSearchParams();
   const { companyId } = useSession();
   const confirm = useConfirm();
-  const { data: [workItems = [], history = [], penalties = [], inbox = [], contracts = [], vehicles = []], loading, reload } =
+  const { data: [workItems = [], history = [], penalties = [], inbox = [], contracts = [], vehicles = []], loading, error: loadError, reload } =
     useEntityLists(['work_item', 'history', 'penalty', 'inbox', 'contract', 'vehicle']);
   const [q, setQ] = useState('');
   const [colView, setColView] = useState<LedgerColView>('기본');
@@ -420,6 +420,8 @@ function WorkLedgerInner() {
       colView={colView}
       onColView={setColView}
       loading={loading}
+      error={loadError}
+      onRetry={reload}
       empty={penaltyMode
         ? '과태료 고지서가 없습니다. «업무 생성»에서 업무구분=과태료로 업로드하세요.'
         : '업무가 없습니다. 우측 «업무 생성»으로 담으세요.'}

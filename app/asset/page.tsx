@@ -61,7 +61,7 @@ const ASSET_CREATE_SECTIONS: LedgerFormSection[] = [
 
 export default function AssetLedgerPage() {
   const mobile = useIsMobile();
-  const { data: [vehicles = [], contracts = [], history = []], loading } = useEntityLists(['vehicle', 'contract', 'history']);
+  const { data: [vehicles = [], contracts = [], history = []], loading, error: loadError } = useEntityLists(['vehicle', 'contract', 'history']);
   const [q, setQ] = useState('');
   const [ownershipScope, setOwnershipScope] = useState<AssetOwnershipScope>('보유자산');
   const [quickFilter, setQuickFilter] = useState<AssetQuickFilter | null>(null);
@@ -256,6 +256,7 @@ export default function AssetLedgerPage() {
         />
       )}
       loading={loading}
+      error={loadError}
       empty={<>
         등록된 자산이 없습니다. 등록증은 데이터관리에서 담으세요.
         <div style={{ marginTop: 14, display: 'flex', justifyContent: 'center', gap: 8 }}>
