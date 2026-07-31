@@ -61,12 +61,44 @@ export function loadMaster(companyId: string): CompanyMaster {
   if (!m.modules || !m.modules.length) m.modules = [...DEFAULT_MODULES];
   return m;
 }
-export function saveMaster(companyId: string, m: CompanyMaster): void {
-  if (typeof window === 'undefined' || !companyId) return;
+export type SaveMasterResult = { ok: boolean; conflict?: boolean; message?: string };
+
+/**
+ * 법인 마스터 저장 — 낙관적 잠금(CAS).
+ *
+ * ★왜 CAS 인가: 이 문서는 «전체 교체»로 저장된다(차고지·공문대장 같은 배열의 삭제가 반영돼야 하므로
+ *   merge 를 쓸 수 없다). 그런데 편집 화면이 하이드레이트 완료 «전»의 로컬 스냅샷을 들고 있거나
+ *   다른 사람이 그 사이에 저장했으면, 전체 교체가 원격의 최신값을 통째로 지운다
+ *   (차고지·증차신청·공문대장 전사 소실 = 되돌릴 수 없음).
+ *   → baseUpdatedAt(내가 읽은 시점의 원격 스탬프)과 원격 현재값을 비교해 어긋나면 «거부»한다.
+ *
+ * 로컬 캐시는 원격 성공 후에만 갱신한다 — 실패한 값을 «최신»으로 찍으면 하이드레이트가
+ * 그 기기를 영구히 복구하지 못한다.
+ */
+export async function saveMaster(
+  companyId: string,
+  m: CompanyMaster,
+  opts?: { baseUpdatedAt?: string },
+): Promise<SaveMasterResult> {
+  if (typeof window === 'undefined' || !companyId) return { ok: false, message: '저장 대상이 없습니다' };
   const at = new Date().toISOString();
+  const r = await persistRemote(companyId, m, at, opts?.baseUpdatedAt);
+  if (r.ok) {
+    writeCache(companyId, m);
+    setStamp(companyId, at);
+    return { ok: true };
+  }
+  if (r.conflict) {
+    return { ok: false, conflict: true, message: '다른 기기·다른 사람이 먼저 저장했습니다 — 새로고침 후 다시 입력하세요(덮어쓰면 차고지·공문대장이 사라집니다)' };
+  }
+  // 원격에 못 닿았다 — 로컬만 갱신하되 «최신 스탬프»는 찍지 않는다(다음 하이드레이트가 원격을 이기게).
   writeCache(companyId, m);
-  setStamp(companyId, at);
-  void persistRemote(companyId, m, at);
+  return { ok: false, message: r.message || '서버 저장 실패 — 이 PC에만 남았습니다. 연결 확인 후 다시 저장하세요(대외문서가 공란으로 인쇄될 수 있음)' };
+}
+
+/** 내가 읽은 시점의 원격 스탬프 — 저장 시 CAS 기준값. */
+export function masterStampOf(companyId: string): string {
+  return stamps()[companyId] || '';
 }
 
 function writeCache(companyId: string, m: CompanyMaster): void {
@@ -78,21 +110,35 @@ function writeCache(companyId: string, m: CompanyMaster): void {
   window.dispatchEvent(new Event('jpk:master-change'));
 }
 
-async function persistRemote(companyId: string, m: CompanyMaster, at = new Date().toISOString()): Promise<void> {
+type PersistResult = { ok: boolean; conflict?: boolean; message?: string };
+
+async function persistRemote(
+  companyId: string,
+  m: CompanyMaster,
+  at: string,
+  baseUpdatedAt?: string,
+): Promise<PersistResult> {
   try {
     const { firebaseReady, getFirebaseApp } = await import('./firebase/client');
-    if (!firebaseReady()) return;
-    const { getFirestore, doc, setDoc } = await import('firebase/firestore');
-    // 배열 필드(차고지·공문 등)의 «삭제»가 반영돼야 하므로 merge를 쓰지 않는다(전체 교체).
-    await setDoc(doc(getFirestore(getFirebaseApp()!), COLL, companyId), {
-      companyId, master: m, updatedAt: at,
+    if (!firebaseReady()) return { ok: false, message: 'Firebase 미초기화' };
+    const { getFirestore, doc, runTransaction } = await import('firebase/firestore');
+    const ref = doc(getFirestore(getFirebaseApp()!), COLL, companyId);
+    let conflict = false;
+    await runTransaction(getFirestore(getFirebaseApp()!), async (tx) => {
+      const snap = await tx.get(ref);
+      if (snap.exists()) {
+        const remoteAt = String((snap.data() as { updatedAt?: string }).updatedAt || '');
+        // baseUpdatedAt 이 없으면 «원격을 읽지 않은 채 저장»이므로, 원격이 존재하면 거부한다.
+        if (remoteAt && remoteAt !== (baseUpdatedAt || '')) { conflict = true; return; }
+      }
+      // 배열 필드(차고지·공문 등)의 «삭제»가 반영돼야 하므로 merge를 쓰지 않는다(전체 교체).
+      tx.set(ref, { companyId, master: m, updatedAt: at });
     });
+    if (conflict) return { ok: false, conflict: true };
+    return { ok: true };
   } catch (e) {
-    // ★조용히 삼키면 «저장됐다»는 거짓 신호가 남는다 — 이 값은 대외문서에 인쇄되므로
-    //   다른 PC에서 공란으로 나가는 사고로 직결된다. 사용자에게 반드시 알린다.
     console.warn('법인 마스터 원격 저장 실패', e);
-    const { toast } = await import('./toast');
-    toast('법인 정보 서버 저장 실패 — 이 PC에만 남았습니다. 다시 저장하세요(대외문서가 공란으로 인쇄될 수 있음)', 'error');
+    return { ok: false, message: (e as Error).message };
   }
 }
 

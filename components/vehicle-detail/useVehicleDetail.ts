@@ -10,6 +10,7 @@ import { type DocReplacePayload } from '@/components/InfoDoc';
 import { pushDocVersion } from '@/lib/docs';
 import { deriveLocation, locationLabel } from '@/lib/vehicle-location';
 import { contractSchedules, computeContractView, effectiveEndDate, patchTerminate, patchExtend, patchEngineLock, earlyTerminationFee, isReturnable, deriveStatus } from '@/lib/contract-ops';
+import { findDuplicateBankPayment } from '@/lib/payments/duplicate-cash';
 import { canTransition } from '@/lib/domain/status';
 import { isCashPurchase } from '@/lib/domain/vehicle-finance';
 import { computeVehicleTax } from '@/lib/domain/vehicle-tax';
@@ -149,7 +150,9 @@ export function useVehicleDetail(plate: string, focus?: string) {
   async function delVehicle() {
     if (!v || !(await confirm({ message: `차량 ${plate}을(를) 삭제할까요? (휴지통에서 복구 가능)\n※ 매각·처분은 삭제가 아니라 상태(매각/말소)로 처리하세요.`, danger: true }))) return;
     try {
-      await commitRemove({ entity: 'vehicle', sessionCompanyId: companyId, rec: v, key: plate, reason: '수기 삭제' });
+      /* ★key는 반드시 _key — 차량 문서ID는 «등록 당시 번호»로 고정되므로, 번호를 바꾼 차를
+         현재 번호로 삭제하려 하면 존재하지 않는 문서를 지우려다 영구 실패한다(원인도 감춰진다). */
+      await commitRemove({ entity: 'vehicle', sessionCompanyId: companyId, rec: v, key: String(v._key || plate), reason: '수기 삭제' });
       toast('차량 삭제 — 휴지통에서 복구 가능', 'info');
     } catch { toast(NEED_COMPANY, 'error'); }
   }
@@ -280,8 +283,11 @@ export function useVehicleDetail(plate: string, focus?: string) {
   const cancelEdit = () => setEditInfo(false);
   const saveInfo = async () => {
     try {
-      if (v?._key) await commitUpdate({ entity: 'vehicle', sessionCompanyId: companyId, rec: v, key: String(v._key), patch: { ...form, plate } });
-      else await commitSave({ entity: 'vehicle', sessionCompanyId: companyId, rec: v, records: [{ ...form, plate }] });
+      /* ★plate를 라우트 파라미터(plate)로 덮어쓰면 안 된다. 번호를 바꾼 차는 «옛 번호 URL»로도
+         열리므로(plateHistory 매칭), 그 화면에서 아무 필드나 저장하면 차량번호가 조용히 옛 번호로
+         되돌아가고 이력에 현재 번호가 한 칸 더 쌓인다. 수정 시에는 폼 값만 쓴다. */
+      if (v?._key) await commitUpdate({ entity: 'vehicle', sessionCompanyId: companyId, rec: v, key: String(v._key), patch: { ...form } });
+      else await commitSave({ entity: 'vehicle', sessionCompanyId: companyId, rec: v, records: [{ ...form, plate: String(form.plate || plate) }] });
       setEditInfo(false);
     } catch { toast(NEED_COMPANY, 'error'); }
   };
@@ -331,6 +337,16 @@ export function useVehicleDetail(plate: string, focus?: string) {
     try {
       if (recMode === 'pay') {
         const list = Array.isArray(active._payments) ? (active._payments as unknown[]) : [];
+        // ★역방향 이중차감 — 이 돈을 이미 통장 매칭으로 반영해 두었을 수 있다.
+        //   («현장수납 먼저 → 통장 매칭 나중»은 자금일보에서 막지만, 그 반대는 여기서만 막을 수 있다.)
+        const dup = findDuplicateBankPayment(active, { date: recForm.date, amount: Number(recForm.amount) });
+        if (dup && !(await confirm({
+          title: '중복 수납 의심',
+          message: `${dup.message}
+
+그래도 이 수납을 기록할까요?`,
+          confirmLabel: '기록', danger: true,
+        }))) return;
         await commitUpdate({
           entity: 'contract', sessionCompanyId: companyId, rec: active, key,
           patch: { _payments: [...list, { seq: Number(recForm.seq), date: recForm.date, amount: Number(recForm.amount), source: recForm.method }] },

@@ -15,11 +15,29 @@
  *   둘 중 하나면 «중복 의심». 이미 txId가 붙은 수납(계좌 연결분)은 대상에서 제외한다.
  */
 
-/** 계좌에서 온 수납인가 — 이 수납은 통장 거래와 이미 짝지어졌거나 통장에서 유래한다. */
-function isFromBank(p: Record<string, unknown>): boolean {
-  if (p.txId) return true;
-  const src = String(p.source || '');
-  return src === '계좌' || src === 'CMS' || src === '이체';
+/**
+ * 이 수납이 «통장 거래에 이미 짝지어졌는가» — 판정은 txId 존재 여부 하나로 한다.
+ *
+ * ★source 문자열로 판정하면 안 된다(초기 구현의 치명적 오류): 차량360 수납기록 폼의
+ *   기본 수단이 '계좌'다(components/vehicle-detail/useVehicleDetail.ts:97 method: '계좌').
+ *   즉 «손으로 계좌입금을 기록 → 며칠 뒤 통장 거래를 매칭» 이라는 가장 흔한 이중차감 경로에서
+ *   그 수납이 '계좌'로 저장돼 «통장 유래»로 오인되고 가드가 통째로 비활성화됐다.
+ *   실제로 통장 거래에서 온 수납은 매칭 시 txId가 붙는다(app/payments/page.tsx manualMatch·apply).
+ *   txId가 없는 수납은 수단이 무엇이든 «사람이 손으로 적은 것»이므로 중복 후보다.
+ */
+function isLinkedToBankTx(p: Record<string, unknown>): boolean {
+  return !!p.txId || !!p.cardTxId;
+}
+
+/**
+ * 시스템이 만들어 넣은 수납인가 — 실제 돈의 이동이 아니라 «계산 결과의 기록»이다.
+ *   보증금 충당(lib/deposit.ts:54 source '정산') · 스냅샷 자동정리(lib/payments/payment-schedule.ts)
+ *   · 선불 1회차 합성(lib/contract-ops.ts:73). 이들을 현장수납으로 세면 진짜 입금 매칭을 막는다.
+ */
+function isSynthetic(p: Record<string, unknown>): boolean {
+  if (p.synthetic === true) return true;
+  if (String(p.source || '') === '정산') return true;
+  return !!p.kind;   // deposit-offset 등 kind가 붙은 것은 청구·충당 기록이다
 }
 
 export type CashPayment = {
@@ -57,7 +75,7 @@ export function findDuplicateCashPayment(
 
   const raw = Array.isArray(contract._payments) ? (contract._payments as Array<Record<string, unknown>>) : [];
   const inWindow: CashPayment[] = raw
-    .filter((p) => !isFromBank(p))
+    .filter((p) => !isLinkedToBankTx(p) && !isSynthetic(p))
     .filter((p) => dayDiff(String(p.date || ''), txDate) <= windowDays)
     .map((p) => ({
       seq: Number(p.seq) || 0,
@@ -84,6 +102,58 @@ export function findDuplicateCashPayment(
       payments: inWindow,
       total,
       message: `±${windowDays}일 안의 ${inWindow.map((p) => p.source).join('·')} 수납 ${inWindow.length}건 합계(${total.toLocaleString('ko-KR')}원)와 금액이 같습니다 — 같은 돈이면 미수가 두 번 차감됩니다`,
+    };
+  }
+  return null;
+}
+
+/**
+ * 역방향 — «통장 매칭이 먼저, 손 기록이 나중».
+ *
+ * 직원이 통장 입금을 계약에 연결해 두었는데, 며칠 뒤 같은 돈을 «현장에서 받았다»고 또 기록하면
+ * 역시 두 번 차감된다. 방향만 다르고 피해는 동일하므로 수납기록 화면에서도 물어봐야 한다.
+ *
+ * 판정 대상이 반대다: 이번에는 «통장에 짝지어진 수납(txId 있음)»을 후보로 본다.
+ */
+export function findDuplicateBankPayment(
+  contract: Record<string, unknown> | null | undefined,
+  entry: { date?: string; amount?: number },
+  opts?: { windowDays?: number },
+): DuplicateCashHit | null {
+  const amount = Number(entry?.amount) || 0;
+  const date = String(entry?.date || '');
+  if (!contract || amount <= 0 || !date) return null;
+  const windowDays = opts?.windowDays ?? 3;
+
+  const raw = Array.isArray(contract._payments) ? (contract._payments as Array<Record<string, unknown>>) : [];
+  const inWindow: CashPayment[] = raw
+    .filter((p) => isLinkedToBankTx(p) && !isSynthetic(p))
+    .filter((p) => dayDiff(String(p.date || ''), date) <= windowDays)
+    .map((p) => ({
+      seq: Number(p.seq) || 0,
+      date: String(p.date || ''),
+      amount: Number(p.amount) || 0,
+      source: String(p.source || '계좌'),
+    }))
+    .filter((p) => p.amount > 0);
+  if (inWindow.length === 0) return null;
+
+  const exact = inWindow.find((p) => p.amount === amount);
+  if (exact) {
+    return {
+      kind: '단건',
+      payments: [exact],
+      total: exact.amount,
+      message: `${exact.date} 통장 매칭분 ${exact.amount.toLocaleString('ko-KR')}원과 금액이 같습니다 — 같은 돈이면 미수가 두 번 차감됩니다`,
+    };
+  }
+  const total = inWindow.reduce((s, p) => s + p.amount, 0);
+  if (total === amount) {
+    return {
+      kind: '합계',
+      payments: inWindow,
+      total,
+      message: `±${windowDays}일 안의 통장 매칭분 ${inWindow.length}건 합계(${total.toLocaleString('ko-KR')}원)와 금액이 같습니다 — 같은 돈이면 미수가 두 번 차감됩니다`,
     };
   }
   return null;

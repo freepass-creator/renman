@@ -14,7 +14,7 @@ import {
   stampCreateFields, stampUpdateFields, stampDeleteFields, stampRestoreFields,
 } from './audit';
 import { newId } from './domain/ids';
-import { assertMoneyMutable, ensurePeriodLocksHydrated } from './finance/period-lock';
+import { assertMoneyMutable, ensurePeriodLocksHydrated, isPeriodLocked } from './finance/period-lock';
 import { normPlate } from './plate';
 import { assertNoLockConflict, peelExpectedUpdatedAt } from './lock-conflict';
 import { withTimeout } from './async';
@@ -224,6 +224,21 @@ class FirestoreAdapter implements StoreAdapter {
     // ★서버 라우트는 요청당 500건 상한 → 청크로 나눠 보낸다. (전량 1회로 보내면 대량 임포트가
     //   항상 400을 받아 «검증 없는 직접 경로»로 새던 문제 — QA 적대검증 지적)
     if (typeof window !== 'undefined' && pending.length > 0) {
+      /* ★서버는 요청(청크) 단위로 «마감월 섞이면 전량 거부»를 보장한다. 500건을 넘으면 앞선 청크는
+         이미 저장된 뒤 뒤 청크가 거부돼 «부분 저장 + 전량 거부 메시지»가 된다.
+         그래서 보내기 전에 여기서 한 번 선검사해 한 건이라도 마감월이면 아예 시작하지 않는다.
+         (마감 캐시가 비어 있으면 통과하지만, 그 경우 서버가 다시 잡는다 — 이중 방어) */
+      if (entityKey === 'bank_tx' || entityKey === 'card_tx') {
+        await ensurePeriodLocksHydrated(companyId);
+        const blocked = new Set<string>();
+        for (const { data } of pending) {
+          const ym = String((data as { txDate?: string }).txDate || '').slice(0, 7);
+          if (ym && isPeriodLocked(companyId, `${ym}-01`)) blocked.add(ym);
+        }
+        if (blocked.size > 0) {
+          throw new Error(`마감된 기간(${[...blocked].sort().join(', ')})의 자금거래가 포함되어 저장하지 않았습니다 — 설정에서 해당 월 마감을 해제한 뒤 다시 투입하세요`);
+        }
+      }
       const { apiAuthHeaders } = await import('./api-headers');
       const headers = await apiAuthHeaders();
       headers.set('content-type', 'application/json');

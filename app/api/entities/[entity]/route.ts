@@ -122,6 +122,14 @@ export async function POST(req: Request, ctx: { params: Promise<{ entity: string
     if (closed.size > 0) {
       const ym = String(data.txDate || '').slice(0, 7);
       if (ym && closed.has(ym)) { blockedMonths.add(ym); continue; }
+      /* ★기존 문서의 월도 봐야 한다 — 이 라우트의 set은 덮어쓰기이므로, 마감월 거래의 txDate를
+         열린 달로 바꿔 «마감월에서 빼내는» 것이 신 데이터만 검사하면 통과한다.
+         비용은 갱신 건에만 발생(신규는 존재하지 않으므로 exists=false). */
+      const prev = await db.collection(entity).doc(id).get();
+      if (prev.exists) {
+        const prevYm = String((prev.data() as { txDate?: string }).txDate || '').slice(0, 7);
+        if (prevYm && closed.has(prevYm)) { blockedMonths.add(prevYm); continue; }
+      }
     }
     batch.set(db.collection(entity).doc(id), data);
   }

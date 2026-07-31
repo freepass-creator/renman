@@ -195,7 +195,8 @@ export default function ManagementPage() {
         </span>
       )}
       loading={loading}
-      error={acctError || leaseError}
+      // 오류 배너도 loading과 같이 «보고 있는 탭»만 — 법인 탭이 무관한 조회 실패로 막히지 않게
+      error={tab === '계좌' ? acctError : tab === '임대차' ? leaseError : null}
       empty={tab === '법인' ? '등록된 법인이 없습니다' : tab === '계좌' ? '계좌 없음 — 자금관리에서 등록' : '임대차 계약 없음'}
       cols={(
         tab === '법인' ? COMPANY_COLS

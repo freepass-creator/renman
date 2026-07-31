@@ -61,16 +61,19 @@ function ClosingBody({ companyId, actor }: { companyId: string; actor: string })
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
   });
 
+  /* ★원격(period_locks) 반영에 성공했을 때만 «마감/해제»를 말한다.
+     이전에는 로컬 저장만 하고 무조건 성공 토스트를 띄웠다 → 서버가 마감을 모르는데
+     사용자는 마감됐다고 믿는 상태(결산 무결성 통제가 작동하지 않으면서 작동하는 척). */
   const toggle = async (ym: string) => {
     try {
       if (closed.includes(ym)) {
         const reason = await prompt({ message: `${ym} 마감 해제 사유 (필수)`, initial: '', required: true });
         if (!reason?.trim()) { toast('해제 사유를 입력해야 합니다', 'error'); return; }
-        reopenPeriod(companyId, ym, actor, reason);
-        toast(`${ym} 마감 해제`, 'info');
+        const r = await reopenPeriod(companyId, ym, actor, reason);
+        toast(r.ok ? `${ym} 마감 해제` : `마감 해제 실패 — 서버에 반영되지 않았습니다${r.message ? ` (${r.message})` : ''}`, r.ok ? 'info' : 'error');
       } else {
-        closePeriod(companyId, ym, actor);
-        toast(`${ym} 마감`, 'success');
+        const r = await closePeriod(companyId, ym, actor);
+        toast(r.ok ? `${ym} 마감` : `마감 실패 — 서버에 반영되지 않았습니다${r.message ? ` (${r.message})` : ''}`, r.ok ? 'success' : 'error');
       }
       reload();
     } catch (e) {
@@ -207,7 +210,9 @@ export default function SettingsPage() {
         </ListBox>
       </Panel>
 
-      {!scopeAll && (
+      {/* 회계 마감은 firestore.rules 상 본사(hq)만 쓸 수 있다 → 법인 사용자에게 노출하면
+          «눌렀는데 서버는 모르는» 상태가 된다. 본사 + 특정 법인 스코프일 때만 표시. */}
+      {isOperator && !scopeAll && (
         <Panel title="회계">
           <ListBox>
             <ListRow

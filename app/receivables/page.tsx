@@ -20,6 +20,7 @@ import { companyLabel } from '@/lib/companies';
 import { toast } from '@/lib/toast';
 import { TODAY } from '@/lib/dashboard-consts';
 import { useEntityLists } from '@/lib/use-entity-lists';
+import { computeReturnSettlement } from '@/lib/contracts/settlement';
 import { commitUpdate } from '@/lib/commit';
 import { resolveWriteCompany, NEED_COMPANY } from '@/lib/scope';
 import { useSecOrder } from '@/lib/use-sec-order';
@@ -34,6 +35,18 @@ const RECV_SECS = ['recv-status', 'recv-list'] as const;
 // 미수 워크벤치 = 회수 파트의 "딱 여기만" 메인. 미수율이 핵심축. 자금(수납)과 연동돼 자동 갱신.
 // 담당자가 어떻게 관리했는지(내용증명 발송·시동제어 여부·최근 연락)가 보이고, 그 자리에서 조치.
 const STONE: Record<string, 'gray' | 'amber' | 'orange' | 'red' | 'purple'> = { 정상: 'gray', 경고: 'amber', 시동제어: 'orange', 내용증명: 'red', 채권화: 'purple' };
+
+/**
+ * 계약에 기록된 «보증금 실수령액» — 없으면 null(모름).
+ * ★0 과 «모름»은 다르다. 빈 문자열·비숫자도 모름으로 본다(폼이 ''를 남길 수 있다).
+ *   0 은 «한 푼도 못 받음»이라는 확정 정보이므로 그대로 0 을 돌려준다.
+ */
+function depositReceivedOf(rec: EntityRecord): number | null {
+  const raw = rec.depositReceived;
+  if (raw == null || raw === '') return null;
+  const n = Number(raw);
+  return Number.isFinite(n) ? n : null;
+}
 
 export default function ReceivablesPage() {
   const { companyId, scopeAll, user } = useSession();
@@ -80,13 +93,19 @@ export default function ReceivablesPage() {
     name: String(r.rec.contractorName || ''), plate: String(r.rec.plate || ''),
     phone: String(r.rec.contractorPhone || ''), contractNo: String(r.rec.contractNo || ''),
     unpaidAmount: r.v.net, unpaidSeqCount: r.v.count, currentSeq: r.v.count, monthlyRent: r.v.monthlyRent,
-    depositDue: Number(r.rec.deposit || 0), depositRefund: r.v.refund,
-    // ★보증금 실수령액은 아직 기록하는 곳이 없다 → null(모름). 0으로 채우면
-    //   '미수령 0원'·'0원 입금 확인' 같은 틀린 문자가 고객에게 발송된다.
-    depositReceived: r.rec.depositReceived == null ? null : Number(r.rec.depositReceived),
-    depositUnreceived: r.rec.depositReceived == null
+    depositDue: Number(r.rec.deposit || 0),
+    /* ★보증금 실수령액은 «기록되지 않았으면 모름(null)»이다. 0으로 채우면
+       '미수령 0원'·'0원 입금 확인' 같은 틀린 문자가 고객에게 발송된다.
+       빈 문자열·숫자 아님도 «모름»으로 본다(폼이 ''를 남길 수 있다). */
+    depositReceived: depositReceivedOf(r.rec),
+    depositUnreceived: depositReceivedOf(r.rec) == null
       ? null
-      : Math.max(0, Number(r.rec.deposit || 0) - Number(r.rec.depositReceived || 0)),
+      : Math.max(0, Number(r.rec.deposit || 0) - Number(depositReceivedOf(r.rec) || 0)),
+    /* ★환불액은 «받은 보증금»에서 나온다. 이전에는 r.v.refund(=반납 일할 대여료 환불)를 넣어
+       보증금과 무관한 금액을 «보증금 환불»로 통보했다. 실수령이 미기록이면 이것도 모름. */
+    depositRefund: depositReceivedOf(r.rec) == null
+      ? null
+      : computeReturnSettlement(Number(depositReceivedOf(r.rec) || 0), r.v, { contract: r.rec, asOf: TODAY }).refund,
   }));
   const smsCount = recipients.filter((r) => r.phone).length;
 

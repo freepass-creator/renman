@@ -18,7 +18,9 @@ export type NotifyRecipient = {
   contractKey: string; companyId: string;
   name: string; plate: string; phone: string; contractNo?: string;
   unpaidAmount: number; unpaidSeqCount: number; currentSeq: number; monthlyRent: number;
-  depositDue: number; depositRefund: number;
+  depositDue: number;
+  /** 보증금 «환불 예정액» — 받은 보증금 기준. 실수령을 모르면 이것도 모름(null). */
+  depositRefund: number | null;
   /**
    * 보증금 «실수령액». null = 기록이 없어 모른다는 뜻 — 0원으로 위장해서는 안 된다.
    * 0으로 채우면 '미수령 0원'·'0원 입금 확인' 같은 사실과 다른 문자가 고객에게 발송된다.
@@ -28,7 +30,8 @@ export type NotifyRecipient = {
 };
 
 /** needsDeposit=true 인 템플릿은 «보증금 실수령액»이 기록된 계약에만 쓸 수 있다. */
-const TEMPLATES: { label: string; body: string; needsDeposit?: boolean }[] = [
+/** needsDeposit = 실수령 기록 필요 · needsReceived = 실제로 받은 금액(>0)이 있어야 함. */
+const TEMPLATES: { label: string; body: string; needsDeposit?: boolean; needsReceived?: boolean }[] = [
   { label: '미납 1차 안내', body: '[렌터카매니저] {{고객명}} 님, {{차량번호}} 미수금 {{미수금}} ({{미납회차}}). 금일 중 입금 부탁드립니다.' },
   { label: '미납 2차 독촉', body: '[렌터카매니저] {{고객명}} 님, {{차량번호}} 미수금 {{미수금}} ({{미납회차}}) 미납이 계속되어 시동제어 등 조치가 진행될 수 있습니다. 즉시 입금 또는 연락 부탁드립니다.' },
   { label: '시동제어 예고', body: '[렌터카매니저] {{고객명}} 님, {{차량번호}} 미납 누적으로 시동제어가 곧 시행됩니다. 입금 또는 회신 부탁드립니다.' },
@@ -39,8 +42,8 @@ const TEMPLATES: { label: string; body: string; needsDeposit?: boolean }[] = [
   { label: '정기점검 안내', body: '[렌터카매니저] {{고객명}} 님, {{차량번호}} 차량 정기점검 일정 안내드립니다. 가까운 영업소 방문 부탁드립니다.' },
   { label: '대여료 청구', body: '[렌터카매니저] {{고객명}} 님, {{차량번호}} {{이번회차}} 대여료 {{월대여료}} 결제일이 도래했습니다. 입금 부탁드립니다.' },
   { label: '보증금 입금 안내', body: '[렌터카매니저] {{고객명}} 님, {{차량번호}} 계약 보증금 {{보증금}} 입금 부탁드립니다 (미수령 {{보증금미수령}}). 입금 후 출고 일정 안내드리겠습니다.' , needsDeposit: true },
-  { label: '보증금 입금 확인', body: '[렌터카매니저] {{고객명}} 님, {{차량번호}} 보증금 {{보증금수령}} 입금 확인되었습니다. 출고 일정 별도 안내드리겠습니다.' , needsDeposit: true },
-  { label: '반납 정산 안내', body: '[렌터카매니저] {{고객명}} 님, {{차량번호}} 반납 정산 — 보증금 {{보증금수령}} 중 차감액 제외 후 환불 {{보증금환불}} 예정입니다. 환불계좌 확인 부탁드립니다.' , needsDeposit: true },
+  { label: '보증금 입금 확인', body: '[렌터카매니저] {{고객명}} 님, {{차량번호}} 보증금 {{보증금수령}} 입금 확인되었습니다. 출고 일정 별도 안내드리겠습니다.' , needsDeposit: true, needsReceived: true },
+  { label: '반납 정산 안내', body: '[렌터카매니저] {{고객명}} 님, {{차량번호}} 반납 정산 — 보증금 {{보증금수령}} 중 차감액 제외 후 환불 {{보증금환불}} 예정입니다. 환불계좌 확인 부탁드립니다.' , needsDeposit: true, needsReceived: true },
   { label: '직접 입력', body: '' },
 ];
 
@@ -56,7 +59,7 @@ function fill(body: string, r: NotifyRecipient): string {
     .replace(/\{\{보증금\}\}/g, won(r.depositDue))
     .replace(/\{\{보증금수령\}\}/g, r.depositReceived == null ? '(미확인)' : won(r.depositReceived))
     .replace(/\{\{보증금미수령\}\}/g, r.depositUnreceived == null ? '(미확인)' : won(r.depositUnreceived))
-    .replace(/\{\{보증금환불\}\}/g, won(r.depositRefund));
+    .replace(/\{\{보증금환불\}\}/g, r.depositRefund == null ? '(미확인)' : won(r.depositRefund));
 }
 const today = todayKST;
 
@@ -77,8 +80,12 @@ export function NotifyDialog({ recipients, onClose, onSent }: {
   /* 보증금 실수령액이 기록되지 않은 대상 — 보증금 문구가 든 문자는 이 대상에게 보낼 수 없다.
      ★ERP가 «모르는 값을 0으로» 인쇄해 고객에게 틀린 안내를 보내는 것을 막는다. */
   const depositUnknown = useMemo(() => targets.filter((r) => r.depositReceived == null).length, [targets]);
-  const usesDeposit = /\{\{보증금(수령|미수령)\}\}/.test(body);
-  const depositBlocked = usesDeposit && depositUnknown > 0;
+  /* «받은 돈이 0원»인 대상에게 '보증금 입금 확인'·'반납 정산 안내'를 보내면
+     «보증금 0원 입금 확인되었습니다» 같은 문자가 나간다 → 수령액이 실제로 있어야만 허용. */
+  const depositZero = useMemo(() => targets.filter((r) => r.depositReceived != null && r.depositReceived <= 0).length, [targets]);
+  const usesDeposit = /\{\{보증금(수령|미수령|환불)\}\}/.test(body);
+  const usesReceived = /\{\{보증금(수령|환불)\}\}/.test(body);
+  const depositBlocked = (usesDeposit && depositUnknown > 0) || (usesReceived && depositZero > 0);
 
   function applyTemplate(i: number) { setIdx(i); setBody(TEMPLATES[i].body); }
 
@@ -129,7 +136,9 @@ export function NotifyDialog({ recipients, onClose, onSent }: {
         {result && <span style={{ fontSize: 12, color: result.startsWith('발송 완료') ? C.ok : C.warn }}>{result}</span>}
         {depositBlocked && !result && (
           <span style={{ fontSize: 12, color: C.danger }}>
-            보증금 실수령액이 기록되지 않은 대상 {depositUnknown}건 — 이 문구로는 발송할 수 없습니다(0원으로 잘못 안내됨)
+            {depositUnknown > 0
+              ? `보증금 실수령액이 기록되지 않은 대상 ${depositUnknown}건 — 이 문구로는 발송할 수 없습니다(0원으로 잘못 안내됨)`
+              : `보증금을 아직 받지 않은 대상 ${depositZero}건 — «0원 입금 확인» 문자가 나갑니다`}
           </span>
         )}
         <span style={{ flex: 1 }} />
@@ -158,7 +167,7 @@ export function NotifyDialog({ recipients, onClose, onSent }: {
             <div style={lbl}>템플릿</div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: mobile ? 8 : 6 }}>
               {TEMPLATES.map((t, i) => {
-                const locked = !!t.needsDeposit && depositUnknown > 0;
+                const locked = (!!t.needsDeposit && depositUnknown > 0) || (!!t.needsReceived && depositZero > 0);
                 return (
                   <button key={t.label} type="button" data-ui="toggle" disabled={locked}
                     title={locked ? '보증금 실수령액이 기록되지 않아 사용할 수 없습니다' : undefined}

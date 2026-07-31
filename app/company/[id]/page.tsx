@@ -1,13 +1,14 @@
 'use client';
 // 법인 워크스페이스 — 법인 하나의 전용 페이지. 모듈(기본정보·차고지·등록대수·증차신청·공문…)을
 // 접기/펼치기 + 카탈로그에서 추가/제거. 자산·자금이 이 법인에 귀속되는 뿌리 설정.
-import { useEffect, useState, type CSSProperties } from 'react';
+import { useEffect, useState, type CSSProperties, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { Plus, X, Trash2, Building2, AlertTriangle } from 'lucide-react';
 import { useSession } from '@/lib/session';
 import { getStore } from '@/lib/store';
 import { COMPANIES, companyLabel, companyShort } from '@/lib/companies';
-import { loadMaster, saveMaster, genId, MODULE_CATALOG, type CompanyMaster, type Garage, type RegApplication, type OfficialDoc } from '@/lib/company-master';
+import { loadMaster, saveMaster, masterStampOf, ensureCompanyMasterHydrated, genId, MODULE_CATALOG, type CompanyMaster, type Garage, type RegApplication, type OfficialDoc } from '@/lib/company-master';
+import { toast } from '@/lib/toast';
 import { Page, Panel, Sec, Btn, Input, Select, C } from '@/components/ui';
 import { WorkbenchBar } from '@/components/WorkbenchBar';
 
@@ -25,13 +26,55 @@ export default function CompanyWorkspace() {
   const [m, setM] = useState<CompanyMaster>({});
   const [dirty, setDirty] = useState(false);
   const [owned, setOwned] = useState(0); // 이 법인 보유 차량 수(정합용)
+  /* 저장 준비 상태 — 원격을 읽기 «전»에 저장하면 하이드레이트 전 로컬 스냅샷이 원격 최신값을
+     통째로 덮어써 차고지·증차신청·공문대장이 사라진다(전체 교체 저장이므로 되돌릴 수 없음).
+     그래서 하이드레이트가 끝날 때까지 저장 버튼을 열지 않고, 그때의 원격 스탬프를 CAS 기준값으로 잡는다. */
+  const [ready, setReady] = useState(false);
+  const [base, setBase] = useState('');
+  const [saving, setSaving] = useState(false);
 
-  useEffect(() => { setM(loadMaster(id)); setDirty(false); }, [id]);
+  useEffect(() => {
+    let cancelled = false;
+    setM(loadMaster(id)); setDirty(false); setReady(false);
+    void ensureCompanyMasterHydrated(id).then(() => {
+      if (cancelled) return;
+      // 하이드레이트가 캐시를 갈아끼웠을 수 있다 → 다시 읽는다(사용자가 이미 고치던 중이면 보존).
+      setM((prev) => (Object.keys(prev).length && dirtyRef.current ? prev : loadMaster(id)));
+      setBase(masterStampOf(id));
+      setReady(true);
+    });
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id]);
+
+  // dirty를 effect 안에서 최신값으로 읽기 위한 ref(구독 콜백이 낡은 값을 보지 않게).
+  const dirtyRef = useRef(false);
+  useEffect(() => { dirtyRef.current = dirty; }, [dirty]);
+
+  // 다른 탭·다른 화면에서 이 법인 마스터가 바뀌면 화면을 맞춘다(내가 고치던 중이면 보류).
+  useEffect(() => {
+    const on = () => { if (!dirtyRef.current) { setM(loadMaster(id)); setBase(masterStampOf(id)); } };
+    window.addEventListener('jpk:master-change', on);
+    return () => window.removeEventListener('jpk:master-change', on);
+  }, [id]);
   useEffect(() => { getStore().list('vehicle', id).then((v) => setOwned(v.filter((x) => String(x.status || '') !== '매각' && String(x.status || '') !== '말소').length)).catch(() => {}); }, [id]);
 
   const modules = m.modules || [];
   const set = (patch: Partial<CompanyMaster>) => { setM((p) => ({ ...p, ...patch })); setDirty(true); };
-  const save = () => { saveMaster(id, m); setDirty(false); };
+  const save = async () => {
+    if (saving) return;
+    setSaving(true);
+    const r = await saveMaster(id, m, { baseUpdatedAt: base });
+    setSaving(false);
+    if (r.ok) {
+      setBase(masterStampOf(id));
+      setDirty(false);
+      toast('법인 정보 저장', 'success');
+      return;
+    }
+    // ★실패했는데 dirty를 지우면 «저장됐다»는 거짓 신호가 남는다 — 그대로 둔다.
+    toast(r.message || '저장 실패', 'error');
+  };
   const addModule = (k: string) => set({ modules: [...modules, k] });
   const removeModule = (k: string) => set({ modules: modules.filter((x) => x !== k) });
   const available = MODULE_CATALOG.filter((c) => !modules.includes(c.key));
@@ -44,7 +87,8 @@ export default function CompanyWorkspace() {
       tools={<WorkbenchBar actions={
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           {dirty && <span style={{ fontSize: 12, color: C.warn, fontWeight: 700 }}>저장 안 됨</span>}
-          <Btn onClick={save} disabled={!dirty}>저장</Btn>
+          {!ready && <span style={{ fontSize: 12, color: C.mute }}>서버 확인 중…</span>}
+          <Btn onClick={save} disabled={!dirty || !ready || saving}>{saving ? '저장 중…' : '저장'}</Btn>
         </div>
       } />}>
 

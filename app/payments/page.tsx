@@ -206,8 +206,17 @@ export default function PaymentsPage() {
     const trec = txs.find((r) => String(r._key) === t.id);
     if (!trec) return;
     const crec = cs.find((r) => String(r._key) === String(t.matchedContractId));
-    await safeUpdate(async () => {
+    /* ★쓰기 순서 = bank_tx → contract (apply와 동일 규칙).
+       commitAll은 트랜잭션이 아니라 앞선 쓰기가 남는다. 계약을 먼저 쓰면 부분 실패 시
+       «수납은 지워졌는데 입금은 여전히 매칭 상태» = 미수가 잘못 늘고 되돌릴 버튼도 없다.
+       bank_tx를 먼저 풀면 부분 실패해도 «해제 표시 + 수납 잔존»이라 다시 해제/연결로 복구된다. */
+    const ok = await safeUpdate(async () => {
       const ops = [];
+      if (!resolveWriteCompany(companyId, trec)) { toast(NEED_COMPANY, 'error'); return; }
+      ops.push({
+        entity: 'bank_tx', sessionCompanyId: companyId, rec: trec, key: String(trec._key),
+        patch: { matchedContractId: '', matchedScheduleSeq: '', matchedAt: '', subject: '', category: '' },
+      });
       if (crec) {
         const existing = Array.isArray(crec._payments) ? (crec._payments as Array<Record<string, unknown>>) : [];
         if (!resolveWriteCompany(companyId, crec)) { toast(NEED_COMPANY, 'error'); return; }
@@ -216,13 +225,10 @@ export default function PaymentsPage() {
           patch: { _payments: existing.filter((p) => p.txId !== t.id) },
         });
       }
-      if (!resolveWriteCompany(companyId, trec)) { toast(NEED_COMPANY, 'error'); return; }
-      ops.push({
-        entity: 'bank_tx', sessionCompanyId: companyId, rec: trec, key: String(trec._key),
-        patch: { matchedContractId: '', matchedScheduleSeq: '', matchedAt: '', subject: '', category: '' },
-      });
       await commitAll(ops);
     });
+    // ★실패했는데 «해제됨»이라고 말하면 안 된다(서버 마감·권한 거부가 조용히 삼켜졌다).
+    if (ok == null) { reload(); return; }
     toast('매칭 해제 — 미수 원복', 'info'); reload();
   }
 
@@ -249,14 +255,18 @@ export default function PaymentsPage() {
     const txCo = resolveWriteCompany(companyId, trec);
     if (!co || !txCo) { toast(NEED_COMPANY, 'error'); return; }
     try {
+      /* ★쓰기 순서 = bank_tx → contract. apply()가 못박은 규칙과 같아야 한다.
+         계약을 먼저 쓰면 bank_tx 실패 시(서버 회계마감 거부 등) «미수는 깎였는데 입금은 미매칭»이 되고,
+         자금일보에 «해제» 버튼이 뜨지 않아 화면에서 되돌릴 방법이 없는 영구 고아가 된다.
+         bank_tx를 먼저 쓰면 실패해도 «매칭 표시만 남고 미수는 정상» → 해제로 복구 가능. */
       await commitAll([
-        {
-          entity: 'contract', sessionCompanyId: companyId, rec: crec, key: String(crec._key),
-          patch: { _payments: [...existing, { seq, date: t.txDate, amount: t.amount, source: '계좌', txId: t.id, manual: true }] },
-        },
         {
           entity: 'bank_tx', sessionCompanyId: companyId, rec: trec, key: String(trec._key),
           patch: { matchedContractId: String(crec._key), matchedScheduleSeq: seq, matchedAt: new Date().toISOString(), subject: '대여료수입', category: '대여료수입' },
+        },
+        {
+          entity: 'contract', sessionCompanyId: companyId, rec: crec, key: String(crec._key),
+          patch: { _payments: [...existing, { seq, date: t.txDate, amount: t.amount, source: '계좌', txId: t.id, manual: true }] },
         },
       ]);
       toast(`${String(crec.contractorName || '')} · ${won(t.amount)} 연결 — 미수 반영`, 'success');
