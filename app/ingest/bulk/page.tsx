@@ -87,6 +87,7 @@ export default function BulkMatchPage() {
       const recs: EntityRecord[] = [];
       const updateEvents: EntityRecord[] = [];
       let updated = 0;
+      let plateSkipped = 0;   // OCR 번호가 기존 차량과 다른데 갱신하지 않은 건수
       for (const r of okRows) {
         const key = String(r.rec.plate || r.rec.policyNo || 'new');
         // 원본 파일 저장(Firebase + 회사 Drive 미러) → 레코드에 첨부.
@@ -98,7 +99,16 @@ export default function BulkMatchPage() {
           ? { ...r.rec, _docs: pushDocVersion(current || r.rec, { type: kind, url, reason: '대량 자동매칭', by: String(user?.name || '') }) }
           : r.rec;
         if (current?._key) {
-          await getStore().update(kind, target, String(current._key), merged);
+          /* ★차량번호(plate)는 자동 갱신 대상에서 제외한다.
+             VIN·차명 등으로 같은 차로 매칭됐더라도 OCR 이 번호를 오독하면 그 값이 그대로 저장되고,
+             번호변경 승계(carryPlateHistory)가 작동해 «오독 번호»가 이력에 영구 박제된다
+             (그 뒤로는 별칭 조인이 잘못된 번호까지 같은 차로 인식한다 = 되돌리기 어려움).
+             번호 변경은 사람이 차량 상세에서 눈으로 확인하고 바꿔야 한다. */
+          const patch = kind === 'vehicle'
+            ? (() => { const { plate: _ocrPlate, ...rest } = merged as Record<string, unknown>; return rest as EntityRecord; })()
+            : merged;
+          if (kind === 'vehicle' && r.plate && normPlate(r.plate) !== normPlate(current.plate)) plateSkipped++;
+          await getStore().update(kind, target, String(current._key), patch);
           updateEvents.push(buildAtomicEvent({
             entityType: kind, companyId: target, record: { ...current, ...merged }, source: 'ocr',
           }));
@@ -111,7 +121,11 @@ export default function BulkMatchPage() {
         ? await saveIntake(kind, target, recs, { context: { source: 'ocr' } })
         : { save: { saved: 0, duplicates: 0, backend: getStore().backend } };
       if (updateEvents.length) await getStore().save('atomic_event', target, updateEvents);
-      toast(`${res.save.saved + updated}건 반영 (${KIND[kind].label} · ${companyLabel(target)})${updated ? ` · 기존 갱신 ${updated}` : ''}`, 'success');
+      toast(
+        `${res.save.saved + updated}건 반영 (${KIND[kind].label} · ${companyLabel(target)})${updated ? ` · 기존 갱신 ${updated}` : ''}`
+        + (plateSkipped ? ` · ★차량번호 불일치 ${plateSkipped}건은 번호를 바꾸지 않았습니다(차량 상세에서 확인)` : ''),
+        plateSkipped ? 'info' : 'success',
+      );
       reset();
     } catch (e) {
       toast('반영 실패: ' + (e as Error).message, 'error');
@@ -121,7 +135,18 @@ export default function BulkMatchPage() {
   const cols: Col<Row>[] = [
     { key: 'file', label: '파일', render: (r) => <span style={{ fontSize: 12, color: C.mute }}>{r.file.name}</span> },
     { key: 'plate', label: '번호판(OCR)', render: (r) => r.plate || <span style={{ color: C.danger }}>미인식</span> },
-    { key: 'match', label: '매칭 차량', render: (r) => r.match ? `${String(r.match.plate || '')} · ${String(r.match.carName || '')}` : '—' },
+    {
+      key: 'match', label: '매칭 차량',
+      render: (r) => {
+        if (!r.match) return '—';
+        const label = `${String(r.match.plate || '')} · ${String(r.match.carName || '')}`;
+        // OCR 번호와 기존 차량번호가 다르면 «번호는 갱신하지 않는다»는 사실을 미리 알린다.
+        const mismatch = !!r.plate && normPlate(r.plate) !== normPlate(r.match.plate);
+        return mismatch
+          ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>{label}<Badge tone="amber">번호 불일치 · 미갱신</Badge></span>
+          : label;
+      },
+    },
     {
       key: 'status', label: '처리', render: (r) => {
         const tone = r.status === '실패' ? 'red' : r.status === '신규' || r.status === '검토' ? 'amber' : 'green';

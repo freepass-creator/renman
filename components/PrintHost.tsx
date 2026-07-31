@@ -6,7 +6,7 @@ import { type EntityRecord } from '@/lib/intake/entities';
 import { computeContractView, computeReturnSettlement } from '@/lib/contract-ops';
 import { loadMaster } from '@/lib/company-master';
 import { companyLabel } from '@/lib/companies';
-import { normPlate } from '@/lib/plate';
+import { plateAliasesFor, inPlateAliases } from '@/lib/plate';
 import { fmtKMoneyHangul } from '@/lib/won-korean';
 import { matchDriver } from '@/lib/penalty-reassign';
 import { buildNoticeClaim } from '@/lib/docs/notice-claim';
@@ -29,6 +29,7 @@ export function PrintHost() {
   const [bulkCs, setBulkCs] = useState<EntityRecord[]>([]);
   const [penalties, setPenalties] = useState<EntityRecord[]>([]);
   const [plateContracts, setPlateContracts] = useState<EntityRecord[]>([]);
+  const [vehicles, setVehicles] = useState<EntityRecord[]>([]);
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
@@ -54,7 +55,9 @@ export function PrintHost() {
     Promise.all([
       store.list('contract', companyId),
       doc.type === 'penalty' ? store.list('penalty', companyId) : Promise.resolve([] as EntityRecord[]),
-    ]).then(([cs, ps]) => {
+      // 번호변경 이력(plateHistory)을 읽기 위해 차량도 함께 — 별칭 조인의 근거.
+      store.list('vehicle', companyId).catch(() => [] as EntityRecord[]),
+    ]).then(([cs, ps, vs]) => {
       if (doc.type === 'notice' && doc.contractKeys?.length) {
         const byKey = new Map(cs.map((x) => [String(x._key), x]));
         const ordered = doc.contractKeys.map((k) => byKey.get(k)).filter((x): x is EntityRecord => !!x);
@@ -62,16 +65,20 @@ export function PrintHost() {
         setC(ordered[0] || null);
         setPlateContracts([]);
         setPenalties([]);
+        setVehicles(vs);
         setReady(true);
         return;
       }
       setBulkCs([]);
-      const np = normPlate(doc.plate);
-      const mine = cs.filter((x) => normPlate(x.plate) === np);
+      /* ★대외문서는 «번호변경 이력»까지 봐야 한다. 정확 일치만 쓰면 임판→정식번호 전환 후
+         내용증명·거래사실확인서에 그 차의 계약·과태료가 누락된 채 인쇄된다(법적 문서). */
+      const aliases = plateAliasesFor(vs, doc.plate);
+      const mine = cs.filter((x) => inPlateAliases(aliases, x.plate));
       setPlateContracts(mine);
       const byKey = doc.contractKey ? mine.find((x) => String(x._key) === doc.contractKey) : null;
       setC(byKey || mine.find((x) => !x.returnedDate) || mine[0] || null);
-      setPenalties(ps.filter((x) => normPlate(x.plate) === np));
+      setPenalties(ps.filter((x) => inPlateAliases(aliases, x.plate)));
+      setVehicles(vs);
       setReady(true);
     }).catch(() => setReady(true));
   }, [doc, companyId]);
@@ -90,7 +97,7 @@ export function PrintHost() {
         <Btn onClick={() => window.print()}>인쇄 / PDF 저장</Btn>
       </div>
       {!ready ? <PageLoading />
-        : doc.type === 'penalty' ? (penalties.length ? <PenaltyDoc penalties={penalties} contracts={plateContracts} companyId={companyId} /> : <div style={{ textAlign: 'center', padding: 40, color: '#64748b' }}>이 차량의 과태료가 없습니다.</div>)
+        : doc.type === 'penalty' ? (penalties.length ? <PenaltyDoc penalties={penalties} contracts={plateContracts} vehicles={vehicles} companyId={companyId} /> : <div style={{ textAlign: 'center', padding: 40, color: '#64748b' }}>이 차량의 과태료가 없습니다.</div>)
           : isBulkNotice ? (
             <div className="print-stack">
               {bulkCs.map((rec, i) => <NoticeDoc key={String(rec._key)} c={rec} companyId={companyId} pageIndex={i + 1} pageTotal={bulkCs.length} />)}
@@ -228,13 +235,13 @@ function ReceiptDoc({ c, companyId, amount, label }: { c: EntityRecord; companyI
   );
 }
 
-function PenaltyDoc({ penalties, contracts, companyId }: { penalties: EntityRecord[]; contracts: EntityRecord[]; companyId: string }) {
+function PenaltyDoc({ penalties, contracts, vehicles, companyId }: { penalties: EntityRecord[]; contracts: EntityRecord[]; vehicles: EntityRecord[]; companyId: string }) {
   const co = String(penalties[0]?.companyId || companyId);
   const m = loadMaster(co);
   const t = new Date();
   const dateStr = `${t.getFullYear()}. ${t.getMonth() + 1}. ${t.getDate()}.`;
   const issuer = String(penalties.find((p) => p.issuer)?.issuer || '과태료 부과기관');
-  const rows = penalties.map((p) => { const drv = matchDriver(p, contracts); return { p, name: String(p.driverName || drv?.contractorName || '—'), phone: String(p.driverPhone || drv?.contractorPhone || '') }; });
+  const rows = penalties.map((p) => { const drv = matchDriver(p, contracts, vehicles); return { p, name: String(p.driverName || drv?.contractorName || '—'), phone: String(p.driverPhone || drv?.contractorPhone || '') }; });
   const total = penalties.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
   const N = penalties.length;
   const hCell: CSSProperties = { ...cellL, width: 'auto', textAlign: 'center', fontSize: 11.5 };

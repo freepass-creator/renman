@@ -96,7 +96,7 @@ export function computeDashboard(input: DashboardInput, today: string) {
     .map((v) => ({ rec: v.rec, flags: checkCompliance(v.rec, vehByPlate.get(normPlate(v.rec.plate)) || null, today) }))
     .filter((x) => x.flags.length > 0)
     .sort((a, b) => (b.flags.some((f) => f.severity === 'high') ? 1 : 0) - (a.flags.some((f) => f.severity === 'high') ? 1 : 0));
-  const penaltyPending = penalties.filter((p) => !['변경부과완료', '종결'].includes(String(p.reassignStatus || ''))).map((p) => ({ rec: p, driver: matchDriver(p, contracts) }));
+  const penaltyPending = penalties.filter((p) => !['변경부과완료', '종결'].includes(String(p.reassignStatus || ''))).map((p) => ({ rec: p, driver: matchDriver(p, contracts, vehicles) }));
   // 중복 대여 — 같은 차(normPlate)에 기간이 겹치는 미반납 계약 2건 이상(배차 사고 방지).
   const cByPlate = new Map<string, EntityRecord[]>();
   for (const c of contracts) {

@@ -11,6 +11,7 @@ import { WorkbenchBar } from '@/components/WorkbenchBar';
 import { companyLabel } from '@/lib/companies';
 import { openCar } from '@/lib/ui-bus';
 import { useEntityList } from '@/lib/use-entity-lists';
+import { plateAliasesFor, inPlateAliases } from '@/lib/plate';
 import { textMatch } from '@/lib/search-match';
 
 const yy = (s: unknown) => { const t = String(s || ''); return /^\d{4}-\d{2}-\d{2}/.test(t) ? t.slice(2, 10) : (t || '—'); };
@@ -28,13 +29,14 @@ export default function ContractHistoryPage() {
   const [q, setQ] = useState('');
   const [view, setView] = useState<'card' | 'excel'>('card');
   const { rows, loading } = useEntityList('contract');
+  const { rows: vehicles } = useEntityList('vehicle');   // 번호변경 이력(plateHistory) 조인용
   useEffect(() => { try { setPlate(new URLSearchParams(window.location.search).get('plate') || ''); } catch { /* 무시 */ } }, []);
   const toggleFacet = (label: string) => setFacets((s) => { const n = new Set(s); n.has(label) ? n.delete(label) : n.add(label); return n; });
   const resetFacets = () => setFacets(new Set());
 
   const past = useMemo(() => rows
-    .filter((c) => c.returnedDate && (!plate || normPlate(c.plate) === normPlate(plate)))
-    .sort((a, b) => String(b.returnedDate || '').localeCompare(String(a.returnedDate || ''))), [rows, plate]);
+    .filter((c) => c.returnedDate && (!plate || inPlateAliases(plateAliasesFor(vehicles, plate), c.plate)))
+    .sort((a, b) => String(b.returnedDate || '').localeCompare(String(a.returnedDate || ''))), [rows, plate, vehicles]);
 
   const counts = useMemo(() => {
     const c: Record<string, number> = { 만료: 0, 중도해지: 0, 기타: 0 };

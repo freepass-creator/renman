@@ -16,7 +16,7 @@ import { isCashPurchase } from '@/lib/domain/vehicle-finance';
 import { computeVehicleTax } from '@/lib/domain/vehicle-tax';
 import { pushToFreepass, vehicleToProduct } from '@/lib/freepass/product-sync';
 import { FUEL_LEVELS } from '@/lib/domain/fuel';
-import { normPlate } from '@/lib/plate';
+import { normPlate, vehicleMatchesPlate } from '@/lib/plate';
 import { linkFleet, handoverHistory, recommendNextRent } from '@/lib/domain/model';
 import { loanSchedule, loanSummary } from '@/lib/loan';
 import { assetEconomics } from '@/lib/asset-econ';
@@ -80,16 +80,43 @@ export function useVehicleDetail(plate: string, focus?: string) {
     useEntityLists(['contract', 'insurance', 'penalty', 'history', 'vehicle']);
   const np = normPlate(plate);
 
+  /* 차량 찾기 — 옛 번호 URL로도 열려야 한다(번호변경 이력 매칭 + 문서ID 폴백). */
   const v = useMemo(
-    () => allVehicles.find((x) => normPlate(x.plate) === np || String(x._key) === plate) ?? null,
-    [allVehicles, np, plate],
+    () => allVehicles.find((x) => vehicleMatchesPlate(x, plate) || String(x._key) === plate) ?? null,
+    [allVehicles, plate],
   );
-  const contracts = useMemo(() => allContracts.filter((c) => normPlate(c.plate) === np), [allContracts, np]);
-  const insurances = useMemo(() => insAll.filter((c) => normPlate(c.plate) === np), [insAll, np]);
-  const penalties = useMemo(() => penAll.filter((c) => normPlate(c.plate) === np), [penAll, np]);
+
+  /**
+   * 조인 키 = URL 번호 + 현재 번호 + 번호변경 이력 전부.
+   *
+   * ★정확 일치(normPlate(x) === np)만 쓰면 번호를 바꾼 차의 «옛 번호로 걸린» 계약·보험·과태료·이력이
+   *   화면에서 사라진다. plateHistory 에 이력을 쌓아도 조인이 그것을 보지 않으면 의미가 없다
+   *   (승계는 데이터만 보존했고 조회는 여전히 끊겨 있었다 — 임판→정식번호가 신차의 기본 흐름이므로
+   *   오픈 후 바로 터지는 경로다).
+   */
+  const plateKeys = useMemo(() => {
+    const set = new Set<string>();
+    if (np) set.add(np);
+    const cur = normPlate(v?.plate);
+    if (cur) set.add(cur);
+    const hist = Array.isArray(v?.plateHistory) ? (v.plateHistory as unknown[]) : [];
+    for (const h of hist) {
+      const n = normPlate(h);
+      if (n) set.add(n);
+    }
+    return set;
+  }, [np, v]);
+  const matchesPlate = useMemo(
+    () => (p: unknown) => { const n = normPlate(p); return !!n && plateKeys.has(n); },
+    [plateKeys],
+  );
+
+  const contracts = useMemo(() => allContracts.filter((c) => matchesPlate(c.plate)), [allContracts, matchesPlate]);
+  const insurances = useMemo(() => insAll.filter((c) => matchesPlate(c.plate)), [insAll, matchesPlate]);
+  const penalties = useMemo(() => penAll.filter((c) => matchesPlate(c.plate)), [penAll, matchesPlate]);
   const history = useMemo(
-    () => hisAll.filter((h) => normPlate(h.plate) === np).sort((a, b) => (String(a.date) < String(b.date) ? 1 : -1)),
-    [hisAll, np],
+    () => hisAll.filter((h) => matchesPlate(h.plate)).sort((a, b) => (String(a.date) < String(b.date) ? 1 : -1)),
+    [hisAll, matchesPlate],
   );
 
   const [editInfo, setEditInfo] = useState(false);

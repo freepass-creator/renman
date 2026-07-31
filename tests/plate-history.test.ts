@@ -6,7 +6,7 @@
  *   재투입 시 같은 차가 2대로 갈라진다. 오픈 후에는 수동 병합밖에 없어 사실상 복구 불가.
  */
 import { describe, test, expect } from 'vitest';
-import { vehicleMatchesPlate, findVehicleByPlate, normPlate } from '@/lib/plate';
+import { vehicleMatchesPlate, findVehicleByPlate, normPlate, plateAliasesOf, plateAliasesFor, inPlateAliases } from '@/lib/plate';
 
 /** lib/store.ts carryPlateHistory 와 동일 규약(승계 결과 형태)을 검증용으로 재현. */
 function carry(before: Record<string, unknown>, patch: Record<string, unknown>): Record<string, unknown> {
@@ -76,5 +76,49 @@ describe('재투입 별칭 dedup — 번호 바뀐 차가 2대로 갈라지지 �
     expect(aliases.has(normPlate('123가4567'))).toBe(true);
     expect(aliases.has(normPlate('01가1234'))).toBe(true);   // 옛 번호로 들어온 시트도 흡수
     expect(aliases.has(normPlate('777다7777'))).toBe(false); // 진짜 새 차는 통과
+  });
+});
+
+describe('별칭 조인 — 이력을 쌓아도 «조회»가 보지 않으면 의미가 없다', () => {
+  const v = { _key: '01가1234', plate: '123가4567', plateHistory: ['01가1234'] };
+
+  test('plateAliasesOf: 현재 번호 + 이력 전부', () => {
+    const a = plateAliasesOf(v);
+    expect(a.has(normPlate('123가4567'))).toBe(true);
+    expect(a.has(normPlate('01가1234'))).toBe(true);
+    expect(a.size).toBe(2);
+  });
+
+  test('plateAliasesOf: 차량이 없으면 빈 집합', () => {
+    expect(plateAliasesOf(null).size).toBe(0);
+    expect(plateAliasesOf(undefined).size).toBe(0);
+  });
+
+  test('plateAliasesFor: 옛 번호로 찾아도 별칭 전부가 나온다', () => {
+    const a = plateAliasesFor([v], '01가1234');
+    expect(a.has(normPlate('123가4567'))).toBe(true);
+    expect(a.has(normPlate('01가1234'))).toBe(true);
+  });
+
+  test('plateAliasesFor: 모르는 번호면 그 번호 하나만(오조인 방지)', () => {
+    const a = plateAliasesFor([v], '777다7777');
+    expect([...a]).toEqual([normPlate('777다7777')]);
+  });
+
+  test('★옛 번호로 걸린 계약·과태료가 별칭 조인으로 붙는다', () => {
+    const aliases = plateAliasesOf(v);
+    const contracts = [
+      { plate: '01가1234', contractorName: '홍길동' },   // 임판 시절 계약
+      { plate: '123가4567', contractorName: '김철수' },  // 정식번호 계약
+      { plate: '777다7777', contractorName: '남의차' },
+    ];
+    const mine = contracts.filter((c) => inPlateAliases(aliases, c.plate));
+    expect(mine.map((c) => c.contractorName)).toEqual(['홍길동', '김철수']);
+  });
+
+  test('정확 일치만 쓰면 옛 번호 계약이 사라진다 — 고치기 전의 실제 피해', () => {
+    const np = normPlate(v.plate);
+    const contracts = [{ plate: '01가1234' }, { plate: '123가4567' }];
+    expect(contracts.filter((c) => normPlate(c.plate) === np)).toHaveLength(1);
   });
 });

@@ -16,11 +16,11 @@ import { yy } from '../useVehicleDetail';
 import { Add, type PanelProps } from './shared';
 
 export function PenaltyPanel({ plate, vd }: PanelProps) {
-  const { penalties, contracts, companyId } = vd;
+  const { penalties, contracts, companyId, v } = vd;
   return (
     <Sec id="v-penalty" title="과태료 · 변경부과" n={penalties.length} right={<span style={{ display: 'inline-flex', gap: 6 }}>{penalties.length ? <Btn variant="ghost" onClick={() => openPrintDoc('penalty', plate)}>변경부과 공문</Btn> : null}<Add type="penalty" plate={plate} label="+ 추가" /></span>}>
       {penalties.length ? <Cards min={360}>{penalties.map((p, i) => {
-        const drv = matchDriver(p, contracts); const st = penaltyStatus(p);
+        const drv = matchDriver(p, contracts, v ? [v] : []); const st = penaltyStatus(p);
         const NEXT: Record<string, string | null> = { '접수': '임차인확인', '임차인확인': '변경부과신청', '변경부과신청': '변경부과완료', '변경부과완료': '종결', '종결': null };
         const next = NEXT[st] || null;
         const advance = async () => {

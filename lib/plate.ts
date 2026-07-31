@@ -35,6 +35,41 @@ export function vehicleMatchesPlate(vehicle: EntityRecord, plate?: unknown): boo
   return hist.some((h) => normPlate(h) === key);
 }
 
+/**
+ * 그 차의 «번호 별칭 집합» — 현재 번호 + 번호변경 이력(plateHistory).
+ *
+ * ★조인 SSOT. 계약·보험·과태료·이력은 «발생 당시의 번호»를 그대로 보관한다(과태료 고지서에 옛 번호가
+ *   찍혀 있으므로 소급 변경하면 안 된다 — 법적 근거물이다). 그래서 조회하는 쪽이 별칭으로 찾아야 한다.
+ *   정확 일치만 쓰면 임판→정식번호 전환 후 그 차의 계약·정비이력·과태료·보험이 화면에서 사라진다.
+ */
+export function plateAliasesOf(vehicle?: EntityRecord | null): Set<string> {
+  const out = new Set<string>();
+  if (!vehicle) return out;
+  const cur = normPlate(vehicle.plate);
+  if (cur) out.add(cur);
+  const hist = Array.isArray(vehicle.plateHistory) ? (vehicle.plateHistory as unknown[]) : [];
+  for (const h of hist) {
+    const n = normPlate(h);
+    if (n) out.add(n);
+  }
+  return out;
+}
+
+/** plate 로 그 차를 찾아 별칭 집합을 만든다. 못 찾으면 그 번호 하나만. */
+export function plateAliasesFor(vehicles: readonly EntityRecord[], plate?: unknown): Set<string> {
+  const np = normPlate(plate);
+  const veh = vehicles.find((v) => vehicleMatchesPlate(v, plate));
+  const out = plateAliasesOf(veh);
+  if (np) out.add(np);
+  return out;
+}
+
+/** 이 레코드가 그 차에 속하는가 — plate 필드가 별칭 중 하나면 true. */
+export function inPlateAliases(aliases: ReadonlySet<string>, plate?: unknown): boolean {
+  const n = normPlate(plate);
+  return !!n && aliases.has(n);
+}
+
 /** plate로 차량 찾기 — normPlate 매칭(현재번호 우선, 번호변경 이력 폴백). */
 export function findVehicleByPlate(vehicles: EntityRecord[], plate?: unknown): EntityRecord | undefined {
   const key = normPlate(plate);
