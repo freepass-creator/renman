@@ -176,7 +176,7 @@ function IntegrityInner() {
   const counts = useMemo(() => {
     const kinds = ['필수누락', '만기', '고아', '날짜역전', '미납', '보험불일치', '반납지남', '면허 만료', '면허 미확인', '무보험 운행',
       // 서류 교차검증 5종 — 업로드한 서류와 데이터가 어긋난 것
-      '번호오기입', '정체불명', '무보험', '서류미비', '차종불일치', '대여료불일치'];
+      '번호오기입', '정체불명', '무보험', '서류미비', '차종불일치', '대여료불일치', '연령구간상승'];
     const c: Record<string, number> = { 위험: 0, 주의: 0 };
     for (const k of kinds) c[k] = 0;
     for (const it of items) {

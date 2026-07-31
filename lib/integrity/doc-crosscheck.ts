@@ -11,6 +11,7 @@
  * 손으로 대조해서 «실제로 나온 문제»만 골랐다. 이론적 검사는 넣지 않았다.
  */
 import { normPlate, isNormalPlate, vehicleMatchesPlate } from '@/lib/plate';
+import { ageFromBirth } from '@/lib/compliance';
 import type { EntityRecord } from '@/lib/intake/entities';
 
 export type CrossCheckKind =
@@ -19,7 +20,8 @@ export type CrossCheckKind =
   | '무보험'       // 보유 차량인데 유효 보험이 없다(해지만 있는 경우 포함)
   | '서류미비'     // 등록증·보험증권·계약서 중 없는 것
   | '차종불일치'   // 같은 차의 차명이 서류·마스터·거래에서 다르다
-  | '대여료불일치'; // 계약 월대여료와 실입금이 «일정하게» 다르다 — 재조정 미반영 의심
+  | '대여료불일치'  // 계약 월대여료와 실입금이 «일정하게» 다르다 — 재조정 미반영 의심
+  | '연령구간상승'; // 계약 당시보다 연령 구간이 올라갔다 — 보험료 인하 여지
 
 export type CrossCheckSev = 'high' | 'med' | 'low';
 
@@ -265,6 +267,16 @@ export function crossCheckDocuments(input: CrossCheckInput): CrossCheckItem[] {
      갱신되지 않은 것»이다(계약서 제4조에 서면합의 재조정 조항이 있다).
      ★그대로 두면 ERP가 계약 금액으로 미수를 계산해 정상 납부 고객에게 매달 미수가 쌓이고
        독촉·내용증명이 나간다. «미납»과 «재조정 미반영»은 조치가 정반대다.
+
+     ★차액의 원인은 두 가지이고 처리가 다르다 — 사람이 골라야 하므로 둘 다 안내한다:
+       ① 보험 연령구간 하락 → 월대여료 자체가 내려간 것. 계약 monthlyRent 를 고쳐야 한다.
+          실데이터 확인: 325구9443 최정훈(99년 12월생)은 계약 시 만 25세로 「만 24세 이상」 구간이었고
+          2025년 12월 만 26세가 되며 구간이 내려갔다 → −70,000 이 설명된다.
+       ② 협의 할인 → 계약 금액은 그대로 두고 «청구할인»(_discounts)으로 기록해야 한다.
+          그래야 «원래 얼마인데 얼마를 깎았는지»가 남고 손익·세무에서 근거가 된다.
+          실데이터의 나머지 4건은 부족액이 90,000·70,000·100,000 으로 만원 단위이고 비율도
+          일정하지 않아(9.4%/8.2%/8.1%) VAT·연령 어느 쪽도 아니다 → 협의 할인으로 보인다.
+
      오탐을 막기 위해 3회 이상 · 금액이 서로 같을 때만 본다(분납·연체합납은 금액이 흔들린다). */
   const rentPays = new Map<string, number[]>();
   for (const t of bankTx) {
@@ -295,10 +307,47 @@ export function crossCheckDocuments(input: CrossCheckInput): CrossCheckItem[] {
       sev: 'high',
       detail: `계약 월대여료 ${rent.toLocaleString('ko-KR')}원인데 실입금이 ${amts.length}회 모두 `
         + `${actual.toLocaleString('ko-KR')}원(${gap > 0 ? '+' : ''}${gap.toLocaleString('ko-KR')}) `
-        + '— 재조정 미반영으로 보입니다. 계약 금액을 고치지 않으면 미수가 잘못 쌓입니다',
+        + '— 미납이 아니라 재조정 미반영으로 보입니다. 그대로 두면 미수가 잘못 쌓여 독촉이 나갑니다',
       evidence: [
         `계약: ${String(c.contractorName || '계약자 미기재')} · 월 ${rent.toLocaleString('ko-KR')}원`,
         `실입금 ${amts.length}회 전부 ${actual.toLocaleString('ko-KR')}원`,
+        // 원인에 따라 조치가 다르므로 둘 다 제시한다 — 사람이 골라야 한다.
+        '보험 연령구간이 내려갔다면 → 계약 월대여료를 실제 금액으로 수정',
+        '협의 할인이라면 → 계약 금액은 그대로 두고 «청구할인»으로 기록(깎은 근거가 남는다)',
+      ],
+    });
+  }
+
+  /* ── ⑦ 연령구간 상승 — 보험료 인하 여지 ────────────────────────────
+     사장님 지적으로 확인된 실제 사례: 325구9443 최정훈(99년 12월생)은 계약 시 만 25세로
+     계약서 「만 24세 이상」 구간이었고, 2025년 12월 만 26세가 되며 구간이 내려가 대여료가
+     70,000원 낮아졌다. 자동차보험 연령 구간은 통상 21·24·26·30·35세에서 꺾인다.
+     ★놓치면 «고객이 더 낸다» — 알려주면 그대로 두는 것보다 신뢰가 쌓이고, 재계약 협상 카드도 된다.
+     계약서상 최소운전연령(driverAgeMin)이 있는 계약만 본다. 이미 35세 이상이면 더 내려갈 구간이 없다. */
+  const AGE_BANDS = [21, 24, 26, 30, 35];
+  for (const c of contracts) {
+    if (c.returnedDate) continue;
+    const bandAtSign = Number(c.driverAgeMin) || 0;
+    if (!bandAtSign || bandAtSign >= 35) continue;       // 최상위 구간이면 인하 여지 없음
+    const ageNow = ageFromBirth(c.contractorBirth, today);
+    if (!ageNow) continue;                               // 생년월일이 없으면 판단하지 않는다
+    // 지금 나이가 도달한 가장 높은 구간
+    const bandNow = AGE_BANDS.filter((b) => ageNow >= b).pop() || 0;
+    if (bandNow <= bandAtSign) continue;
+    const n = normPlate(c.plate);
+    const v = fleet.find((x) => normPlate(x.plate) === n);
+    out.push({
+      companyId: String(c.companyId || v?.companyId || ''),
+      plate: String(c.plate || n),
+      kind: '연령구간상승',
+      // 돈이 잘못 계산되는 것은 아니므로 low — 다만 고객이 더 내고 있을 수 있다.
+      sev: 'low',
+      detail: `계약 당시 「만 ${bandAtSign}세 이상」 구간이었는데 현재 만 ${ageNow}세로 `
+        + `「만 ${bandNow}세 이상」 구간입니다 — 보험료 인하 여지가 있습니다`,
+      evidence: [
+        `계약자: ${String(c.contractorName || '계약자 미기재')} · 현재 만 ${ageNow}세`,
+        `계약서 최소운전연령: 만 ${bandAtSign}세 이상`,
+        '보험 재산정 후 월대여료를 조정할 수 있습니다(자동차보험 연령 구간: 21·24·26·30·35세)',
       ],
     });
   }
@@ -309,7 +358,7 @@ export function crossCheckDocuments(input: CrossCheckInput): CrossCheckItem[] {
 /** 종류별 건수 — 요약 카드·투입 후 안내에 쓴다. */
 export function crossCheckCounts(items: CrossCheckItem[]): Record<CrossCheckKind, number> {
   const base: Record<CrossCheckKind, number> = {
-    번호오기입: 0, 정체불명: 0, 무보험: 0, 서류미비: 0, 차종불일치: 0, 대여료불일치: 0,
+    번호오기입: 0, 정체불명: 0, 무보험: 0, 서류미비: 0, 차종불일치: 0, 대여료불일치: 0, 연령구간상승: 0,
   };
   for (const it of items) base[it.kind] += 1;
   return base;

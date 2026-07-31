@@ -284,10 +284,10 @@ describe('집계·요약 — 투입 직후 안내', () => {
     expect(s).toContain('서류미비');
   });
 
-  test('종류별 카운트는 6종 전부 키를 갖는다', () => {
+  test('종류별 카운트는 7종 전부 키를 갖는다', () => {
     const c = crossCheckCounts([]);
     expect(Object.keys(c).sort())
-      .toEqual(['무보험', '번호오기입', '서류미비', '정체불명', '차종불일치', '대여료불일치'].sort());
+      .toEqual(['무보험', '번호오기입', '서류미비', '정체불명', '차종불일치', '대여료불일치', '연령구간상승'].sort());
   });
 });
 
@@ -368,5 +368,60 @@ describe('대여료불일치 — «미납»과 «재조정 미반영»은 조치
       today: TODAY,
     });
     expect(items.filter((i) => i.kind === '대여료불일치')).toHaveLength(0);
+  });
+});
+
+describe('연령구간 상승 — 고객이 더 내고 있을 수 있다', () => {
+  const C = (extra: Record<string, unknown>) => ({
+    plate: '325구9443', companyId: 'switchplan', contractorName: '최정훈', monthlyRent: 850_000, ...extra,
+  });
+  const base = { vehicles: [CLEAN('325구9443')], insurances: [INS('325구9443')], today: TODAY };
+
+  test('★실데이터 케이스: 계약 시 만 24세 구간 → 현재 만 26세', () => {
+    // 99년 12월생 → 2026-07-31 기준 만 26세. 계약서 최소운전연령 만 24세.
+    const items = crossCheckDocuments({
+      ...base, contracts: [C({ driverAgeMin: 24, contractorBirth: '1999-12-15' })],
+    });
+    const m = items.filter((i) => i.kind === '연령구간상승');
+    expect(m).toHaveLength(1);
+    expect(m[0].sev).toBe('low');
+    expect(m[0].detail).toContain('만 24세 이상');
+    expect(m[0].detail).toContain('만 26세');
+    expect(m[0].evidence.join(' ')).toContain('최정훈');
+  });
+
+  test('같은 구간 안이면 잡지 않는다 — 만 24세 계약, 현재 만 25세', () => {
+    const items = crossCheckDocuments({
+      ...base, contracts: [C({ driverAgeMin: 24, contractorBirth: '2001-03-01' })],
+    });
+    expect(items.filter((i) => i.kind === '연령구간상승')).toHaveLength(0);
+  });
+
+  test('이미 만 35세 이상 구간이면 인하 여지가 없다', () => {
+    const items = crossCheckDocuments({
+      ...base, contracts: [C({ driverAgeMin: 35, contractorBirth: '1979-12-01' })],
+    });
+    expect(items.filter((i) => i.kind === '연령구간상승')).toHaveLength(0);
+  });
+
+  test('생년월일이 없으면 판단하지 않는다(추측 금지)', () => {
+    const items = crossCheckDocuments({
+      ...base, contracts: [C({ driverAgeMin: 24 })],
+    });
+    expect(items.filter((i) => i.kind === '연령구간상승')).toHaveLength(0);
+  });
+
+  test('계약서 최소운전연령이 없으면 판단하지 않는다', () => {
+    const items = crossCheckDocuments({
+      ...base, contracts: [C({ contractorBirth: '1999-12-15' })],
+    });
+    expect(items.filter((i) => i.kind === '연령구간상승')).toHaveLength(0);
+  });
+
+  test('반납된 계약은 대상이 아니다', () => {
+    const items = crossCheckDocuments({
+      ...base, contracts: [C({ driverAgeMin: 24, contractorBirth: '1999-12-15', returnedDate: '2026-05-01' })],
+    });
+    expect(items.filter((i) => i.kind === '연령구간상승')).toHaveLength(0);
   });
 });
