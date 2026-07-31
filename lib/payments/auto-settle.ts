@@ -189,8 +189,6 @@ export async function applyCardSettlementsAuto(
         settlementGrossAmount: cand.itemsSum,
         settlementFeeAmount: cand.estimatedFee,
         settlementItemCount: cand.items.length,
-        subject: '지급수수료',
-        category: '지급수수료',
         memo: `카드집금 정산${feeLabel}`,
       });
       Object.assign(dep, { settlementId: sid });
@@ -209,14 +207,39 @@ export async function applyCardSettlementsAuto(
   return { applied, skipped };
 }
 
-/** 담기 부수효과용 — CMS·카드 집금 자동 붙이기. */
+/** 담기 부수효과용 — CMS·카드 집금 자동 붙이기 + 잘못 덮인 집금과목 복구. */
 export async function autoSettleAfterIntake(companyId: string): Promise<string[]> {
   const labels: string[] = [];
+  const repaired = await repairSettlementDepositSubjects(companyId);
+  if (repaired) labels.push(`settle-subject-repair:${repaired}`);
   const cms = await applyCmsSettlementsAuto(companyId, { confidences: [...AUTO_CONF] });
   if (cms.applied) labels.push(`cms-settle:${cms.applied}`);
   const card = await applyCardSettlementsAuto(companyId, { confidences: [...AUTO_CONF] });
   if (card.applied) labels.push(`card-settle:${card.applied}`);
   return labels;
+}
+
+/**
+ * 과거에 집금 category를 지급수수료로 덮어쓴 행 복구.
+ * cms_* → CMS집금 · card_* → 카드매출. 수입과목 복구 후 totalIn만 회복(영업손익 inAmt는 원래 포함).
+ */
+export async function repairSettlementDepositSubjects(companyId: string): Promise<number> {
+  const bank = await getStore().list('bank_tx', companyId);
+  let n = 0;
+  for (const r of bank) {
+    if (String(r.settlementRole || '') !== 'deposit') continue;
+    const cat = String(r.category || '');
+    const sub = String(r.subject || '');
+    if (cat !== '지급수수료' && sub !== '지급수수료') continue;
+    const sid = String(r.settlementId || '');
+    const income = sid.startsWith('card_') ? '카드매출' : 'CMS집금';
+    await getStore().update('bank_tx', companyId, String(r._key), {
+      category: income,
+      subject: income,
+    });
+    n++;
+  }
+  return n;
 }
 
 /** 미정산 CMS 성공분(method=CMS) — 수동 매칭 후보. */
@@ -272,8 +295,6 @@ export async function manualLinkCmsSettlement(
     settlementGrossAmount: itemsSum,
     settlementFeeAmount: fee,
     settlementItemCount: items.length,
-    subject: '지급수수료',
-    category: '지급수수료',
     memo: `CMS집금 정산(수동) 수수료 ${fee.toLocaleString('ko-KR')}원`,
   });
   for (const it of items) {

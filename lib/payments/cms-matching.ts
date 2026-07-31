@@ -153,7 +153,8 @@ export function findCmsMatchCandidates(bankTx: BankTransaction[]): CmsMatchCandi
 }
 
 /**
- * 매칭 확정 패치 — deposit=지급수수료(이중수익 방지) · items=settlement 링크만.
+ * 매칭 확정 패치 — deposit 수입과목 유지 · 수수료는 settlementFeeAmount 메타만.
+ * (category를 지급수수료로 덮으면 inAmt가 영업수입·과세매출에서 누락되고 영업손익과 어긋남)
  */
 export function buildSettlementPatches(
   candidate: CmsMatchCandidate,
@@ -170,8 +171,6 @@ export function buildSettlementPatches(
       settlementGrossAmount: candidate.itemsSum,
       settlementFeeAmount: candidate.estimatedFee,
       settlementItemCount: candidate.items.length,
-      subject: '지급수수료',
-      category: '지급수수료',
       memo: `CMS집금 정산${feeLabel}`,
     },
   }];
