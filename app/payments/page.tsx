@@ -149,6 +149,9 @@ export default function PaymentsPage() {
     await runBusy(async () => {
       setApplying(true);
       const txByKey = new Map(txs.map((r) => [String(r._key), r]));
+      // ★같은 계약에 입금 2건 이상을 적용할 때, 직전 append 결과를 누적해야 앞선 입금이 안 지워진다.
+      //   (csByKey는 페이지 로드 스냅샷 → 매 루프 같은 _payments를 읽어 전체 교체하면 1건만 남음: QA 출시차단 #2)
+      const appliedPayments = new Map<string, Array<Record<string, unknown>>>();
       let applied = 0, skipped = 0, locked = 0;
       for (const r of results) {
         if (!sel.has(r.tx.id)) continue;
@@ -156,7 +159,9 @@ export default function PaymentsPage() {
         const crec = csByKey.get(r.candidate.contract.id);
         const trec = txByKey.get(r.tx.id);
         if (!crec || !trec || trec.matchedContractId) { skipped++; continue; }
-        const existing = Array.isArray(crec._payments) ? (crec._payments as Array<Record<string, unknown>>) : [];
+        const ckey = String(crec._key);
+        const existing = appliedPayments.get(ckey)
+          ?? (Array.isArray(crec._payments) ? (crec._payments as Array<Record<string, unknown>>) : []);
         if (existing.some((p) => p.txId === r.tx.id)) { skipped++; continue; }
         const co = resolveWriteCompany(companyId, crec);
         const txCo = resolveWriteCompany(companyId, trec);
@@ -164,14 +169,14 @@ export default function PaymentsPage() {
         const newPayments = [...existing, { seq: r.candidate.scheduleSeq, date: r.tx.txDate, amount: r.tx.amount, source: '계좌', txId: r.tx.id }];
         const ok = await safeUpdate(async () => {
           await commitAll([
-            { entity: 'contract', sessionCompanyId: companyId, rec: crec, key: String(crec._key), patch: { _payments: newPayments } },
+            { entity: 'contract', sessionCompanyId: companyId, rec: crec, key: ckey, patch: { _payments: newPayments } },
             {
               entity: 'bank_tx', sessionCompanyId: companyId, rec: trec, key: String(trec._key),
-              patch: { matchedContractId: String(crec._key), matchedScheduleSeq: r.candidate.scheduleSeq, matchedAt: new Date().toISOString(), subject: '대여료수입', category: '대여료수입' },
+              patch: { matchedContractId: ckey, matchedScheduleSeq: r.candidate.scheduleSeq, matchedAt: new Date().toISOString(), subject: '대여료수입', category: '대여료수입' },
             },
           ]);
         });
-        if (ok != null) applied++; else skipped++;
+        if (ok != null) { applied++; appliedPayments.set(ckey, newPayments); } else skipped++;
       }
       setApplying(false);
       const lockNote = locked ? ` · 마감월 ${locked}` : '';

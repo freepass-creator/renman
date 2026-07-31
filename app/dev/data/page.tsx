@@ -43,6 +43,11 @@ export default function DevDataPage() {
   useEffect(() => { load(); }, [load]);
 
   async function loadCompany(c: string) {
+    // ★프로덕션에선 «반영» 자체를 차단 — live 소스가 403이라 frozen(가명) 시드로 실데이터를 덮게 된다.
+    if (process.env.NODE_ENV === 'production') {
+      setMsg('프로덕션 «반영» 차단 — 실데이터가 가명 시드로 대체될 수 있습니다(개발 환경에서만 사용).');
+      return;
+    }
     const cnt = counts[c];
     const hasData = !!cnt && (cnt.vehicle + cnt.contract + cnt.bank_tx + cnt.insurance) > 0;
     // 반영 = 깨끗한 최신 적재 + 운영 스냅샷 산출(공용 reflect 엔진). 옛 1930·미분류 잔존 방지.
@@ -58,6 +63,7 @@ export default function DevDataPage() {
     finally { setBusy(''); }
   }
   async function clearCompany(c: string) {
+    if (hardWipeBlocked('법인 비우기')) return;
     if (!(await confirm({ message: `${companyLabel(c)}의 모든 데이터를 지웁니다(하드, 되돌릴 수 없음). 계속?`, danger: true }))) return;
     const typed = await prompt({ message: `확인: 법인 코드 "${c}" 를 그대로 입력하세요.`, required: true });
     if (typed !== c) { setMsg('초기화 취소 — 법인 코드 불일치'); return; }
@@ -66,11 +72,20 @@ export default function DevDataPage() {
     catch (e) { setMsg(`${companyLabel(c)} 초기화 실패: ${(e as Error).message}`); }
     finally { setBusy(''); }
   }
-  async function clearAll() {
+  /**
+   * ★프로덕션 파괴 가드 — wipeCompany/wipeAllData를 부르는 «모든» 경로가 통과해야 한다.
+   *   (QA 긴급: 전체초기화에만 걸려 있어 반영·비우기·데모가 실데이터를 하드삭제할 수 있었음)
+   */
+  function hardWipeBlocked(what: string): boolean {
     if (process.env.NODE_ENV === 'production' && process.env.NEXT_PUBLIC_ALLOW_HARD_WIPE !== '1') {
-      setMsg('프로덕션 전체 초기화 차단 — NEXT_PUBLIC_ALLOW_HARD_WIPE=1 필요');
-      return;
+      setMsg(`프로덕션 ${what} 차단 — NEXT_PUBLIC_ALLOW_HARD_WIPE=1 필요`);
+      return true;
     }
+    return false;
+  }
+
+  async function clearAll() {
+    if (hardWipeBlocked('전체 초기화')) return;
     if (!(await confirm({ message: '전 회사 데이터를 완전히 지웁니다(하드). 계속?', danger: true }))) return;
     const typed = await prompt({ message: '확인: WIPE-ALL 을 입력하세요.', required: true });
     if (typed !== 'WIPE-ALL') { setMsg('전체 초기화 취소'); return; }
@@ -80,7 +95,10 @@ export default function DevDataPage() {
     finally { setBusy(''); }
   }
   async function loadDemoAll() {
+    if (hardWipeBlocked('데모 샘플 적재')) return;
     if (!(await confirm({ message: '전 법인 데이터를 비우고 데모 샘플(차량·계약·미수·과태료·미분류입금)을 넣습니다. 계속?', danger: true }))) return;
+    const typedDemo = await prompt({ message: '확인: DEMO 를 입력하세요(전 법인 데이터가 삭제됩니다).', required: true });
+    if (typedDemo !== 'DEMO') { setMsg('데모 적재 취소'); return; }
     setBusy('__demo__'); setMsg(''); setSnap(null);
     try {
       let total = 0;
