@@ -177,17 +177,27 @@ class FirestoreAdapter implements StoreAdapter {
       saved++;
     }
     // 브라우저에서 권한 실패를 기다렸다가 재시도하지 않고 인증된 서버 경로를 우선 사용한다.
+    // ★서버 라우트는 요청당 500건 상한 → 청크로 나눠 보낸다. (전량 1회로 보내면 대량 임포트가
+    //   항상 400을 받아 «검증 없는 직접 경로»로 새던 문제 — QA 적대검증 지적)
     if (typeof window !== 'undefined' && pending.length > 0) {
       const { apiAuthHeaders } = await import('./api-headers');
       const headers = await apiAuthHeaders();
       headers.set('content-type', 'application/json');
-      const res = await fetch(`/api/entities/${encodeURIComponent(entityKey)}`, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({ companyId, docs: pending }),
-      });
-      if (res.ok) return { saved, duplicates, backend: this.backend };
-      console.warn(`Firestore save(${entityKey}) 서버 저장 실패 (${res.status}) — 직접 저장 경로로 전환`);
+      const CHUNK = 500;
+      let allOk = true;
+      for (let i = 0; i < pending.length; i += CHUNK) {
+        const res = await fetch(`/api/entities/${encodeURIComponent(entityKey)}`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({ companyId, docs: pending.slice(i, i + CHUNK) }),
+        });
+        if (!res.ok) {
+          allOk = false;
+          console.warn(`Firestore save(${entityKey}) 서버 저장 실패 (${res.status}) — 직접 저장 경로로 전환`);
+          break;
+        }
+      }
+      if (allOk) return { saved, duplicates, backend: this.backend };
     }
     try {
     if (pending.length === 1) {

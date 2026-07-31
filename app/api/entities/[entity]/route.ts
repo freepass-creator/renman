@@ -12,14 +12,16 @@ export const runtime = 'nodejs';
  *   타 법인 문서 하드 덮어쓰기를 막을 수 있다(QA 출시차단 #1).
  */
 function docIdBelongsTo(id: string, companyId: string): boolean {
+  // ★companyId 자체에 '__'가 있으면 접두어 검증이 무의미해진다(`a__b__k` = companyId 'a__b'의 문서와 동일 ID).
+  //   회사 id는 영숫자 slug(lib/companies slug())이므로 '__'·'/'는 있을 수 없다.
+  if (!companyId || companyId.includes('__') || companyId.includes('/')) return false;
   const prefix = `${companyId}__`;
   if (!id.startsWith(prefix)) return false;
   const key = id.slice(prefix.length);
   if (!key) return false;
-  // Firestore 실제 제약만: '/'(경로 구분자·정상 경로는 퍼센트 인코딩됨) · '.'/'..' 단독 · 길이
-  if (key.includes('/')) return false;
-  if (key === '.' || key === '..') return false;
-  if (id.length > 1_200) return false;
+  if (key.includes('/')) return false; // 경로 구분자(정상 경로는 %2F로 인코딩됨)
+  // Firestore 문서 ID 제약은 «1,500바이트» — UTF-16 길이로 재면 한글 키를 잘못 통과시킨다.
+  if (Buffer.byteLength(id, 'utf8') > 1_500) return false;
   return true;
 }
 
@@ -30,7 +32,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ entity: string 
   if (limited) return limited;
 
   const { entity } = await ctx.params;
-  if (!ENTITIES[entity]) return NextResponse.json({ error: 'unknown entity' }, { status: 404 });
+  if (!Object.hasOwn(ENTITIES, entity)) return NextResponse.json({ error: 'unknown entity' }, { status: 404 });
 
   const url = new URL(req.url);
   const requestedCompany = url.searchParams.get('companyId') || '';
@@ -57,7 +59,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ entity: string
   if (limited) return limited;
 
   const { entity } = await ctx.params;
-  if (!ENTITIES[entity]) return NextResponse.json({ error: 'unknown entity' }, { status: 404 });
+  if (!Object.hasOwn(ENTITIES, entity)) return NextResponse.json({ error: 'unknown entity' }, { status: 404 });
   const body = await req.json().catch(() => null) as {
     companyId?: string;
     docs?: Array<{ id?: string; data?: Record<string, unknown> }>;

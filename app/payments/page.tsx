@@ -167,13 +167,17 @@ export default function PaymentsPage() {
         const txCo = resolveWriteCompany(companyId, trec);
         if (!co || !txCo) { skipped++; continue; }
         const newPayments = [...existing, { seq: r.candidate.scheduleSeq, date: r.tx.txDate, amount: r.tx.amount, source: '계좌', txId: r.tx.id }];
+        // ★순서 = bank_tx 먼저, 계약(_payments) 나중.
+        //   commitAll은 트랜잭션이 아니다(lib/commit.ts) → 부분 실패가 반드시 «복구 가능한» 쪽으로 끝나야 한다.
+        //   · 계약 먼저였을 때: 수납은 들어갔는데 입금은 미매칭 → 화면에 «해제» 버튼이 없어 영구 고아(미수도 잘못 깎임)
+        //   · bank_tx 먼저: 입금은 매칭 표시·수납 미기록 → 미수는 정상(안 깎임) + «해제»로 되돌릴 수 있음
         const ok = await safeUpdate(async () => {
           await commitAll([
-            { entity: 'contract', sessionCompanyId: companyId, rec: crec, key: ckey, patch: { _payments: newPayments } },
             {
               entity: 'bank_tx', sessionCompanyId: companyId, rec: trec, key: String(trec._key),
               patch: { matchedContractId: ckey, matchedScheduleSeq: r.candidate.scheduleSeq, matchedAt: new Date().toISOString(), subject: '대여료수입', category: '대여료수입' },
             },
+            { entity: 'contract', sessionCompanyId: companyId, rec: crec, key: ckey, patch: { _payments: newPayments } },
           ]);
         });
         if (ok != null) { applied++; appliedPayments.set(ckey, newPayments); } else skipped++;

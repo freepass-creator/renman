@@ -16,6 +16,13 @@ service cloud.firestore {
     function tenantOK(companyId) { return isHQ() || (isSignedIn() && myCompany() == companyId); }
     // ★ 민감 컬렉션 — 범용 규칙에서 반드시 제외. 각자의 명시 match만 지배(범용 OR 우회로 권한승격 차단).
     //   users: role 자기승격 방지 · period_locks: 마감 우회 방지 · audit_logs: 위변조 방지.
+    // 문서ID 소유권 — `{companyId}__…` 접두어. companyId 자체에 '__'가 없어야 유효(회사 id는 영숫자 slug).
+    function docIdOwnedBy(docId, companyId) {
+      return companyId is string
+             && !companyId.matches('.*__.*')
+             && docId.size() > companyId.size() + 2
+             && docId[0:(companyId.size() + 2)] == companyId + '__';
+    }
     function businessColl(coll) {
       return coll != 'users'
         && coll != 'period_locks'
@@ -56,9 +63,12 @@ service cloud.firestore {
     // 업무 데이터(vehicle·contract·payment·bank_tx…) — 법인 격리. businessColl()로 민감 컬렉션(users·period_locks·audit_logs)은 절대 여기 안 걸림 → 범용 OR 우회 차단.
     match /{coll}/{docId} {
       allow read: if isSignedIn() && businessColl(coll) && tenantOK(resource.data.companyId);
+      // ★생성 시 문서ID 소유권도 강제 — docId = `{companyId}__{자연키}`(lib/store.ts firestoreDocId).
+      //   없으면 남의 회사 문서ID를 «선점»해 그 회사의 정상 저장을 영구 차단할 수 있다(dedup read 거부→저장 실패).
       allow create: if isSignedIn() && businessColl(coll)
                     && tenantOK(request.resource.data.companyId)
-                    && request.resource.data.companyId is string;
+                    && request.resource.data.companyId is string
+                    && docIdOwnedBy(docId, request.resource.data.companyId);
       // 수정: 소유 법인이거나 본사. companyId(테넌트)는 불변 — 법인 사용자가 자기 문서를 남의 회사로 이동 금지(본사만 재배정 가능).
       allow update: if isSignedIn() && businessColl(coll)
                     && tenantOK(resource.data.companyId)
