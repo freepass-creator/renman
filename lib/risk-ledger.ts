@@ -32,7 +32,10 @@ export type RiskSheetRow = {
   companyId: string;
   company: string;
   plate: string;
+  /** 신원 — «실제 사람·거래상대» 이름만. 사유·차명·제목을 담지 않는다(칸이 의미를 잃는다). */
   customer: string;
+  /** 사유·제목 — 무엇 때문에 걸렸는지. 신원과 절대 섞지 않는다(「리스크내용」 칸). */
+  subject: string;
   phone: string;
   carName: string;
   due: string;
@@ -138,6 +141,7 @@ export function buildRiskSheetRows(
       ...companyOf(r),
       plate: r.plate,
       customer: r.customer || LEDGER_EMPTY.none,
+      subject: `계약 만기 경과 · ${carNameOf(r)}`,
       phone: r.phone,
       carName: carNameOf(r),
       due: `${ddayLabel(r.dday)} · ${r.end || LEDGER_EMPTY.dash}`,
@@ -153,6 +157,7 @@ export function buildRiskSheetRows(
       ...companyOf(r),
       plate: r.plate,
       customer: r.customer || LEDGER_EMPTY.none,
+      subject: `${r.ownership} · ${carNameOf(r)}`,
       phone: r.phone,
       carName: carNameOf(r),
       due: r.status || r.ownership,
@@ -168,9 +173,12 @@ export function buildRiskSheetRows(
     push(rowOf('미완료', {
       id: `미완료:일정:${a.key}`,
       kind: a.kind,
-      ...companyOf(fr),
+      // 차량이 안 붙은 일정도 회사는 반드시 채운다 — 일정 자체가 companyId 를 갖고 있다.
+      ...companyOf(fr, { companyId: a.companyId } as EntityRecord),
       plate: a.plate,
-      customer: a.title || LEDGER_EMPTY.none,
+      // ★신원은 차량으로 찾은 «실제 계약자»만. a.title(차명·사유)을 여기 넣으면 칸이 의미를 잃는다.
+      customer: fr?.customer || LEDGER_EMPTY.none,
+      subject: a.title || LEDGER_EMPTY.dash,
       phone: phoneOf(fr),
       carName: fr ? carNameOf(fr) : LEDGER_EMPTY.dash,
       due: `${ddayLabel(a.dday)} · ${a.date}`,
@@ -191,6 +199,9 @@ export function buildRiskSheetRows(
       ...companyOf(fr, v.rec),
       plate,
       customer: String(v.rec.contractorName || LEDGER_EMPTY.none),
+      subject: v.ended
+        ? `반납 후 미수 ${v.count}건`
+        : (v.overdueDays ? `대여료 ${v.count}회 미납 · ${v.overdueDays}일 연체` : `대여료 ${v.count}회 미납`),
       phone: phoneOf(fr, String(v.rec.contractorPhone || '')),
       carName: fr ? carNameOf(fr) : String(v.rec.carName || LEDGER_EMPTY.dash),
       due: v.overdueDays ? `${v.overdueDays}일 연체` : ddayLabel(v.dday),
@@ -211,6 +222,7 @@ export function buildRiskSheetRows(
       ...companyOf(r),
       plate: r.plate,
       customer: r.customer || LEDGER_EMPTY.none,
+      subject: `계약 만기 임박 · ${carNameOf(r)}`,
       phone: r.phone,
       carName: carNameOf(r),
       due: `${ddayLabel(r.dday)} · ${r.end || LEDGER_EMPTY.dash}`,
@@ -228,9 +240,10 @@ export function buildRiskSheetRows(
     push(rowOf('만기', {
       id: `만기:일정:${a.key}`,
       kind: a.kind,
-      ...companyOf(fr),
+      ...companyOf(fr, { companyId: a.companyId } as EntityRecord),
       plate: a.plate,
-      customer: a.title || LEDGER_EMPTY.none,
+      customer: fr?.customer || LEDGER_EMPTY.none,
+      subject: a.title || LEDGER_EMPTY.dash,
       phone: phoneOf(fr),
       carName: fr ? carNameOf(fr) : LEDGER_EMPTY.dash,
       due: `${ddayLabel(a.dday)} · ${a.date}`,
@@ -250,9 +263,13 @@ export function buildRiskSheetRows(
     push(rowOf('미완료', {
       id,
       kind: p.kind,
-      ...companyOf(fr),
+      // ★자금미분류(통장거래)·서류미첨부는 차량이 없어 회사가 비었다 → 큐가 나르는 companyId 로 채운다.
+      ...companyOf(fr, { companyId: p.companyId } as EntityRecord),
       plate: p.plate,
-      customer: p.title || LEDGER_EMPTY.none,
+      // ★자금미분류의 p.title은 «거래상대»이고 서류미첨부의 p.title은 «사유»다 — 둘 다 신원 칸이 아니다.
+      //   차량으로 계약자를 찾을 수 있으면 그것만 신원에 넣고, 제목은 리스크내용으로 보낸다.
+      customer: fr?.customer || LEDGER_EMPTY.none,
+      subject: p.title || LEDGER_EMPTY.dash,
       phone: phoneOf(fr),
       carName: fr ? carNameOf(fr) : LEDGER_EMPTY.dash,
       due: p.detail || LEDGER_EMPTY.dash,
@@ -270,6 +287,7 @@ export function buildRiskSheetRows(
       ...companyOf(r),
       plate: r.plate,
       customer: r.customer || LEDGER_EMPTY.none,
+      subject: `휴차 · ${carNameOf(r)}`,
       phone: r.phone,
       carName: carNameOf(r),
       due: LEDGER_EMPTY.dash,

@@ -98,7 +98,7 @@ const FL = {
     render: (r) => r.overdueDays > 0 ? <span style={{ color: r.overdueDays >= 90 ? C.danger : C.warn, fontWeight: 700 }}>{r.overdueDays}일</span> : LEDGER_EMPTY.dash,
     text: (r) => r.overdueDays,
   },
-  own: { key: 'own', label: '소유', priority: 2 as const, render: (r) => r.ownership || LEDGER_EMPTY.dash, text: (r) => r.ownership },
+  own: { key: 'own', label: '차량분류', priority: 2 as const, render: (r) => r.ownership || LEDGER_EMPTY.dash, text: (r) => r.ownership },
   util: { key: 'util', label: '가동', render: (r) => r.util || LEDGER_EMPTY.dash, text: (r) => r.util },
   loanStart: { key: 'loanStart', label: '할부시작', render: (r) => ymd(r.loanStart), text: (r) => r.loanStart },
   stage: {

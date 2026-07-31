@@ -26,12 +26,12 @@ const AGENDA_COL_CATALOG: SheetCol<AgendaItem>[] = [
     text: (r) => r.dday,
   },
   {
-    key: 'status', label: '이행', align: 'c',
+    key: 'status', label: '일정상태', align: 'c',
     render: (r) => <Badge tone={statusTone(r.status)}>{r.status}</Badge>,
     text: (r) => r.status,
   },
   {
-    key: 'kind', label: '종류', align: 'c',
+    key: 'kind', label: '일정분류', align: 'c',
     render: (r) => <Badge tone="gray">{r.kind}</Badge>,
     text: (r) => r.kind,
   },
@@ -42,8 +42,8 @@ const AGENDA_COL_CATALOG: SheetCol<AgendaItem>[] = [
 ];
 
 export const AGENDA_SHEET_KEYS: SheetViewKeys = {
-  basic: ['company', 'date', 'dday', 'status', 'kind', 'plate', 'title'],
-  all: ['company', 'date', 'dday', 'status', 'kind', 'plate', 'title', 'companyId', 'key'],
+  basic: ['company', 'plate', 'title', 'kind', 'status', 'date', 'dday'],
+  all: ['company', 'plate', 'title', 'kind', 'status', 'date', 'dday', 'companyId', 'key'],
 };
 
 const _agendaViews = buildSheetViews(AGENDA_COL_CATALOG, AGENDA_SHEET_KEYS);

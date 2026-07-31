@@ -22,9 +22,9 @@ const ACCOUNT_COL_CATALOG: SheetCol<BankAccountRow>[] = [
   { key: 'account', label: '계좌번호', priority: 2, render: (r) => r.accountNumber || LEDGER_EMPTY.dash, text: (r) => r.accountNumber },
   { key: 'alias', label: '계좌명', priority: 1, render: (r) => r.accountAlias || LEDGER_EMPTY.dash, text: (r) => r.accountAlias },
   { key: 'holder', label: '예금주', priority: 2, render: (r) => r.accountHolder || LEDGER_EMPTY.dash, text: (r) => r.accountHolder },
-  { key: 'type', label: '계좌구분', priority: 2, render: (r) => r.accountType || LEDGER_EMPTY.dash, text: (r) => r.accountType },
+  { key: 'type', label: '계좌분류', priority: 2, render: (r) => r.accountType || LEDGER_EMPTY.dash, text: (r) => r.accountType },
   {
-    key: 'status', label: '상태', priority: 1, align: 'c',
+    key: 'status', label: '계좌상태', priority: 1, align: 'c',
     render: (r) => <Badge tone={r.status === '사용중' ? 'green' : 'gray'}>{r.status || LEDGER_EMPTY.dash}</Badge>,
     text: (r) => r.status,
   },
@@ -71,7 +71,7 @@ const ACCOUNT_COL_CATALOG: SheetCol<BankAccountRow>[] = [
 
 /** 회사 → 신원(은행·계좌) → 상태 → 수치 */
 export const ACCOUNT_SHEET_KEYS: SheetViewKeys = {
-  basic: ['company', 'bank', 'alias', 'status', 'totalIn', 'totalOut', 'currentBalance'],
+  basic: ['company', 'bank', 'alias', 'holder', 'type', 'status', 'totalIn', 'totalOut', 'currentBalance'],
   all: [
     'company', 'bank', 'account', 'alias', 'holder', 'type', 'status',
     'totalIn', 'totalOut', 'currentBalance', 'createdAt', 'createdBy',

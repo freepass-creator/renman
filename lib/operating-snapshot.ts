@@ -53,6 +53,7 @@ export function computeDashboard(input: DashboardInput, today: string) {
   const expiring = [
     ...views.filter((v) => v.status === '운행' && v.dday != null && v.dday > 7 && v.dday <= 30).map((v) => ({
       plate: v.rec.plate,
+      companyId: String(v.rec.companyId || ''),
       dday: v.dday as number,
       main: `${v.rec.plate} · ${v.rec.contractorName}`,
       sub: `계약 만기 D-${v.dday}`,
@@ -60,6 +61,7 @@ export function computeDashboard(input: DashboardInput, today: string) {
     })),
     ...insurances.filter((i) => { const d = dday(i.endDate); return d != null && d <= 30; }).map((i) => ({
       plate: i.plate,
+      companyId: String(i.companyId || ''),
       dday: dday(i.endDate)!,
       main: `${i.plate} · ${i.insurer || '보험'}`,
       sub: `보험 만기 ${(() => { const d = dday(i.endDate)!; return d < 0 ? `${-d}일 경과` : `D-${d}`; })()}`,
@@ -67,10 +69,24 @@ export function computeDashboard(input: DashboardInput, today: string) {
     })),
     ...vehicles.filter((v) => { const d = dday(v.inspectionTo); return d != null && d <= 30; }).map((v) => ({
       plate: v.plate,
+      companyId: String(v.companyId || ''),
       dday: dday(v.inspectionTo)!,
       main: `${v.plate} · ${v.carName || ''}`,
       sub: `검사 만기 ${(() => { const d = dday(v.inspectionTo)!; return d < 0 ? `${-d}일 경과` : `D-${d}`; })()}`,
       agendaKey: `insp:${v._key || v.plate}:${v.inspectionTo}`,
+    })),
+    ...vehicles.filter((v) => {
+      const due = String(v.vehicleTaxDueDate || '');
+      const paid = String(v.vehicleTaxPaidDate || '');
+      if (!due || (paid && paid >= due)) return false;
+      const d = dday(due); return d != null && d <= 30;
+    }).map((v) => ({
+      plate: v.plate,
+      companyId: String(v.companyId || ''),
+      dday: dday(String(v.vehicleTaxDueDate))!,
+      main: `${v.plate} · ${v.carName || ''}`,
+      sub: `자동차세 ${(() => { const d = dday(String(v.vehicleTaxDueDate))!; return d < 0 ? `${-d}일 경과` : `D-${d}`; })()}`,
+      agendaKey: `tax:${v._key || v.plate}:${String(v.vehicleTaxDueDate)}`,
     })),
   ];
   const repair = rows.filter((r) => ['정비', '사고'].includes(r.status));
@@ -90,28 +106,42 @@ export function computeDashboard(input: DashboardInput, today: string) {
     const cur = cByPlate.get(p);
     if (cur) cur.push(c); else cByPlate.set(p, [c]);
   }
-  const doubleBooking: { plate: string; detail: string }[] = [];
+  const doubleBooking: { plate: string; companyId: string; detail: string }[] = [];
   for (const [p, cs] of cByPlate) {
     if (cs.length < 2) continue;
     for (let i = 0; i < cs.length; i++) for (let j = i + 1; j < cs.length; j++) {
       const a = cs[i], b = cs[j];
       const as = String(a.startDate || a.deliveredDate || ''), ae = String(a.endDate || '9999-12-31');
       const bs = String(b.startDate || b.deliveredDate || ''), be = String(b.endDate || '9999-12-31');
-      if (as && bs && as <= be && bs <= ae) doubleBooking.push({ plate: p, detail: `${a.contractorName || '?'}(${as}~) ↔ ${b.contractorName || '?'}(${bs}~)` });
+      if (as && bs && as <= be && bs <= ae) {
+        doubleBooking.push({
+          plate: p,
+          companyId: String(a.companyId || b.companyId || ''),
+          detail: `${a.contractorName || '?'}(${as}~) ↔ ${b.contractorName || '?'}(${bs}~)`,
+        });
+      }
     }
   }
   // 처리 대기(할 일) — 완료 안 된 상태: 인도(출고) 대기·구매/등록 예정 등 액션 필요한 것
   const deliveryPending = contracts.filter(isDeliveryPending);
   const purchasePending = rows.filter((r) => ['구매대기', '구매예정', '등록대기', '입고대기', '매입대기'].includes(r.status));
-  const todo: { plate: string; name: string; action: string; detail: string; cta: string; focus?: string }[] = [
-    ...deliveryPending.map((c) => ({ plate: String(c.plate), name: String(c.contractorName || '임차인 미정'), action: '인도 대기', detail: `계약 ${String(c.startDate || c.contractDate || '—')} · 아직 출고 안 함`, cta: '인도(출고) →' })),
-    ...purchasePending.map((r) => ({ plate: String(r.v.plate), name: String(r.v.carName || '차명 미정'), action: r.status, detail: '구매·등록 진행 필요', cta: '처리 →' })),
+  const todo: { plate: string; companyId: string; name: string; action: string; detail: string; cta: string; focus?: string }[] = [
+    ...deliveryPending.map((c) => ({ plate: String(c.plate), companyId: String(c.companyId || ''), name: String(c.contractorName || '임차인 미정'), action: '인도 대기', detail: `계약 ${String(c.startDate || c.contractDate || '—')} · 아직 출고 안 함`, cta: '인도(출고) →' })),
+    ...purchasePending.map((r) => ({ plate: String(r.v.plate), companyId: String(r.v.companyId || ''), name: String(r.v.carName || '차명 미정'), action: r.status, detail: '구매·등록 진행 필요', cta: '처리 →' })),
   ];
   // 일정 — 무엇을 담을지 재정의 예정. 당분간 비움(반납·검사·보험·과태료는 각자 미결/만기 섹션에서 관리).
   const sched: { d: number; type: string; plate: string; label: string; tone: 'amber' | 'teal' | 'purple' | 'orange' }[] = [];
   // 미결 종합 — 자금 미분류(매칭 안 됨) · 미등록 차량(계약만 있고 등록증/서류 없음)
   const unmatchedTx = bankTx.filter((t) => !t.category || String(t.category) === '(미분류)');
-  const ghostPlates = Array.from(new Set(contracts.map((c) => String(c.plate || '')).filter((p) => p && !vehByPlate.has(normPlate(p)))));
+  /* 계약만 있고 차량 등록증이 없는 차 — «회사»를 함께 나른다(리스크원장의 회사 칸이 비지 않게).
+     같은 번호가 여러 계약에 있으면 처음 만난 계약의 회사를 쓴다. */
+  const ghostMap = new Map<string, string>();
+  for (const c of contracts) {
+    const plate = String(c.plate || '');
+    if (!plate || vehByPlate.has(normPlate(plate))) continue;
+    if (!ghostMap.has(plate)) ghostMap.set(plate, String(c.companyId || ''));
+  }
+  const ghostPlates = Array.from(ghostMap, ([plate, companyId]) => ({ plate, companyId }));
 
   // 헤드라인 스냅샷 — "반영" 요약이 읽는 값(같은 계산). 보유/전체/매각/운행/미수/자금.
   // v5 migrate-switchplan 사전점검 대응: 전체구매(자산)·현보유·매각·운행중차량·운행중계약·반납·할부·미수(액/건)·자금건수.

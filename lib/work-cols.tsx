@@ -69,12 +69,12 @@ function detailNum(key: string, label: string, suffix = ''): SheetCol<WorkLedger
 const WORK_COL_CATALOG: SheetCol<WorkLedgerRow>[] = [
   { key: 'company', label: '회사명', pin: true, priority: 2, render: (r) => r.company || LEDGER_EMPTY.dash, text: (r) => r.company },
   {
-    key: 'kind', label: '업무구분', pin: true, priority: 1,
+    key: 'kind', label: '업무분류', pin: true, priority: 1,
     render: (r) => <KindCell kind={r.kind} />,
     text: (r) => r.kind,
   },
   {
-    key: 'status', label: '상태', align: 'c', priority: 1,
+    key: 'status', label: '업무상태', align: 'c', priority: 1,
     render: (r) => <Badge tone={workStatusTone(r.status)}>{r.status}</Badge>,
     text: (r) => r.status,
   },
@@ -183,11 +183,11 @@ const PENALTY_COL_CATALOG: SheetCol<WorkLedgerRow>[] = [
   },
   { key: 'driver', label: '실운전자', priority: 1, render: (r) => r.driverName || LEDGER_EMPTY.unmatched, text: (r) => r.driverName || '' },
   {
-    key: 'status', label: '처리상태', align: 'c', priority: 1,
+    key: 'status', label: '과태료상태', align: 'c', priority: 1,
     render: (r) => <Badge tone={workStatusTone(r.status)}>{r.status}</Badge>,
     text: (r) => r.status,
   },
-  { key: 'ptype', label: '유형', priority: 2, render: (r) => r.penaltyKind || LEDGER_EMPTY.dash, text: (r) => r.penaltyKind || '' },
+  { key: 'ptype', label: '과태료분류', priority: 2, render: (r) => r.penaltyKind || LEDGER_EMPTY.dash, text: (r) => r.penaltyKind || '' },
   { key: 'title', label: '위반내용', priority: 2, render: (r) => r.title || LEDGER_EMPTY.dash, text: (r) => r.title },
   { key: 'company', label: '회사명', priority: 2, render: (r) => r.company || LEDGER_EMPTY.dash, text: (r) => r.company },
   { key: 'due', label: '납기', priority: 2, render: (r) => r.dueDate || LEDGER_EMPTY.dash, text: (r) => r.dueDate },
@@ -208,16 +208,16 @@ const PENALTY_DETAIL_CATALOG: SheetCol<WorkLedgerRow>[] = [
 ];
 
 export const WORK_SHEET_KEYS: SheetViewKeys = {
-  basic: ['company', 'plate', 'contractor', 'title', 'kind', 'priority', 'status', 'contractNo', 'workDate', 'due', 'assignee'],
+  basic: ['company', 'plate', 'contractor', 'title', 'kind', 'status', 'priority', 'contractNo', 'workDate', 'due', 'assignee'],
   all: [
-    'company', 'plate', 'contractor', 'title', 'kind', 'priority', 'status', 'contractNo', 'workDate',
+    'company', 'plate', 'contractor', 'title', 'kind', 'status', 'priority', 'contractNo', 'workDate',
     'assignee', 'created', 'updated', 'due', 'amount', 'source',
   ],
 };
 
 export const PENALTY_SHEET_KEYS: SheetViewKeys = {
-  basic: ['company', 'plate', 'driver', 'title', 'status', 'violationDate', 'amount'],
-  all: ['company', 'plate', 'driver', 'title', 'status', 'violationDate', 'amount', 'ptype', 'due'],
+  basic: ['company', 'plate', 'driver', 'title', 'ptype', 'status', 'violationDate', 'amount'],
+  all: ['company', 'plate', 'driver', 'title', 'ptype', 'status', 'violationDate', 'amount', 'due'],
 };
 
 const _workViews = buildSheetViews(WORK_COL_CATALOG, WORK_SHEET_KEYS);

@@ -17,7 +17,15 @@ import {
 
 export type HomeQueueRow = {
   id: string;
+  /** 표시용 회사명. */
   company: string;
+  /**
+   * 회사 식별자 — 표시명과 별개로 반드시 함께 나른다.
+   * ★리스크원장이 이 큐를 차용하는데, 차량이 안 붙은 리스크(자금미분류·서류미첨부 등)는
+   *   차량으로 회사를 찾을 수 없어 «회사 칸이 비는» 문제가 있었다(행 문법 1번 칸 누락).
+   *   원본 레코드에 companyId 가 있으므로 여기서 같이 실어 보낸다.
+   */
+  companyId: string;
   kind: string;
   plate: string;
   title: string;
@@ -29,6 +37,7 @@ export type HomeQueueRow = {
 export type HomeIdleRow = {
   id: string;
   company: string;
+  companyId: string;
   plate: string;
   carName: string;
   status: string;
@@ -44,6 +53,7 @@ export function buildHomePendingRows(D: Dashboard): HomeQueueRow[] {
     rows.push({
       id: riskReturnOverOpenId(plate),
       company: companyDisplay(v.rec.companyId),
+      companyId: String(v.rec.companyId || ''),
       kind: '반납지남',
       plate,
       title: String(v.rec.contractorName || '계약자 미정'),
@@ -56,7 +66,8 @@ export function buildHomePendingRows(D: Dashboard): HomeQueueRow[] {
     rows.push({
       // risk embeds as 미완료:업무:… — 홈은 배차로 (표 open 없음)
       id: `미완료:업무:overlap:${d.plate}`,
-      company: '',
+      company: companyDisplay(d.companyId),
+      companyId: String(d.companyId || ''),
       kind: '배차충돌',
       plate: d.plate,
       title: '기간 겹침',
@@ -69,6 +80,7 @@ export function buildHomePendingRows(D: Dashboard): HomeQueueRow[] {
     rows.push({
       id: penaltyOpenId(p.rec),
       company: companyDisplay(p.rec.companyId),
+      companyId: String(p.rec.companyId || ''),
       kind: '과태료',
       plate: String(p.rec.plate || ''),
       title: String(p.rec.description || p.rec.docType || '과태료'),
@@ -80,7 +92,8 @@ export function buildHomePendingRows(D: Dashboard): HomeQueueRow[] {
   for (const t of D.todo) {
     rows.push({
       id: `미완료:업무:todo:${t.action}:${t.plate}`,
-      company: '',
+      company: companyDisplay(t.companyId),
+      companyId: String(t.companyId || ''),
       kind: t.action,
       plate: t.plate,
       title: t.name,
@@ -89,10 +102,11 @@ export function buildHomePendingRows(D: Dashboard): HomeQueueRow[] {
       amount: 0,
     });
   }
-  for (const plate of D.ghostPlates) {
+  for (const { plate, companyId } of D.ghostPlates) {
     rows.push({
       id: `미완료:업무:ghost:${plate}`,
-      company: '',
+      company: companyDisplay(companyId),
+      companyId: String(companyId || ''),
       kind: '서류미첨부',
       plate,
       title: '등록증 없음',
@@ -105,6 +119,7 @@ export function buildHomePendingRows(D: Dashboard): HomeQueueRow[] {
     rows.push({
       id: `tx:${t._key || t.id || ''}`,
       company: companyDisplay(t.companyId),
+      companyId: String(t.companyId || ''),
       kind: '자금미분류',
       plate: '',
       title: String(t.memo || t.counterpart || '미분류 거래'),
@@ -123,6 +138,7 @@ export function buildHomeRiskRows(D: Dashboard): HomeQueueRow[] {
     rows.push({
       id: riskUnpaidOpenId(v.rec),
       company: companyDisplay(v.rec.companyId),
+      companyId: String(v.rec.companyId || ''),
       kind: v.ended ? '종료미수' : '운행중미수',
       plate: String(v.rec.plate || ''),
       title: String(v.rec.contractorName || '계약자 미정'),
@@ -136,6 +152,7 @@ export function buildHomeRiskRows(D: Dashboard): HomeQueueRow[] {
     rows.push({
       id: riskComplianceOpenId(c.rec),
       company: companyDisplay(c.rec.companyId),
+      companyId: String(c.rec.companyId || ''),
       kind: high ? '컴플라이언스(위험)' : '컴플라이언스',
       plate: String(c.rec.plate || ''),
       title: String(c.rec.contractorName || c.rec.plate || '—'),
@@ -149,6 +166,7 @@ export function buildHomeRiskRows(D: Dashboard): HomeQueueRow[] {
     rows.push({
       id: `acc:${r.v._key || r.v.plate}`,
       company: companyDisplay(r.v.companyId),
+      companyId: String(r.v.companyId || ''),
       kind: '사고',
       plate: String(r.v.plate || ''),
       title: String(r.v.carName || r.v.plate || '사고'),
@@ -163,7 +181,8 @@ export function buildHomeRiskRows(D: Dashboard): HomeQueueRow[] {
     // expiring dday<0 = 보험·검사만(계약 만기경과 dday≤7은 returnFlow). agendaKey SSOT.
     rows.push({
       id: riskAgendaOverOpenId(e.agendaKey || `insp:${plate}`),
-      company: '',
+      company: companyDisplay(e.companyId),
+      companyId: String(e.companyId || ''),
       kind: '만기경과',
       plate,
       title: String(e.main || '만기'),
@@ -179,6 +198,7 @@ export function buildHomeIdleRows(D: Dashboard): HomeIdleRow[] {
   return D.idleCars.map((r) => ({
     id: String(r.v._key || r.v.plate),
     company: companyDisplay(r.v.companyId),
+    companyId: String(r.v.companyId || ''),
     plate: String(r.v.plate || ''),
     carName: String(r.v.carName || ''),
     status: r.status,
@@ -197,6 +217,7 @@ export function buildHomeUpcomingRows(D: Dashboard): HomeQueueRow[] {
     rows.push({
       id: `up:ret:${plate}:${String(v.rec.endDate || '')}`,
       company: companyDisplay(v.rec.companyId),
+      companyId: String(v.rec.companyId || ''),
       kind: '반납임박',
       plate,
       title: String(v.rec.contractorName || '계약자 미정'),
@@ -210,7 +231,8 @@ export function buildHomeUpcomingRows(D: Dashboard): HomeQueueRow[] {
     if (dd == null || dd < 0) continue;
     rows.push({
       id: `up:${e.agendaKey || `exp:${e.plate}`}`,
-      company: '',
+      company: companyDisplay(e.companyId),
+      companyId: String(e.companyId || ''),
       kind: '만기임박',
       plate: String(e.plate || ''),
       title: String(e.main || '만기'),
