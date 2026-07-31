@@ -4,7 +4,7 @@
 import type { EntityRecord } from './intake/entities';
 import { buildMatchContract, computeContractView, computeReturnSettlement } from './contract-ops';
 import { applyPayment } from './payments/payment-schedule';
-import { DEPOSIT_OFFSET_MEMO, hasDepositOffsetPayment } from './contracts/deposit-offset';
+import { DEPOSIT_OFFSET_KIND, DEPOSIT_OFFSET_MEMO, hasDepositOffsetPayment } from './contracts/deposit-offset';
 
 export type DepositView = {
   deposit: number;        // 예치 보증금
@@ -48,6 +48,7 @@ export function buildDepositOffsetPayments(
   const base = {
     date: today,
     source: '정산' as const,
+    kind: DEPOSIT_OFFSET_KIND,   // ★구조적 식별키(문자열 memo에 의존 금지)
     memo: DEPOSIT_OFFSET_MEMO,
     subject: DEPOSIT_OFFSET_MEMO,
     synthetic: true,
@@ -64,4 +65,4 @@ export function buildDepositOffsetPayments(
   return consumed.map((x) => ({ ...base, seq: x.seq, amount: x.amount }));
 }
 
-export { DEPOSIT_OFFSET_MEMO, hasDepositOffsetPayment } from './contracts/deposit-offset';
+export { DEPOSIT_OFFSET_KIND, DEPOSIT_OFFSET_MEMO, hasDepositOffsetPayment } from './contracts/deposit-offset';

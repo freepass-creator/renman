@@ -9,7 +9,6 @@ import type { Contract, PaymentEntry, DiscountEntry } from './payments/types';
 import { generateSchedules, recalcContract, addPaymentEntry, addDiscountEntry, distributeUnpaid, applyPayment, computeCurrentSeq } from './payments/payment-schedule';
 import { applyReturnedProration } from './payments/returned-proration';
 import { ymd, ddayFrom, addMonthsIso } from './contracts/dates';
-import { legacyDepositOffsetNet } from './contracts/deposit-offset';
 import {
   isDeliveryPending as statusDeliveryPending,
   isReturnable as statusReturnable,
@@ -176,8 +175,12 @@ export function computeContractView(rec: EntityRecord, today: string): ContractV
   const seedNet = seedCarry ? (hasPerSeq ? schedGross : carrySeed) : null;
   const gross = seedNet != null ? seedNet : schedGross;
   let net = seedNet != null ? seedNet : schedGross;
-  // 레거시 보증금정산: 날짜만 찍힌 계약은 충당액을 net에서 차감(미수·시동·내용증명 잔존 방지)
-  net = legacyDepositOffsetNet(rec, net);
+  // ★레거시 보증금정산 «view-time 차감»은 폐기(2026-07-31 적대검증).
+  //   depositSettledDate는 손으로 편집 가능한 필드인데, 그 날짜만 보고 net을 깎으면
+  //   ① 날짜 한 번 입력으로 기록 없이 미수가 소멸 ② 종료 여부 무관·운행중 계약에도 적용
+  //   ③ 매 계산마다 재적용돼 같은 보증금이 새 대여료를 영구히 가림 ④ 배포만으로 기존 미수가 소급 감소.
+  //   과거 «씨앗 carry 이중차감»(원장 밖 보정)과 동일 형태 → 원장(_payments)에 기록된 충당만 인정한다.
+  //   레거시 계약은 별도 백필(충당 수납 entry를 실제로 write)로 처리할 것.
   const rent0 = Number(rec.monthlyRent) || 0;
   // 미납 회차수: 씨앗 무납부는 net÷월대여(회차표 carry 분배 전에도 문서 회차 일치). 앱수납 후·일반=엔진 카운트.
   const count = seedNet != null && !hasPerSeq

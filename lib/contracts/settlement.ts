@@ -1,5 +1,6 @@
 /** 종료 정산 — 반납 보증금 정산 + 중도해지 위약금 + 초과주행. 정산서·반납폼·해지 공용 SSOT. */
 import type { EntityRecord } from '../intake/entities';
+import { recordedDepositOffsetAmount } from './deposit-offset';
 import { ymd, addMonthsIso, monthsBetweenIso } from './dates';
 import { computeOverMileage, type OverMileageBasis } from '@/lib/domain/over-mileage';
 
@@ -57,12 +58,16 @@ export function computeReturnSettlement(
   }
 
   const charge = unpaid + overMileageFee;
+  // ★이미 충당으로 소진된 보증금을 다시 «전액 남아있는» 것으로 계산하면 재인쇄 때마다 반환액이
+  //   보증금 전액으로 되살아나 과다 지급이 된다(적대검증 R2). 기록된 충당액을 차감한 잔액으로 계산.
+  const consumed = opts?.contract ? recordedDepositOffsetAmount(opts.contract) : 0;
+  const avail = Math.max(0, deposit - consumed);
   return {
     deposit,
     unpaid,
-    offset: Math.min(deposit, charge),
-    refund: Math.max(0, deposit - charge),
-    addCharge: Math.max(0, charge - deposit),
+    offset: consumed + Math.min(avail, charge),
+    refund: Math.max(0, avail - charge),
+    addCharge: Math.max(0, charge - avail),
     proRefund: view.refund,
     overMileageFee,
     excessKm,

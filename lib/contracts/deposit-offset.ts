@@ -6,23 +6,33 @@ import type { EntityRecord } from '@/lib/intake/entities';
 
 export const DEPOSIT_OFFSET_MEMO = '보증금충당';
 
+/** 구조적 식별키 — 자유서술 memo 문자열에 의존하면 손수납('보증금 충당'·'보증금상계')을 놓쳐 이중차감된다. */
+export const DEPOSIT_OFFSET_KIND = 'deposit-offset';
+
 export function hasDepositOffsetPayment(rec: EntityRecord): boolean {
   const pays = Array.isArray(rec._payments) ? (rec._payments as Array<Record<string, unknown>>) : [];
   return pays.some((p) => {
-    const m = String(p.memo || '');
-    const s = String(p.subject || '');
-    return m === DEPOSIT_OFFSET_MEMO || s === DEPOSIT_OFFSET_MEMO;
+    if (String(p.kind || '') === DEPOSIT_OFFSET_KIND) return true;
+    // 손수납·구버전 호환: 공백·표기 차이를 흡수(보증금 충당 / 보증금상계 / 보증금 상계 …)
+    const text = `${String(p.memo || '')} ${String(p.subject || '')}`.replace(/\s/g, '');
+    return text.includes('보증금충당') || text.includes('보증금상계');
   });
 }
 
 /**
- * 레거시: depositSettledDate만 있고 보증금충당 수납이 없을 때 net에서 충당액 차감.
- * 실수납이 있으면 buildContract가 이미 반영 → 이중차감 금지.
+ * ⚠ legacyDepositOffsetNet 폐기(2026-07-31) — view-time 차감은 미수를 기록 없이 소멸시킨다.
+ *   레거시(날짜만 찍힌) 계약은 «충당 수납 entry를 실제로 write하는 백필»로 처리한다.
  */
-export function legacyDepositOffsetNet(rec: EntityRecord, net: number): number {
-  if (!rec.depositSettledDate || net <= 0) return net;
-  if (hasDepositOffsetPayment(rec)) return net;
-  const deposit = Number(rec.deposit) || 0;
-  if (deposit <= 0) return net;
-  return Math.max(0, net - Math.min(deposit, net));
+
+/** 이미 «보증금에서 빠져나간» 충당액 합계 — 정산 재계산 시 보증금을 다시 전액으로 취급하지 않기 위해. */
+export function recordedDepositOffsetAmount(rec: EntityRecord): number {
+  const pays = Array.isArray(rec._payments) ? (rec._payments as Array<Record<string, unknown>>) : [];
+  let sum = 0;
+  for (const p of pays) {
+    const isOffset = String(p.kind || '') === DEPOSIT_OFFSET_KIND
+      || `${String(p.memo || '')} ${String(p.subject || '')}`.replace(/\s/g, '').includes('보증금충당')
+      || `${String(p.memo || '')} ${String(p.subject || '')}`.replace(/\s/g, '').includes('보증금상계');
+    if (isOffset) sum += Number(p.amount) || 0;
+  }
+  return Math.max(0, Math.round(sum));
 }

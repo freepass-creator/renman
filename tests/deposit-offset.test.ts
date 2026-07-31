@@ -44,15 +44,19 @@ describe('보증금 충당 → 미수 반영', () => {
         expectAfter: 500_000,
       },
       {
-        label: 'C 레거시(날짜만·수납없음) → legacy net 보정',
+        // ★2026-07-31 정정: «날짜만 찍히면 net 0»은 위험한 가정이었다(적대검증 R3).
+        //   depositSettledDate는 손 편집 가능 필드라 그것만 보고 깎으면 기록 없이 미수가 소멸하고,
+        //   운행중 계약·재계산마다 반복 적용된다. 원장(_payments)에 기록된 충당만 인정한다.
+        //   레거시 계약은 별도 백필(충당 수납을 실제로 write)로 처리 → 그때 net이 내려간다.
+        label: 'C 레거시(날짜만·수납없음) → 미수 유지(백필 대상)',
         before: returned({
           _key: 'c',
           _carryUnpaid: 700_000,
           plate: 'C',
           depositSettledDate: '2026-07-01',
         }),
-        expectBefore: 0, // 이미 settled → legacy 보정으로 0
-        expectAfter: 0,
+        expectBefore: 700_000,
+        expectAfter: 700_000,
       },
     ];
 
@@ -66,10 +70,10 @@ describe('보증금 충당 → 미수 반영', () => {
       totalBefore += netBefore;
 
       if (c.before.depositSettledDate) {
-        // 레거시: 수납 없이 이미 보정됨
+        // 레거시(날짜만): 충당 수납이 없으므로 미수는 그대로 남아야 한다 — 백필 전까지 유지.
         expect(netBefore).toBe(c.expectAfter);
         totalAfter += netBefore;
-        report.push(`${c.label}: net ${netBefore} (legacy settled)`);
+        report.push(`${c.label}: net ${netBefore} (백필 대상 — 미수 유지)`);
         continue;
       }
 
@@ -102,8 +106,8 @@ describe('보증금 충당 → 미수 반영', () => {
     // eslint-disable-next-line no-console
     console.log(report.join('\n'));
 
-    expect(totalBefore).toBe(800_000 + 1_500_000 + 0);
-    expect(totalAfter).toBe(0 + 500_000 + 0);
+    expect(totalBefore).toBe(800_000 + 1_500_000 + 700_000);
+    expect(totalAfter).toBe(0 + 500_000 + 700_000);
     expect(rowsAfter.every((r) => r.v.net > 0)).toBe(true);
     expect(rowsAfter.find((r) => r.rec._key === 'a')).toBeUndefined();
     expect(rowsAfter.find((r) => r.rec._key === 'b')?.v.net).toBe(500_000);

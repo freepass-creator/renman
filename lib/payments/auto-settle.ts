@@ -5,6 +5,7 @@
  * high·medium 만 자동 적용(low는 /payments 수동).
  */
 import { getStore } from '@/lib/store';
+import { isPeriodLocked } from '@/lib/finance/period-lock';
 import { lockReason } from '@/lib/finance/period-lock';
 import { type EntityRecord } from '@/lib/intake/entities';
 import {
@@ -231,13 +232,22 @@ export async function repairSettlementDepositSubjects(companyId: string): Promis
     const cat = String(r.category || '');
     const sub = String(r.subject || '');
     if (cat !== '지급수수료' && sub !== '지급수수료') continue;
+    // ★회계 마감월은 건드리지 않는다 — 담기마다 자동 실행되는 복구가 마감된 달의 금액 과목을
+    //   조용히 바꾸면 마감의 의미가 사라진다(적대검증). 마감월 건은 사람이 재오픈 후 처리.
+    const txDate = String(r.txDate || r.date || '');
+    if (isPeriodLocked(companyId, txDate)) continue;
     const sid = String(r.settlementId || '');
     const income = sid.startsWith('card_') ? '카드매출' : 'CMS집금';
-    await getStore().update('bank_tx', companyId, String(r._key), {
-      category: income,
-      subject: income,
-    });
-    n++;
+    try {
+      await getStore().update('bank_tx', companyId, String(r._key), {
+        category: income,
+        subject: income,
+      });
+      n++;
+    } catch (e) {
+      // 한 건 실패가 담기 전체(자동정산 체인)를 중단시키지 않게 — 신규 매출 집계 누락 방지.
+      console.warn('settle-subject 복구 건너뜀:', String(r._key), (e as Error).message);
+    }
   }
   return n;
 }
