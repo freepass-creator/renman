@@ -14,7 +14,7 @@ const statusTone = (s: AgendaItem['status']): 'red' | 'amber' | 'green' =>
   s === '어김' ? 'red' : s === '임박' ? 'amber' : 'green';
 
 const AGENDA_COL_CATALOG: SheetCol<AgendaItem>[] = [
-  { key: 'company', label: '표시명', pin: true, align: 'c', render: (r) => r.company || LEDGER_EMPTY.dash, text: (r) => r.company },
+  { key: 'company', label: '회사명', pin: true, align: 'c', render: (r) => r.company || LEDGER_EMPTY.dash, text: (r) => r.company },
   { key: 'date', label: '기한일', align: 'c', render: (r) => r.date, text: (r) => r.date },
   {
     key: 'dday', label: 'D-day', align: 'c',
@@ -42,8 +42,10 @@ const AGENDA_COL_CATALOG: SheetCol<AgendaItem>[] = [
 ];
 
 export const AGENDA_SHEET_KEYS: SheetViewKeys = {
-  basic: ['company', 'plate', 'kind', 'status', 'title', 'date', 'dday'],
-  all: ['company', 'plate', 'kind', 'status', 'title', 'date', 'dday', 'companyId', 'key'],
+  // 기준 = 자산관리: 회사(1) · 식별자(2) · 이름(3) · 분류(4) · 상태(5) · 나머지
+  // 일정은 «차명» 칸이 없으므로 내용(차명·보험사·위반내용)이 이름 슬롯을 맡는다.
+  basic: ['company', 'plate', 'title', 'kind', 'status', 'date', 'dday'],
+  all: ['company', 'plate', 'title', 'kind', 'status', 'date', 'dday', 'companyId', 'key'],
 };
 
 const _agendaViews = buildSheetViews(AGENDA_COL_CATALOG, AGENDA_SHEET_KEYS);

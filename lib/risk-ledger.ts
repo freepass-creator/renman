@@ -80,6 +80,22 @@ function companyOf(fr?: Pick<FleetRow, 'companyId' | 'company'>, rec?: EntityRec
   return { companyId, company: fr?.company || companyShort(companyId) };
 }
 
+/**
+ * 일정 유래 행의 «리스크내용».
+ *
+ * ★lib/agenda.ts 의 title 은 kind 마다 담는 것이 다르다:
+ *   검사만기·세금만기 = 차명 · 보험만기 = 보험사 · 과태료 기한 = 위반내용 · 반납·만기 = 계약자.
+ *   차명은 이제 「차량번호」 칸이 2줄로 담으므로, 내용 칸에까지 차명을 넣으면 중복이고
+ *   «무엇 때문에 걸렸는지»를 알려주지 못한다 → 차명류는 사유 문장으로 바꾼다.
+ */
+function agendaSubject(kind: string, title: string): string {
+  if (kind === '검사만기') return '정기검사 미필';
+  if (kind === '세금 만기') return '자동차세 미납';
+  if (kind === '보험만기') return title ? `보험사 ${title}` : '보험 만기';
+  if (kind === '반납·만기') return '계약 만기·반납 대상';
+  return title || LEDGER_EMPTY.dash;   // 과태료 위반내용 등은 그대로 유용
+}
+
 function phoneOf(fr?: Pick<FleetRow, 'phone'>, fallback = ''): string {
   return String(fr?.phone || fallback || '').trim();
 }
@@ -178,7 +194,7 @@ export function buildRiskSheetRows(
       plate: a.plate,
       // ★신원은 차량으로 찾은 «실제 계약자»만. a.title(차명·사유)을 여기 넣으면 칸이 의미를 잃는다.
       customer: fr?.customer || LEDGER_EMPTY.none,
-      subject: a.title || LEDGER_EMPTY.dash,
+      subject: agendaSubject(a.kind, a.title),
       phone: phoneOf(fr),
       carName: fr ? carNameOf(fr) : LEDGER_EMPTY.dash,
       due: `${ddayLabel(a.dday)} · ${a.date}`,
@@ -243,7 +259,7 @@ export function buildRiskSheetRows(
       ...companyOf(fr, { companyId: a.companyId } as EntityRecord),
       plate: a.plate,
       customer: fr?.customer || LEDGER_EMPTY.none,
-      subject: a.title || LEDGER_EMPTY.dash,
+      subject: agendaSubject(a.kind, a.title),
       phone: phoneOf(fr),
       carName: fr ? carNameOf(fr) : LEDGER_EMPTY.dash,
       due: `${ddayLabel(a.dday)} · ${a.date}`,

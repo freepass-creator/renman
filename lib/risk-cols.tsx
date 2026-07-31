@@ -9,7 +9,7 @@
  *   소스별로 뒤섞여 들어가 칸이 의미를 잃었다.
  */
 import React from 'react';
-import { Badge, money, C, type SheetCol } from '@/components/ui';
+import { Badge, money, C, TwoLineCell, type SheetCol } from '@/components/ui';
 import type { RiskSheetRow } from './risk-ledger';
 import { buildSheetViews, buildDetailSections, type DetailSectionDef, type SheetViewKeys } from './ledger-ext';
 import { LEDGER_EMPTY } from './ledger-empty';
@@ -25,23 +25,22 @@ const CATALOG: SheetCol<RiskSheetRow>[] = [
     text: (r) => r.company,
   },
   {
+    // 구분은 «상태»가 아니다 → 배지를 쓰지 않는다(상태 신호는 배지 색으로만).
     key: 'group', label: '리스크구분', priority: 1, align: 'c',
-    render: (r) => <Badge tone={r.badgeTone}>{r.group}</Badge>,
+    render: (r) => <span style={{ color: C.mute }}>{r.group}</span>,
     text: (r) => r.group,
   },
   {
     key: 'kind', label: '리스크분류', priority: 1, align: 'c',
-    render: (r) => r.kind || LEDGER_EMPTY.dash,
+    render: (r) => (r.kind ? <Badge tone="gray">{r.kind}</Badge> : LEDGER_EMPTY.dash),
     text: (r) => r.kind,
   },
   {
     key: 'plate', label: '차량번호', priority: 1, pin: true,
-    render: (r) => (
-      <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 700 }}>
-        {r.plate || LEDGER_EMPTY.dash}
-      </span>
-    ),
-    text: (r) => r.plate,
+    render: (r) => (r.plate
+      ? <TwoLineCell mono main={r.plate} sub={r.carName && r.carName !== LEDGER_EMPTY.dash ? r.carName : undefined} />
+      : <span style={{ color: C.mute }}>{LEDGER_EMPTY.dash}</span>),
+    text: (r) => [r.plate, r.carName].filter((v) => v && v !== LEDGER_EMPTY.dash).join(' '),
   },
   {
     key: 'customer', label: '계약자', priority: 1,
