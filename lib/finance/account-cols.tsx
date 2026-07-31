@@ -2,7 +2,7 @@
  * 자금·계좌 열 SSOT — BankAccountRow.
  * 엑셀: `자금·계좌 · 엑셀기본|엑셀전체 · ±key` @see lib/ledger-ext.ts
  */
-import { Badge, C, money, TwoLineCell, type SheetCol } from '@/components/ui';
+import { Badge, C, money, type SheetCol } from '@/components/ui';
 import type { BankAccountRow } from '@/lib/finance/cash-ledger';
 import { buildDetailSections, buildSheetViews, type DetailSectionDef, type SheetViewKeys } from '@/lib/ledger-ext';
 import { LEDGER_EMPTY } from '@/lib/ledger-empty';
@@ -10,14 +10,10 @@ import { LEDGER_EMPTY } from '@/lib/ledger-empty';
 const ACCOUNT_COL_CATALOG: SheetCol<BankAccountRow>[] = [
   { key: 'company', label: '회사명', priority: 1, render: (r) => r.company || LEDGER_EMPTY.dash, text: (r) => r.company },
   {
-    key: 'bank', label: '은행·계좌', priority: 1,
-    render: (r) => (
-      <TwoLineCell
-        main={r.bankName || r.accountAlias || LEDGER_EMPTY.dash}
-        sub={r.accountNumber || undefined}
-      />
-    ),
-    text: (r) => [r.bankName, r.accountNumber].filter(Boolean).join(' '),
+    // 2줄 금지 — 계좌번호는 「계좌번호」 컬럼이 담당(기본뷰 편입).
+    key: 'bank', label: '은행', priority: 1,
+    render: (r) => r.bankName || r.accountAlias || LEDGER_EMPTY.dash,
+    text: (r) => r.bankName || r.accountAlias || '',
   },
   { key: 'account', label: '계좌번호', priority: 2, render: (r) => r.accountNumber || LEDGER_EMPTY.dash, text: (r) => r.accountNumber },
   { key: 'alias', label: '계좌명', priority: 1, render: (r) => r.accountAlias || LEDGER_EMPTY.dash, text: (r) => r.accountAlias },
@@ -71,7 +67,7 @@ const ACCOUNT_COL_CATALOG: SheetCol<BankAccountRow>[] = [
 
 /** 회사 → 신원(은행·계좌) → 상태 → 수치 */
 export const ACCOUNT_SHEET_KEYS: SheetViewKeys = {
-  basic: ['company', 'bank', 'holder', 'type', 'status', 'alias', 'totalIn', 'totalOut', 'currentBalance'],
+  basic: ['company', 'bank', 'holder', 'type', 'status', 'account', 'alias', 'totalIn', 'totalOut', 'currentBalance'],
   all: [
     'company', 'bank', 'account', 'alias', 'holder', 'type', 'status',
     'totalIn', 'totalOut', 'currentBalance', 'createdAt', 'createdBy',

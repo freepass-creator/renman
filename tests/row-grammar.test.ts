@@ -17,6 +17,7 @@ import { FLEET_BASIC_COLS } from '@/lib/sheet-cols';
 import { CASH_BASIC_COLS } from '@/lib/finance/cash-cols';
 import { ACCOUNT_BASIC_COLS } from '@/lib/finance/account-cols';
 import { AGENDA_BASIC_COLS } from '@/lib/agenda-cols';
+import { STAFF_COLS } from '@/lib/staff-cols';
 
 type Col = { key: string; label?: string };
 
@@ -32,6 +33,7 @@ const SCREENS: Array<{ name: string; cols: readonly Col[] }> = [
   { name: '자금관리', cols: CASH_BASIC_COLS as readonly Col[] },
   { name: '계좌', cols: ACCOUNT_BASIC_COLS as readonly Col[] },
   { name: '일정', cols: AGENDA_BASIC_COLS as readonly Col[] },
+  { name: '직원(경영관리)', cols: STAFF_COLS as readonly Col[] },
 ];
 
 const labelsOf = (cols: readonly Col[]) => cols.map((c) => String(c.label ?? c.key));
@@ -84,8 +86,24 @@ describe('행 문법 — 신원 칸(2·3번)은 실제 식별자여야 한다', 
     test(`${name}: 2·3번이 신원 성격`, () => {
       const labels = labelsOf(cols);
       const slots = [labels[1], labels[2]].filter(Boolean);
-      const bad = slots.filter((l) => /분류$|상태$|금액$|일자$|기한$|일$/.test(l));
+      // 날짜성 라벨만 잡는다 — 「이메일」처럼 '일'로 끝나는 신원 라벨을 오탐하지 않게.
+      const bad = slots.filter((l) => /분류$|상태$|금액$|일자$|기한$|발생일$|위반일$|등록일$|만기$/.test(l));
       expect({ 화면: name, 신원슬롯: slots, 위반: bad }).toMatchObject({ 위반: [] });
     });
   }
+});
+
+describe('표에서는 2줄 셀(TwoLineCell)을 쓰지 않는다', () => {
+  // 행 높이가 --ledger-row-h 로 고정이고 B2B 표는 조밀해야 읽힌다.
+  // 가려질 정보는 2줄로 숨기지 말고 각자의 컬럼으로 내보낸다.
+  test('열 카탈로그가 TwoLineCell 을 import 하지 않는다', async () => {
+    const { readFileSync } = await import('node:fs');
+    const files = [
+      'lib/risk-cols.tsx', 'lib/work-cols.tsx', 'lib/sheet-cols.tsx', 'lib/agenda-cols.tsx',
+      'lib/master-ledger-cols.tsx', 'lib/staff-cols.tsx',
+      'lib/finance/cash-cols.tsx', 'lib/finance/account-cols.tsx',
+    ];
+    const offenders = files.filter((f) => readFileSync(f, 'utf8').includes('TwoLineCell'));
+    expect({ 위반파일: offenders }).toMatchObject({ 위반파일: [] });
+  });
 });

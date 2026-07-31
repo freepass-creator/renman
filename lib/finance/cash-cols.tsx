@@ -2,7 +2,7 @@
  * 재무원장 열 SSOT — 계좌 입·출금 스트림(CashRow).
  * 엑셀 추가/삭제: `자금 · 엑셀기본|엑셀전체 · +|-key` @see lib/ledger-ext.ts
  */
-import { Badge, C, money, TwoLineCell, TreeIndent, type SheetCol } from '@/components/ui';
+import { Badge, C, money, TreeIndent, type SheetCol } from '@/components/ui';
 import { companyDisplay } from '@/lib/companies';
 import { groupOfLabel, isUnclassified, kindOfLabel } from '@/lib/payments/ledger-subjects';
 import type { CashRow } from '@/lib/finance/cash-ledger';
@@ -37,9 +37,10 @@ const CASH_COL_CATALOG: SheetCol<CashRow>[] = [
   {
     key: 'acctName', label: '계좌명', pin: true, priority: 1,
     render: (r) => {
-      if (r.nest === 'cms-pending') return <TwoLineCell main="CMS 명세" />;
-      if (r.nest === 'cms-item') return <TwoLineCell main="CMS연결" sub={r.account || undefined} />;
-      return <TwoLineCell main={r.accountName || LEDGER_EMPTY.dash} sub={r.account || undefined} />;
+      // 2줄 금지 — 계좌번호는 전체뷰 「계좌번호」 컬럼이 담당.
+      if (r.nest === 'cms-pending') return 'CMS 명세';
+      if (r.nest === 'cms-item') return 'CMS연결';
+      return r.accountName || LEDGER_EMPTY.dash;
     },
     text: (r) => r.accountName || (r.nest === 'cms-pending' ? 'CMS 명세' : r.account || ''),
   },
@@ -59,7 +60,7 @@ const CASH_COL_CATALOG: SheetCol<CashRow>[] = [
     text: (r) => (r.party || '').trim(),
   },
   {
-    key: 'cat', label: '계정과목', priority: 1,
+    key: 'cat', label: '자금분류', priority: 1,
     render: (r) => {
       if (r.nest === 'cms-item') return <Badge tone="blue">CMS연결</Badge>;
       if (r.nest === 'cms-pending') return <Badge tone="amber">CMS미연결</Badge>;
@@ -77,16 +78,16 @@ const CASH_COL_CATALOG: SheetCol<CashRow>[] = [
     },
   },
   {
-    key: 'match', label: '매칭상태', align: 'c', priority: 1,
+    key: 'match', label: '자금상태', align: 'c', priority: 1,
     render: (r) => {
       const status = matchStatus(r);
       return <Badge tone={status.tone}>{status.label}</Badge>;
     },
     text: (r) => matchStatus(r).label,
   },
-  { key: 'date', label: '일자', align: 'c', priority: 1, render: (r) => r.date || LEDGER_EMPTY.dash, text: (r) => r.date },
+  { key: 'date', label: '일자', align: 'c', priority: 1, xf: 'date', render: (r) => r.date || LEDGER_EMPTY.dash, text: (r) => r.date },
   {
-    key: 'in', label: '입금', align: 'r', priority: 1,
+    key: 'in', label: '입금', align: 'r', priority: 1, xf: 'money',
     render: (r) => (r.inAmt
       ? <span style={{
           color: (r.nest === 'cms-item' || r.nest === 'cms-pending') ? C.brand : C.ok,
@@ -96,12 +97,12 @@ const CASH_COL_CATALOG: SheetCol<CashRow>[] = [
     text: (r) => r.inAmt,
   },
   {
-    key: 'out', label: '출금', align: 'r', priority: 1,
+    key: 'out', label: '출금', align: 'r', priority: 1, xf: 'money',
     render: (r) => (r.outAmt ? <span style={{ fontWeight: 700 }}>{money(r.outAmt)}</span> : LEDGER_EMPTY.dash),
     text: (r) => r.outAmt,
   },
   {
-    key: 'balance', label: '잔액', align: 'r', priority: 1,
+    key: 'balance', label: '잔액', align: 'r', priority: 1, xf: 'money',
     render: (r) => {
       const bal = r.raw.balance;
       if (bal === '' || bal == null) return LEDGER_EMPTY.dash;
@@ -154,8 +155,9 @@ const CASH_COL_CATALOG: SheetCol<CashRow>[] = [
 /** 회사 → 계좌 → 일자·내용·상대 → 수지·계정·매칭 → 금액·잔액·알람 */
 export const CASH_SHEET_KEYS: SheetViewKeys = {
   basic: [
-    'company', 'acctName', 'date', 'content', 'party', 'flowNature', 'cat', 'match',
-    'matchedContract', 'matchedSchedule', 'in', 'out', 'balance', 'alert',
+    'company', 'acctName', 'party', 'cat', 'match',
+    'flowNature', 'date', 'content', 'in', 'out', 'balance',
+    'matchedContract', 'matchedSchedule', 'alert',
   ],
   all: [
     'company', 'acctName', 'acct', 'date', 'content', 'party', 'flowNature', 'cat', 'match', 'in', 'out', 'balance', 'alert',
@@ -193,13 +195,14 @@ export const CASH_TX_DETAIL_SECTIONS = buildDetailSections(CASH_TX_DETAIL_CATALO
 /** 카드 승인 — 원장 raw 필드(시트에 없는 키) */
 const CARD_DETAIL_CATALOG: SheetCol<CashRow>[] = [
   ...CASH_EXPANDED_COLS,
-  { key: 'cardName', label: '카드명', render: (r) => String(r.raw.cardName || r.accountName || LEDGER_EMPTY.dash) },
-  { key: 'cardLast4', label: '카드번호', render: (r) => (r.raw.cardLast4 ? `•••• ${String(r.raw.cardLast4)}` : LEDGER_EMPTY.dash) },
-  { key: 'merchant', label: '가맹점', render: (r) => String(r.raw.merchant || r.party || LEDGER_EMPTY.dash) },
-  { key: 'approvalNo', label: '승인번호', render: (r) => String(r.raw.approvalNo || LEDGER_EMPTY.dash) },
+  { key: 'cardName', label: '카드명', render: (r) => String(r.raw.cardName || r.accountName || LEDGER_EMPTY.dash), text: (r) => String(r.raw.cardName || r.accountName || '') },
+  { key: 'cardLast4', label: '카드번호', render: (r) => (r.raw.cardLast4 ? `•••• ${String(r.raw.cardLast4)}` : LEDGER_EMPTY.dash), text: (r) => String(r.raw.cardLast4 || '') },
+  { key: 'merchant', label: '가맹점', render: (r) => String(r.raw.merchant || r.party || LEDGER_EMPTY.dash), text: (r) => String(r.raw.merchant || r.party || '') },
+  { key: 'approvalNo', label: '승인번호', render: (r) => String(r.raw.approvalNo || LEDGER_EMPTY.dash), text: (r) => String(r.raw.approvalNo || '') },
   {
-    key: 'cardAmount', label: '승인금액', align: 'r',
+    key: 'cardAmount', label: '승인금액', align: 'r', xf: 'money',
     render: (r) => money(Number(r.raw.amount) || r.outAmt),
+    text: (r) => Number(r.raw.amount) || r.outAmt || 0,
   },
 ];
 

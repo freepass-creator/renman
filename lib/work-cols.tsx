@@ -7,7 +7,7 @@
 'use client';
 
 import React from 'react';
-import { Badge, C, money, TwoLineCell, type SheetCol } from '@/components/ui';
+import { Badge, C, money, type SheetCol } from '@/components/ui';
 import { buildDetailSections, buildSheetViews, type DetailSectionDef, type SheetViewKeys } from '@/lib/ledger-ext';
 import { LEDGER_EMPTY } from '@/lib/ledger-empty';
 import {
@@ -80,17 +80,23 @@ const WORK_COL_CATALOG: SheetCol<WorkLedgerRow>[] = [
   },
   {
     key: 'plate', label: '차량번호', priority: 1, pin: true,
+    // 표에서는 2줄 셀 금지 — 차명은 별도 「차명」 컬럼.
     render: (r) => (r.plate
-      ? <TwoLineCell mono main={r.plate} sub={r.carName || undefined} />
+      ? <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 700 }}>{r.plate}</span>
       : <span style={{ color: C.mute }}>{LEDGER_EMPTY.dash}</span>),
-    text: (r) => [r.plate, r.carName].filter(Boolean).join(' '),
+    text: (r) => r.plate || '',
+  },
+  {
+    key: 'carName', label: '차명', priority: 2,
+    render: (r) => r.carName || LEDGER_EMPTY.dash,
+    text: (r) => r.carName || '',
   },
   {
     key: 'contractor', label: '계약자', priority: 1,
     render: (r) => {
       const name = String(r.customerName || '').trim();
       if (!name) return <span style={{ color: C.mute }}>{LEDGER_EMPTY.none}</span>;
-      return <TwoLineCell main={name} sub={r.rentalType || undefined} />;
+      return name;   // 2줄 금지 — 대여형태는 전체뷰 「계약분류」가 담당.
     },
     text: (r) => r.customerName || LEDGER_EMPTY.none,
   },
@@ -208,9 +214,9 @@ const PENALTY_DETAIL_CATALOG: SheetCol<WorkLedgerRow>[] = [
 ];
 
 export const WORK_SHEET_KEYS: SheetViewKeys = {
-  basic: ['company', 'plate', 'contractor', 'kind', 'status', 'priority', 'title', 'contractNo', 'workDate', 'due', 'assignee'],
+  basic: ['company', 'plate', 'contractor', 'kind', 'status', 'priority', 'title', 'carName', 'contractNo', 'workDate', 'due', 'assignee'],
   all: [
-    'company', 'plate', 'contractor', 'kind', 'status', 'priority', 'title', 'contractNo', 'workDate',
+    'company', 'plate', 'contractor', 'kind', 'status', 'priority', 'title', 'carName', 'rentalType', 'contractNo', 'workDate',
     'assignee', 'created', 'updated', 'due', 'amount', 'source',
   ],
 };

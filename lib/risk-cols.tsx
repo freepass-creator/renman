@@ -9,7 +9,7 @@
  *   소스별로 뒤섞여 들어가 칸이 의미를 잃었다.
  */
 import React from 'react';
-import { Badge, money, C, TwoLineCell, type SheetCol } from '@/components/ui';
+import { Badge, money, C, type SheetCol } from '@/components/ui';
 import type { RiskSheetRow } from './risk-ledger';
 import { buildSheetViews, buildDetailSections, type DetailSectionDef, type SheetViewKeys } from './ledger-ext';
 import { LEDGER_EMPTY } from './ledger-empty';
@@ -36,11 +36,13 @@ const CATALOG: SheetCol<RiskSheetRow>[] = [
     text: (r) => r.kind,
   },
   {
+    // 표에서는 «2줄 셀»을 쓰지 않는다 — 행 높이가 고정(--ledger-row-h)이고 조밀해야 읽힌다.
+    //   차명은 별도 「차명」 컬럼이 담당한다(기본뷰 편입).
     key: 'plate', label: '차량번호', priority: 1, pin: true,
     render: (r) => (r.plate
-      ? <TwoLineCell mono main={r.plate} sub={r.carName && r.carName !== LEDGER_EMPTY.dash ? r.carName : undefined} />
+      ? <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 700 }}>{r.plate}</span>
       : <span style={{ color: C.mute }}>{LEDGER_EMPTY.dash}</span>),
-    text: (r) => [r.plate, r.carName].filter((v) => v && v !== LEDGER_EMPTY.dash).join(' '),
+    text: (r) => r.plate,
   },
   {
     key: 'customer', label: '계약자', priority: 1,
@@ -95,7 +97,7 @@ const CATALOG: SheetCol<RiskSheetRow>[] = [
  *   구분→분류→상태를 «연속 블록»으로 둬서 분류 바로 뒤에 상태가 오는 규격을 지킨다.
  */
 export const RISK_SHEET_KEYS: SheetViewKeys = {
-  basic: ['company', 'plate', 'customer', 'kind', 'status', 'group', 'subject', 'due', 'amount', 'phone'],
+  basic: ['company', 'plate', 'customer', 'kind', 'status', 'group', 'subject', 'due', 'amount', 'carName', 'phone'],
   all: ['company', 'plate', 'customer', 'kind', 'status', 'group', 'subject', 'due', 'amount', 'carName', 'phone'],
 };
 
