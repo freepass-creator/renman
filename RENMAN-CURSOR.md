@@ -70,6 +70,7 @@ curl -s -o /dev/null -w "%{http_code}" http://localhost:6006/<route>   # 200
 
 | 날짜 | 작업자 | 내용 | 상태 |
 |---|---|---|---|
+| 2026-07-31 | Cursor | QA돈3: 보증금충당→_payments·레거시net · CMS집금과목유지·복구 · bank_tx txKey(잔액·#n) | tsc0 · curl200 · vitest7 · 커밋3 |
 | 2026-07-31 | Cursor | 행틴트잔재제거: 6원장 rowStyle·xxxRail·work-rail삭제 · ExcelSheet/LedgerFrame prop제거 · redesign=배지색만 | tsc0 |
 | 2026-07-31 | Cursor | 상세/생성: 사용자가 섹션 펼칠 때만 패널본문 안 reveal(창 scrollIntoView X) | tsc 대기 |
 | 2026-07-31 | Cursor | 과태료 업로드: 상단 회사선택 재사용(아래 중복 Select 제거) · scrollIntoView 제거 유지 | tsc0 |

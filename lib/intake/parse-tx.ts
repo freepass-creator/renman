@@ -129,6 +129,8 @@ export function parseBankRow(row: Record<string, unknown>, fileName: string, ban
   };
   if (finalWithdraw > 0) rec.withdraw = finalWithdraw;
   if (balance > 0) rec.balance = balance;
+  const txTime = extractTxTime(get(row, '거래일시', '거래시각', '거래시간', '처리일시'));
+  if (txTime) rec.txTime = txTime;
   const contractNo = get(row, '계약번호', '약정번호'); if (contractNo) rec.contractNo = contractNo;
   return rec;
 }
@@ -154,6 +156,42 @@ export function parseCmsRow(row: Record<string, unknown>, _fileName: string): En
 }
 
 /* ── 파일 전체 → bank_tx 레코드 (은행/CMS 자동판별) ── */
+/** 거래시각 — 날짜만 남기는 normalize와 별도. HH:mm[:ss] */
+export function extractTxTime(raw: string): string {
+  const t = String(raw || '').trim();
+  if (!t) return '';
+  const m = t.match(/(?:T|\s)(\d{1,2}):(\d{2})(?::(\d{2}))?/);
+  if (!m) return '';
+  return `${String(+m[1]).padStart(2, '0')}:${m[2]}${m[3] != null ? `:${m[3]}` : ''}`;
+}
+
+/** 내용 fingerprint — 재임포트 안정 · 동일키 N건은 #2… */
+export function bankTxFingerprint(r: EntityRecord): string {
+  return [
+    r.account ?? '',
+    r.txDate ?? '',
+    r.txTime ?? '',
+    r.amount ?? 0,
+    r.withdraw ?? 0,
+    r.balance ?? '',
+    r.counterparty ?? '',
+    r.memo ?? '',
+    r.method ?? '',
+  ].join('|');
+}
+
+/** 파일 내 등장 순으로 txKey 부여. 1건=fp · 2건째=fp#2 (재임포트 동일키 → store dedupe). */
+export function assignBankTxKeys(rows: EntityRecord[]): EntityRecord[] {
+  const counts = new Map<string, number>();
+  for (const rec of rows) {
+    const fp = bankTxFingerprint(rec);
+    const n = (counts.get(fp) ?? 0) + 1;
+    counts.set(fp, n);
+    rec.txKey = n === 1 ? fp : `${fp}#${n}`;
+  }
+  return rows;
+}
+
 export async function parseTxFile(file: File): Promise<EntityRecord[]> {
   const buf = await file.arrayBuffer();
   const wb = XLSX.read(buf, { type: 'array', cellDates: true });
@@ -181,5 +219,5 @@ export async function parseTxFile(file: File): Promise<EntityRecord[]> {
       if (rec) out.push(rec);
     }
   }
-  return out;
+  return assignBankTxKeys(out);
 }

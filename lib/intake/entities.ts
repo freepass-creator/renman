@@ -321,7 +321,7 @@ export const ENTITIES: Record<string, Entity> = {
     ],
   },
   bank_tx: {
-    key: 'bank_tx', label: '계좌 거래', layer: ENTITY_LAYER.bank_tx, source: '은행 거래내역(엑셀/CSV)', idFrom: 'txKey', keyFields: ['txDate', 'amount', 'withdraw', 'counterparty'],
+    key: 'bank_tx', label: '계좌 거래', layer: ENTITY_LAYER.bank_tx, source: '은행 거래내역(엑셀/CSV)', idFrom: 'txKey', keyFields: ['account', 'txDate', 'amount', 'withdraw', 'balance', 'counterparty', 'memo'],
     fields: [
       { key: 'account', label: '계좌번호', type: 'text', required: true, note: '어느 법인의 어느 계좌' },
       { key: 'txDate', label: '거래일', type: 'date', required: true },
