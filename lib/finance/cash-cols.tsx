@@ -5,6 +5,10 @@
 import { Badge, C, money, TreeIndent, type SheetCol } from '@/components/ui';
 import { companyDisplay } from '@/lib/companies';
 import { groupOfLabel, isUnclassified, kindOfLabel } from '@/lib/payments/ledger-subjects';
+import {
+  moneyStatusOf, moneyClassOf, MONEY_STATUS, MONEY_STATUS_TONE, MONEY_CLASS, MONEY_CLASS_TONE,
+  type MoneyStatus, type MoneyClass,
+} from '@/lib/finance/money-status';
 import type { CashRow } from '@/lib/finance/cash-ledger';
 import { buildDetailSections, buildSheetViews, type DetailSectionDef, type SheetViewKeys } from '@/lib/ledger-ext';
 import { LEDGER_EMPTY } from '@/lib/ledger-empty';
@@ -13,18 +17,26 @@ const coName = (r: CashRow) => companyDisplay(r.companyId);
 /** 내용 = 메모(거래 설명). 상대방은 party 열. */
 const content = (r: CashRow) => (r.memo || '').trim();
 
-const matchStatus = (r: CashRow) => {
-  if (r.nest === 'cms-item') return { label: '매칭완료', tone: 'green' as const };
-  if (r.nest === 'cms-pending') return { label: LEDGER_EMPTY.unmatched, tone: 'amber' as const };
-  if (r.nest === 'cms-dep') {
-    return String(r.raw.settlementRole || '') === 'deposit'
-      ? { label: '매칭완료', tone: 'green' as const }
-      : { label: LEDGER_EMPTY.unmatched, tone: 'amber' as const };
-  }
-  if (r.raw.matchedContractId || r.raw.matchedScheduleSeq) return { label: '매칭완료', tone: 'green' as const };
-  if (r.inAmt > 0) return { label: LEDGER_EMPTY.unmatched, tone: 'amber' as const };
-  return { label: '해당없음', tone: 'gray' as const };
-};
+/* 자금상태 = «매칭됐는가». 판정은 lib/finance/money-status.ts 가 유일한 정의처다.
+   ★이전 구현은 상태가 3개뿐이라 «계정과목이 없는 돈»과 «분류는 됐지만 계약에 안 붙은 돈»이
+     똑같이 «미매칭»으로 보였다 — 해야 할 일이 다른데 같은 상태로 표시됐다. */
+const moneyStatus = (r: CashRow): MoneyStatus => moneyStatusOf({
+  category: r.category,
+  inAmount: r.inAmt,
+  outAmount: r.outAmt,
+  matchedContractId: r.raw.matchedContractId,
+  matchedScheduleSeq: r.raw.matchedScheduleSeq,
+  isCmsItem: r.nest === 'cms-item' || r.nest === 'cms-pending',
+  isCmsDeposit: r.nest === 'cms-dep',
+  cmsSettled: String(r.raw.settlementRole || '') === 'deposit',
+});
+
+/* 자금분류 = «뭐로 입금됐는가». 계정과목(무슨 돈인가)과 다른 축 — 같은 칸에 담지 않는다. */
+const moneyClass = (r: CashRow): MoneyClass => moneyClassOf({
+  isCms: r.nest === 'cms-item' || r.nest === 'cms-pending' || r.nest === 'cms-dep',
+  isCard: !!r.raw.approvalNo || !!r.raw.cardNo,
+  source: r.raw.method || r.raw.source,
+});
 
 const CASH_COL_CATALOG: SheetCol<CashRow>[] = [
   {
@@ -60,7 +72,7 @@ const CASH_COL_CATALOG: SheetCol<CashRow>[] = [
     text: (r) => (r.party || '').trim(),
   },
   {
-    key: 'cat', label: '자금분류', priority: 1,
+    key: 'cat', label: '계정과목', priority: 1,
     render: (r) => {
       if (r.nest === 'cms-item') return <Badge tone="blue">CMS연결</Badge>;
       if (r.nest === 'cms-pending') return <Badge tone="amber">CMS미연결</Badge>;
@@ -78,12 +90,18 @@ const CASH_COL_CATALOG: SheetCol<CashRow>[] = [
     },
   },
   {
+    // 행 문법 4번 — 자금분류(뭐로 입금됐는가). 분류는 신호가 아니므로 중립 톤.
+    key: 'moneyClass', label: '자금분류', align: 'c', priority: 1,
+    render: (r) => <Badge tone={MONEY_CLASS_TONE[moneyClass(r)]}>{moneyClass(r)}</Badge>,
+    text: (r) => moneyClass(r),
+    values: () => [...MONEY_CLASS],
+  },
+  {
+    // 행 문법 5번 — 자금상태(매칭됐는가). 색 신호는 여기가 담당.
     key: 'match', label: '자금상태', align: 'c', priority: 1,
-    render: (r) => {
-      const status = matchStatus(r);
-      return <Badge tone={status.tone}>{status.label}</Badge>;
-    },
-    text: (r) => matchStatus(r).label,
+    render: (r) => <Badge tone={MONEY_STATUS_TONE[moneyStatus(r)]}>{moneyStatus(r)}</Badge>,
+    text: (r) => moneyStatus(r),
+    values: () => [...MONEY_STATUS],
   },
   { key: 'date', label: '일자', align: 'c', priority: 1, xf: 'date', render: (r) => r.date || LEDGER_EMPTY.dash, text: (r) => r.date },
   {
@@ -155,12 +173,13 @@ const CASH_COL_CATALOG: SheetCol<CashRow>[] = [
 /** 회사 → 계좌 → 일자·내용·상대 → 수지·계정·매칭 → 금액·잔액·알람 */
 export const CASH_SHEET_KEYS: SheetViewKeys = {
   basic: [
-    'company', 'acctName', 'party', 'cat', 'match',
-    'flowNature', 'date', 'content', 'in', 'out', 'balance',
+    'company', 'acctName', 'party', 'moneyClass', 'match',
+    'cat', 'flowNature', 'date', 'content', 'in', 'out', 'balance',
     'matchedContract', 'matchedSchedule', 'alert',
   ],
   all: [
-    'company', 'acctName', 'acct', 'date', 'content', 'party', 'flowNature', 'cat', 'match', 'in', 'out', 'balance', 'alert',
+    'company', 'acctName', 'party', 'moneyClass', 'match', 'cat',
+    'acct', 'date', 'content', 'flowNature', 'in', 'out', 'balance', 'alert',
     'fundNature', 'matchedContract', 'matchedSchedule', 'src', 'ent', 'key',
   ],
 };

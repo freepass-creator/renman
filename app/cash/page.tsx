@@ -5,7 +5,7 @@
  *   · 통장 CMS집금 → CMS집금·미매칭 / 매칭 후 하위행 CMS연결
  *   · 집금 또는 미연결 클릭 → 수동 매칭 패널
  */
-import { useMemo, useState, useCallback } from 'react';
+import { useMemo, useState, useCallback, type MouseEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { Plus, X, Link2, Unlink, UploadCloud } from 'lucide-react';
 import { buildCashLedger, withCmsItemRows, buildBankAccountLedger, type CashRow, type BankAccountRow } from '@/lib/finance/cash-ledger';
@@ -34,7 +34,7 @@ import { resolveWriteCompany, NEED_COMPANY } from '@/lib/scope';
 import { toast } from '@/lib/toast';
 import {
   LedgerActions, LedgerCreatePanel, LedgerFilterButton, LedgerFilterFields, LedgerFilterPanel, LedgerFrame, LedgerPanelFooter, LedgerRecordPanel, Btn, Input, Select, Search, PillTabs, PeriodBar, Badge, Message, ListBox, ListRow,
-  C, won, type LedgerColView, type LedgerFormSection,
+  C, ContextMenu, type ContextMenuItem, useSheetExport, won, type LedgerColView, type LedgerFormSection,
 } from '@/components/ui';
 import { useIsMobile } from '@/lib/use-mobile';
 import FileDrop from '@/components/FileDrop';
@@ -283,9 +283,22 @@ function CmsMatchPanel({
 export default function CashLedgerPage() {
   const mobile = useIsMobile();
   const router = useRouter();
-  const { companyId } = useSession();
+  const { companyId, isOperator } = useSession();
   const { bank, card, loading, error: loadError, reload } = useCashLedgerLists();
   const { rows: accountRecords, loading: accountLoading } = useEntityList('bank_account');
+  const [ctxMenu, setCtxMenu] = useState<{ open: boolean; x: number; y: number }>({ open: false, x: 0, y: 0 });
+  const xlTx = useSheetExport<CashRow>({
+    title: '자금관리',
+    filterSummary: () => '전체',
+  });
+  const xlAcct = useSheetExport<BankAccountRow>({
+    title: '계좌관리',
+    filterSummary: () => '전체',
+  });
+  const openCtx = (e: MouseEvent) => {
+    e.preventDefault();
+    setCtxMenu({ open: true, x: e.clientX, y: e.clientY });
+  };
 
   const allRows = useMemo(() => {
     const base = buildCashLedger(bank, card)
@@ -404,6 +417,17 @@ export default function CashLedgerPage() {
   const rowMore = Math.max(0, rows.length - ROW_DISPLAY_CAP);
   const displayRows = rowMore > 0 ? rows.slice(0, ROW_DISPLAY_CAP) : rows;
   const cols = colView === '기본' ? CASH_BASIC_COLS : CASH_EXPANDED_COLS;
+  const onLedgerKindChange = (event: { target: { value: string } }) => {
+    const next = event.target.value as CashLedgerKind;
+    setLedgerKind(next);
+    setFlow('전체');
+    setSourceQuickFilter(null);
+    setUnclassifiedOnly(false);
+    setSelected(null);
+    setSelectedAccount(null);
+    setCreating(null);
+  };
+
   const ledgerKindControl = (
     <Select
       size="sm"
@@ -419,6 +443,20 @@ export default function CashLedgerPage() {
         setSelectedAccount(null);
         setCreating(null);
       }}
+    >
+      <option value="입출금내역">입출금내역</option>
+      <option value="계좌관리">계좌관리</option>
+      <option value="CMS 원천내역">CMS 원천내역</option>
+      <option value="법인카드 원천내역">법인카드 원천내역</option>
+    </Select>
+  );
+  /* 필터 패널용 — 공용 필드와 동일 규격(size 미지정 · width 100%). 값·핸들러는 헤더용과 공유. */
+  const ledgerKindPanelControl = (
+    <Select
+      aria-label="원장 선택"
+      value={ledgerKind}
+      onChange={onLedgerKindChange}
+      style={{ width: '100%' }}
     >
       <option value="입출금내역">입출금내역</option>
       <option value="계좌관리">계좌관리</option>
@@ -496,9 +534,11 @@ export default function CashLedgerPage() {
       }}
       onClose={() => setFilterOpen(false)}
     >
+      {/* ★필터 패널 안의 셀렉트는 공용 필드(LedgerFilterFields)와 같은 규격이어야 한다 —
+          size 미지정 + width:100%. 헤더용 컨트롤(size="sm")을 그대로 넣으면 폭이 혼자 좁아진다. */}
       <label>
         <span style={{ display: 'block', fontSize: 12, fontWeight: 800, marginBottom: 6 }}>원장 선택</span>
-        {ledgerKindControl}
+        {ledgerKindPanelControl}
       </label>
       <LedgerFilterFields
         defs={cashFilterDefs}
@@ -582,7 +622,12 @@ export default function CashLedgerPage() {
 
   if (ledgerKind === '계좌관리') {
     const { total: accountTotal, active: activeAccounts } = summarizeAccountLedgerStats(accountRows);
+    const acctItems: ContextMenuItem[] = [
+      xlAcct.exportItem(),
+      ...(isOperator ? [xlAcct.exportItem({ unmasked: true })] : []),
+    ];
     return (
+      <>
       <LedgerFrame
         title="자금관리"
         meta="계좌·입출금·CMS"
@@ -610,6 +655,8 @@ export default function CashLedgerPage() {
         rows={accountRows}
         rowKey={(row) => row.id}
         selectedRowKey={selectedAccount?.id}
+        onView={xlAcct.onView}
+        onRowContextMenu={openCtx}
         onRowDoubleClick={(row) => {
           setCreating(null);
           setSelectedAccount(row);
@@ -662,6 +709,14 @@ export default function CashLedgerPage() {
           </LedgerRecordPanel>
         ) : null}
       />
+      <ContextMenu
+        open={ctxMenu.open}
+        x={ctxMenu.x}
+        y={ctxMenu.y}
+        onClose={() => setCtxMenu((m) => ({ ...m, open: false }))}
+        items={acctItems}
+      />
+      </>
     );
   }
 
@@ -680,6 +735,7 @@ export default function CashLedgerPage() {
   );
 
   return (
+    <>
     <LedgerFrame
       title="자금관리"
       meta={ledgerMeta}
@@ -724,6 +780,8 @@ export default function CashLedgerPage() {
       rows={displayRows}
       rowKey={(r) => r.id}
       selectedRowKey={selected?.id}
+      onView={xlTx.onView}
+      onRowContextMenu={openCtx}
       onRowDoubleClick={(row) => {
         setCreating(null);
         setSelected(row);
@@ -776,5 +834,16 @@ export default function CashLedgerPage() {
         />
       ) : null}
     />
+    <ContextMenu
+      open={ctxMenu.open}
+      x={ctxMenu.x}
+      y={ctxMenu.y}
+      onClose={() => setCtxMenu((m) => ({ ...m, open: false }))}
+      items={[
+        xlTx.exportItem(),
+        ...(isOperator ? [xlTx.exportItem({ unmasked: true })] : []),
+      ]}
+    />
+    </>
   );
 }
