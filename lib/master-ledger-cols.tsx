@@ -1,17 +1,11 @@
-import { Badge, Btn, C, money, type RailTone, type SheetCol } from '@/components/ui';
+import { Badge, Btn, C, money, type SheetCol } from '@/components/ui';
 import type { AssetMasterRow, ContractMasterRow } from './master-ledgers';
 import {
   buildDetailSections, buildSheetViews, type DetailSectionDef, type SheetViewKeys,
 } from './ledger-ext';
 import { paymentTimingOf } from './schema/contract';
-import { workRailStyle } from './work-rail';
 import { LEDGER_EMPTY } from './ledger-empty';
-import { assetLifecycle, assetLifecycleTone } from './domain/asset-lifecycle';
-import {
-  VEHICLE_IDLE, VEHICLE_REPAIR,
-  isContractEndedStatus,
-} from './domain/status';
-import { dday } from './dashboard-consts';
+import { assetLifecycleTone } from './domain/asset-lifecycle';
 import { openCar } from './ui-bus';
 
 const dash = (v: unknown) => (v === '' || v === null || v === undefined || v === 0 ? LEDGER_EMPTY.dash : String(v));
@@ -22,35 +16,6 @@ const number = (v: number, suffix = '') => (v ? `${v.toLocaleString('ko-KR')}${s
 const numberOrNull = (v: number | null, suffix = '') => (
   v == null ? LEDGER_EMPTY.dash : `${v.toLocaleString('ko-KR')}${suffix}`
 );
-
-/**
- * 자산 원장 rail — `assetLifecycle` 판정 SSOT → 톤 매핑.
- * 구매예정=brand · 처분예정=warn · 처분완료=mute · 보유중=가동상태(사고 danger · 정비/휴차 warn · 운행 none).
- */
-export function assetRail(r: Pick<AssetMasterRow, 'disposed' | 'status'>): RailTone {
-  const s = String(r.status || '');
-  const lc = assetLifecycle(s, r.disposed);
-  if (lc === '처분완료') return 'mute';
-  if (lc === '처분예정') return 'warn';
-  if (lc === '구매예정') return 'brand';
-  if (s === '사고') return 'danger';
-  if (VEHICLE_REPAIR.has(s) || VEHICLE_IDLE.has(s)) return 'warn';
-  return 'none';
-}
-
-export { workRailStyle as assetRailStyle };
-
-/** 계약 원장 rail — 만기경과·미납=danger · 만기임박=warn · 종료=mute · 정상=무색. */
-export function contractRail(r: Pick<ContractMasterRow, 'ended' | 'status' | 'net' | 'unpaidCount' | 'endDate'>): RailTone {
-  if (r.ended || isContractEndedStatus(r.status)) return 'mute';
-  if (r.net > 0 || r.unpaidCount > 0) return 'danger';
-  const d = dday(r.endDate);
-  if (d != null && d < 0) return 'danger';
-  if (d != null && d <= 30) return 'warn';
-  return 'none';
-}
-
-export { workRailStyle as contractRailStyle };
 
 function assetStatusTone(r: Pick<AssetMasterRow, 'disposed' | 'status' | 'vehicleType'>): 'gray' | 'green' | 'amber' | 'red' | 'blue' | 'purple' {
   if (r.disposed) return 'gray';

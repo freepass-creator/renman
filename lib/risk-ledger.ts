@@ -16,10 +16,8 @@ import { buildHomePendingRows } from '@/lib/home-rows';
 import { riskUnpaidOpenId } from '@/lib/ledger-open-ids';
 import { companyShort } from '@/lib/companies';
 import type { BadgeTone } from '@/components/ui/misc';
-import type { RailTone } from '@/components/ui';
 import { NAV_GROUPS, type NavItem } from '@/lib/nav';
 import { LEDGER_EMPTY } from '@/lib/ledger-empty';
-import { workRailStyle } from '@/lib/work-rail';
 
 /** 만기 칩 경계 — D≤이 값(경과 포함은 미완료, 임박만 만기). buildAgenda 임박과 동일. */
 export const RISK_DDAY_BOUND = 7;
@@ -297,16 +295,6 @@ export function countRiskSheetGroups(rows: RiskSheetRow[]): RiskGroupCounts {
   for (const r of rows) counts[r.group]++;
   return counts;
 }
-
-/**
- * 리스크 행 rail — row.tone 재활용(틴트 판정).
- * 시각은 workRailStyle→ExcelSheet/ObjRow danger 틴트만. 좌측 점·세로선 없음.
- */
-export function riskRail(r: Pick<RiskSheetRow, 'tone'>): RailTone {
-  return r.tone;
-}
-
-export { workRailStyle as riskRailStyle };
 
 export function buildRiskSheet(
   vehicles: EntityRecord[],

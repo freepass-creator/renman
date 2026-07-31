@@ -138,7 +138,7 @@ function FilterPop<T>({ col, x, y, rows, sel, onSel, sort, onSort, onClose }: {
 
 export function ExcelSheet<T>({
   cols, rows, onRow, onRowDoubleClick, rowKey, selectedRowKey,
-  onFiltered, mode = 'excel', fit = false, rowStyle, rowClickable,
+  onFiltered, mode = 'excel', fit = false, rowClickable,
   selectedKeys,
   onRowMouseDown, onRowClickEvent, onRowContextMenu,
 }: {
@@ -158,8 +158,6 @@ export function ExcelSheet<T>({
   mode?: 'excel' | 'card';
   /** 기본보기: 가로 스크롤 없이 현재 표 영역에 맞추고 낮은 중요도 열을 자동 숨김. */
   fit?: boolean;
-  /** 행 배경·장식 — CMS 상시 하위행 등. */
-  rowStyle?: (row: T) => React.CSSProperties | undefined;
   /** false면 클릭 비활성(하위 장식행). 기본 true. */
   rowClickable?: (row: T) => boolean;
   /** 다중 선택 하이라이트(--bg-selected). 체크박스 없음. */
@@ -222,10 +220,7 @@ export function ExcelSheet<T>({
                 <ObjCard
                   title={visibleCols[0]?.render(r)}
                   fields={visibleCols.slice(1, 5).map((c) => [c.label, c.render(r)] as [React.ReactNode, React.ReactNode])}
-                  style={{
-                    ...rowStyle?.(r),
-                    ...(multi ? { background: 'var(--bg-selected)' } : null),
-                  }}
+                  style={multi ? { background: 'var(--bg-selected)' } : undefined}
                   onClick={(onRowDoubleClick || onRow) ? () => {
                     haptic.tap();
                     (onRowDoubleClick || onRow)?.(r);
@@ -295,15 +290,12 @@ export function ExcelSheet<T>({
           </thead>
           <tbody>
             {view.map((r, i) => {
-              const custom = rowStyle?.(r);
               const rowId = rowKey?.(r, i) ?? String(i);
               const hasClick = !!(onRow || onRowClickEvent || onRowDoubleClick);
               const clickable = hasClick ? (rowClickable ? rowClickable(r) : true) : false;
               const selected = (selectedRowKey != null && rowId === selectedRowKey)
                 || !!selectedKeys?.has(rowId);
-              const bg = custom?.background
-                ? String(custom.background)
-                : (i % 2 ? C.zebra : C.card);
+              const bg = i % 2 ? C.zebra : C.card;
               const rowBg = selected
                 ? 'var(--bg-selected)'
                 : (hover === i && clickable ? C.hover : bg);
@@ -352,7 +344,6 @@ export function ExcelSheet<T>({
                     cursor: clickable ? 'pointer' : 'default',
                     background: rowBg,
                     userSelect: onRowDoubleClick ? 'none' : undefined,
-                    ...custom,
                     ...(hover === i && clickable ? { background: C.hover } : {}),
                   }}
                   onMouseEnter={() => setHover(i)}

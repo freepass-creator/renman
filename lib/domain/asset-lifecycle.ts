@@ -1,7 +1,6 @@
 /**
- * 자산분류(표시용 생애주기) — rail 폐기로 사라진 구매예정·처분예정 등 식별.
+ * 자산분류(표시용 생애주기) — lifecycle Badge 톤 SSOT.
  * classifyVehicle.ownership과 별개(등록예정→구매예정 합침 · 4값).
- * assetRail · lifecycle Badge 공통 판정 SSOT.
  */
 import {
   OUT, VEHICLE_BUY_PLAN, VEHICLE_DISPOSE_PLAN, VEHICLE_REG_PLAN,

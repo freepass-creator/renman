@@ -70,6 +70,12 @@ curl -s -o /dev/null -w "%{http_code}" http://localhost:6006/<route>   # 200
 
 | 날짜 | 작업자 | 내용 | 상태 |
 |---|---|---|---|
+| 2026-07-31 | Cursor | 행틴트잔재제거: 6원장 rowStyle·xxxRail·work-rail삭제 · ExcelSheet/LedgerFrame prop제거 · redesign=배지색만 | tsc0 |
+| 2026-07-31 | Cursor | 상세/생성: 사용자가 섹션 펼칠 때만 패널본문 안 reveal(창 scrollIntoView X) | tsc 대기 |
+| 2026-07-31 | Cursor | 과태료 업로드: 상단 회사선택 재사용(아래 중복 Select 제거) · scrollIntoView 제거 유지 | tsc0 |
+| 2026-07-31 | Cursor | 생성/상세 패널 scrollIntoView 제거 · 열면 본문 맨 위 고정(아래로 끌려가던 것) | tsc0 |
+| 2026-07-31 | Cursor | 업무생성 과태료 선택 시 setGroupAndUrl이 패널을 닫던 버그(keepCreating) · DEV claims미배정 폴백 · 본문 display:block 스크롤 | tsc0 · 브라우저확인 |
+| 2026-07-31 | Cursor | 상세/생성 패널: 세부섹션 펼침 높이 복구(__fields flex제거·section overflow visible·본문만 스크롤) | tsc0 |
 | 2026-07-31 | Cursor | 최종정리v2: IA상단·처리·원장·하단 · 미수메뉴제거 · risk4그룹원복 · 컴플→정합성·보증금→계약 · 체크X+rowSel우클릭 · /management3탭 · deeplink 배차/자금/ingest open=은 페이지이동만(후속) | tsc0 · 커밋분리 · push |
 | 2026-07-31 | Cursor | 지시층마감: 딥링크id SSOT·risk 컴플/보증금그룹·?group=·면허만기필드/판정·검색손님키 | tsc0 · curl200 · 데모id왕복0실패 · 브라우저로그인차단으로 육안클릭미완 · 커밋분리 |
 | 2026-07-30 | Cursor | 지시층1: work-orders·InstructionStrip→/risk · 홈오늘할일5 · section 23삭제(유지 s-repair·a-other) · ack TODO | tsc0 · /·/risk·/repair 200 |

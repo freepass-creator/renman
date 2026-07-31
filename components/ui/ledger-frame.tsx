@@ -29,7 +29,7 @@ export function LedgerFrame<R>({
   view, companySlot, body,
   loading, empty,
   cols, rows, rowKey, onRow, onRowDoubleClick, onCloseDetail, selectedRowKey,
-  rowStyle, rowClickable,
+  rowClickable,
   selectedKeys,
   onRowMouseDown, onRowClickEvent, onRowContextMenu,
   selectionBar,
@@ -66,7 +66,6 @@ export function LedgerFrame<R>({
   onRowDoubleClick?: (r: R) => void;
   onCloseDetail?: () => void;
   selectedRowKey?: string | null;
-  rowStyle?: (r: R) => React.CSSProperties | undefined;
   rowClickable?: (r: R) => boolean;
   /** 다중 선택 하이라이트(체크박스 없음). */
   selectedKeys?: ReadonlySet<string>;
@@ -179,7 +178,6 @@ export function LedgerFrame<R>({
                 onRowDoubleClick={openDetail}
                 selectedRowKey={onRowDoubleClick ? (pickedKey ?? selectedRowKey) : selectedRowKey}
                 fit={colView === '기본'}
-                rowStyle={rowStyle}
                 rowClickable={rowClickable}
                 selectedKeys={selectedKeys}
                 onRowMouseDown={onRowMouseDown}

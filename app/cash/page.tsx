@@ -9,7 +9,7 @@ import { useMemo, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { Plus, X, Link2, Unlink, UploadCloud } from 'lucide-react';
 import { buildCashLedger, withCmsItemRows, buildBankAccountLedger, type CashRow, type BankAccountRow } from '@/lib/finance/cash-ledger';
-import { CASH_BASIC_COLS, CASH_CARD_DETAIL_SECTIONS, CASH_EXPANDED_COLS, CASH_TX_DETAIL_SECTIONS, cashRail, cashRailStyle } from '@/lib/finance/cash-cols';
+import { CASH_BASIC_COLS, CASH_CARD_DETAIL_SECTIONS, CASH_EXPANDED_COLS, CASH_TX_DETAIL_SECTIONS } from '@/lib/finance/cash-cols';
 import {
   ACCOUNT_ALL_COLS, ACCOUNT_BASIC_COLS, ACCOUNT_DETAIL_SECTIONS,
 } from '@/lib/finance/account-cols';
@@ -53,8 +53,6 @@ type BulkInputSource = '파일' | '링크' | '텍스트';
 const amt = (n: number) => (n ? won(n) : '—');
 /** 표 DOM 폭주 방지 — 24·25 CMS미연결 수백건이면 페이지가 죽음 */
 const ROW_DISPLAY_CAP = 200;
-
-const CMS_DEP_BG = 'color-mix(in srgb, var(--brand) 10%, var(--bg-card))';
 
 const ACCOUNT_CREATE_SECTIONS: LedgerFormSection[] = [
   { title: '계좌 기본', open: true, fields: ['bankName', 'accountNumber', 'accountAlias', 'accountHolder', 'accountType', 'status'] },
@@ -724,14 +722,6 @@ export default function CashLedgerPage() {
       rows={displayRows}
       rowKey={(r) => r.id}
       selectedRowKey={selected?.id}
-      rowStyle={(r) => {
-        const rail = cashRailStyle(cashRail(r));
-        if (r.nest === 'cms-dep') return { ...rail, background: CMS_DEP_BG };
-        if (r.nest === 'cms-pending') {
-          return { ...rail, background: 'color-mix(in srgb, var(--orange-text) 8%, var(--bg-card))' };
-        }
-        return rail;
-      }}
       onRowDoubleClick={(row) => {
         setCreating(null);
         setSelected(row);

@@ -5,7 +5,7 @@ import { Pencil, Plus, UploadCloud } from 'lucide-react';
 import { assetMasterRow, type AssetMasterRow } from '@/lib/master-ledgers';
 import {
   ASSET_DETAIL_SECTIONS, ASSET_MASTER_BASIC_COLS, ASSET_MASTER_EXPANDED_COLS,
-  ASSET_MAINT_BASIC_COLS, assetRail, assetRailStyle,
+  ASSET_MAINT_BASIC_COLS,
 } from '@/lib/master-ledger-cols';
 import { fleetMaintRanking } from '@/lib/asset-econ';
 import { useEntityLists } from '@/lib/use-entity-lists';
@@ -267,7 +267,6 @@ export default function AssetLedgerPage() {
       rows={rows}
       rowKey={(r) => r.plate}
       selectedRowKey={selected?.plate}
-      rowStyle={(r) => assetRailStyle(assetRail(r))}
       onRowDoubleClick={(row) => {
         setCreating(false);
         setEditing(false);

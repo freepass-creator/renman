@@ -152,7 +152,7 @@ export function statusRank(r: Pick<FleetRow, 'ownership' | 'util' | 'dday'>): nu
   return 5;                                                                // 정비 등 기타
 }
 
-/** FleetRow → ObjRow/ExcelSheet 레일색(상태축). statusRank와 같은 술어. 정상(운행)=무색. */
+/** FleetRow → 모바일 ObjRow rail(상태축). statusRank와 같은 술어. 웹 원장 행 배경에는 쓰지 않음. */
 export function fleetRail(r: Pick<FleetRow, 'ownership' | 'util' | 'dday'>): RowRail {
   const rank = statusRank(r);
   return rank === 0 ? 'brand' : rank === 1 ? 'danger' : rank === 2 ? 'violet'

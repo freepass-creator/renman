@@ -2,13 +2,12 @@
  * 재무원장 열 SSOT — 계좌 입·출금 스트림(CashRow).
  * 엑셀 추가/삭제: `자금 · 엑셀기본|엑셀전체 · +|-key` @see lib/ledger-ext.ts
  */
-import { Badge, C, money, TwoLineCell, TreeIndent, type RailTone, type SheetCol } from '@/components/ui';
+import { Badge, C, money, TwoLineCell, TreeIndent, type SheetCol } from '@/components/ui';
 import { companyDisplay } from '@/lib/companies';
 import { groupOfLabel, isUnclassified, kindOfLabel } from '@/lib/payments/ledger-subjects';
 import type { CashRow } from '@/lib/finance/cash-ledger';
 import { buildDetailSections, buildSheetViews, type DetailSectionDef, type SheetViewKeys } from '@/lib/ledger-ext';
 import { LEDGER_EMPTY } from '@/lib/ledger-empty';
-import { workRailStyle } from '@/lib/work-rail';
 
 const coName = (r: CashRow) => companyDisplay(r.companyId);
 /** 내용 = 메모(거래 설명). 상대방은 party 열. */
@@ -26,13 +25,6 @@ const matchStatus = (r: CashRow) => {
   if (r.inAmt > 0) return { label: LEDGER_EMPTY.unmatched, tone: 'amber' as const };
   return { label: '해당없음', tone: 'gray' as const };
 };
-
-/** 자금 행 rail — 미매칭=warn · 매칭완료·해당없음=무색. */
-export function cashRail(r: CashRow): RailTone {
-  return matchStatus(r).label === LEDGER_EMPTY.unmatched ? 'warn' : 'none';
-}
-
-export { workRailStyle as cashRailStyle };
 
 const CASH_COL_CATALOG: SheetCol<CashRow>[] = [
   {

@@ -5,7 +5,7 @@ import { CircleDollarSign, Pencil, Plus, UploadCloud } from 'lucide-react';
 import { useSearchParams } from 'next/navigation';
 import { TODAY, dday } from '@/lib/dashboard-consts';
 import { contractMasterRow } from '@/lib/master-ledgers';
-import { CONTRACT_DETAIL_SECTIONS, CONTRACT_MASTER_BASIC_COLS, CONTRACT_MASTER_EXPANDED_COLS, contractRail, contractRailStyle } from '@/lib/master-ledger-cols';
+import { CONTRACT_DETAIL_SECTIONS, CONTRACT_MASTER_BASIC_COLS, CONTRACT_MASTER_EXPANDED_COLS } from '@/lib/master-ledger-cols';
 import { latestDateOf, summarizeContractLedgerStats } from '@/lib/ledger-stats';
 import { useEntityList } from '@/lib/use-entity-lists';
 import { textMatch } from '@/lib/search-match';
@@ -227,7 +227,6 @@ function ContractLedgerInner() {
       rows={rows}
       rowKey={(r) => r.contractNo || `${r.plate}:${r.startDate}`}
       selectedRowKey={selected ? (selected.contractNo || `${selected.plate}:${selected.startDate}`) : null}
-      rowStyle={(r) => contractRailStyle(contractRail(r))}
       onRowDoubleClick={(row) => {
         setCreating(false);
         setEditing(false);

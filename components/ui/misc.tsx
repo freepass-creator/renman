@@ -118,9 +118,9 @@ export function Metric({ label, value, hint, tone, onClick }: { label: React.Rea
 }
 // 객체 카드 = 목록의 단일 원자(2행 신원카드). 웹·모바일 높이 56(= freepass ERP4 ObjCard).
 //  1행 신원: [회사][상태배지][차량번호(모노·무잘림) 또는 이름][차종(축소가능)] …[우측 핵심수치]
-//  2행 원자: fields(라벨-값, 우선순위 상위 3 + ＋n) 또는 sub(자유문). danger=옅은 배경 틴트. 좌측점·세로선 금지.
+//  2행 원자: fields(라벨-값, 우선순위 상위 3 + ＋n) 또는 sub(자유문). 상태색=배지만. 행배경·좌측점·세로선 금지.
 //  호출부는 "필요한 원자만" 넘긴다. 차번=plate, 비차량 주체(자금 상대방·고객)=name, 부가식별=carType.
-// 레일 톤 SSOT — 판정용 RailTone. 시각=danger 틴트만(workRailStyle). brand·violet은 상태축용.
+// RailTone — 모바일 ObjRow 잔여. 원장 ExcelSheet 행 틴트에는 쓰지 않음.
 export type RailTone = 'none' | 'brand' | 'danger' | 'warn' | 'violet' | 'ok' | 'mute';
 export function railToneColor(tone: Exclude<RailTone, 'none'>): string {
   return tone === 'brand' ? C.brand
@@ -195,7 +195,7 @@ export function ObjCard({ badge, badgeTone = 'gray', co, rail = 'none', plate, n
   badge?: React.ReactNode; badgeTone?: BadgeTone; co?: string; rail?: RailTone;
   plate?: string; name?: React.ReactNode; carType?: React.ReactNode; title?: React.ReactNode;
   sub?: React.ReactNode; right?: React.ReactNode; fields?: [React.ReactNode, React.ReactNode][]; onClick?: () => void;
-  /** ExcelSheet rowStyle 등 — 배경 틴트만. 좌측 점/레일 금지. */
+  /** 선택 하이라이트 등 — 상태 틴트 금지(배지만). */
   style?: React.CSSProperties;
 }) {
   const mobile = useIsMobile();
@@ -213,7 +213,7 @@ export function ObjCard({ badge, badgeTone = 'gray', co, rail = 'none', plate, n
     : name != null
       ? <span style={{ flex: '0 1 auto', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: mobile ? 15 : 13, fontWeight: 700, color: C.ink }}>{name}</span>
       : <span style={{ flex: '0 1 auto', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: mobile ? 14 : 12.5, fontWeight: 600, color: C.ink }}>{title}</span>;
-  // danger 틴트: rowStyle.background 또는 rail==='danger'. 호버 시 hover가 우선.
+  // rail danger 틴트는 잔여(모바일). 상태 신호의 SSOT는 Badge.
   const tintBg = style?.background ?? (rail === 'danger' ? 'var(--danger-tint)' : undefined);
   return (
     <div onClick={onClick} {...on} style={{

@@ -11,7 +11,7 @@ import { FileWarning, HandCoins } from 'lucide-react';
 import { TODAY } from '@/lib/dashboard-consts';
 import { useDashboardData } from '@/lib/use-dashboard-data';
 import { textMatch } from '@/lib/search-match';
-import { buildRiskSheetRows, countRiskSheetGroups, riskRail, riskRailStyle, type RiskSheetGroup, type RiskSheetRow } from '@/lib/risk-ledger';
+import { buildRiskSheetRows, countRiskSheetGroups, type RiskSheetGroup, type RiskSheetRow } from '@/lib/risk-ledger';
 import { RISK_BASIC_COLS, RISK_DETAIL_SECTIONS, RISK_EXPANDED_COLS } from '@/lib/risk-cols';
 import { LEDGER_EMPTY } from '@/lib/ledger-empty';
 import { latestDateOf } from '@/lib/ledger-stats';
@@ -234,7 +234,6 @@ function RiskLedgerInner() {
         rows={rows}
         rowKey={(r) => r.id}
         selectedRowKey={selected?.id ?? null}
-        rowStyle={(r) => riskRailStyle(riskRail(r))}
         selectedKeys={sel.selectedIds}
         onRowMouseDown={(e) => rowSel.onRowMouseDown(e)}
         onRowClickEvent={(e, r, idx) => {
