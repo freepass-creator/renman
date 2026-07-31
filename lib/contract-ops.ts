@@ -9,6 +9,7 @@ import type { Contract, PaymentEntry, DiscountEntry } from './payments/types';
 import { generateSchedules, recalcContract, addPaymentEntry, addDiscountEntry, distributeUnpaid, applyPayment, computeCurrentSeq } from './payments/payment-schedule';
 import { applyReturnedProration } from './payments/returned-proration';
 import { ymd, ddayFrom, addMonthsIso } from './contracts/dates';
+import { legacyDepositOffsetNet } from './contracts/deposit-offset';
 import {
   isDeliveryPending as statusDeliveryPending,
   isReturnable as statusReturnable,
@@ -174,7 +175,9 @@ export function computeContractView(rec: EntityRecord, today: string): ContractV
   const carrySeed = Math.max(0, Number(rec._carryUnpaid) || 0);
   const seedNet = seedCarry ? (hasPerSeq ? schedGross : carrySeed) : null;
   const gross = seedNet != null ? seedNet : schedGross;
-  const net = seedNet != null ? seedNet : schedGross;
+  let net = seedNet != null ? seedNet : schedGross;
+  // 레거시 보증금정산: 날짜만 찍힌 계약은 충당액을 net에서 차감(미수·시동·내용증명 잔존 방지)
+  net = legacyDepositOffsetNet(rec, net);
   const rent0 = Number(rec.monthlyRent) || 0;
   // 미납 회차수: 씨앗 무납부는 net÷월대여(회차표 carry 분배 전에도 문서 회차 일치). 앱수납 후·일반=엔진 카운트.
   const count = seedNet != null && !hasPerSeq

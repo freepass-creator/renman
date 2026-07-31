@@ -44,7 +44,7 @@ function lastContactByPlate(history: EntityRecord[]): Map<string, EntityRecord> 
   return map;
 }
 
-/** 미수 행(net>0) · 금액 큰 순. */
+/** 미수 행(net>0) · 금액 큰 순. 보증금 정산 완료(충당 반영 후 net=0)는 제외. */
 export function buildReceivableRows(
   contracts: EntityRecord[],
   history: EntityRecord[],

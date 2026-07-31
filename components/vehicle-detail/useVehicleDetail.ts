@@ -19,7 +19,7 @@ import { normPlate } from '@/lib/plate';
 import { linkFleet, handoverHistory, recommendNextRent } from '@/lib/domain/model';
 import { loanSchedule, loanSummary } from '@/lib/loan';
 import { assetEconomics } from '@/lib/asset-econ';
-import { depositView } from '@/lib/deposit';
+import { depositView, buildDepositOffsetPayments } from '@/lib/deposit';
 import { penaltyStatus } from '@/lib/penalty-reassign';
 import { loadMaster } from '@/lib/company-master';
 import { toast } from '@/lib/toast';
@@ -259,8 +259,13 @@ export function useVehicleDetail(plate: string, focus?: string) {
     if (!pendDeposit?.c._key) return;
     const t = requireTarget();
     if (!t) return;
-    const { d: dep } = pendDeposit;
-    await doTransition({ depositSettledDate: TODAY }, String(pendDeposit.c._key), pendDeposit.c);
+    const { d: dep, c: contract } = pendDeposit;
+    const existing = Array.isArray(contract._payments) ? (contract._payments as unknown[]) : [];
+    const offsetPays = buildDepositOffsetPayments(contract, TODAY);
+    await doTransition({
+      depositSettledDate: TODAY,
+      ...(offsetPays.length ? { _payments: [...existing, ...offsetPays] } : {}),
+    }, String(contract._key), contract);
     await saveIntake('history', t, [{
       plate, category: '보증금',
       title: dep.addCharge > 0 ? `보증금 충당 후 추가청구 ${won(dep.addCharge)}` : `보증금 반환 ${won(dep.refund)}`,
