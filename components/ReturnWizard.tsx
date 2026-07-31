@@ -173,10 +173,18 @@ export function ReturnWizard({ contract, vehicle, onClose, onDone }: {
             {settle.mileageBasis === '산출불가' && (
               <Message variant="warning">주행거리 미입력 — 초과주행 산출 불가</Message>
             )}
+            {settle.mileageBasis === '단가미확인' && (
+              <Message variant="warning">
+                초과 {settle.excessKm.toLocaleString('ko-KR')}km — 계약서의 초과주행 단가를 못 읽었습니다.
+                계약 상세에서 «초과주행 단가»를 입력하면 자동 계산됩니다(추측 단가로 청구하지 않습니다).
+              </Message>
+            )}
             <WizCard gap={9}>
               <Row k="미납 대여료 (일할정산 반영)" v={won(settle.unpaid)} strong={settle.unpaid > 0} />
               {settle.mileageBasis === '산출불가' ? (
                 <Row k="초과주행" v="산출 불가" muted />
+              ) : settle.mileageBasis === '단가미확인' ? (
+                <Row k="초과주행" v={`초과 ${settle.excessKm.toLocaleString('ko-KR')}km · 단가 미확인`} muted />
               ) : settle.mileageBasis === '한도없음' ? (
                 <Row k="초과주행" v="한도 없음(무제한)" muted />
               ) : settle.overMileageFee > 0 ? (

@@ -2,7 +2,7 @@
  * 초과주행 과금 — 반납 정산 라인아이템 순수 계산.
  *   driven = returnMileage − mileageOut (둘 다 있을 때만).
  *   허용 = annualMileageLimit × (사용일수/365) 일할.
- *   요율 = contract.overMileageRate || DEFAULT_OVER_MILEAGE_RATE.
+ *   요율 = 직접지정 > 계약서 단가(국산/수입, OCR) > 없으면 «단가미확인»(청구 보류).
  *   ★결측을 0km로 계산하지 않음(산출불가).
  *
  * TODO(2단계): 진행중 차량 예상 초과 — history.mileage(정비 계기판) 최신값으로
@@ -10,11 +10,16 @@
  */
 import type { EntityRecord } from '@/lib/intake/entities';
 import { ymd } from '@/lib/contracts/dates';
+import { isForeignMaker } from '@/lib/domain/vehicle-master';
 
-/** 회사 공통 초과주행 단가(원/km). 계약 overMileageRate 미입력 시 폴백. */
-export const DEFAULT_OVER_MILEAGE_RATE = 100;
+/**
+ * ★단가는 «계약서에 있는 값»이다(회사 공통 상수 아님) — 고객마다 약정 단가가 다르다.
+ *   OCR이 계약서에서 국산·수입 2종을 읽어 overMileageRateKr/Foreign에 저장 → 차종으로 선택.
+ *   직접지정(overMileageRate)이 있으면 그게 우선. 아무것도 없으면 «단가미확인»으로 청구 보류
+ *   (추측 단가로 채권을 잡으면 틀린 금액이 내용증명까지 간다).
+ */
 
-export type OverMileageBasis = '반납확정' | '산출불가' | '한도없음';
+export type OverMileageBasis = '반납확정' | '산출불가' | '한도없음' | '단가미확인';
 
 export type OverMileageResult = {
   allowedKm: number;
@@ -39,7 +44,27 @@ function usageDaysBetween(from: string, to: string): number {
  * 계약 1건 초과주행 과금.
  * @param today 반납일 what-if(미반납이면 조회 기준일). returnedDate가 있으면 그걸 우선.
  */
-export function computeOverMileage(contract: EntityRecord, today: string): OverMileageResult {
+/**
+ * 적용 단가 — 직접지정 > 계약서(차종별 국산/수입) > 없음(null).
+ * 차종 판별이 안 되면(제조사 미상) 두 단가가 같을 때만 사용, 다르면 null(사람 확인).
+ */
+export function resolveOverMileageRate(contract: EntityRecord, vehicle?: EntityRecord | null): number | null {
+  const manual = Number(contract.overMileageRate);
+  if (Number.isFinite(manual) && manual > 0) return manual;
+  const kr = Number(contract.overMileageRateKr);
+  const fg = Number(contract.overMileageRateForeign);
+  const hasKr = Number.isFinite(kr) && kr > 0;
+  const hasFg = Number.isFinite(fg) && fg > 0;
+  if (!hasKr && !hasFg) return null;
+  const foreign = isForeignMaker(vehicle?.maker ?? contract.carName);
+  if (foreign === true) return hasFg ? fg : null;
+  if (foreign === false) return hasKr ? kr : null;
+  // 국산·수입 판별 불가 — 두 값이 같으면 안전하게 사용, 다르면 보류.
+  if (hasKr && hasFg) return kr === fg ? kr : null;
+  return hasKr ? kr : (hasFg ? fg : null);
+}
+
+export function computeOverMileage(contract: EntityRecord, today: string, vehicle?: EntityRecord | null): OverMileageResult {
   const empty = (basis: OverMileageBasis, rate = 0): OverMileageResult => ({
     allowedKm: 0, drivenKm: 0, excessKm: 0, rate, fee: 0, basis, usageDays: 0,
   });
@@ -77,10 +102,11 @@ export function computeOverMileage(contract: EntityRecord, today: string): OverM
   // 음수 주행(계기판 오류) = 초과 없음.
   const excessKm = Math.max(0, drivenKm - allowedKm);
 
-  const rateRaw = contract.overMileageRate;
-  const rate = (rateRaw !== '' && rateRaw != null && Number.isFinite(Number(rateRaw)))
-    ? Number(rateRaw)
-    : DEFAULT_OVER_MILEAGE_RATE;
+  const rate = resolveOverMileageRate(contract, vehicle);
+  if (rate == null) {
+    // 단가를 모르면 금액을 만들지 않는다 — 화면·정산서에 «계약서 단가 미확인»으로 표시.
+    return { ...empty('단가미확인'), allowedKm: Math.round(allowedKm * 10) / 10, drivenKm, excessKm: Math.round(excessKm * 10) / 10, usageDays };
+  }
   const fee = Math.round(excessKm * rate);
 
   return {

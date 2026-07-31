@@ -170,9 +170,11 @@ function SettlementDoc({ c, companyId }: { c: EntityRecord; companyId: string })
         {line('미납 대여료 (일할정산 반영)', won(unpaid))}
         {mileageBasis === '산출불가'
           ? line('초과주행', '주행거리 미입력 — 산출 불가')
-          : mileageBasis === '한도없음'
-            ? line('초과주행', '연주행한도 없음(무제한)')
-            : overMileageFee > 0
+          : mileageBasis === '단가미확인'
+            ? line('초과주행', `초과 ${excessKm.toLocaleString('ko-KR')}km · 계약서 단가 미확인 — 별도 청구`)
+            : mileageBasis === '한도없음'
+              ? line('초과주행', '연주행한도 없음(무제한)')
+              : overMileageFee > 0
               ? line(`초과주행 (${excessKm.toLocaleString('ko-KR')}km × ${overMileageRate.toLocaleString('ko-KR')}원)`, won(overMileageFee), false, true)
               : line('초과주행', '과금 없음')}
         {line('예치 보증금', won(deposit))}

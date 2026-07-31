@@ -259,7 +259,10 @@ export const ENTITIES: Record<string, Entity> = {
       { key: 'endDate', label: '종료일', type: 'date', ocrFrom: 'end_date' },
       { key: 'driverAgeMin', label: '최소운전연령', type: 'number', ocrFrom: 'driver_age_min' },
       { key: 'annualMileageLimit', label: '연주행한도(km)', type: 'number', ocrFrom: 'annual_mileage_limit_km' },
-      { key: 'overMileageRate', label: '초과주행 단가(원/km)', type: 'number', manual: true, note: '미입력 시 회사 공통 단가' },
+      // 초과주행 단가 — 계약서에 국산·수입 2종으로 표기됨(OCR: excess_mileage_fee_*). 차종으로 선택.
+      { key: 'overMileageRateKr', label: '초과주행 단가·국산(원/km)', type: 'number', ocrFrom: 'excess_mileage_fee_kr' },
+      { key: 'overMileageRateForeign', label: '초과주행 단가·수입(원/km)', type: 'number', ocrFrom: 'excess_mileage_fee_foreign' },
+      { key: 'overMileageRate', label: '초과주행 단가(직접지정)', type: 'number', manual: true, note: '비우면 계약서 단가(국산/수입) 자동 선택' },
       { key: 'monthlyRent', label: '월대여료(원)', type: 'number', manual: true, note: '계약서 표기 없으면 직접입력' },
       { key: 'deposit', label: '보증금(원)', type: 'number', manual: true },
       // ── 표준약관·법정 필수기재(자동차대여 표준약관·여객자동차법 정합) ──
