@@ -8,7 +8,7 @@
 import { useMemo, type CSSProperties, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import {
-  LedgerFrame, EmptyState, ExcelSheet, Badge, won, C, R, NUM, SPACE_GROUP_M,
+  LedgerFrame, EmptyState, ExcelSheet, Badge, PageLoading, won, C, R, NUM,
   type SheetCol,
 } from '@/components/ui';
 import { TODAY } from '@/lib/dashboard-consts';
@@ -63,7 +63,6 @@ function KpiTile({
         cursor: onClick ? 'pointer' : 'default',
         display: 'flex',
         flexDirection: 'column',
-        boxShadow: 'var(--shadow-sm)',
       }}
     >
       <span style={{ fontSize: 11, fontWeight: 700, color: C.sub }}>{label}</span>
@@ -88,9 +87,10 @@ function Panel({ title, desc, children }: { title: string; desc: string; childre
       border: `1px solid ${C.line}`, borderRadius: R, background: C.card, overflow: 'hidden',
       display: 'flex', flexDirection: 'column', minHeight: 0,
     }}>
-      <div style={{ padding: '14px 16px', borderBottom: `1px solid ${C.line}` }}>
-        <div style={{ fontSize: 14, fontWeight: 800, color: C.ink }}>{title}</div>
-        <div style={{ fontSize: 11, color: C.mute, marginTop: 3 }}>{desc}</div>
+      {/* 패널 제목 위계 = 상세패널 규격(13.5/800) */}
+      <div style={{ padding: '12px 14px', borderBottom: `1px solid ${C.line}`, background: 'var(--bg-header)' }}>
+        <div style={{ fontSize: 13.5, fontWeight: 800, color: C.ink }}>{title}</div>
+        <div style={{ fontSize: 11.5, color: C.mute, marginTop: 3 }}>{desc}</div>
       </div>
       <div style={{ flex: 1, minHeight: 0, padding: 12 }}>{children}</div>
     </section>
@@ -216,7 +216,7 @@ export default function DashboardPage() {
           </header>
           <div className="ledger-record-panel__body" style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: 10 }}>
             {loading ? (
-              <EmptyState variant="sec">…</EmptyState>
+              <PageLoading />
             ) : todayPanel.count === 0 ? (
               <EmptyState variant="ok">오늘 챙길 일이 없습니다</EmptyState>
             ) : (
@@ -246,9 +246,10 @@ export default function DashboardPage() {
         </section>
       )}
       body={(
+        // 원장 시트와 동일: 워크스페이스 폭 그대로 · 상단 0(패널과 정렬) · 간격 12 통일
         <div style={{
-          display: 'flex', flexDirection: 'column', gap: SPACE_GROUP_M,
-          padding: mobile ? '8px 0 24px' : '4px 0 28px', maxWidth: 1500,
+          display: 'flex', flexDirection: 'column', gap: 12,
+          padding: mobile ? '0 0 24px' : '0 0 28px',
         }}>
           <div style={{
             ...gridKpi,
@@ -297,11 +298,11 @@ export default function DashboardPage() {
           <div style={{
             display: 'grid',
             gridTemplateColumns: mobile ? '1fr' : 'minmax(0, 1.6fr) minmax(240px, 1fr)',
-            gap: 16,
+            gap: 12,
           }}>
             <Panel title="법인별 요약" desc="보유·가동·미수·영업손익 — 같은 KPI SSOT.">
               {loading ? (
-                <EmptyState variant="sec">…</EmptyState>
+                <PageLoading />
               ) : coRows.length === 0 ? (
                 <EmptyState variant="sec">표시할 법인이 없습니다</EmptyState>
               ) : (
@@ -311,7 +312,7 @@ export default function DashboardPage() {
 
             <Panel title="영업손익 추이" desc="최근 6개월 · 현금 기준.">
               {loading ? (
-                <EmptyState variant="sec">…</EmptyState>
+                <PageLoading />
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: '4px 2px' }}>
                   {trend.list.map((x) => {
