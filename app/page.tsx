@@ -7,6 +7,7 @@
  */
 import { useMemo, type CSSProperties, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
+import { ChevronRight } from 'lucide-react';
 import {
   LedgerFrame, EmptyState, ExcelSheet, Badge, PageLoading, won, C, R, NUM,
   type SheetCol,
@@ -115,7 +116,7 @@ function rowTone(row: HomeQueueRow): 'red' | 'amber' | 'gray' {
   return 'amber';
 }
 
-function TodoRow({ row, onGo }: { row: HomeQueueRow; onGo: (href: string) => void }) {
+function TodoRow({ row, onGo, first }: { row: HomeQueueRow; onGo: (href: string) => void; first?: boolean }) {
   const overdue = row.dday != null && row.dday < 0;
   return (
     <button
@@ -123,8 +124,8 @@ function TodoRow({ row, onGo }: { row: HomeQueueRow; onGo: (href: string) => voi
       onClick={() => onGo(hrefForTodayRow(row))}
       style={{
         display: 'flex', alignItems: 'center', gap: 7, width: '100%', textAlign: 'left',
-        padding: '6px 9px', border: `1px solid ${C.line}`, borderRadius: R,
-        background: overdue ? 'var(--danger-tint)' : C.card, cursor: 'pointer', fontFamily: 'inherit',
+        padding: '7px 10px', border: 'none', borderTop: first ? 'none' : `1px solid ${C.line2}`,
+        background: overdue ? 'var(--danger-tint)' : 'transparent', cursor: 'pointer', fontFamily: 'inherit',
       }}
     >
       <Badge tone={rowTone(row)}>{row.kind}</Badge>
@@ -214,27 +215,31 @@ export default function DashboardPage() {
             ) : todayPanel.count === 0 ? (
               <EmptyState variant="ok">오늘 챙길 일이 없습니다</EmptyState>
             ) : (
-              todayPanel.groups.map((g) => (
-                <div key={g.bucket} style={{ marginBottom: 14 }}>
-                  <div style={{
-                    display: 'flex', alignItems: 'center', gap: 6, padding: '2px 2px 7px',
-                    fontSize: 11.5, fontWeight: 600, color: g.bucket === '경과' ? C.danger : C.mute,
-                  }}>
-                    {BUCKET_LABEL[g.bucket]}
-                    <Badge tone={BUCKET_TONE[g.bucket]}>{g.rows.length}</Badge>
-                  </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-                    {g.rows.slice(0, BUCKET_CAP).map((row) => (
-                      <TodoRow key={row.id} row={row} onGo={go} />
-                    ))}
-                    {g.rows.length > BUCKET_CAP ? (
-                      <span style={{ fontSize: 11, color: C.faint, padding: '1px 2px' }}>
-                        외 {g.rows.length - BUCKET_CAP}건 — 해당 원장에서 확인
-                      </span>
-                    ) : null}
-                  </div>
-                </div>
-              ))
+              <div className="ledger-record-panel__sections">
+                {todayPanel.groups.map((g) => (
+                  <details
+                    key={g.bucket}
+                    className="ledger-record-panel__section"
+                    open={g.bucket === '경과' || g.bucket === '오늘'}
+                  >
+                    <summary>
+                      <ChevronRight className="ledger-record-panel__chevron" size={14} aria-hidden="true" />
+                      {BUCKET_LABEL[g.bucket]}
+                      <Badge tone={BUCKET_TONE[g.bucket]}>{g.rows.length}</Badge>
+                    </summary>
+                    <div style={{ borderTop: `1px solid ${C.line2}` }}>
+                      {g.rows.slice(0, BUCKET_CAP).map((row, i) => (
+                        <TodoRow key={row.id} row={row} onGo={go} first={i === 0} />
+                      ))}
+                      {g.rows.length > BUCKET_CAP ? (
+                        <div style={{ fontSize: 11, color: C.faint, padding: '6px 10px', borderTop: `1px solid ${C.line2}` }}>
+                          외 {g.rows.length - BUCKET_CAP}건 — 해당 원장에서 확인
+                        </div>
+                      ) : null}
+                    </div>
+                  </details>
+                ))}
+              </div>
             )}
           </div>
         </section>
