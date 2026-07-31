@@ -33,7 +33,7 @@ import { useSession } from '@/lib/session';
 import { resolveWriteCompany, NEED_COMPANY } from '@/lib/scope';
 import { toast } from '@/lib/toast';
 import {
-  LedgerActions, LedgerCreatePanel, LedgerFilterButton, LedgerFilterFields, LedgerFilterPanel, LedgerFrame, LedgerPanelFooter, LedgerRecordPanel, Btn, Input, Select, Search, PillTabs, PeriodBar, Badge, Message, ListBox, ListRow,
+  LedgerActions, LedgerActiveFilters, LedgerCreatePanel, LedgerFilterButton, LedgerFilterFields, LedgerFilterPanel, LedgerFrame, LedgerPanelFooter, LedgerRecordPanel, Btn, Input, Select, Search, PillTabs, PeriodBar, Badge, Message, ListBox, ListRow,
   C, ContextMenu, type ContextMenuItem, useSheetExport, won, type LedgerColView, type LedgerFormSection,
 } from '@/components/ui';
 import { useIsMobile } from '@/lib/use-mobile';
@@ -643,6 +643,21 @@ export default function CashLedgerPage() {
             style={{ width: mobile ? 160 : 280, flexShrink: 0 }}
           />
           <LedgerFilterButton open={filterOpen} count={cashFilterCount} onClick={() => setFilterOpen((o) => !o)} />
+          {!filterOpen && (
+            <LedgerActiveFilters
+              defs={cashFilterDefs} values={cashFilterValues}
+              onClear={(key: string) => onCashFilterChange(key, '')}
+              onClearAll={() => cashFilterDefs.forEach((d) => onCashFilterChange(d.key, ''))}
+            />
+          )}
+          {/* 필터 창이 닫혀 있어도 «무엇을 보고 있는지» 알아야 한다 — 칩을 누르면 그 축만 해제. */}
+          {!filterOpen && (
+            <LedgerActiveFilters
+              defs={cashFilterDefs} values={cashFilterValues}
+              onClear={(key: string) => onCashFilterChange(key, '')}
+              onClearAll={() => cashFilterDefs.forEach((d) => onCashFilterChange(d.key, ''))}
+            />
+          )}
           <PeriodBar latest={latest} initial="월간" size="sm" onRange={onRange} />
         </>}
         filterPanel={cashFilterPanel}

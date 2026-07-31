@@ -8,6 +8,59 @@ import { C, R, ctrlH } from './tokens';
 import { useIsMobile } from '@/lib/use-mobile';
 import type { LedgerFilterFieldDef } from '@/lib/ledger-filter-defs';
 
+/**
+ * 활성 필터 요약 — «필터 창이 닫혀 있어도 무엇을 보고 있는지» 페이지에서 알 수 있어야 한다(사장님 확정).
+ *
+ * 닫으면 배지 숫자만 남아서 «몇 개 걸렸다»는 것만 알고 «무엇이 걸렸는지»는 알 수 없었다.
+ * 이 상태로 숫자를 읽으면 전체 합계라고 오해한다 — 돈 화면에서는 특히 위험하다.
+ *
+ * 칩을 누르면 그 필터만 해제한다(패널을 열지 않고 바로 되돌릴 수 있게).
+ * 값이 없는 축은 칩을 만들지 않으므로, 아무것도 안 걸렸으면 아예 렌더되지 않는다.
+ */
+export function LedgerActiveFilters({
+  defs, values, onClear, onClearAll,
+}: {
+  defs: readonly LedgerFilterFieldDef[];
+  values: Record<string, string>;
+  onClear: (key: string) => void;
+  onClearAll?: () => void;
+}) {
+  const active = defs.filter((d) => values[d.key]);
+  if (active.length === 0) return null;
+  return (
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', minWidth: 0 }}>
+      {active.map((d) => (
+        <button
+          key={d.key}
+          type="button"
+          onClick={() => onClear(d.key)}
+          title={`${d.label} 필터 해제`}
+          style={{
+            display: 'inline-flex', alignItems: 'center', gap: 5, height: 20, padding: '0 7px',
+            border: `1px solid ${C.brand}`, borderRadius: 'var(--radius-badge)',
+            background: C.card, color: C.brand, fontSize: 11, fontWeight: 700,
+            cursor: 'pointer', whiteSpace: 'nowrap', maxWidth: 240, overflow: 'hidden',
+          }}
+        >
+          <span style={{ color: C.mute, fontWeight: 600 }}>{d.label}</span>
+          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{values[d.key]}</span>
+          <X size={11} aria-hidden />
+        </button>
+      ))}
+      {active.length > 1 && onClearAll && (
+        <button
+          type="button"
+          onClick={onClearAll}
+          style={{
+            height: 20, padding: '0 7px', border: `1px solid ${C.line}`, borderRadius: 'var(--radius-badge)',
+            background: C.card, color: C.mute, fontSize: 11, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap',
+          }}
+        >전체 해제</button>
+      )}
+    </span>
+  );
+}
+
 export function LedgerFilterButton({ open, count, onClick }: { open: boolean; count: number; onClick: () => void }) {
   const mobile = useIsMobile();
   const h = ctrlH(mobile, 'sm');
