@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { ChevronRight, Plus, Save, UploadCloud, X } from 'lucide-react';
 import { COMPANIES, companyLabel, companyShort } from '@/lib/companies';
 import { ENTITIES, type EntityRecord, type Field } from '@/lib/intake/entities';
@@ -11,6 +11,7 @@ import { toast } from '@/lib/toast';
 import { Btn, Input, PillTabs, Select } from './controls';
 import { FormGrid } from './detail';
 import { LedgerPanelFooter } from './ledger-actions';
+import { revealSectionInPanel } from './ledger-panel-scroll';
 import { Message } from './misc';
 import { C } from './tokens';
 
@@ -21,15 +22,59 @@ export type LedgerFormSection = {
 };
 
 /** kind 값 → 일반 폼 대신 게이트웨이(저장 금지 · 외부/인라인 등록). */
+export type LedgerKindGatewayCtx = {
+  /** 생성 패널 상단에서 고른 저장 회사. */
+  companyId: string;
+};
 export type LedgerKindGateway = {
+  /** 패널 안 접이식 섹션 제목. 기본=해당 kind명. */
+  sectionTitle?: string;
   message?: ReactNode;
   /** render 없을 때 액션 버튼. */
   actionLabel?: string;
   href?: string;
   onAction?: () => void;
-  /** 있으면 href/actionLabel UI 대신 이 노드만(패널 내 업로드 등). */
-  render?: ReactNode;
+  /** 있으면 href/actionLabel UI 대신 이 노드(또는 회사 전달 함수). */
+  render?: ReactNode | ((ctx: LedgerKindGatewayCtx) => ReactNode);
 };
+
+export function CreateSection({
+  title,
+  initiallyOpen,
+  children,
+}: {
+  title: string;
+  initiallyOpen: boolean;
+  children: ReactNode;
+}) {
+  const [open, setOpen] = useState(initiallyOpen);
+  const userToggleRef = useRef(false);
+
+  return (
+    <details
+      className="ledger-create-panel__section"
+      open={open}
+      onToggle={(event) => {
+        const el = event.currentTarget;
+        const next = el.open;
+        setOpen(next);
+        // 사용자가 summary를 눌러 펼친 경우만 — 패널 최초 오픈 시 아래로 끌지 않음.
+        if (next && userToggleRef.current) {
+          userToggleRef.current = false;
+          revealSectionInPanel(el);
+        } else {
+          userToggleRef.current = false;
+        }
+      }}
+    >
+      <summary onClick={() => { userToggleRef.current = true; }}>
+        <ChevronRight className="ledger-create-panel__chevron" size={14} aria-hidden="true" />
+        {title}
+      </summary>
+      {children}
+    </details>
+  );
+}
 
 function normalizedForm(fields: Field[], form: EntityRecord): EntityRecord {
   const out: EntityRecord = { ...form };
@@ -89,6 +134,7 @@ export function LedgerCreatePanel({
     return base;
   });
   const [busy, setBusy] = useState(false);
+  const bodyRef = useRef<HTMLDivElement>(null);
 
   const activeSections = useMemo(() => {
     if (sectionsByKind) {
@@ -117,9 +163,15 @@ export function LedgerCreatePanel({
     }
   }, [entity, activeSections, entityKey]);
 
+  // 패널 열릴 때 본문은 항상 맨 위.
+  useEffect(() => {
+    const el = bodyRef.current;
+    if (!el) return;
+    el.scrollTop = 0;
+  }, []);
+
   const fieldByKey = useMemo(() => new Map(selectedFields.map((field) => [field.key, field])), [selectedFields]);
 
-  if (!entity) return null;
   const kindValue = String(form[kindField] || '');
   const gateway = kindGateways?.[kindValue];
   const companyReady = !scopeAll || !!String(form.companyId || '').trim();
@@ -129,6 +181,8 @@ export function LedgerCreatePanel({
       ? !!String(form.title || '').trim()
       : selectedFields.every((field) => !field.required || !!String(form[field.key] ?? '').trim());
   const canSave = !gateway && companyReady && fieldsReady;
+
+  if (!entity) return null;
 
   const change = (key: string, value: string) => {
     setForm((current) => {
@@ -202,7 +256,7 @@ export function LedgerCreatePanel({
         </button>
       </header>
 
-      <div className="ledger-create-panel__body">
+      <div ref={bodyRef} className="ledger-create-panel__body">
         {prefix}
         {scopeAll && (
           quick ? (
@@ -273,25 +327,37 @@ export function LedgerCreatePanel({
             .map((key) => fieldByKey.get(key))
             .filter((field): field is Field => !!field);
           if (!sectionFields.length) return null;
+          // key에 kind 포함 — 업무구분 바꾸면 섹션 remount → initiallyOpen 재적용.
           return (
-            <details className="ledger-create-panel__section" open={section.open ?? sectionIndex === 0} key={section.title}>
-              <summary><ChevronRight className="ledger-create-panel__chevron" size={14} aria-hidden="true" />{section.title}</summary>
+            <CreateSection
+              key={`${kindValue}::${section.title}`}
+              title={section.title}
+              initiallyOpen={section.open ?? sectionIndex === 0}
+            >
               <FormGrid fields={sectionFields} form={form} onChange={change} onPatch={patch} cols={1} showNotes={false} />
-            </details>
+            </CreateSection>
           );
         })}
 
         {gateway && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 4 }}>
-            {gateway.message != null ? <Message variant="info">{gateway.message}</Message> : null}
-            {gateway.render != null
-              ? gateway.render
-              : (gateway.actionLabel ? (
-                <Btn size="sm" href={gateway.href} onClick={gateway.onAction}>
-                  <UploadCloud size={14} /> {gateway.actionLabel}
-                </Btn>
-              ) : null)}
-          </div>
+          <CreateSection
+            key={`gateway::${kindValue}`}
+            title={gateway.sectionTitle || kindValue || '등록'}
+            initiallyOpen
+          >
+            <div className="ledger-create-panel__gateway">
+              {gateway.message != null ? <Message variant="info">{gateway.message}</Message> : null}
+              {gateway.render != null
+                ? (typeof gateway.render === 'function'
+                  ? gateway.render({ companyId: String(form.companyId || '') })
+                  : gateway.render)
+                : (gateway.actionLabel ? (
+                  <Btn size="sm" href={gateway.href} onClick={gateway.onAction}>
+                    <UploadCloud size={14} /> {gateway.actionLabel}
+                  </Btn>
+                ) : null)}
+            </div>
+          </CreateSection>
         )}
       </div>
 

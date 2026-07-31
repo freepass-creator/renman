@@ -32,7 +32,6 @@ import { latestDateOf } from '@/lib/ledger-stats';
 import { TODAY } from '@/lib/dashboard-consts';
 import { WORK_SECTIONS_BY_KIND } from '@/lib/work-form-sections';
 import { PenaltyBucketPanel } from '@/components/work/PenaltyBucketPanel';
-import { workRail, workRailStyle } from '@/lib/work-rail';
 import {
   WORK_GROUPS, WORK_SOURCE_LABEL,
   carNameOf, contractMeta, normalizeWorkStatus, parseWorkGroup, summarizeWorkLedgerRows, workGroup,
@@ -43,8 +42,6 @@ import {
   PENALTY_BASIC_COLS, PENALTY_ALL_COLS, PENALTY_DETAIL_SECTIONS,
   workStatusTone,
 } from '@/lib/work-cols';
-
-const PENALTY_ROW_BG = 'color-mix(in srgb, var(--brand) 10%, var(--bg-card))';
 
 function WorkLedgerInner() {
   const mobile = useIsMobile();
@@ -286,10 +283,11 @@ function WorkLedgerInner() {
     [rows],
   );
 
-  const setGroupAndUrl = (next: WorkGroupFilter) => {
+  const setGroupAndUrl = (next: WorkGroupFilter, opts?: { keepCreating?: boolean }) => {
     setGroup(next);
     setSelected(null);
-    setCreating(false);
+    // 생성 패널 안에서 구분 전환(과태료 등)할 때는 패널을 유지한다.
+    if (!opts?.keepCreating) setCreating(false);
     setPenProcess(null);
     setPenKind(null);
     const url = next === '전체' ? '/work' : `/work?group=${encodeURIComponent(next)}`;
@@ -423,19 +421,12 @@ function WorkLedgerInner() {
       onColView={setColView}
       loading={loading}
       empty={penaltyMode
-        ? '과태료 고지서가 없습니다. «대량 업로드»로 OCR 등록하세요.'
-        : '업무가 없습니다. 우측 «업무 생성» 또는 과태료 OCR로 담으세요.'}
+        ? '과태료 고지서가 없습니다. «업무 생성»에서 업무구분=과태료로 업로드하세요.'
+        : '업무가 없습니다. 우측 «업무 생성»으로 담으세요.'}
       cols={cols}
       rows={rows}
       rowKey={(r) => r.id}
       selectedRowKey={selected?.id}
-      rowStyle={(r) => {
-        const rail = workRailStyle(workRail(r));
-        if (r.nest === 'penalty-bucket') {
-          return { ...rail, background: PENALTY_ROW_BG };
-        }
-        return rail;
-      }}
       onRow={(row) => {
         // 표 클릭 = 우측 상세패널만 (다른 페이지 이동 없음)
         setCreating(false);
@@ -456,9 +447,11 @@ function WorkLedgerInner() {
           fallbackKind="기타"
           kindGateways={{
             과태료: {
-              message: '과태료는 고지서 파일로 등록합니다. 업로드하면 OCR로 위반일시·차량을 읽어 계약(임차인)을 자동 매칭합니다.',
-              render: (
+              sectionTitle: '고지서 업로드',
+              message: '고지서 파일을 올리면 OCR로 위반일시·차량을 읽어 계약(임차인)을 자동 매칭합니다. 등록 후 과태료 목록에 반영됩니다.',
+              render: ({ companyId: co }) => (
                 <PenaltyIntakePanel
+                  companyId={co}
                   onDone={() => {
                     setCreating(false);
                     setGroupAndUrl('과태료');
@@ -469,7 +462,8 @@ function WorkLedgerInner() {
             },
           }}
           onKindChange={(kind) => {
-            if (kind === '과태료') setGroupAndUrl('과태료');
+            // 목록 탭만 맞춤 · 생성 패널은 열어 둔 채 업로드 섹션이 펼쳐지게.
+            if (kind === '과태료') setGroupAndUrl('과태료', { keepCreating: true });
           }}
           quick
           initial={{

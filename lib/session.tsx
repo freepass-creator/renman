@@ -76,7 +76,20 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         try {
           const prof = await withTimeout(loadProfile(fb.uid, fb.email), 8_000, '프로필 로드');
           if (!alive) return;
-          if (!prof) { setPhase('no-profile'); return; }
+          if (!prof) {
+            // 로컬: Auth는 됐는데 claims 미배정이면 DEV_USERS 이메일 매칭으로 화면 확인 가능.
+            // (프로덕션은 no-profile 유지 — 본사 배정 필수)
+            if (process.env.NODE_ENV === 'development') {
+              const dev = DEV_USERS.find((u) => u.email === fb.email) || DEV_USERS[0];
+              console.warn('[DEV] claims 없음 → DEV_USERS 폴백', fb.email, '→', dev.uid);
+              setUser(dev);
+              setCompanyState(resolveCompany(dev, localStorage.getItem(LS_CO)));
+              setPhase('ready');
+              return;
+            }
+            setPhase('no-profile');
+            return;
+          }
           if (isStaffSuspended(prof.email)) {
             await signOutUser();
             setPhase('suspended');

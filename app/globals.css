@@ -2512,7 +2512,10 @@ kbd {
 .ledger-workspace__panel {
   min-width: 0;
   min-height: 0;
+  height: 100%;
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
   border: 1px solid var(--border);
   border-radius: 4px;
   background: var(--bg-card);
@@ -2520,16 +2523,22 @@ kbd {
   align-self: stretch;
 }
 .ledger-record-panel {
+  flex: 1 1 auto;
+  width: 100%;
   height: 100%;
   min-height: 0;
+  max-height: 100%;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
 .ledger-record-panel__body {
-  flex: 1 1 auto;
+  flex: 1 1 0;
   min-height: 0;
-  overflow: auto;
-  padding: 12px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 12px 12px 24px;
   box-sizing: border-box;
 }
 .ledger-record-panel__sections {
@@ -2541,8 +2550,9 @@ kbd {
 .ledger-record-panel__section {
   border: 1px solid var(--border);
   border-radius: 6px;
-  overflow: hidden;
+  overflow: visible;
   background: var(--bg-card);
+  min-height: min-content;
 }
 .ledger-record-panel__section > summary {
   display: flex;
@@ -2676,11 +2686,14 @@ kbd {
   background: var(--bg-hover);
   color: var(--text-main);
 }
+/* 필드 목록 = 자연 높이. 스크롤은 __body 단독.
+   flex:1·min-height:0 이면 섹션 안에 넣을 때 펼침 높이가 죽어 필드가 안 나옴. */
 .ledger-record-panel__fields {
-  flex: 1;
-  min-height: 0;
   margin: 0;
-  overflow: auto;
+}
+.ledger-record-panel__body > .ledger-record-panel__fields {
+  /* 섹션 없이 평탄일 때만 본문 남은 칸을 채움(스크롤은 body) */
+  min-height: min-content;
 }
 .ledger-record-panel__field {
   display: grid;
@@ -2708,14 +2721,17 @@ kbd {
   padding-top: 1px;
 }
 .ledger-create-panel__body {
-  flex: 1;
+  flex: 1 1 0;
   min-height: 0;
-  overflow: auto;
-  display: grid;
-  align-content: start;
-  gap: 14px;
-  padding: 12px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  display: block;
+  padding: 12px 12px 24px;
   box-sizing: border-box;
+}
+.ledger-create-panel__body > * + * {
+  margin-top: 14px;
 }
 .ledger-create-panel__company {
   display: grid;
@@ -2754,8 +2770,9 @@ kbd {
 .ledger-create-panel__section {
   border: 1px solid var(--border);
   border-radius: 6px;
-  overflow: hidden;
+  overflow: visible;
   background: var(--bg-card);
+  min-height: min-content;
 }
 .ledger-create-panel__section:last-of-type {
   border-bottom: 1px solid var(--border);
@@ -2785,10 +2802,15 @@ kbd {
 .ledger-create-panel__section[open] > summary .ledger-create-panel__chevron {
   transform: rotate(90deg);
 }
-/* FormGrid 등 summary 아래 본문 — 테두리·제목에 붙지 않게 */
+/* FormGrid · 게이트웨이 본문 — summary 아래 테두리·제목에 붙지 않게 */
 .ledger-create-panel__section > :not(summary) {
   padding: 12px 14px 14px;
   border-top: 1px solid var(--border-soft);
+}
+.ledger-create-panel__gateway {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
 .ledger-create-panel__grid {
   display: grid;

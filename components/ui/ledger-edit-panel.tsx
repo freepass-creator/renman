@@ -5,7 +5,7 @@
  *   저장은 getStore().update.
  */
 import { useMemo, useState } from 'react';
-import { ChevronRight, Save, X } from 'lucide-react';
+import { Save, X } from 'lucide-react';
 import { ENTITIES, type EntityRecord, type Field } from '@/lib/intake/entities';
 import { getStore } from '@/lib/store';
 import { resolveWriteCompany, NEED_COMPANY } from '@/lib/scope';
@@ -14,7 +14,7 @@ import { toast } from '@/lib/toast';
 import { Btn } from './controls';
 import { FormGrid } from './detail';
 import { LedgerPanelFooter } from './ledger-actions';
-import type { LedgerFormSection } from './ledger-create-panel';
+import { CreateSection, type LedgerFormSection } from './ledger-create-panel';
 
 function normalizedForm(fields: Field[], form: EntityRecord): EntityRecord {
   const out: EntityRecord = { ...form };
@@ -122,10 +122,13 @@ export function LedgerEditPanel({
             .filter((field): field is Field => !!field);
           if (!sectionFields.length) return null;
           return (
-            <details className="ledger-create-panel__section" open={section.open ?? sectionIndex === 0} key={section.title}>
-              <summary><ChevronRight className="ledger-create-panel__chevron" size={14} aria-hidden="true" />{section.title}</summary>
+            <CreateSection
+              key={section.title}
+              title={section.title}
+              initiallyOpen={section.open ?? sectionIndex === 0}
+            >
               <FormGrid fields={sectionFields} form={form} onChange={change} onPatch={patch} cols={1} showNotes={false} />
-            </details>
+            </CreateSection>
           );
         })}
       </div>

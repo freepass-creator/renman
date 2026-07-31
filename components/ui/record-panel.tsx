@@ -4,6 +4,7 @@ import React from 'react';
 import { ChevronRight, X } from 'lucide-react';
 import type { SheetCol } from './excel-sheet';
 import { LedgerPanelFooter } from './ledger-actions';
+import { revealSectionInPanel } from './ledger-panel-scroll';
 import { C } from './tokens';
 
 export type LedgerRecordSection<T> = {
@@ -44,13 +45,25 @@ function RecordSection<T>({
   fieldList: (fieldCols: SheetCol<T>[]) => React.ReactNode;
 }) {
   const [open, setOpen] = React.useState(initiallyOpen);
+  const userToggleRef = React.useRef(false);
+
   return (
     <details
       className="ledger-record-panel__section"
       open={open}
-      onToggle={(event) => setOpen((event.currentTarget as HTMLDetailsElement).open)}
+      onToggle={(event) => {
+        const el = event.currentTarget;
+        const next = el.open;
+        setOpen(next);
+        if (next && userToggleRef.current) {
+          userToggleRef.current = false;
+          revealSectionInPanel(el);
+        } else {
+          userToggleRef.current = false;
+        }
+      }}
     >
-      <summary>
+      <summary onClick={() => { userToggleRef.current = true; }}>
         <ChevronRight className="ledger-record-panel__chevron" size={14} aria-hidden="true" />
         {title}
       </summary>

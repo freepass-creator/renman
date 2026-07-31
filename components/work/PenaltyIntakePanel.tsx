@@ -36,15 +36,32 @@ function needsManual(row: PenaltyIntakeRow): boolean {
   return row.status === 'failed' || (row.status === 'done' && !isPenaltyIntakeReady(row));
 }
 
-export function PenaltyIntakePanel({ onDone }: { onDone: () => void }) {
+export function PenaltyIntakePanel({
+  onDone,
+  companyId: companyFromParent,
+}: {
+  onDone: () => void;
+  /** 생성 패널 상단에서 이미 고른 회사. 있으면 아래 회사 선택 UI 숨김. */
+  companyId?: string;
+}) {
   const { companyId, scopeAll } = useSession();
-  const [co, setCo] = useState(companyId === ALL_COMPANIES ? '' : companyId);
+  const parentCo = String(companyFromParent ?? '').trim();
+  const lockedToParent = companyFromParent !== undefined;
+  const [co, setCo] = useState(() => {
+    if (lockedToParent) return parentCo;
+    return companyId === ALL_COMPANIES ? '' : companyId;
+  });
   const [rows, setRows] = useState<PenaltyIntakeRow[]>([]);
   const [busy, setBusy] = useState(false);
   const [saving, setSaving] = useState(false);
   const [contracts, setContracts] = useState<EntityRecord[]>([]);
   const [existing, setExisting] = useState<EntityRecord[]>([]);
   const [openId, setOpenId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!lockedToParent) return;
+    setCo(parentCo);
+  }, [lockedToParent, parentCo]);
 
   useEffect(() => {
     if (!co) { setContracts([]); setExisting([]); return; }
@@ -118,7 +135,7 @@ export function PenaltyIntakePanel({ onDone }: { onDone: () => void }) {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-      {scopeAll && (
+      {scopeAll && !lockedToParent && (
         <label style={{ display: 'grid', gap: 4 }}>
           <span style={{ fontSize: 12, fontWeight: 700, color: C.sub }}>회사 <span style={{ color: C.danger }}>*</span></span>
           <Select size="sm" value={co} onChange={(e) => setCo(e.target.value)}>
@@ -126,6 +143,9 @@ export function PenaltyIntakePanel({ onDone }: { onDone: () => void }) {
             {COMPANIES.map((c) => <option key={c} value={c}>{companyShort(c)} · {companyLabel(c)}</option>)}
           </Select>
         </label>
+      )}
+      {lockedToParent && !parentCo && (
+        <Message variant="warning">위에서 회사를 먼저 선택하세요.</Message>
       )}
 
       <FileDrop
@@ -219,7 +239,7 @@ export function PenaltyIntakePanel({ onDone }: { onDone: () => void }) {
         </ul>
       )}
 
-      <Btn size="sm" disabled={saving || busy || !ready.length || (scopeAll && !co)} onClick={() => { void save(); }}>
+      <Btn size="sm" disabled={saving || busy || !ready.length || !co} onClick={() => { void save(); }}>
         {saving ? '등록 중…' : `${ready.length}건 등록`}
       </Btn>
       {incomplete.length > 0 && ready.length > 0 ? (
