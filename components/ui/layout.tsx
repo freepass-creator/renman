@@ -8,12 +8,12 @@ import { ChevronDown, ChevronLeft, EyeOff, GripVertical, type LucideIcon } from 
 import { C, R, NUM, SH, ctrlH } from './tokens';
 import { PAGE_PAD_M, PAGE_HEAD_PB_M, SPACE_M, SPACE_GROUP_M } from './tokens';
 import { CompanyFilter, Btn } from './controls';
-import { PageLoading } from './misc';
+import { ErrorState, PageLoading } from './misc';
 import { navIconForPath } from '@/lib/nav';
 
 /* 페이지 골격 · 패널 · 섹션 · 세부 진입 껍데기 — 레이아웃 원자. */
 
-export function Page({ title, meta, left, mid, right, tools, children, fill, frame, back, noCompany, loading, icon }: {
+export function Page({ title, meta, left, mid, right, tools, children, fill, frame, back, noCompany, loading, error, icon }: {
   title?: React.ReactNode; meta?: React.ReactNode; left?: React.ReactNode; mid?: React.ReactNode; right?: React.ReactNode;
   /** 셸 툴바 SSOT — WorkbenchBar. title 옆(또는 모바일 전폭). mid/right 손롤 툴바 대신 이걸 쓴다. */
   tools?: React.ReactNode;
@@ -23,6 +23,11 @@ export function Page({ title, meta, left, mid, right, tools, children, fill, fra
   frame?: boolean;
   /** ERP 목록 로딩 — 제목·셸 유지, 본문만 PageLoading(작업영역 정중앙). children은 무시. */
   loading?: boolean;
+  /**
+   * 조회 실패 메시지 — 본문 위에 오류 배너. «0건·0원»으로 위장되는 거짓 안심 방지(QA 중요).
+   * 목록이 비어 보이는 게 «없음»이 아니라 «못 읽음»임을 알려야 한다. children은 그대로 렌더.
+   */
+  error?: string | null;
   /**
    * 타이틀 앞 nav 아이콘. 생략=현재 경로의 nav icon(SSOT=lib/nav).
    * false=숨김 · LucideIcon=강제 지정.
@@ -126,6 +131,11 @@ export function Page({ title, meta, left, mid, right, tools, children, fill, fra
         {right != null && <><span style={{ flex: tools != null ? 0 : 1, minWidth: tools != null ? 0 : 8 }} />{right}</>}
       </div>
       )}
+      {error ? (
+        <div style={{ padding: mobile ? '0 12px 8px' : '0 0 10px' }}>
+          <ErrorState variant="sec" message={`${error} — 아래 숫자는 불완전합니다`} />
+        </div>
+      ) : null}
       {frameMode
         ? <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>{loading ? <PageLoading /> : children}</div>
         : loading ? <PageLoading /> : children}
@@ -135,10 +145,10 @@ export function Page({ title, meta, left, mid, right, tools, children, fill, fra
 
 /** 전폭 워크벤치 셸. 홈·업무 등 FacetRail 쓰는 면 — 좌측 인-플로우 필터(콘텐츠를 민다).
  *  원장(LedgerFrame)은 상단 필터줄만 쓰므로 rail 안 넘김. */
-export function FacetPage({ title, meta, left, mid, right, tools, rail, frame, back, loading, children, icon }: {
+export function FacetPage({ title, meta, left, mid, right, tools, rail, frame, back, loading, error, children, icon }: {
   title?: React.ReactNode; meta?: React.ReactNode; left?: React.ReactNode; mid?: React.ReactNode; right?: React.ReactNode;
   tools?: React.ReactNode; rail?: React.ReactNode | null; frame?: boolean; back?: () => void;
-  loading?: boolean; children?: React.ReactNode; icon?: LucideIcon | false;
+  loading?: boolean; error?: string | null; children?: React.ReactNode; icon?: LucideIcon | false;
 }) {
   const mobile = useIsMobile();
   const hasRail = rail != null;
@@ -147,7 +157,7 @@ export function FacetPage({ title, meta, left, mid, right, tools, rail, frame, b
      undefined = 필터 안 씀(손익·부가세=maxWidth 가운데). */
   const usesRail = rail !== undefined;
   const page = (
-    <Page title={title} meta={meta} left={left} mid={mid} right={right} tools={tools} fill={usesRail && !mobile} frame={frame} back={back} loading={loading} icon={icon}>
+    <Page title={title} meta={meta} left={left} mid={mid} right={right} tools={tools} fill={usesRail && !mobile} frame={frame} back={back} loading={loading} error={error} icon={icon}>
       {mobile && hasRail ? rail : null}{/* 모바일: 인-플로우 블록(닫히면 null) */}
       {children}
     </Page>

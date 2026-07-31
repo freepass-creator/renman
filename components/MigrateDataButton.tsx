@@ -11,7 +11,7 @@ import { getStore } from '@/lib/store';
 import { reflectCompany, type ReflectResult } from '@/lib/reflect';
 import { companyLabel } from '@/lib/companies';
 import { toast } from '@/lib/toast';
-import { Btn, LoadingOverlay, useConfirm } from '@/components/ui';
+import { Btn, LoadingOverlay, useConfirm, usePrompt } from '@/components/ui';
 
 const TARGET = 'switchplan';
 
@@ -26,9 +26,15 @@ export function MigrateDataButton({
 }) {
   const { isOperator } = useSession();
   const confirm = useConfirm();
+  const prompt = usePrompt();
   const [busy, setBusy] = useState(false);
 
   if (!isOperator) return null;
+  // ★프로덕션에서는 버튼 자체를 렌더하지 않는다.
+  //   reflectCompany → wipeCompany 가 전 엔티티를 하드삭제하고, 프로덕션에선 live 소스가 403이라
+  //   «가명(frozen) 시드»로 대체된다 = 실데이터 전멸. /dev/data는 가드했는데 이 버튼은 운영 원장
+  //   3곳(계약·자금·자산)의 빈 상태에 노출돼 있었다(자금은 필터 결과가 비어도 뜸) — QA 적대검증 B2.
+  if (process.env.NODE_ENV === 'production' && process.env.NEXT_PUBLIC_ALLOW_HARD_WIPE !== '1') return null;
 
   async function run() {
     const store = getStore();
@@ -38,10 +44,14 @@ export function MigrateDataButton({
       store.list('bank_tx', TARGET),
     ]);
     const hasData = vehicles.length + contracts.length + bankTx.length > 0;
-    if (hasData && !(await confirm({
-      message: `${companyLabel(TARGET)} 기존 데이터를 지우고 최신 실데이터로 다시 넣습니다. 계속할까요?`,
-      danger: true,
-    }))) return;
+    if (hasData) {
+      if (!(await confirm({
+        message: `${companyLabel(TARGET)}의 기존 데이터(차량 ${vehicles.length}·계약 ${contracts.length}·거래 ${bankTx.length})를 모두 지우고 다시 넣습니다. 되돌릴 수 없습니다. 계속할까요?`,
+        danger: true,
+      }))) return;
+      const typed = await prompt({ message: `확인: 법인 코드 "${TARGET}" 를 그대로 입력하세요.`, required: true });
+      if (typed !== TARGET) { toast('마이그레이션 취소 — 법인 코드 불일치', 'info'); return; }
+    }
 
     setBusy(true);
     try {

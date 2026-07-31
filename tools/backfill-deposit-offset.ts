@@ -53,9 +53,12 @@ async function main() {
   }> = [];
 
   for (const doc of snap.docs) {
-    const companyId = doc.ref.parent.parent?.id || '';
+    // flat 컬렉션 `contract/{companyId}__{key}` — companyId는 필드(또는 docId prefix)
+    const data = doc.data();
+    const fromId = doc.id.includes('__') ? doc.id.slice(0, doc.id.indexOf('__')) : '';
+    const companyId = String(data.companyId || fromId || '');
     if (COMPANY_FILTER && companyId !== COMPANY_FILTER) continue;
-    const rec = { ...doc.data(), _key: doc.id, _docId: doc.id, companyId } as Rec;
+    const rec = { ...data, _key: doc.id, _docId: doc.id, companyId } as Rec;
     if (!rec.depositSettledDate) continue;
     if (hasDepositOffsetPayment(rec as never)) continue;
 

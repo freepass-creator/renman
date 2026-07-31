@@ -87,8 +87,8 @@ export default function ManagementPage() {
   const [selectedLease, setSelectedLease] = useState<LeaseRow | null>(null);
   const [masterTick, setMasterTick] = useState(0);
 
-  const { rows: accountRecords, loading: acctLoading } = useEntityList('bank_account');
-  const { rows: leaseRecords, loading: leaseLoading } = useEntityList('lease');
+  const { rows: accountRecords, loading: acctLoading, error: acctError } = useEntityList('bank_account');
+  const { rows: leaseRecords, loading: leaseLoading, error: leaseError } = useEntityList('lease');
 
   useEffect(() => {
     const on = () => setMasterTick((n) => n + 1);
@@ -195,6 +195,7 @@ export default function ManagementPage() {
         </span>
       )}
       loading={loading}
+      error={acctError || leaseError}
       empty={tab === '법인' ? '등록된 법인이 없습니다' : tab === '계좌' ? '계좌 없음 — 자금관리에서 등록' : '임대차 계약 없음'}
       cols={(
         tab === '법인' ? COMPANY_COLS

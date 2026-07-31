@@ -37,7 +37,7 @@ const STONE: Record<string, 'gray' | 'amber' | 'orange' | 'red' | 'purple'> = { 
 
 export default function ReceivablesPage() {
   const { companyId, scopeAll, user } = useSession();
-  const { data: [cs = [], hs = []], loading, reload } = useEntityLists(['contract', 'history']);
+  const { data: [cs = [], hs = []], loading, error: loadError, reload } = useEntityLists(['contract', 'history']);
   const [facets, setFacets] = useState<Set<string>>(new Set());
   const [q, setQ] = useState('');
   const [logKey, setLogKey] = useState<string | null>(null);
@@ -138,6 +138,7 @@ export default function ReceivablesPage() {
   return (
     <FacetPage
       title="미수관리"
+      error={loadError}
       meta={`${scopeAll ? '전체 회사' : companyLabel(companyId)} · 미수 ${D.count}건`}
       tools={<WorkbenchBar mid={<WorkHubBack />} search={{ value: q, onChange: setQ, placeholder: '손님·차량·계약' }} stat={<span style={{ fontSize: 13, fontWeight: 800, color: D.totalUnpaid > 0 ? C.danger : C.ok, whiteSpace: 'nowrap' }}>미수 {won(D.totalUnpaid)}</span>} actions={<>
         <Btn

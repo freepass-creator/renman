@@ -60,7 +60,7 @@ function toBankTx(rec: EntityRecord): BankTransaction {
 export default function PaymentsPage() {
   const { companyId, scopeAll } = useSession();
   // work hub back only — no sibling tabs
-  const { data: [cs = [], txs = []], loading, reload } = useEntityLists(['contract', 'bank_tx']);
+  const { data: [cs = [], txs = []], loading, error: loadError, reload } = useEntityLists(['contract', 'bank_tx']);
   const [results, setResults] = useState<AutoMatchResult[] | null>(null);
   const [cmsResults, setCmsResults] = useState<CmsMatchCandidate[] | null>(null);
   const [cmsSel, setCmsSel] = useState<Set<string>>(new Set());
@@ -255,6 +255,7 @@ export default function PaymentsPage() {
   return (
     <FacetPage
       title="자금일보"
+      error={loadError}
       meta={`${scopeAll ? '전체 회사' : companyLabel(companyId)} · 입금→계약 · 재무현황 공급`}
       tools={<WorkbenchBar mid={<WorkHubBack />} search actions={
         <>
