@@ -51,6 +51,13 @@ export const ContractSchema = z.object({
   _paidTotal: z.number().optional(),         // 개시 역산 납부(표시용)
   _payments: z.array(PaymentEntrySchema).optional(),
   _discounts: z.array(DiscountEntrySchema).optional(),
+  _charges: z.array(z.object({
+    date: z.string(),
+    amount: z.number(),
+    kind: z.string(),
+    memo: z.string().optional(),
+    synthetic: z.boolean().optional(),
+  }).loose()).optional(),
 }).loose();                                  // 그 외 필드(cdw·deductible·mileageOut 등)는 허용
 export type ContractRecord = z.infer<typeof ContractSchema>;
 

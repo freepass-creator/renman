@@ -19,7 +19,7 @@ import { normPlate } from '@/lib/plate';
 import { linkFleet, handoverHistory, recommendNextRent } from '@/lib/domain/model';
 import { loanSchedule, loanSummary } from '@/lib/loan';
 import { assetEconomics } from '@/lib/asset-econ';
-import { depositView, buildDepositOffsetPayments } from '@/lib/deposit';
+import { depositView, buildDepositSettlement } from '@/lib/deposit';
 import { penaltyStatus } from '@/lib/penalty-reassign';
 import { loadMaster } from '@/lib/company-master';
 import { toast } from '@/lib/toast';
@@ -260,11 +260,13 @@ export function useVehicleDetail(plate: string, focus?: string) {
     const t = requireTarget();
     if (!t) return;
     const { d: dep, c: contract } = pendDeposit;
-    const existing = Array.isArray(contract._payments) ? (contract._payments as unknown[]) : [];
-    const offsetPays = buildDepositOffsetPayments(contract, TODAY);
+    const existingPays = Array.isArray(contract._payments) ? (contract._payments as unknown[]) : [];
+    const existingCharges = Array.isArray(contract._charges) ? (contract._charges as unknown[]) : [];
+    const { charges, payments } = buildDepositSettlement(contract, TODAY);
     await doTransition({
       depositSettledDate: TODAY,
-      ...(offsetPays.length ? { _payments: [...existing, ...offsetPays] } : {}),
+      ...(payments.length ? { _payments: [...existingPays, ...payments] } : {}),
+      ...(charges.length ? { _charges: [...existingCharges, ...charges] } : {}),
     }, String(contract._key), contract);
     await saveIntake('history', t, [{
       plate, category: '보증금',

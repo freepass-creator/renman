@@ -311,9 +311,12 @@ export function distributeUnpaid<T extends PaymentScheduleInline>(
   return list.map((s) => map.get(s.seq) ?? s) as T[];
 }
 
-/** 재구성(자동정리) entry 판별 — synthetic 플래그 또는 구데이터 source='정산' 폴백. 실입금만 골라낼 때(회계·期초). */
-export function isSyntheticPayment(p: { synthetic?: boolean; source?: string }): boolean {
-  return p.synthetic === true || p.source === '정산';
+/** 재구성·보증금충당 등 실입금 아님. 입금누계·수납피드에서 제외할 때 사용. */
+export function isSyntheticPayment(p: { synthetic?: boolean; source?: string; kind?: string }): boolean {
+  if (p.synthetic === true) return true;
+  if (String(p.kind || '') === 'deposit-offset') return true;
+  // 구 스냅샷 자동정리: source=정산 (실입금 계좌/카드/현금/수동/CMS는 제외)
+  return p.source === '정산';
 }
 
 /** 회차 배열에서 currentSeq (가장 오래된 미납 또는 부분납. 없으면 다음 예정) 계산 */

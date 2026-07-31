@@ -40,8 +40,11 @@ describe('씨앗 계약 — net은 _carryUnpaid(직원 확정 실미수) 앵커'
     })).toBe(700_000);
   });
 
-  it('앱수납 초과(carry 50만 · 수납 90만) → net == 0 (음수 아님)', () => {
-    expect(net({ _carryUnpaid: 500_000, _payments: [{ seq: 1, date: '2026-07-01', amount: 900_000, source: '계좌' }] })).toBe(0);
+  it('앱수납 초과(carry 50만 · 수납 90만) → net == 0 · overpay == 40만', () => {
+    const v = computeContractView(c({ _carryUnpaid: 500_000, _payments: [{ seq: 1, date: '2026-07-01', amount: 900_000, source: '계좌' }] }), TODAY);
+    expect(v.net).toBe(0);
+    expect(v.overpay).toBe(400_000);
+    expect(v.paid).toBe(900_000);
   });
 
   it('carry 0 → net == 0', () => {

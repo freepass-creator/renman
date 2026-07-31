@@ -23,7 +23,7 @@ export type ReceivablesSnapshot = {
   overpayTotal: number;
 };
 
-/** 미수 집계 1곳 — 홈·미수·리스크·재무·KPI가 동일 숫자. 음수 net=과오납(합산 제외). */
+/** 미수 집계 1곳 — 홈·미수·리스크·재무·KPI가 동일 숫자. 과오납은 view.overpay. */
 export function selectReceivables(contracts: EntityRecord[], today: string): ReceivablesSnapshot {
   const views = contracts.map((c) => computeContractView(c, today));
   let misuActive = 0, misuReturned = 0, overpayTotal = 0;
@@ -31,8 +31,8 @@ export function selectReceivables(contracts: EntityRecord[], today: string): Rec
   let over30 = 0, over90 = 0;
 
   for (const v of views) {
+    if (v.overpay > 0) overpayTotal += v.overpay;
     const net = v.net;
-    if (net < 0) { overpayTotal += -net; continue; }
     if (net <= 0) continue;
     unpaidCount++;
     if (v.ended) {

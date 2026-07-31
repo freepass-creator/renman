@@ -163,6 +163,7 @@ export default function ReceivablesPage() {
               <Cards min={128} fit>
                 <Metric label="현재 미수" value={won(D.misuActive)} hint="운행중 · 정상 회수" tone={D.misuActive ? 'danger' : 'ink'} />
                 <Metric label="계약종료 미수" value={won(D.misuReturned)} hint="반납·해지 추심" tone={D.misuReturned ? 'warn' : 'ink'} />
+                <Metric label="과오납(환불)" value={won(D.overpayTotal)} hint="충당 후 실입금 등" tone={D.overpayTotal ? 'warn' : 'ink'} />
                 <Metric label="미수 계약" value={`${D.misuActiveCount}건`} tone={D.misuActiveCount ? 'warn' : 'ink'} />
                 <Metric label="미수율(계약)" value={`${D.rate}%`} tone={D.rate >= 20 ? 'danger' : D.rate >= 10 ? 'warn' : 'ok'} />
                 <Metric label="30일+ 연체" value={`${D.over30}건`} tone={D.over30 ? 'warn' : 'ink'} />

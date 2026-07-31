@@ -1,6 +1,7 @@
 /** 종료 정산 — 반납 보증금 정산 + 중도해지 위약금 + 초과주행. 정산서·반납폼·해지 공용 SSOT. */
 import type { EntityRecord } from '../intake/entities';
 import { recordedDepositOffsetAmount } from './deposit-offset';
+import { sumChargesByKind, CHARGE_KIND_OVER_MILEAGE, CHARGE_KIND_EARLY_TERM } from './charges';
 import { ymd, addMonthsIso, monthsBetweenIso } from './dates';
 import { computeOverMileage, type OverMileageBasis } from '@/lib/domain/over-mileage';
 
@@ -30,9 +31,9 @@ export type ReturnSettlementOpts = {
 
 /**
  * 반납 정산.
- *   청구합 = unpaid + overMileageFee
- *   refund = max(0, deposit − 청구합)
- *   addCharge = max(0, 청구합 − deposit)
+ *   · _charges에 초과주행·위약금이 있으면 view.net에 이미 편입 → 여기선 중복 가산 금지.
+ *   · 미기록 시에만 산출 수수료를 charge에 더함(미리보기).
+ *   · 이미 충당 소진된 보증금(recordedDepositOffset)은 avail에서 차감(R2).
  */
 export function computeReturnSettlement(
   deposit: number,
@@ -44,6 +45,7 @@ export function computeReturnSettlement(
   let excessKm = 0;
   let overMileageRate = 0;
   let mileageBasis: OverMileageBasis = '산출불가';
+  let earlyTermFee = 0;
 
   if (opts?.contract) {
     const asOf = ymd(opts.asOf) || ymd(opts.contract.returnedDate) || '';
@@ -51,15 +53,32 @@ export function computeReturnSettlement(
       ? { ...opts.contract, returnMileage: opts.returnMileage }
       : opts.contract;
     const om = computeOverMileage(draft, asOf);
-    overMileageFee = om.fee;
+    const omRecorded = sumChargesByKind(opts.contract, CHARGE_KIND_OVER_MILEAGE);
+    // 원장에 청구가 있으면 그 금액·표시용. 없으면 산출값(미리보기).
+    overMileageFee = omRecorded > 0 ? omRecorded : om.fee;
     excessKm = om.excessKm;
     overMileageRate = om.rate;
-    mileageBasis = om.basis;
+    mileageBasis = omRecorded > 0 ? (om.basis === '산출불가' ? '반납확정' : om.basis) : om.basis;
+
+    const et = (() => {
+      const rate = Number(opts.contract.earlyTerminationRate) || 0;
+      const monthlyRent = Number(opts.contract.monthlyRent) || 0;
+      const term = Number(opts.contract.rentalMonths) || 0;
+      const start = ymd(opts.contract.startDate || opts.contract.contractDate);
+      const maturity = start && term ? addMonthsIso(start, term) : '';
+      const isEarly = !!maturity && asOf < maturity;
+      const remainingMonths = isEarly ? monthsBetweenIso(asOf, maturity) : 0;
+      return Math.round(remainingMonths * monthlyRent * (rate / 100));
+    })();
+    const etRecorded = sumChargesByKind(opts.contract, CHARGE_KIND_EARLY_TERM);
+    earlyTermFee = etRecorded > 0 ? etRecorded : et;
   }
 
-  const charge = unpaid + overMileageFee;
-  // ★이미 충당으로 소진된 보증금을 다시 «전액 남아있는» 것으로 계산하면 재인쇄 때마다 반환액이
-  //   보증금 전액으로 되살아나 과다 지급이 된다(적대검증 R2). 기록된 충당액을 차감한 잔액으로 계산.
+  // net에 이미 편입된 청구는 unpaid에 포함 → 가산 0. 미편입(미리보기)만 더함.
+  const omInNet = opts?.contract ? sumChargesByKind(opts.contract, CHARGE_KIND_OVER_MILEAGE) > 0 : false;
+  const etInNet = opts?.contract ? sumChargesByKind(opts.contract, CHARGE_KIND_EARLY_TERM) > 0 : false;
+  const extra = (omInNet ? 0 : overMileageFee) + (etInNet ? 0 : earlyTermFee);
+  const charge = unpaid + extra;
   const consumed = opts?.contract ? recordedDepositOffsetAmount(opts.contract) : 0;
   const avail = Math.max(0, deposit - consumed);
   return {

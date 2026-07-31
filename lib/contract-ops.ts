@@ -6,9 +6,10 @@
  */
 import type { EntityRecord } from './intake/entities';
 import type { Contract, PaymentEntry, DiscountEntry } from './payments/types';
-import { generateSchedules, recalcContract, addPaymentEntry, addDiscountEntry, distributeUnpaid, applyPayment, computeCurrentSeq } from './payments/payment-schedule';
+import { generateSchedules, recalcContract, addPaymentEntry, addDiscountEntry, distributeUnpaid, applyPayment, computeCurrentSeq, isSyntheticPayment } from './payments/payment-schedule';
 import { applyReturnedProration } from './payments/returned-proration';
 import { ymd, ddayFrom, addMonthsIso } from './contracts/dates';
+import { openChargesTotal } from './contracts/charges';
 import {
   isDeliveryPending as statusDeliveryPending,
   isReturnable as statusReturnable,
@@ -28,9 +29,10 @@ export type ContractView = {
   endDate: string;
   monthsLeft: number | null;   // 만기까지 일수→개월 아님, D-day(일)
   dday: number | null;         // endDate까지 일수 (음수=경과)
-  gross: number;               // 도래 미수(일할 반영 후)
-  paid: number;
-  net: number;                 // 순미수
+  gross: number;               // 도래 미수(일할 반영 후) + 미결제 추가청구
+  paid: number;                // 실입금 누계(synthetic·보증금충당 제외)
+  net: number;                 // 순미수 ≥ 0
+  overpay: number;             // 과오납(환불의무) — net은 0 밑으로 안 내려가므로 별도
   count: number;               // 미납 회차수
   refund: number;              // 반납 일할 환불(있으면)
   monthlyRent: number;
@@ -53,6 +55,8 @@ function buildContract(rec: EntityRecord, today: string): Contract {
         .map((s) => ({ ...s, id: 's' + s.seq, contractId: String(rec._key || 'c') }))
     : [];
   const pays = Array.isArray(rec._payments) ? (rec._payments as Array<Record<string, unknown>>) : [];
+  // chargeKind 수납은 회차표가 아니라 _charges 잔액만 깐다(보증금충당 순서 2·3단계).
+  const schedulePays = pays.filter((p) => !p.chargeKind);
   const discs = Array.isArray(rec._discounts) ? (rec._discounts as Array<Record<string, unknown>>) : [];
   // 미수 분배 먼저 — 명시 실미수(_carryUnpaid) 또는 레거시 _paidTotal.
   //   ★앱수납(_payments) 유무와 무관하게 선행(B-1 완화). 예전 `!pays.length` 가드는 첫 앱수납 순간
@@ -77,7 +81,7 @@ function buildContract(rec: EntityRecord, today: string): Contract {
     const distributed = distributeUnpaid(distTarget, unpaid, cutoff, '');
     schedules = prepaidFirst ? [schedules[0], ...distributed] : distributed;
   }
-  if (schedules.length && (pays.length || discs.length)) {
+  if (schedules.length && (schedulePays.length || discs.length)) {
     const bySeq = new Map<number, number>(schedules.map((s, i) => [s.seq, i]));
     for (const dsc of discs) {
       const idx = bySeq.get(Number(dsc.seq));
@@ -86,14 +90,14 @@ function buildContract(rec: EntityRecord, today: string): Contract {
     // 씨앗(carry) 계약: 분배 후 실수납은 FIFO(applyPayment). seq 지정 납부는 분배와 어긋나 회차 왜곡.
     // 일반 계약: 회차(seq)에 직접 가산.
     if (hasCarry) {
-      for (const p of pays) {
+      for (const p of schedulePays) {
         const amt = Number(p.amount) || 0;
         if (amt <= 0) continue;
         const src = (p.source || '수동') as PaymentEntry['source'];
         schedules = applyPayment(schedules, amt, String(p.date || today), src, p.txId ? { txId: String(p.txId) } : undefined).schedules;
       }
     } else {
-      for (const p of pays) {
+      for (const p of schedulePays) {
         const idx = bySeq.get(Number(p.seq));
         if (idx != null) { const r = addPaymentEntry(schedules[idx], { date: String(p.date || ''), amount: Number(p.amount) || 0, source: (p.source || '수동') } as PaymentEntry, today); schedules[idx] = r.schedule; }
       }
@@ -161,33 +165,39 @@ export function computeContractView(rec: EntityRecord, today: string): ContractV
   const overdueDue = (rc.schedules || []).filter((s) => s.status === '연체' || s.status === '부분납').map((s) => s.dueDate).filter(Boolean).sort();
   const overdueDays = overdueDue.length ? Math.max(0, Math.round((new Date(asOf).getTime() - new Date(overdueDue[0]).getTime()) / 86400000)) : 0;
   const schedGross = rc.unpaidAmount || 0;
-  const seedPaid = Array.isArray(rec._payments) ? (rec._payments as Array<Record<string, unknown>>).reduce((s, p) => s + (Number(p.amount) || 0), 0) : 0;
-  const seedPaidTotal = Number(rec._paidTotal) || 0;   // 씨앗 개시 역산 납부분(오픈 전 상환분)
-  const hasPerSeq = seedPaid > 0;
-  // 입금누계: 씨앗은 개시분(_paidTotal) + 오픈후 앱수납(_payments). 그 외는 _payments 또는 _paidTotal.
-  const paid = seedCarry ? seedPaidTotal + seedPaid : (hasPerSeq ? seedPaid : seedPaidTotal);
-  // _carryUnpaid = 마이그레이션 개시이월(opening balance) 앵커 = 순미수 SSOT.
-  //   · 무납부 = carry 그대로(스케줄 날짜경계 무관). ★ start결손·용량·면제·「반납일≤시작일」(승계·스위치)
-  //     처럼 회차 도래창이 비는 케이스에서 스케줄은 carry를 담을 자리가 없다 → 이 앵커가 load-bearing(제거 금지).
-  //   · 앱수납 후 = buildContract가 carry 분배→수납 FIFO → schedGross가 순미수(헤드라인=회차표).
-  // (완전 ledger화[charge/payment/allocation로 도출]는 P2 아키텍처 — 현재 net==carry는 정확·tests/receivables 보호.)
+  const allPays = Array.isArray(rec._payments) ? (rec._payments as Array<Record<string, unknown>>) : [];
+  const isSynth = (p: Record<string, unknown>) => isSyntheticPayment(p as { synthetic?: boolean; source?: string; kind?: string });
+  const realPays = allPays.filter((p) => !isSynth(p));
+  const synthPays = allPays.filter((p) => isSynth(p));
+  const realPaidAmt = realPays.reduce((s, p) => s + (Number(p.amount) || 0), 0);
+  const seedPaidTotal = Number(rec._paidTotal) || 0;
+  // 입금누계 = 실입금만(보증금충당·synthetic 제외). 씨앗은 개시분(_paidTotal)+오픈후 실수납.
+  const paid = seedCarry ? seedPaidTotal + realPaidAmt : realPaidAmt;
   const carrySeed = Math.max(0, Number(rec._carryUnpaid) || 0);
-  const seedNet = seedCarry ? (hasPerSeq ? schedGross : carrySeed) : null;
-  const gross = seedNet != null ? seedNet : schedGross;
-  let net = seedNet != null ? seedNet : schedGross;
-  // ★레거시 보증금정산 «view-time 차감»은 폐기(2026-07-31 적대검증).
-  //   depositSettledDate는 손으로 편집 가능한 필드인데, 그 날짜만 보고 net을 깎으면
-  //   ① 날짜 한 번 입력으로 기록 없이 미수가 소멸 ② 종료 여부 무관·운행중 계약에도 적용
-  //   ③ 매 계산마다 재적용돼 같은 보증금이 새 대여료를 영구히 가림 ④ 배포만으로 기존 미수가 소급 감소.
-  //   과거 «씨앗 carry 이중차감»(원장 밖 보정)과 동일 형태 → 원장(_payments)에 기록된 충당만 인정한다.
-  //   레거시 계약은 별도 백필(충당 수납 entry를 실제로 write)로 처리할 것.
+  const hasAnyPay = allPays.length > 0;
+  const seedNet = seedCarry ? (hasAnyPay ? schedGross : carrySeed) : null;
+  const schedPart = seedNet != null ? seedNet : schedGross;
+  // 과오납: synthetic만 적용한 잔여채권 − 실입금. net은 0 하한 · overpay 별도.
+  const owedAfterSynth = (() => {
+    if (!realPays.length && !synthPays.length) return schedPart + openChargesTotal(rec);
+    const synthOnly = { ...rec, _payments: synthPays } as EntityRecord;
+    let c2 = buildContract(synthOnly, today);
+    if (returnedDate && c2.schedules?.length && !seedCarry) {
+      c2 = applyReturnedProration(c2, returnedDate);
+    }
+    const asOf2 = returnedDate && returnedDate < today ? returnedDate : today;
+    const sched2 = recalcContract(c2, asOf2).unpaidAmount || 0;
+    const seed2 = seedCarry ? (synthPays.length ? sched2 : carrySeed) : sched2;
+    return Math.max(0, seed2) + openChargesTotal(synthOnly);
+  })();
+  const overpay = Math.max(0, realPaidAmt - owedAfterSynth);
+  const net = Math.max(0, owedAfterSynth - realPaidAmt);
+  const gross = owedAfterSynth;
+  // ★레거시 view-time 차감 폐기 — 원장(_payments/_charges) 기록만 인정.
   const rent0 = Number(rec.monthlyRent) || 0;
-  // 미납 회차수: 씨앗 무납부는 net÷월대여(회차표 carry 분배 전에도 문서 회차 일치). 앱수납 후·일반=엔진 카운트.
-  const count = seedNet != null && !hasPerSeq
+  const count = seedNet != null && !hasAnyPay
     ? (seedNet > 0 ? Math.max(1, rent0 > 0 ? Math.ceil(seedNet / rent0) : 1) : 0)
     : (rc.unpaidSeqCount || 0);
-  // 회차 — 현재 회차(computeCurrentSeq: 최고참 미납 or 다음 예정)/총. 선불=1회차 개시일 도래·후불=+1개월.
-  // 스케줄 없으면(도래창 결손) 총=대여기간 폴백.
   const scheds = rc.schedules || [];
   const roundTotal = scheds.length || Number(rec.rentalMonths) || 0;
   const roundDue = scheds.length ? computeCurrentSeq(scheds, asOf) : 0;
@@ -195,7 +205,7 @@ export function computeContractView(rec: EntityRecord, today: string): ContractV
   return {
     rec, status, delivered, ended, startDate: start, endDate: end,
     monthsLeft: null, dday: ended ? null : ddayFrom(today, end),
-    gross, paid, net, count, refund,
+    gross, paid, net, overpay, count, refund,
     monthlyRent: Number(rec.monthlyRent) || 0,
     overdueDays,
     roundDue, roundTotal,
@@ -213,12 +223,26 @@ export function contractSchedules(rec: EntityRecord, today: string) {
   return (rc.schedules || []).map((s) => {
     const discount = (s.discounts || []).reduce((t, d) => t + (d.amount || 0), 0);
     const paid = s.paidAmount || 0;
+    const lastPay = s.payments && s.payments.length ? s.payments[s.payments.length - 1] : null;
+    const lastKind = lastPay && (lastPay as { kind?: string; memo?: string }).kind;
+    const lastMemo = lastPay ? String((lastPay as { memo?: string }).memo || '') : '';
+    const methodLabel = lastKind === 'deposit-offset' || lastMemo.includes('보증금충당')
+      ? '보증금충당'
+      : lastPay
+        ? String(lastPay.source || '')
+        : '';
     return {
       seq: s.seq, dueDate: s.dueDate, amount: s.amount, discount, paid,
-      balance: Math.max(0, s.amount - discount - paid), // 회차 미납 = 청구−할인−납부(분할납부 누계)
-      paidAt: s.paidAt || '', // 최근 납부일
-      payments: (s.payments || []).map((p) => ({ date: p.date, amount: p.amount, source: p.source })), // 분할납부 내역(일자·금액·수단)
-      method: (s.payments && s.payments.length) ? String(s.payments[s.payments.length - 1].source || '') : '', // 납부 수단(계좌/CMS/카드/현금)
+      balance: Math.max(0, s.amount - discount - paid),
+      paidAt: s.paidAt || '',
+      payments: (s.payments || []).map((p) => ({
+        date: p.date,
+        amount: p.amount,
+        source: (p as { kind?: string }).kind === 'deposit-offset' || String(p.memo || '').includes('보증금충당')
+          ? '보증금충당'
+          : p.source,
+      })),
+      method: methodLabel,
       status: s.status,
     };
   });
