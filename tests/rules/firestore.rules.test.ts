@@ -180,3 +180,18 @@ describe('회계마감 서버 강제 — 마감월 자금거래는 아무도 못
     await assertSucceeds(updateDoc(doc(staffA(), 'contracts', 'c1'), { renter: '홍길동2' }));
   });
 });
+
+describe('법인 마스터(company_master) — 본사만 쓰기, 범용 우회 불가', () => {
+  test('소속 법인은 자기 회사 마스터를 읽을 수 있다', async () => {
+    await assertSucceeds(getDoc(doc(staffA(), 'company_master', 'C1')));
+  });
+  test('타 법인 마스터는 읽을 수 없다', async () => {
+    await assertFails(getDoc(doc(staffB(), 'company_master', 'C1')));
+  });
+  test('법인 직원은 마스터를 쓸 수 없다 — 대외문서에 인쇄되는 법인 신원이므로', async () => {
+    await assertFails(setDoc(doc(staffA(), 'company_master', 'C1'), { companyId: 'C1', master: { ceo: '가짜대표' } }));
+  });
+  test('본사는 쓸 수 있다', async () => {
+    await assertSucceeds(setDoc(doc(hq(), 'company_master', 'C1'), { companyId: 'C1', master: { ceo: '박용호' } }));
+  });
+});

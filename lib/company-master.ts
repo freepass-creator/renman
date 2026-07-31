@@ -1,8 +1,15 @@
 'use client';
 // 법인(회사) 마스터 — 모든 자산(차)·자금(계좌)이 "어느 법인의 X"로 귀속되는 뿌리 설정.
 // 법인별 소재지·차고지·등록대수·증차신청·공문 등 운영 기준의 SSOT. 모듈형(접기·추가·제거).
-// 지금은 localStorage(설정 데이터), 후에 Firestore 마스터로 승격.
+// 저장 = Firestore(company_master/{companyId}) + localStorage 캐시 이중화.
+//
+// ★왜 서버여야 하는가: 내용증명·과태료 변경부과 공문·거래사실확인서가 이 마스터에서 대표자·주소·
+//   사업자번호·전화를 읽어 «인쇄»한다(PrintHost·PenaltyDocs·docs/issue). localStorage만이면
+//   입력하지 않은 PC에서 뽑은 대외문서가 공란으로 나가 무효가 되고, 캐시를 지우면 전 법인 마스터가
+//   소실된다. 읽기 호출부가 7곳 모두 동기이므로 «부팅 시 원격→캐시 하이드레이트» 방식으로
+//   호출부를 바꾸지 않고 서버화한다(회계마감 period-lock과 같은 패턴).
 const LS_KEY = 'jpk:company-master';
+const COLL = 'company_master';
 
 export type Garage = { id: string; name?: string; address?: string; capacity?: number; note?: string };
 export type RegApplication = {
@@ -56,8 +63,73 @@ export function loadMaster(companyId: string): CompanyMaster {
 }
 export function saveMaster(companyId: string, m: CompanyMaster): void {
   if (typeof window === 'undefined' || !companyId) return;
-  const all = loadMasters();
-  all[companyId] = m;
-  localStorage.setItem(LS_KEY, JSON.stringify(all));
+  const at = new Date().toISOString();
+  writeCache(companyId, m);
+  setStamp(companyId, at);
+  void persistRemote(companyId, m, at);
+}
+
+function writeCache(companyId: string, m: CompanyMaster): void {
+  try {
+    const all = loadMasters();
+    all[companyId] = m;
+    localStorage.setItem(LS_KEY, JSON.stringify(all));
+  } catch { /* 쿼터 초과 등 — 원격 저장은 계속 시도 */ }
   window.dispatchEvent(new Event('jpk:master-change'));
+}
+
+async function persistRemote(companyId: string, m: CompanyMaster, at = new Date().toISOString()): Promise<void> {
+  try {
+    const { firebaseReady, getFirebaseApp } = await import('./firebase/client');
+    if (!firebaseReady()) return;
+    const { getFirestore, doc, setDoc } = await import('firebase/firestore');
+    // 배열 필드(차고지·공문 등)의 «삭제»가 반영돼야 하므로 merge를 쓰지 않는다(전체 교체).
+    await setDoc(doc(getFirestore(getFirebaseApp()!), COLL, companyId), {
+      companyId, master: m, updatedAt: at,
+    });
+  } catch (e) { console.warn('법인 마스터 원격 저장 실패', e); }
+}
+
+/* ── 원격 하이드레이트 ────────────────────────────────────────────
+   회사당 1회. 원격이 로컬보다 새로우면 캐시를 갈아끼운다(대외문서가 최신 법인정보를 쓰게).
+   실패하면 조용히 로컬 캐시를 유지한다 — 문서 발행을 막지는 않되, 공란 인쇄는
+   화면(경영관리·문서발행)에서 «미입력» 경고로 드러난다. */
+const _hydrated = new Set<string>();
+const _hydrating = new Map<string, Promise<void>>();
+const STAMP_KEY = 'jpk:company-master:at';
+
+function stamps(): Record<string, string> {
+  if (typeof window === 'undefined') return {};
+  try { return JSON.parse(localStorage.getItem(STAMP_KEY) || '{}'); } catch { return {}; }
+}
+function setStamp(companyId: string, at: string): void {
+  try {
+    const all = stamps(); all[companyId] = at;
+    localStorage.setItem(STAMP_KEY, JSON.stringify(all));
+  } catch { /* 무시 */ }
+}
+
+export function ensureCompanyMasterHydrated(companyId: string): Promise<void> {
+  if (!companyId || typeof window === 'undefined' || _hydrated.has(companyId)) return Promise.resolve();
+  const inflight = _hydrating.get(companyId);
+  if (inflight) return inflight;
+  const p = (async () => {
+    const { firebaseReady, getFirebaseApp } = await import('./firebase/client');
+    if (!firebaseReady()) return;
+    const { getFirestore, doc, getDoc } = await import('firebase/firestore');
+    const snap = await getDoc(doc(getFirestore(getFirebaseApp()!), COLL, companyId));
+    if (!snap.exists()) return;
+    const data = snap.data() as { master?: CompanyMaster; updatedAt?: string };
+    if (!data.master || typeof data.master !== 'object') return;
+    const remoteAt = String(data.updatedAt || '');
+    const localAt = stamps()[companyId] || '';
+    if (!localAt || (remoteAt && remoteAt > localAt)) {
+      writeCache(companyId, data.master);
+      setStamp(companyId, remoteAt || new Date().toISOString());
+    }
+  })()
+    .catch(() => { /* 원격 실패 — 로컬 캐시 유지 */ })
+    .finally(() => { _hydrating.delete(companyId); _hydrated.add(companyId); });
+  _hydrating.set(companyId, p);
+  return p;
 }

@@ -15,7 +15,8 @@ service cloud.firestore {
     }
     function tenantOK(companyId) { return isHQ() || (isSignedIn() && myCompany() == companyId); }
     // ★ 민감 컬렉션 — 범용 규칙에서 반드시 제외. 각자의 명시 match만 지배(범용 OR 우회로 권한승격 차단).
-    //   users: role 자기승격 방지 · period_locks: 마감 우회 방지 · audit_logs: 위변조 방지.
+    //   users: role 자기승격 방지 · period_locks: 마감 우회 방지 · audit_logs: 위변조 방지
+    //   · company_master: 대외문서에 인쇄되는 법인 신원 위조 방지.
     // 문서ID 소유권 — `{companyId}__…` 접두어. companyId 자체에 '__'가 없어야 유효(회사 id는 영숫자 slug).
     function docIdOwnedBy(docId, companyId) {
       return companyId is string
@@ -25,6 +26,7 @@ service cloud.firestore {
     }
     function businessColl(coll) {
       return coll != 'users'
+        && coll != 'company_master'
         && coll != 'period_locks'
         && coll != 'audit_logs'
         && coll != '_api_rate_limits';
@@ -52,6 +54,13 @@ service cloud.firestore {
                     && request.resource.data.companyId is string
                     && request.resource.data.byUid == request.auth.uid;
       allow update, delete: if false;
+    }
+
+    // 법인 마스터 — 대외문서(내용증명·과태료 공문·거래사실확인서)에 인쇄되는 법인 신원.
+    //   위조되면 회사 명의 문서가 잘못 나가므로 쓰기는 본사만. 소속 법인은 읽기.
+    match /company_master/{companyId} {
+      allow read: if isSignedIn() && tenantOK(companyId);
+      allow write: if isHQ();
     }
 
     // 회계기간 마감 — 본사 쓰기, 소속 법인 읽기.

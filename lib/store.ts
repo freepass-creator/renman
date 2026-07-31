@@ -15,6 +15,7 @@ import {
 } from './audit';
 import { newId } from './domain/ids';
 import { assertMoneyMutable, ensurePeriodLocksHydrated } from './finance/period-lock';
+import { ensureCompanyMasterHydrated } from './company-master';
 import { normPlate } from './plate';
 import { assertNoLockConflict, peelExpectedUpdatedAt } from './lock-conflict';
 import { withTimeout } from './async';
@@ -278,6 +279,9 @@ class FirestoreAdapter implements StoreAdapter {
       // 회계마감 원격 캐시 채우기(회사당 1회, await 안 함) — 마감 가드가 읽는 localStorage가
       // 새 기기·시크릿창에서 비어 «마감 없음»으로 보이는 것을 막는다. 서버 강제는 firestore.rules.
       void ensurePeriodLocksHydrated(companyId);
+      // 법인 마스터도 함께 — 대외문서(내용증명·과태료 공문)가 이 값을 인쇄하므로
+      // «입력하지 않은 PC»에서 공란으로 나가는 것을 막는다.
+      void ensureCompanyMasterHydrated(companyId);
       try {
         const { apiAuthHeaders } = await import('./api-headers');
         const headers = await apiAuthHeaders();
