@@ -6,6 +6,8 @@ import { Plus, Trash2, Pencil, Check } from 'lucide-react';
 import { staffDefs, addStaff, updateStaff, removeStaff, setStaffStatus, type StaffRole } from '@/lib/staff';
 import { companyDefs, companyLabel } from '@/lib/companies';
 import { Panel, Btn, Input, Select, Badge, C, useConfirm } from '@/components/ui';
+import { apiAuthHeaders } from '@/lib/api-headers';
+import { toast } from '@/lib/toast';
 
 const ROLES: StaffRole[] = ['본사', '법인'];
 
@@ -14,6 +16,7 @@ export function StaffConsole() {
   const [, force] = useState(0);
   const rerender = () => force((n) => n + 1);
   const [edit, setEdit] = useState(false);
+  const [busyId, setBusyId] = useState('');
   const [nw, setNw] = useState<{ name: string; email: string; role: StaffRole; companyId: string; department: string; phone: string }>({ name: '', email: '', role: '법인', companyId: '', department: '', phone: '' });
   const rows = staffDefs();
   const companies = companyDefs();
@@ -27,6 +30,34 @@ export function StaffConsole() {
     else window.alert('이름·이메일을 확인하세요(이메일 중복 불가).');
   };
 
+  /**
+   * ★정지·해제는 서버 조치 — Firebase Auth 계정 비활성화 + 리프레시 토큰 폐기.
+   *   대장(localStorage)만 바꾸면 직원 브라우저에 전파되지 않아 실제로 차단되지 않는다(QA 긴급).
+   *   서버 성공 후에만 대장 상태를 갱신한다.
+   */
+  const toggleSuspend = async (s: { id: string; name: string; email: string; status: string }) => {
+    const suspend = s.status === '활성';
+    if (suspend && !(await confirm({
+      message: `"${s.name}"(${s.email}) 로그인을 차단합니다. 계정이 비활성화되고 기존 세션도 즉시 만료됩니다. 계속?`,
+      danger: true,
+    }))) return;
+    setBusyId(s.id);
+    try {
+      const res = await fetch('/api/staff/suspend', {
+        method: 'POST',
+        headers: await apiAuthHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify({ email: s.email, suspend }),
+      });
+      const out = await res.json().catch(() => ({}));
+      if (!res.ok) { toast(out.error || '정지 처리 실패', 'error'); return; }
+      setStaffStatus(s.id, suspend ? '정지' : '활성');
+      toast(suspend ? `${s.name} 로그인 차단(계정 비활성·세션 만료)` : `${s.name} 활성화`, 'success');
+      rerender();
+    } catch (e) {
+      toast(`정지 처리 실패: ${(e as Error).message}`, 'error');
+    } finally { setBusyId(''); }
+  };
+
   return (
     <Panel title="직원 · 접근 권한" action={
       <Btn size="sm" variant={edit ? 'solid' : 'ghost'} onClick={() => setEdit((e) => !e)}>
@@ -36,8 +67,8 @@ export function StaffConsole() {
       <div style={{ padding: '10px 16px 14px' }}>
         <p style={{ fontSize: 12.5, color: C.mute, margin: '0 0 6px', lineHeight: 1.7 }}>
           {edit
-            ? '편집 모드 — 역할·소속·상태. 정지는 다음 로그인부터 차단됩니다(명단 이메일 매칭). Auth 계정 비활성화는 Firebase 콘솔에서 별도.'
-            : '직원별 역할·소속 법인 관리대장. 정지 시 동일 이메일 로그인이 차단됩니다.'}
+            ? '편집 모드 — 역할·소속은 관리대장(표시용), 실제 권한은 claims. «정지»는 서버 조치: Auth 계정 비활성 + 기존 세션 즉시 만료.'
+            : '직원별 역할·소속 관리대장. «정지»는 로그인 계정을 비활성화하고 기존 세션도 만료시킵니다(서버 반영).'}
         </p>
 
         {rows.map((s) => edit ? (
@@ -52,7 +83,7 @@ export function StaffConsole() {
               <option value="">{s.role === '본사' ? '전 법인' : '법인 선택'}</option>
               {companies.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}
             </Select>
-            <Btn size="sm" variant={s.status === '활성' ? 'ghost' : 'danger'} onClick={() => { setStaffStatus(s.id, s.status === '활성' ? '정지' : '활성'); rerender(); }}>{s.status === '활성' ? '정지' : '활성화'}</Btn>
+            <Btn size="sm" variant={s.status === '활성' ? 'ghost' : 'danger'} disabled={busyId === s.id} onClick={() => { void toggleSuspend(s); }}>{busyId === s.id ? '처리 중…' : (s.status === '활성' ? '정지' : '활성화')}</Btn>
             <button onClick={() => del(s.id, s.name)} title="삭제" style={{ border: 'none', background: 'none', cursor: 'pointer', color: C.faint, display: 'inline-flex', padding: 4 }} onMouseEnter={(e) => (e.currentTarget.style.color = C.danger)} onMouseLeave={(e) => (e.currentTarget.style.color = C.faint)}><Trash2 size={15} /></button>
           </div>
         ) : (
