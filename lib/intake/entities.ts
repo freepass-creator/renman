@@ -102,6 +102,10 @@ export const ENTITIES: Record<string, Entity> = {
       { key: 'gpsDeviceId', label: 'GPS 단말번호', type: 'text', manual: true },
       { key: 'gpsInstalledDate', label: 'GPS 설치일', type: 'date', manual: true },
       { key: 'gpsControl', label: '시동제어', type: 'select', options: ['가능', '불가'], manual: true, note: 'GPS 장비 원격잠금 능력(상태 저장 X). 적용 여부=contract.engineDisabled' },
+      // ── 자동차세(보유세 정기분 6월·12월 / 연납 1월) — 등록증에 없음 → 수기 ──
+      { key: 'vehicleTaxDueDate', label: '자동차세 납기', type: 'date', manual: true, note: '다음 납부기한. 체납 2회↑면 번호판 영치 위험' },
+      { key: 'vehicleTaxPaidDate', label: '자동차세 납부일', type: 'date', manual: true, note: '납기 이후 날짜가 들어오면 일정에서 사라짐' },
+      { key: 'vehicleTaxAmount', label: '자동차세(원)', type: 'number', manual: true },
       // ── 처분/매각 (매각계약서 → 처분손익) ──
       { key: 'saleDate', label: '매각일', type: 'date', manual: true },
       { key: 'salePrice', label: '매각가(원)', type: 'number', manual: true },
@@ -243,7 +247,7 @@ export const ENTITIES: Record<string, Entity> = {
   contract: {
     key: 'contract', label: '계약', layer: ENTITY_LAYER.contract, ocrType: 'rental_contract', source: '렌탈계약서', idFrom: 'contractNo',
     fields: [
-      { key: 'contractNo', label: '계약번호', type: 'text', ocrFrom: 'contract_no' },
+      { key: 'contractNo', label: '계약번호', type: 'text', ocrFrom: 'contract_no', note: '비우면 저장 시 자동 발번(C-YYMM-####) — 발번기 연결 후' },
       { key: 'contractDate', label: '계약일', type: 'date', ocrFrom: 'contract_date' },
       { key: 'contractorName', label: '임차인', type: 'text', required: true, ocrFrom: 'contractor_name' },
       { key: 'contractorPhone', label: '연락처', type: 'text', ocrFrom: 'contractor_phone' },
@@ -277,7 +281,15 @@ export const ENTITIES: Record<string, Entity> = {
       { key: 'paymentTiming', label: '납부시기', type: 'select', options: ['선납', '후납'], manual: true, note: '선납=계약일 기준 · 후납=익월 (레거시 선불/후불 호환)' },
       { key: 'reservationFee', label: '예약금(원)', type: 'number', manual: true, note: '대여예정요금 10% 범위' },
       { key: 'lateFeeRate', label: '지연손해금율(%)', type: 'number', manual: true },
-      { key: 'earlyTerminationRate', label: '중도해지 위약금율(%)', type: 'number', manual: true, note: '표준 10%' },
+      /* 중도해지 위약금율 — ★계약서에는 «인도일로부터 경과기간»에 따라 두 값이 박혀 있다.
+         실계약 99장 전수: 1년미만 30% / 1년이상 20% (82건) · 40%/30% (4건) · 미기재 13건.
+         한 칸으로는 담을 수 없어 기간별로 나눈다. earlyTerminationRate 는 하위호환용(단일 요율). */
+      { key: 'earlyTerminationRate', label: '중도해지 위약금율(%)', type: 'number', manual: true, note: '기간 구분이 없는 옛 계약용. 아래 두 칸이 있으면 그것을 쓴다' },
+      { key: 'earlyTermRateUnder1y', label: '위약금율·1년미만(%)', type: 'number', ocrFrom: 'early_term_rate_under_1y', note: '계약서 해지수수료율 — 차량인도일로부터 1년 미만' },
+      { key: 'earlyTermRateOver1y', label: '위약금율·1년이상(%)', type: 'number', ocrFrom: 'early_term_rate_over_1y', note: '차량인도일로부터 1년 이상' },
+      /* 지연손해금 — 계약서에 두 단계다(지급명령 송달까지 연 5% / 그 다음날부터 연 12%). 실계약 86건 동일. */
+      { key: 'lateFeeRateBefore', label: '지연손해금율·송달전(%)', type: 'number', ocrFrom: 'late_fee_rate_before', note: '지급명령정본 송달일까지' },
+      { key: 'lateFeeRateAfter', label: '지연손해금율·송달후(%)', type: 'number', ocrFrom: 'late_fee_rate_after', note: '송달 다음날부터 완제일까지' },
       { key: 'cdw', label: '자차보험(CDW)', type: 'select', options: ['가입', '미가입'], manual: true, note: '미가입 시 임차인 실손 배상' },
       { key: 'deductible', label: '면책금/자기부담금(원)', type: 'number', manual: true },
       { key: 'superCover', label: '완전면책 특약', type: 'select', options: ['없음', '있음'], manual: true },

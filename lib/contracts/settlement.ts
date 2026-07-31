@@ -95,16 +95,54 @@ export function computeReturnSettlement(
   };
 }
 
-/* 중도해지 위약금 = 잔여개월 × 월대여료 × 요율(%). 만기 도래(정상종료)면 0. 요율=계약서상 earlyTerminationRate. */
-export type EarlyTermCalc = { rate: number; isEarly: boolean; remainingMonths: number; monthlyRent: number; fee: number; maturity: string };
+/**
+ * 중도해지 위약금 = 잔여개월 × 월대여료 × 요율(%). 만기 도래(정상종료)면 0.
+ *
+ * ★요율은 «차량인도일로부터 경과기간»에 따라 갈린다 — 실계약 99장 전수 확인:
+ *   1년미만 30% / 1년이상 20% (82건) · 40%/30% (4건) · 미기재 13건.
+ *   이전 구현은 단일 `earlyTerminationRate` 만 봤으므로, 1년 이상 경과한 계약에도
+ *   1년미만 요율(30%)을 적용해 위약금을 «과다 청구»할 수 있었다(반대 방향이면 과소).
+ *   위약금은 내용증명·소송 청구액의 근거이므로 요율이 틀리면 법적 문서가 틀린다.
+ *
+ * 기준일 = 인도일(deliveredDate) 우선, 없으면 시작일. 계약서 문구가 «차량인도일로부터»이다.
+ */
+export type EarlyTermCalc = {
+  rate: number; isEarly: boolean; remainingMonths: number; monthlyRent: number; fee: number; maturity: string;
+  /** 요율을 어디서 정했는지 — '1년미만' | '1년이상' | '단일' | '미확인' */
+  rateBasis: '1년미만' | '1년이상' | '단일' | '미확인';
+  /** 인도일로부터 경과 개월 — 화면·문서에서 근거로 보여준다. */
+  elapsedMonths: number;
+};
+
+/** 경과기간에 맞는 위약금율을 고른다. 기간별 값이 없으면 단일 요율로 폴백. */
+function pickEarlyTermRate(rec: EntityRecord, elapsedMonths: number): { rate: number; basis: EarlyTermCalc['rateBasis'] } {
+  const under = Number(rec.earlyTermRateUnder1y);
+  const over = Number(rec.earlyTermRateOver1y);
+  const hasUnder = Number.isFinite(under) && under > 0;
+  const hasOver = Number.isFinite(over) && over > 0;
+  if (hasUnder || hasOver) {
+    if (elapsedMonths >= 12) {
+      if (hasOver) return { rate: over, basis: '1년이상' };
+    } else if (hasUnder) {
+      return { rate: under, basis: '1년미만' };
+    }
+  }
+  const single = Number(rec.earlyTerminationRate);
+  if (Number.isFinite(single) && single > 0) return { rate: single, basis: '단일' };
+  return { rate: 0, basis: '미확인' };
+}
+
 export function earlyTerminationFee(rec: EntityRecord, asOf: string): EarlyTermCalc {
-  const rate = Number(rec.earlyTerminationRate) || 0;
   const monthlyRent = Number(rec.monthlyRent) || 0;
   const term = Number(rec.rentalMonths) || 0;
   const start = ymd(rec.startDate || rec.contractDate);
   const maturity = start && term ? addMonthsIso(start, term) : '';
   const isEarly = !!maturity && asOf < maturity;
   const remainingMonths = isEarly ? monthsBetweenIso(asOf, maturity) : 0;
+  // 계약서 문구가 «차량인도일로부터»이므로 인도일을 우선한다(없으면 시작일).
+  const from = ymd(rec.deliveredDate || rec.startDate || rec.contractDate);
+  const elapsedMonths = from ? Math.max(0, monthsBetweenIso(from, asOf)) : 0;
+  const { rate, basis } = pickEarlyTermRate(rec, elapsedMonths);
   const fee = Math.round(remainingMonths * monthlyRent * (rate / 100));
-  return { rate, isEarly, remainingMonths, monthlyRent, fee, maturity };
+  return { rate, isEarly, remainingMonths, monthlyRent, fee, maturity, rateBasis: basis, elapsedMonths };
 }
