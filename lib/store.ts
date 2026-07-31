@@ -15,7 +15,6 @@ import {
 } from './audit';
 import { newId } from './domain/ids';
 import { assertMoneyMutable, ensurePeriodLocksHydrated } from './finance/period-lock';
-import { ensureCompanyMasterHydrated } from './company-master';
 import { normPlate } from './plate';
 import { assertNoLockConflict, peelExpectedUpdatedAt } from './lock-conflict';
 import { withTimeout } from './async';
@@ -281,7 +280,8 @@ class FirestoreAdapter implements StoreAdapter {
       void ensurePeriodLocksHydrated(companyId);
       // 법인 마스터도 함께 — 대외문서(내용증명·과태료 공문)가 이 값을 인쇄하므로
       // «입력하지 않은 PC»에서 공란으로 나가는 것을 막는다.
-      void ensureCompanyMasterHydrated(companyId);
+      // ★company-master는 'use client' 모듈이라 정적 import 금지(서버 그래프에 섞이면 안 됨) → 동적 import.
+      void import('./company-master').then((m) => m.ensureCompanyMasterHydrated(companyId)).catch(() => {});
       try {
         const { apiAuthHeaders } = await import('./api-headers');
         const headers = await apiAuthHeaders();
