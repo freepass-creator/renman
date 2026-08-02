@@ -9,8 +9,8 @@ import { effectiveEndDate } from './contract-ops';
 import { normPlate } from './plate';
 import { companyShort } from './companies';
 
-export type AgendaKind = '반납·만기' | '검사만기' | '보험만기' | '과태료 기한';
-export const AGENDA_KINDS: AgendaKind[] = ['반납·만기', '검사만기', '보험만기', '과태료 기한'];
+export type AgendaKind = '반납·만기' | '검사만기' | '보험만기' | '과태료 기한' | '세금 만기';
+export const AGENDA_KINDS: AgendaKind[] = ['반납·만기', '검사만기', '보험만기', '과태료 기한', '세금 만기'];
 
 export type AgendaStatus = '어김' | '임박' | '예정';
 
@@ -92,6 +92,20 @@ export function buildAgenda(
       String(v.carName || ''),
       String(v.companyId || ''),
       `insp:${v._key || v.plate}:${v.inspectionTo}`,
+    );
+  }
+  for (const v of vehicles) {
+    const due = String(v.vehicleTaxDueDate || '');
+    if (!due) continue;
+    const paid = String(v.vehicleTaxPaidDate || '');
+    if (paid && paid >= due) continue;
+    push(
+      due,
+      '세금 만기',
+      String(v.plate || ''),
+      String(v.carName || '자동차세'),
+      String(v.companyId || ''),
+      `tax:${v._key || v.plate}:${due}`,
     );
   }
   const curIns = new Map<string, EntityRecord>();

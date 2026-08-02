@@ -12,7 +12,7 @@ export default function MEntry() {
       <MHead title="입력" color="var(--indigo-text)" />
       <div style={{ padding: 14 }}>
         <ActionGrid>
-          <ActionTile icon={<Camera size={24} />} label="증빙 촬영·수집" desc="현장 사진과 계약 증빙 등록" onClick={() => router.push('/inbox')} />
+          <ActionTile icon={<Camera size={24} />} label="현장 수집" desc="사진·문서·서명을 먼저 등록" onClick={() => router.push('/inbox')} />
           <ActionTile icon={<Upload size={24} />} label="차량 등록" desc="등록증 OCR 또는 직접 입력" onClick={() => router.push('/ingest?type=vehicle')} />
           <ActionTile icon={<PenLine size={24} />} label="계약 등록" desc="계약서 OCR 또는 직접 입력" onClick={() => router.push('/ingest?type=contract')} />
           <ActionTile icon={<ReceiptText size={24} />} label="과태료 등록" desc="고지서 촬영 및 책임자 매칭" onClick={() => router.push('/ingest?type=penalty')} />

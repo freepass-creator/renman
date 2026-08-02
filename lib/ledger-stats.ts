@@ -62,6 +62,8 @@ export type FleetStatusStats = {
   runN: number;
   utilPct: number;
   netSum: number;
+  maintainedNetSum: number;
+  endedNetSum: number;
   inspSoon: number;
 };
 
@@ -76,9 +78,11 @@ export function summarizeFleetStatusStats(searched: FleetRow[], rows: FleetRow[]
     heldN++;
     if (r.util === '운행') runN++;
   }
-  let netSum = 0, inspSoon = 0;
+  let netSum = 0, maintainedNetSum = 0, endedNetSum = 0, inspSoon = 0;
   for (const r of rows) {
     netSum += Math.max(0, r.net);
+    maintainedNetSum += Math.max(0, r.maintainedNet);
+    endedNetSum += Math.max(0, r.endedNet);
     const d = dday(r.inspectionTo);
     if (d != null && d <= 30) inspSoon++;
   }
@@ -87,6 +91,8 @@ export function summarizeFleetStatusStats(searched: FleetRow[], rows: FleetRow[]
     runN,
     utilPct: heldN ? Math.round((runN / heldN) * 100) : 0,
     netSum,
+    maintainedNetSum,
+    endedNetSum,
     inspSoon,
   };
 }

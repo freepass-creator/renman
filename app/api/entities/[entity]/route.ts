@@ -60,9 +60,12 @@ export async function GET(req: Request, ctx: { params: Promise<{ entity: string 
 
   const url = new URL(req.url);
   const requestedCompany = url.searchParams.get('companyId') || '';
-  const companies = actor.systemRole === 'hq'
-    ? (requestedCompany === '__ALL__' ? ['switchplan', 'prime', 'sonogong'] : [requestedCompany])
-    : [actor.companyId || ''];
+  // 관리 회사는 클라이언트 레지스트리에서 설정한다. API가 특정 3사를 고정하지 않는다.
+  // 합본 조회는 DispatchStore가 설정된 회사별로 분할 요청한다.
+  if (actor.systemRole === 'hq' && requestedCompany === '__ALL__') {
+    return NextResponse.json({ error: 'configured company required' }, { status: 400 });
+  }
+  const companies = actor.systemRole === 'hq' ? [requestedCompany] : [actor.companyId || ''];
   if (!companies.every(Boolean)) return NextResponse.json({ error: 'company required' }, { status: 400 });
   if (actor.systemRole === 'tenant' && companies[0] !== actor.companyId) {
     return NextResponse.json({ error: 'forbidden' }, { status: 403 });

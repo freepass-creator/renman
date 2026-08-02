@@ -12,7 +12,7 @@ import { getStore } from '@/lib/store';
 import { ENTITIES } from '@/lib/intake/entities';
 import { downloadCsv } from '@/lib/export-csv';
 import { todayKST } from '@/lib/contracts/dates'; // KST 기준 오늘(내보내기 파일명)
-import { Page, Panel, ListBox, ListRow, Btn, C, SPACE_M, usePrompt } from '@/components/ui';
+import { Page, Panel, ListBox, ListRow, Btn, C, SPACE_M, useConfirm, usePrompt } from '@/components/ui';
 import { NAV_GROUPS } from '@/lib/nav';
 import { WorkbenchBar } from '@/components/WorkbenchBar';
 import { closePeriod, reopenPeriod, useClosedPeriods } from '@/lib/finance/period-lock';
@@ -103,6 +103,7 @@ function ClosingBody({ companyId, actor }: { companyId: string; actor: string })
 export default function SettingsPage() {
   const { user, companyId, scopeAll, isOperator } = useSession();
   const { ids: tabIds } = useMobileTabs();
+  const confirm = useConfirm();
   const [msg, setMsg] = useState('');
   const [sending, setSending] = useState(false);
   const [exporting, setExporting] = useState('');
@@ -123,6 +124,11 @@ export default function SettingsPage() {
 
   async function sendReset() {
     if (!user.email) return;
+    if (!(await confirm({
+      title: '비밀번호 재설정',
+      message: `${user.email}로 비밀번호 재설정 링크를 발송합니까?`,
+      confirmLabel: '메일 발송',
+    }))) return;
     setSending(true); setMsg('');
     try {
       await resetPassword(user.email);
@@ -238,8 +244,8 @@ export default function SettingsPage() {
             onClick={() => { if (!sending && user.email) void sendReset(); }}
           />
           <ListRow
-            main={<CollMain open={open === 'export'}>엑셀 내보내기</CollMain>}
-            sub={`${scopeAll ? '전체 법인' : companyLabel(companyId)} CSV`}
+            main={<CollMain open={open === 'export'}>CSV 내보내기</CollMain>}
+            sub={`${scopeAll ? '전체 법인' : companyLabel(companyId)} · 엑셀에서 열 수 있는 CSV`}
             right={<Download size={15} color={C.faint} />}
             onClick={() => toggle('export')}
           />

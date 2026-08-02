@@ -73,7 +73,7 @@ export function unpaidOf(rec: EntityRecord): number {
 }
 
 /** 한 자산(차) 360 — 데이터·상태·핸들러 (UI 없음). */
-export function useVehicleDetail(plate: string, focus?: string) {
+export function useVehicleDetail(plate: string, focus?: string, targetCompanyId?: string) {
   const confirm = useConfirm();
   const { companyId, user } = useSession();
   const { data: [allContracts = [], insAll = [], penAll = [], hisAll = [], allVehicles = []], loading } =
@@ -82,8 +82,9 @@ export function useVehicleDetail(plate: string, focus?: string) {
 
   /* 차량 찾기 — 옛 번호 URL로도 열려야 한다(번호변경 이력 매칭 + 문서ID 폴백). */
   const v = useMemo(
-    () => allVehicles.find((x) => vehicleMatchesPlate(x, plate) || String(x._key) === plate) ?? null,
-    [allVehicles, plate],
+    () => allVehicles.find((x) => (!targetCompanyId || String(x.companyId || '') === targetCompanyId)
+      && (vehicleMatchesPlate(x, plate) || String(x._key) === plate)) ?? null,
+    [allVehicles, plate, targetCompanyId],
   );
 
   /**
@@ -111,12 +112,13 @@ export function useVehicleDetail(plate: string, focus?: string) {
     [plateKeys],
   );
 
-  const contracts = useMemo(() => allContracts.filter((c) => matchesPlate(c.plate)), [allContracts, matchesPlate]);
-  const insurances = useMemo(() => insAll.filter((c) => matchesPlate(c.plate)), [insAll, matchesPlate]);
-  const penalties = useMemo(() => penAll.filter((c) => matchesPlate(c.plate)), [penAll, matchesPlate]);
+  const inTargetCompany = (rec: EntityRecord) => !targetCompanyId || String(rec.companyId || '') === targetCompanyId;
+  const contracts = useMemo(() => allContracts.filter((c) => inTargetCompany(c) && matchesPlate(c.plate)), [allContracts, matchesPlate, targetCompanyId]);
+  const insurances = useMemo(() => insAll.filter((c) => inTargetCompany(c) && matchesPlate(c.plate)), [insAll, matchesPlate, targetCompanyId]);
+  const penalties = useMemo(() => penAll.filter((c) => inTargetCompany(c) && matchesPlate(c.plate)), [penAll, matchesPlate, targetCompanyId]);
   const history = useMemo(
-    () => hisAll.filter((h) => matchesPlate(h.plate)).sort((a, b) => (String(a.date) < String(b.date) ? 1 : -1)),
-    [hisAll, matchesPlate],
+    () => hisAll.filter((h) => inTargetCompany(h) && matchesPlate(h.plate)).sort((a, b) => (String(a.date) < String(b.date) ? 1 : -1)),
+    [hisAll, matchesPlate, targetCompanyId],
   );
 
   const [editInfo, setEditInfo] = useState(false);

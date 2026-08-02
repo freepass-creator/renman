@@ -6,10 +6,10 @@ import { useParams, useRouter } from 'next/navigation';
 import { Plus, X, Trash2, Building2, AlertTriangle } from 'lucide-react';
 import { useSession } from '@/lib/session';
 import { getStore } from '@/lib/store';
-import { COMPANIES, companyLabel, companyShort } from '@/lib/companies';
+import { COMPANIES, companyLabel } from '@/lib/companies';
 import { loadMaster, saveMaster, masterStampOf, ensureCompanyMasterHydrated, genId, MODULE_CATALOG, type CompanyMaster, type Garage, type RegApplication, type OfficialDoc } from '@/lib/company-master';
 import { toast } from '@/lib/toast';
-import { Page, Panel, Sec, Btn, Input, Select, C } from '@/components/ui';
+import { Page, Panel, Sec, Btn, Input, Select, C, useConfirm } from '@/components/ui';
 import { WorkbenchBar } from '@/components/WorkbenchBar';
 
 const lab: CSSProperties = { fontSize: 11.5, color: 'var(--text-sub)', display: 'block', marginBottom: 3 };
@@ -20,6 +20,7 @@ export default function CompanyWorkspace() {
   const { companyId: scope, isOperator } = useSession();
   const params = useParams();
   const router = useRouter();
+  const confirm = useConfirm();
   const id = String(params.id || '');
   // 법인 소속 직원은 자기 법인만. 본사는 전 법인.
   const allowed = isOperator || scope === id;
@@ -76,14 +77,22 @@ export default function CompanyWorkspace() {
     toast(r.message || '저장 실패', 'error');
   };
   const addModule = (k: string) => set({ modules: [...modules, k] });
-  const removeModule = (k: string) => set({ modules: modules.filter((x) => x !== k) });
+  const removeModule = async (k: string, label: string) => {
+    if (!(await confirm({
+      title: '회사 모듈 제거',
+      message: `${label} 모듈을 이 회사 워크스페이스에서 제거합니까?\n저장해야 최종 반영됩니다.`,
+      confirmLabel: '모듈 제거',
+      danger: true,
+    }))) return;
+    set({ modules: modules.filter((x) => x !== k) });
+  };
   const available = MODULE_CATALOG.filter((c) => !modules.includes(c.key));
 
-  if (!allowed) return <Page title="법인관리"><div style={{ padding: 20, color: C.mute }}>이 법인에 접근 권한이 없습니다.</div></Page>;
-  if (!COMPANIES.includes(id)) return <Page title="법인관리"><div style={{ padding: 20, color: C.mute }}>존재하지 않는 법인입니다.</div></Page>;
+  if (!allowed) return <Page title="회사관리"><div style={{ padding: 20, color: C.mute }}>이 회사에 접근 권한이 없습니다.</div></Page>;
+  if (!COMPANIES.includes(id)) return <Page title="회사관리"><div style={{ padding: 20, color: C.mute }}>관리 목록에 없는 회사입니다.</div></Page>;
 
   return (
-    <Page title={companyLabel(id)} meta={`법인 워크스페이스 · ${companyShort(id)}`}
+    <Page title={companyLabel(id)} meta="회사별 전용 워크스페이스"
       tools={<WorkbenchBar actions={
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           {dirty && <span style={{ fontSize: 12, color: C.warn, fontWeight: 700 }}>저장 안 됨</span>}
@@ -95,10 +104,10 @@ export default function CompanyWorkspace() {
       {/* 법인 스위처 — 본사만 */}
       {isOperator && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', margin: '4px 0 18px' }}>
-          <span style={{ fontSize: 11.5, fontWeight: 700, color: C.faint, marginRight: 2 }}>법인 전환</span>
+          <span style={{ fontSize: 11.5, fontWeight: 700, color: C.faint, marginRight: 2 }}>회사 전환</span>
           {COMPANIES.map((c) => (
             <Btn key={c} size="sm" variant={c === id ? 'solid' : 'ghost'} onClick={() => router.push(`/company/${c}`)}>
-              <Building2 size={13} /> {companyShort(c)}
+              <Building2 size={13} /> {companyLabel(c)}
             </Btn>
           ))}
         </div>
@@ -109,7 +118,7 @@ export default function CompanyWorkspace() {
         if (!cat) return null;
         return (
           <Sec key={key} id={`co-${key}`} title={cat.label} desc={cat.desc}
-            right={!cat.core ? <Btn size="sm" variant="ghost" onClick={() => removeModule(key)}><X size={15} /></Btn> : undefined}>
+            right={!cat.core ? <Btn size="sm" variant="ghost" iconOnly tip={`${cat.label} 모듈 제거`} onClick={() => { void removeModule(key, cat.label); }}><X size={15} /></Btn> : undefined}>
             {renderModule(key, m, set, owned)}
           </Sec>
         );
@@ -167,7 +176,7 @@ function GarageModule({ m, set }: MP) {
           <Input value={g.name || ''} onChange={(e) => upd(i, { name: e.target.value })} placeholder="차고지명" style={{ width: 130 }} />
           <Input value={g.address || ''} onChange={(e) => upd(i, { address: e.target.value })} placeholder="주소" style={{ flex: 1, minWidth: 200 }} />
           <Input type="number" value={g.capacity ?? ''} onChange={(e) => upd(i, { capacity: e.target.value === '' ? undefined : Number(e.target.value) })} placeholder="수용대수" style={{ width: 96 }} />
-          <Btn size="sm" variant="ghost" onClick={() => set({ garages: list.filter((_, j) => j !== i) })}><Trash2 size={15} /></Btn>
+          <Btn size="sm" variant="ghost" iconOnly tip={`${g.name || `${i + 1}번`} 차고지 삭제`} onClick={() => set({ garages: list.filter((_, j) => j !== i) })}><Trash2 size={15} /></Btn>
         </div>
       ))}
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 4 }}>
@@ -210,7 +219,7 @@ function VehicleRegModule({ m, set, owned }: MP & { owned: number }) {
               <Select value={a.status} onChange={(e) => upd(i, { status: e.target.value as RegApplication['status'] })} style={{ width: 92, color: statusTone(a.status), fontWeight: 700 }}>
                 {APP_STATUS.map((s) => <option key={s} value={s} style={{ color: C.ink }}>{s}</option>)}
               </Select>
-              <Btn size="sm" variant="ghost" onClick={() => set({ regApplications: apps.filter((_, j) => j !== i) })}><Trash2 size={15} /></Btn>
+              <Btn size="sm" variant="ghost" iconOnly tip={`${a.date || `${i + 1}번`} ${a.kind} 신청 삭제`} onClick={() => set({ regApplications: apps.filter((_, j) => j !== i) })}><Trash2 size={15} /></Btn>
             </div>
           ))}
           <div><Btn size="sm" variant="ghost" onClick={() => set({ regApplications: [...apps, { id: genId('ap'), kind: '증차', status: '준비' }] })}><Plus size={13} /> 신청 추가</Btn></div>
@@ -232,7 +241,7 @@ function OfficialDocModule({ m, set }: MP) {
           <Select value={d.direction} onChange={(e) => upd(i, { direction: e.target.value as OfficialDoc['direction'] })} style={{ width: 84 }}><option value="발신">발신</option><option value="수신">수신</option></Select>
           <Input value={d.title || ''} onChange={(e) => upd(i, { title: e.target.value })} placeholder="제목" style={{ flex: 1, minWidth: 180 }} />
           <Input value={d.counterpart || ''} onChange={(e) => upd(i, { counterpart: e.target.value })} placeholder="상대(수신처/발신처)" style={{ width: 150 }} />
-          <Btn size="sm" variant="ghost" onClick={() => set({ officialDocs: list.filter((_, j) => j !== i) })}><Trash2 size={15} /></Btn>
+          <Btn size="sm" variant="ghost" iconOnly tip={`${d.title || `${i + 1}번`} 공문 삭제`} onClick={() => set({ officialDocs: list.filter((_, j) => j !== i) })}><Trash2 size={15} /></Btn>
         </div>
       ))}
       <div><Btn size="sm" variant="ghost" onClick={() => set({ officialDocs: [...list, { id: genId('doc'), direction: '발신' }] })}><Plus size={13} /> 공문 추가</Btn></div>
@@ -249,7 +258,7 @@ function CardModule({ m, set }: MP) {
         <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
           <Input value={c.no || ''} onChange={(e) => upd(i, { no: e.target.value })} placeholder="카드번호(끝4자리)" style={{ width: 150 }} />
           <Input value={c.alias || ''} onChange={(e) => upd(i, { alias: e.target.value })} placeholder="별명 (예: 영업용)" style={{ flex: 1, minWidth: 150 }} />
-          <Btn size="sm" variant="ghost" onClick={() => set({ cards: list.filter((_, j) => j !== i) })}><Trash2 size={15} /></Btn>
+          <Btn size="sm" variant="ghost" iconOnly tip={`${c.alias || c.no || `${i + 1}번`} 법인카드 삭제`} onClick={() => set({ cards: list.filter((_, j) => j !== i) })}><Trash2 size={15} /></Btn>
         </div>
       ))}
       <div><Btn size="sm" variant="ghost" onClick={() => set({ cards: [...list, { no: '' }] })}><Plus size={13} /> 카드 추가</Btn></div>

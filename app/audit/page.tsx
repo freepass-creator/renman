@@ -1,7 +1,8 @@
 'use client';
 import { Fragment, useMemo, useState } from 'react';
 import { useSession } from '@/lib/session';
-import { companyLabel } from '@/lib/companies';
+import { companyLabel, companyShort } from '@/lib/companies';
+import { looksLikePhone, looksLikeResident, maskPhone, maskResident, PII_MASKERS } from '@/lib/pii';
 import { ENTITIES } from '@/lib/intake/entities';
 import { AUDIT_ACTION_LABEL, type AuditLog } from '@/lib/audit';
 import { FacetPage, Sec, EmptyState, Badge, Btn, C, th, td, type BadgeTone, PageLoading } from '@/components/ui';
@@ -66,7 +67,37 @@ export default function AuditPage() {
       <Sec title="변경 이력" n={filtered.length} desc="등록·수정·삭제·복구 append-only 트레일 — 행 클릭 시 상세" hideable={false}>
         {loading ? <PageLoading />
           : filtered.length === 0 ? <EmptyState>기록된 변경 이력이 없습니다{rows.length === 0 ? ' (변경이 발생하면 여기 쌓입니다)' : ''}</EmptyState>
-            : (
+            : mobile ? (
+              <div style={{ border: `1px solid ${C.line}`, borderRadius: 'var(--radius)', overflow: 'hidden', background: C.card }}>
+                {filtered.map((r, index) => {
+                  const open = openId === r.id;
+                  return (
+                    <div key={r.id} style={{ borderTop: index ? `1px solid ${C.line}` : undefined }}>
+                      <button
+                        type="button"
+                        aria-expanded={open}
+                        onClick={() => setOpenId(open ? null : r.id)}
+                        style={{ width: '100%', minHeight: 68, padding: '10px 12px', border: 'none', background: open ? 'var(--bg-stripe)' : C.card, color: C.ink, textAlign: 'left', cursor: 'pointer', fontFamily: 'inherit' }}
+                      >
+                        <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <Badge tone={ACTION_TONE[r.action] || 'gray'}>{AUDIT_ACTION_LABEL[r.action] || r.action}</Badge>
+                          <span style={{ color: C.mute, fontSize: 12 }}>{entLabel(r.entityType)}</span>
+                          <span style={{ marginLeft: 'auto', color: C.faint, fontSize: 11, fontFamily: 'var(--font-mono)' }}>{fmtAt(r.at)}</span>
+                        </span>
+                        <span style={{ display: 'block', marginTop: 7, overflow: 'hidden', color: C.ink, fontSize: 13, fontWeight: 700, textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.label}</span>
+                        <span style={{ display: 'block', marginTop: 3, color: C.mute, fontSize: 11.5 }}>{r.by}{scopeAll ? ` · ${companyShort(r.companyId)}` : ''}</span>
+                      </button>
+                      {open && (
+                        <div style={{ padding: '10px 12px 14px', borderTop: `1px solid ${C.line2}`, background: 'var(--bg-stripe)' }}>
+                          <Diff before={r.before} after={r.after} />
+                          <div style={{ fontSize: 11, color: C.faint, marginTop: 8 }}>{r.byEmail || r.byUid} · {r.at?.slice(0, 19).replace('T', ' ')} · id {r.entityId || '—'}</div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
               <div style={{ overflowX: 'auto', border: `1px solid ${C.line}`, borderRadius: 'var(--radius)' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 620 }}>
                   <thead><tr>
@@ -88,7 +119,7 @@ export default function AuditPage() {
                             <td style={{ ...td, color: C.mute }}>{entLabel(r.entityType)}</td>
                             <td style={td}>{r.label}</td>
                             <td style={{ ...td, color: C.mute }}>{r.by}</td>
-                            {scopeAll && <td style={{ ...td, color: C.faint, fontSize: 11 }}>{companyLabel(r.companyId)}</td>}
+                            {scopeAll && <td style={{ ...td, color: C.faint, fontSize: 11 }}>{companyShort(r.companyId)}</td>}
                           </tr>
                           {open && (
                             <tr>
@@ -116,7 +147,17 @@ function Diff({ before, after }: { before?: Record<string, unknown> | null; afte
     .filter((k) => !['createdBy', 'createdByUid', 'createdAt', 'updatedBy', 'updatedByUid', 'updatedAt', '_key', 'companyId'].includes(k))
     .slice(0, 20);
   if (keys.length === 0) return <div style={{ fontSize: 12, color: C.faint }}>상세 스냅샷 없음</div>;
-  const show = (v: unknown) => (v == null || v === '' ? '—' : String(v));
+  // 감사 트레일은 변경 여부를 보는 곳이지 개인정보 원문을 대량 조회하는 화면이 아니다.
+  const show = (key: string, v: unknown) => {
+    if (v == null || v === '') return '—';
+    const masker = PII_MASKERS[key];
+    if (masker) return masker(v) || '—';
+    if (looksLikePhone(v)) return maskPhone(v);
+    if (looksLikeResident(v)) return maskResident(v);
+    if (Array.isArray(v)) return `배열 ${v.length}개`;
+    if (typeof v === 'object') return '객체 스냅샷';
+    return String(v);
+  };
   return (
     <div style={{ display: 'grid', gridTemplateColumns: 'minmax(90px,auto) 1fr', gap: '4px 14px', fontSize: 12 }}>
       {keys.map((k) => {
@@ -127,8 +168,8 @@ function Diff({ before, after }: { before?: Record<string, unknown> | null; afte
             <div style={{ color: C.faint, fontWeight: 600 }}>{k}</div>
             <div style={{ color: C.ink }}>
               {before && after
-                ? (changed ? <span><span style={{ color: C.mute, textDecoration: 'line-through' }}>{show(b)}</span> <span style={{ color: C.faint }}>→</span> <b>{show(a)}</b></span> : <span style={{ color: C.mute }}>{show(a)}</span>)
-                : <span>{show(a ?? b)}</span>}
+                ? (changed ? <span><span style={{ color: C.mute, textDecoration: 'line-through' }}>{show(k, b)}</span> <span style={{ color: C.faint }}>→</span> <b>{show(k, a)}</b></span> : <span style={{ color: C.mute }}>{show(k, a)}</span>)
+                : <span>{show(k, a ?? b)}</span>}
             </div>
           </Fragment>
         );

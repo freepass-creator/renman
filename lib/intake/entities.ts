@@ -10,6 +10,7 @@
 import type { DataLayer } from '@/lib/domain/layers';
 import { ENTITY_LAYER } from '@/lib/domain/layers';
 import { RENTAL_TYPES } from '@/lib/schema/contract';
+import { WORK_CATEGORIES } from '@/lib/work-taxonomy';
 
 export type FieldType = 'text' | 'number' | 'date' | 'select' | 'vehicle-picker' | 'contract-picker';
 
@@ -152,7 +153,7 @@ export const ENTITIES: Record<string, Entity> = {
     key: 'work_item', label: '업무', layer: ENTITY_LAYER.work_item, source: '업무 직접입력', idFrom: 'workId',
     fields: [
       { key: 'date', label: '업무일', type: 'date', required: true },
-      { key: 'category', label: '업무구분', type: 'select', required: true, options: ['일정', '고객상담', '정비·수선', '사고', '문서', '기타', '과태료'] },
+      { key: 'category', label: '업무분류', type: 'select', options: [...WORK_CATEGORIES], note: '비워 두면 미분류로 저장되며 나중에 이어서 보완할 수 있습니다.' },
       { key: 'status', label: '상태', type: 'select', options: ['대기', '진행', '완료', '보류', '미배정'] },
       { key: 'priority', label: '우선순위', type: 'select', options: ['긴급', '높음', '보통', '낮음'] },
       { key: 'title', label: '업무내용', type: 'text', required: true },
@@ -178,6 +179,22 @@ export const ENTITIES: Record<string, Entity> = {
       { key: 'maintType', label: '정비유형', type: 'select', options: ['정기점검', '소모품교체', '수리', '판금·도색', '타이어', '기타'], manual: true },
       { key: 'mileage', label: '주행거리(km)', type: 'number', manual: true },
       { key: 'nextMaintDate', label: '다음정비예정', type: 'date', manual: true },
+      // ── 검사·세차·보험·부품교체 ──
+      { key: 'inspectionType', label: '검사유형', type: 'select', options: ['정기검사', '종합검사', '신규검사', '임시검사', '기타'], manual: true },
+      { key: 'inspectionResult', label: '검사결과', type: 'select', options: ['예정', '적합', '부적합', '재검사'], manual: true },
+      { key: 'nextInspectionDate', label: '다음검사일', type: 'date', manual: true },
+      { key: 'washType', label: '세차유형', type: 'select', options: ['일반세차', '내부세차', '디테일링', '광택', '상품화세차', '기타'], manual: true },
+      { key: 'insuranceAction', label: '보험업무', type: 'select', options: ['가입', '갱신', '변경', '사고접수', '해지', '기타'], manual: true },
+      { key: 'insuranceExpiryDate', label: '보험만기일', type: 'date', manual: true },
+      { key: 'partName', label: '부품명', type: 'text', manual: true },
+      { key: 'partQty', label: '수량', type: 'number', manual: true },
+      // ── 계약·고객 업무 ──
+      { key: 'paymentIssueType', label: '수납이슈유형', type: 'select', options: ['미납', '부분수납', '과수납', '오입금', '환불', '기타'], manual: true },
+      { key: 'expectedAmount', label: '예정금액(원)', type: 'number', manual: true },
+      { key: 'receivedAmount', label: '수납금액(원)', type: 'number', manual: true },
+      { key: 'disputeType', label: '분쟁유형', type: 'select', options: ['계약', '요금', '차량상태', '사고', '반납', '기타'], manual: true },
+      { key: 'counterparty', label: '상대방', type: 'text', manual: true },
+      { key: 'claimType', label: '클레임유형', type: 'select', options: ['서비스', '차량', '요금', '계약', '직원응대', '기타'], manual: true },
       // ── 사고 ──
       { key: 'accRole', label: '가해/피해', type: 'select', options: ['가해', '피해'], manual: true },
       { key: 'faultPct', label: '내 과실(%)', type: 'number', manual: true },
@@ -256,8 +273,8 @@ export const ENTITIES: Record<string, Entity> = {
       { key: 'contractorLicenseExpiry', label: '면허만기', type: 'date', manual: true, note: '대여 시점 스냅샷. 계약서 OCR에 만기 키 없음 → 수기' },
       { key: 'contractorAddress', label: '주소', type: 'text', ocrFrom: 'contractor_address' },
       { key: 'plate', label: '차량번호', type: 'text', ocrFrom: 'car_number' },
-      { key: 'carName', label: '차종', type: 'text', ocrFrom: 'car_name' },
-      { key: 'rentalType', label: '대여형태', type: 'select', options: [...RENTAL_TYPES], manual: true, note: '상품 분류. 미지정 허용' },
+      { key: 'carName', label: '차명', type: 'text', ocrFrom: 'car_name' },
+      { key: 'rentalType', label: '계약분류', type: 'select', options: [...RENTAL_TYPES], manual: true, note: '상품 분류. 미지정 허용' },
       { key: 'rentalMonths', label: '대여기간(개월)', type: 'number', ocrFrom: 'rental_period_months' },
       { key: 'startDate', label: '시작일', type: 'date', ocrFrom: 'start_date' },
       { key: 'endDate', label: '종료일', type: 'date', ocrFrom: 'end_date' },
@@ -350,6 +367,11 @@ export const ENTITIES: Record<string, Entity> = {
       { key: 'counterparty', label: '거래상대/적요', type: 'text' },
       { key: 'memo', label: '내용', type: 'text' },
       { key: 'method', label: '수단', type: 'text', note: '계좌/CMS/카드/현금' },
+      { key: 'matchProposalState', label: '연결후보상태', type: 'select', options: ['자동후보', '복수후보', '검토후보', '미매칭', '해당없음'] },
+      { key: 'matchProposalCount', label: '후보수', type: 'number' },
+      { key: 'suggestedContractNo', label: '추천계약', type: 'text' },
+      { key: 'suggestedScheduleSeq', label: '추천회차', type: 'number' },
+      { key: 'matchProposalReason', label: '후보근거', type: 'text' },
     ],
   },
   card_tx: {
@@ -395,10 +417,27 @@ export const ENTITIES: Record<string, Entity> = {
       { key: 'plate', label: '차량번호', type: 'text', manual: true, note: '매칭 대상 차(선택)' },
       { key: 'note', label: '메모', type: 'text', manual: true },
       { key: 'status', label: '상태', type: 'select', options: ['대기', '매칭'], manual: true },
+      { key: 'processingState', label: '처리상태', type: 'select', options: ['분석중', '자동반영', '확인필요', '미분류', '중복', '오류', '처리완료'], manual: true },
+      { key: 'classificationState', label: '분류상태', type: 'select', options: ['미분류', '분류됨'], manual: true },
+      { key: 'intakeState', label: '실행상태', type: 'select', options: ['미처리', '처리중', '처리완료'], manual: true },
+      { key: 'assignmentState', label: '배정상태', type: 'select', options: ['미배정', '배정됨'], manual: true },
+      { key: 'suggestedEntity', label: '연결후보', type: 'text', manual: true },
+      { key: 'classificationConfidence', label: '분류신뢰도', type: 'select', options: ['high', 'medium', 'low'], manual: true },
+      { key: 'classificationReason', label: '분류근거', type: 'text', manual: true },
       { key: 'matchedEntity', label: '연결 대상', type: 'text', manual: true },
       { key: 'matchedKey', label: '연결 키', type: 'text', manual: true },
       { key: 'uploadedBy', label: '올린이', type: 'text' },
       { key: 'uploadedAt', label: '올린시각', type: 'text' },
+      { key: 'originalMime', label: '파일형식', type: 'text' },
+      { key: 'originalSize', label: '파일크기', type: 'number' },
+      { key: 'originalHash', label: '원본해시', type: 'text' },
+      { key: 'fingerprintAlgorithm', label: '해시방식', type: 'text' },
+      { key: 'duplicateOf', label: '중복원본', type: 'text' },
+      { key: 'duplicateDetectedAt', label: '중복확인시각', type: 'text' },
+      { key: 'analyzedAt', label: '분석시각', type: 'text' },
+      { key: 'parsedRowCount', label: '인식행', type: 'number' },
+      { key: 'rejectedRowCount', label: '확인필요행', type: 'number' },
+      { key: 'analysisWarnings', label: '분석경고', type: 'text' },
     ],
   },
 };

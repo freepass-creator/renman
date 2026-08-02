@@ -1,4 +1,4 @@
-// 계정과목 SSOT — 자금일보의 모든 입출금이 여기로 분류된다(렌터카 표준 세트).
+// 계정과목 SSOT — 자금관리 원장의 거래를 자금일보에서 확정할 때 쓰는 렌터카 표준 세트.
 // 저장은 라벨 문자열(category 필드)로 — 기존 자유입력 데이터와 호환. kind는 라벨로 역참조.
 export type LedgerKind = '수입' | '지출' | '이체';
 export type LedgerSubject = { code: string; label: string; kind: LedgerKind; note?: string };

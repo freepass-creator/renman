@@ -85,7 +85,7 @@ export default function SamplePage() {
   const unpaidFiltered = useMemo(() => {
     const qq = recvQ.trim().toLowerCase();
     return unpaid.filter(({ r, st }) => {
-      if (recvLens === '경고+' && st.stage === '정상') return false;
+      if (recvLens === '경고+' && st.stage === '회수대기') return false;
       if (recvLens === '90일+' && r.overdueDays < 90) return false;
       if (!qq) return true;
       const hay = `${r.plate} ${r.customer} ${r.phone} ${r.company}`.toLowerCase();
@@ -95,7 +95,7 @@ export default function SamplePage() {
 
   const unpaidTotal = unpaid.reduce((s, x) => s + x.r.net, 0);
   const unpaid90 = unpaid.filter((x) => x.r.overdueDays >= 90).length;
-  const unpaidWarn = unpaid.filter((x) => x.st.stage !== '정상').length;
+  const unpaidWarn = unpaid.filter((x) => x.st.stage !== '회수대기').length;
 
   const heldCnt = rows.length;
   const idleCnt = rows.filter((r) => r.util === '휴차').length;

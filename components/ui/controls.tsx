@@ -117,10 +117,11 @@ export function PillTabs<T extends string>({ tabs, value, onChange, size = 'md' 
  *   ⚠ 이걸 페이지에서 손롤하지 말 것 — 화면마다 다른 토글이 생기는 게 원래 금지된 것이고,
  *     원자 하나를 공유하는 건 그 금지의 취지에 맞다.
  */
-export function IconSeg<T extends string>({ value, onChange, options, size = 'md' }: {
+export function IconSeg<T extends string>({ value, onChange, options, size = 'md', showLabels = false }: {
   value: T; onChange: (k: T) => void;
   options: { key: T; label: string; icon: React.ReactNode }[];
   size?: CtrlSize;
+  showLabels?: boolean;
 }) {
   const mobile = useIsMobile();
   const h = ctrlH(mobile, size);
@@ -131,12 +132,13 @@ export function IconSeg<T extends string>({ value, onChange, options, size = 'md
         return (
           <button key={o.key} type="button" onClick={() => onChange(o.key)} title={o.label} aria-label={o.label} aria-pressed={on}
             style={{
-              height: h, width: h, display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+              height: h, width: showLabels ? 'auto' : h, minWidth: h, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: showLabels ? 6 : 0,
               cursor: 'pointer', border: 'none', borderLeft: i ? `1px solid ${C.line}` : 'none',
-              background: on ? C.brand : C.taupeBg, color: on ? C.inverse : C.mute, padding: 0,
+              background: on ? C.brand : C.taupeBg, color: on ? C.inverse : C.mute, padding: showLabels ? '0 12px' : 0,
               WebkitTapHighlightColor: 'transparent',
             }}>
             {o.icon}
+            {showLabels ? <span style={{ fontSize: mobile ? 13 : 12, fontWeight: 700, whiteSpace: 'nowrap' }}>{o.label}</span> : null}
           </button>
         );
       })}
@@ -309,7 +311,8 @@ export function PeriodBar({ latest, initial = '월간', onRange, size = 'md' }: 
   const [period, setPeriod] = React.useState<Period>(initial);
   const [ref, setRef] = React.useState<string | null>(null);
   const [custom, setCustom] = React.useState<{ from: string; to: string } | null>(null);
-  const refDate = ref ?? latest ?? today;
+  const latestNotFuture = latest && latest <= today ? latest : today;
+  const refDate = ref ?? latestNotFuture;
   const range = custom ?? periodRange(refDate, period);
   const isAll = !custom && period === '전체';
   const canNav = !custom && period !== '전체';
@@ -318,7 +321,7 @@ export function PeriodBar({ latest, initial = '월간', onRange, size = 'md' }: 
   const nh = ctrlH(mobile, size);
   const nav: React.CSSProperties = { height: nh, width: nh, boxSizing: 'border-box', border: `1px solid ${C.line}`, borderRadius: R, background: C.card, cursor: 'pointer', color: C.mute, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 };
   return (
-    <div style={{ display: 'inline-flex', alignItems: 'center', gap: mobile ? SPACE_M : 8, flexWrap: 'wrap' }}>
+    <div className="period-bar" style={{ display: 'inline-flex', alignItems: 'center', gap: mobile ? SPACE_M : 8, flexWrap: 'wrap' }}>
       <Select size={size} value={custom ? '직접' : period}
         onChange={(e) => { const v = e.target.value; if (v === '직접') setCustom({ from: range.from || refDate, to: range.to || refDate }); else { setCustom(null); setPeriod(v as Period); setRef(null); } }}>
         {PERIODS.map((p) => <option key={p} value={p}>{p}</option>)}

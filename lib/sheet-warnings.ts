@@ -60,7 +60,7 @@ export function rowWarnings(ctx: RowWarnCtx): SheetWarning[] {
   // 3) 미수 회수단계 — overdueDays 있으면 단계 경고. 경고=med, 시동제어·내용증명·채권화=high.
   if (ctx.overdueDays > 0) {
     const cs = collectionStage(ctx.overdueDays);
-    if (cs.stage !== '정상') out.push({ code: 'collection', label: `미수·${cs.stage}`, sev: cs.stage === '경고' ? 'med' : 'high' });
+    if (cs.stage !== '회수대기') out.push({ code: 'collection', label: `미수·${cs.stage}`, sev: cs.stage === '경고' ? 'med' : 'high' });
   }
 
   // 4) 계약 기반(운행 계약 있을 때만) — 반납지남·대여료0·면허·연령.

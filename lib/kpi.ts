@@ -9,6 +9,7 @@ export interface KPI {
   companyId: string;
   totalVehicles: number; running: number; idle: number; util: number;
   totalUnpaid: number; unpaidCount: number;
+  misuActiveCount: number; misuReturnedCount: number;
   misuActive: number; misuReturned: number;
   aging: [number, number, number, number]; // 0-30 / 31-60 / 61-90 / 90+ (운행중 미수)
   loanRemaining: number; assetValue: number;
@@ -19,7 +20,9 @@ export interface KPI {
 export function computeKPI(contracts: EntityRecord[], vehicles: EntityRecord[], today: string, companyId = ''): KPI {
   const views = contracts.map((c) => computeContractView(c, today));
   const fleet = linkFleet(vehicles, contracts, today, views);
-  const held = fleet.vehicles.filter((n) => n.ownership !== '처분완료');
+  // 대시보드는 운영 현황이다. 구매·등록예정을 가동률 분모에 넣지 않고
+  // /status의 `보유` 기준과 같은 ownership === '보유중'을 쓴다.
+  const held = fleet.vehicles.filter((n) => n.ownership === '보유중');
   const running = held.filter((n) => n.utilization === '운행');
   const idle = held.filter((n) => n.utilization === '휴차');
   const util = held.length ? Math.round((running.length / held.length) * 100) : 0;
@@ -38,7 +41,9 @@ export function computeKPI(contracts: EntityRecord[], vehicles: EntityRecord[], 
   const expiring30 = active.filter((v) => v.dday != null && v.dday >= 0 && v.dday <= 30).length;
   return {
     companyId, totalVehicles: held.length, running: running.length, idle: idle.length, util,
-    totalUnpaid: recv.total, unpaidCount: recv.unpaidCount, misuActive: recv.misuActive, misuReturned: recv.misuReturned, aging,
+    totalUnpaid: recv.total, unpaidCount: recv.unpaidCount,
+    misuActiveCount: recv.misuActiveCount, misuReturnedCount: recv.misuReturnedCount,
+    misuActive: recv.misuActive, misuReturned: recv.misuReturned, aging,
     loanRemaining, assetValue, monthlyBilled,
     activeContracts: active.length, expiring30,
     debtRatio: assetValue > 0 ? Math.round((loanRemaining / assetValue) * 100) : 0,

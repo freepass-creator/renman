@@ -101,7 +101,18 @@ export function Metric({ label, value, hint, tone, onClick }: { label: React.Rea
   const color = tone === 'danger' ? C.danger : tone === 'ok' ? C.ok : tone === 'warn' ? C.warn : C.ink;
   const { h, on } = useHover();
   return (
-    <div onClick={onClick} {...on} style={{
+    <div
+      onClick={onClick}
+      role={onClick ? 'button' : undefined}
+      tabIndex={onClick ? 0 : undefined}
+      onKeyDown={onClick ? (event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          onClick();
+        }
+      } : undefined}
+      {...on}
+      style={{
       ...cardStyle(h, !!onClick),
       padding: mobile ? '10px 12px' : '9px 13px',
       flex: mobile ? undefined : '0 0 auto',
@@ -191,13 +202,14 @@ export function IconCount({
   );
 }
 const ATOM_CAP = 3; // 2행 원자 표시 상한 — 넘으면 ＋n(우선순위 상위만 생존, 픽셀측정 대신 count-cap)
-export function ObjCard({ badge, badgeTone = 'gray', co, rail = 'none', plate, name, carType, title, sub, right, fields, onClick, style }: {
+export type ObjCardProps = {
   badge?: React.ReactNode; badgeTone?: BadgeTone; co?: string; rail?: RailTone;
   plate?: string; name?: React.ReactNode; carType?: React.ReactNode; title?: React.ReactNode;
   sub?: React.ReactNode; right?: React.ReactNode; fields?: [React.ReactNode, React.ReactNode][]; onClick?: () => void;
   /** 선택 하이라이트 등 — 상태 틴트 금지(배지만). */
   style?: React.CSSProperties;
-}) {
+};
+export function ObjCard({ badge, badgeTone = 'gray', co, rail = 'none', plate, name, carType, title, sub, right, fields, onClick, style }: ObjCardProps) {
   const mobile = useIsMobile();
   const { h, on } = useHover();
   const grouped = React.useContext(CardGroupContext);   // 그룹 박스 안 → 개별 테두리·그림자 제거
@@ -216,7 +228,18 @@ export function ObjCard({ badge, badgeTone = 'gray', co, rail = 'none', plate, n
   // rail danger 틴트는 잔여(모바일). 상태 신호의 SSOT는 Badge.
   const tintBg = style?.background ?? (rail === 'danger' ? 'var(--danger-tint)' : undefined);
   return (
-    <div onClick={onClick} {...on} style={{
+    <div
+      onClick={onClick}
+      role={onClick ? 'button' : undefined}
+      tabIndex={onClick ? 0 : undefined}
+      onKeyDown={onClick ? (event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          onClick();
+        }
+      } : undefined}
+      {...on}
+      style={{
       ...(grouped
         ? { background: h && !!onClick ? C.hover : (tintBg ?? 'transparent'), cursor: onClick ? 'pointer' : 'default', transition: 'background .12s ease' }
         : {

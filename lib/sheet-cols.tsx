@@ -15,6 +15,7 @@ import { AlertTriangle } from 'lucide-react';
 import { buildDetailSections, buildSheetViews, type DetailSectionDef, type SheetViewKeys } from './ledger-ext';
 import { paymentTimingOf } from './schema/contract';
 import { LEDGER_EMPTY } from './ledger-empty';
+import { LEDGER_LABEL } from './ledger-labels';
 
 const toneBadge = (t: FleetRow['tone']): 'green' | 'amber' | 'red' | 'gray' =>
   t === 'ok' ? 'green' : t === 'warn' ? 'amber' : t === 'danger' ? 'red' : 'gray';
@@ -89,9 +90,24 @@ const FL = {
   insEnd: { key: 'insEnd', label: '보험만기', priority: 3 as const, render: (r) => ddayCell(r.insEnd), text: (r) => r.insEnd },
   insPrem: { key: 'insPrem', label: '보험료', align: 'r', render: (r) => money0(r.insPremium), text: (r) => r.insPremium },
   net: {
-    key: 'net', label: '미수', align: 'r', priority: 1 as const,
+    key: 'net', label: '미수합계', align: 'r', priority: 1 as const,
     render: (r) => r.net > 0 ? <span style={{ color: C.danger, fontWeight: 700 }}>{money0(r.net)}</span> : LEDGER_EMPTY.dash,
     text: (r) => r.net,
+  },
+  maintainedNet: {
+    key: 'maintainedNet', label: '계약유지 미수', align: 'r', priority: 1 as const,
+    render: (r) => r.maintainedNet > 0 ? <span style={{ color: C.danger, fontWeight: 700 }}>{money0(r.maintainedNet)}</span> : LEDGER_EMPTY.dash,
+    text: (r) => r.maintainedNet,
+  },
+  endedNet: {
+    key: 'endedNet', label: '계약종료 미수', align: 'r', priority: 1 as const,
+    render: (r) => r.endedNet > 0 ? <span style={{ color: C.danger, fontWeight: 700 }}>{money0(r.endedNet)}</span> : LEDGER_EMPTY.dash,
+    text: (r) => r.endedNet,
+  },
+  contractState: {
+    key: 'contractState', label: '계약상태', align: 'c', priority: 2 as const,
+    render: (r) => <Badge tone={r.contractState === '계약유지' ? 'green' : r.contractState === '계약예정' ? 'amber' : 'gray'}>{r.contractState}</Badge>,
+    text: (r) => r.contractState,
   },
   od: {
     key: 'od', label: '미수기간', align: 'r',
@@ -153,7 +169,7 @@ const FL = {
   // 비고 — 자유 메모(차량 note/memo). 없으면 —.
   note: { key: 'note', label: '비고', render: (r) => r.note || LEDGER_EMPTY.dash, text: (r) => r.note },
   rentalType: {
-    key: 'rentalType', label: '대여형태', align: 'c',
+    key: 'rentalType', label: LEDGER_LABEL.rentalType, align: 'c',
     render: (r) => r.rentalType || LEDGER_EMPTY.dash,
     text: (r) => r.rentalType,
   },
@@ -171,15 +187,15 @@ const FL = {
 
 /** 기본 = 자산기본(차번·법인·상태·차명·연식) + 계약조건 + 수납/리스크. 한 셀 한 값 · 자리 고정.
  *  정렬 배정 — 가운데(짧은값·날짜·배지)=CENTER · 금액은 FL align'r' 유지. */
-const CENTER_ALIGN = new Set(['company', 'status', 'year', 'term', 'start', 'end', 'dday', 'od', 'stage', 'warn', 'own', 'util', 'phone', 'gps', 'acqDate', 'loanMon', 'loanStart', 'insurer', 'insEnd', 'loanCo', 'inspect', 'paymentDay', 'paymentTiming', 'round', 'rentalType']);
+const CENTER_ALIGN = new Set(['company', 'status', 'contractState', 'year', 'term', 'start', 'end', 'dday', 'od', 'stage', 'warn', 'own', 'util', 'phone', 'gps', 'acqDate', 'loanMon', 'loanStart', 'insurer', 'insEnd', 'loanCo', 'inspect', 'paymentDay', 'paymentTiming', 'round', 'rentalType']);
 const alignCols = (cols: SheetCol<FleetRow>[]): SheetCol<FleetRow>[] =>
   cols.map((c) => (CENTER_ALIGN.has(c.key) ? { ...c, align: 'c' as const } : c));
 
 /** 운영 열 카탈로그 — 새 항목은 FL에 정의 후 SHEET_KEYS에 key만. */
 const FLEET_COL_CATALOG: SheetCol<FleetRow>[] = alignCols([
-  FL.company, FL.plate, FL.status, FL.maker, FL.sub, FL.year,
+  FL.company, FL.plate, FL.status, FL.contractState, FL.maker, FL.sub, FL.year,
   FL.cust, FL.phone, FL.rentalType, FL.term, FL.start, FL.end, FL.dep, FL.rent, FL.paymentDay, FL.paymentTiming, FL.round, FL.dday,
-  FL.net, FL.od, FL.stage, FL.warn, FL.note,
+  FL.maintainedNet, FL.endedNet, FL.net, FL.od, FL.stage, FL.warn, FL.note,
   FL.car, FL.loc, FL.own, FL.util, FL.mileage, FL.contractNo,
   FL.vin, FL.acqDate, FL.acqPrice, FL.gps,
   FL.loanCo, FL.loanAmt, FL.loanRate, FL.loanMon, FL.loanStart,
@@ -190,14 +206,15 @@ const FLEET_COL_CATALOG: SheetCol<FleetRow>[] = alignCols([
 export const FLEET_SHEET_KEYS: SheetViewKeys = {
   // 회사·차번·차명·소유(분류)·상태·사용처·연락처·현위치·대여료·보증금·결제일·회차/기간·미수·만기·검사·보험·주행·경고
   basic: [
-    'company', 'plate', 'car', 'own', 'status', 'cust', 'loc', 'phone',
-    'rent', 'dep', 'paymentDay', 'round', 'net', 'end', 'inspect', 'insEnd', 'mileage', 'warn',
+    'company', 'plate', 'car', 'own', 'status', 'contractState', 'cust', 'loc', 'phone',
+    'rent', 'dep', 'paymentDay', 'round', 'maintainedNet', 'endedNet', 'end', 'inspect', 'insEnd', 'mileage', 'warn',
   ],
   all: [
-    'company', 'plate', 'cust', 'status', 'maker', 'sub', 'year',
-    'phone', 'rentalType', 'term', 'start', 'end', 'dep', 'rent', 'paymentDay', 'paymentTiming', 'round', 'dday',
-    'net', 'od', 'stage', 'warn', 'note',
-    'car', 'loc', 'own', 'util', 'mileage', 'contractNo',
+    'company', 'plate', 'car', 'own', 'status', 'contractState',
+    'cust', 'loc', 'phone', 'maker', 'sub', 'year',
+    'rentalType', 'term', 'start', 'end', 'dep', 'rent', 'paymentDay', 'paymentTiming', 'round', 'dday',
+    'maintainedNet', 'endedNet', 'net', 'od', 'stage', 'warn', 'note',
+    'util', 'mileage', 'contractNo',
     'vin', 'acqDate', 'acqPrice', 'gps',
     'loanCo', 'loanAmt', 'loanRate', 'loanMon', 'loanStart',
     'insurer', 'insEnd', 'insPrem', 'inspect',
@@ -216,11 +233,11 @@ export const FLEET_DETAIL_DEFS: DetailSectionDef[] = [
   },
   {
     title: '계약',
-    keys: ['cust', 'phone', 'rentalType', 'term', 'start', 'end', 'dep', 'rent', 'paymentDay', 'paymentTiming', 'round', 'dday'],
+    keys: ['contractState', 'cust', 'phone', 'rentalType', 'term', 'start', 'end', 'dep', 'rent', 'paymentDay', 'paymentTiming', 'round', 'dday'],
   },
   {
     title: '수납·리스크',
-    keys: ['net', 'od', 'stage', 'warn', 'note'],
+    keys: ['maintainedNet', 'endedNet', 'net', 'od', 'stage', 'warn', 'note'],
   },
   {
     title: '자산·취득',

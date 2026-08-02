@@ -2,6 +2,7 @@
 import { useRef, useState } from 'react';
 import { UploadCloud, CheckCircle2 } from 'lucide-react';
 import { C } from '@/components/ui';
+import { useIsMobile } from '@/lib/use-mobile';
 
 /**
  * 파일 드롭존 SSOT — 앱의 모든 파일 선택은 이걸 쓴다(손롤 `<input type="file">` 금지).
@@ -21,6 +22,7 @@ export default function FileDrop({ onFile, onFiles, multiple, accept, file, hint
   note?: string;
   style?: React.CSSProperties;
 }) {
+  const mobile = useIsMobile();
   const ref = useRef<HTMLInputElement>(null);
   const [over, setOver] = useState(false);
   const take = (fs: FileList | null) => {
@@ -49,6 +51,12 @@ export default function FileDrop({ onFile, onFiles, multiple, accept, file, hint
       role="button"
       aria-label="파일 선택"
       onClick={() => ref.current?.click()}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          ref.current?.click();
+        }
+      }}
       onDragOver={(e) => { e.preventDefault(); setOver(true); }}
       onDragLeave={() => setOver(false)}
       onDrop={(e) => { e.preventDefault(); setOver(false); take(e.dataTransfer.files); }}
@@ -70,7 +78,9 @@ export default function FileDrop({ onFile, onFiles, multiple, accept, file, hint
       {file
         ? <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--green-text)', wordBreak: 'break-all' }}>{file.name}</div>
         : <>
-            <div style={{ fontSize: 13, fontWeight: 600, color: C.mute }}>드래그 · <span style={{ color: C.accent }}>선택</span> · 붙여넣기</div>
+            <div style={{ fontSize: 13, fontWeight: 600, color: C.mute }}>
+              {mobile ? <span style={{ color: C.accent }}>사진 또는 파일 선택</span> : <>드래그 · <span style={{ color: C.accent }}>선택</span> · 붙여넣기</>}
+            </div>
             {hint && <div style={{ fontSize: 11, color: C.faint }}>{hint}</div>}
           </>}
       {note && <div style={{ fontSize: 11, color: C.accent, fontWeight: 700 }}>{note}</div>}

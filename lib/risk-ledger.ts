@@ -10,6 +10,7 @@ import { linkFleet } from '@/lib/domain/model';
 import { buildFleetRows, type FleetRow } from '@/lib/sheet-rows';
 import { buildAgenda, type AgendaItem } from '@/lib/agenda';
 import { computeContractView } from '@/lib/contract-ops';
+import { collectionStage } from '@/lib/collection';
 import { selectReceivables } from '@/lib/snapshot/selectors';
 import { computeDashboard } from '@/lib/operating-snapshot';
 import { buildHomePendingRows } from '@/lib/home-rows';
@@ -204,26 +205,28 @@ export function buildRiskSheetRows(
     }));
   }
 
-  // ── 미납: selectReceivables와 동일 net>0 (진행·반환 포함) — views 1패스 ──
+  // ── 미납: selectReceivables와 동일 net>0 (계약유지·계약종료 포함) — views 1패스 ──
   const views = contracts.map((c) => computeContractView(c, today));
   for (const v of views.filter((x) => x.net > 0).sort((a, b) => b.net - a.net)) {
     const plate = String(v.rec.plate || '');
     const fr = plate ? byPlate.get(plate) : undefined;
+    const collection = collectionStage(v.overdueDays);
     push(rowOf('미납', {
       id: riskUnpaidOpenId(v.rec),
-      kind: v.ended ? '반환미수' : '미납',
+      kind: v.ended ? '계약종료 미수' : '계약유지 미수',
       ...companyOf(fr, v.rec),
       plate,
       customer: String(v.rec.contractorName || LEDGER_EMPTY.none),
       subject: v.ended
-        ? `반납 후 미수 ${v.count}건`
+        ? `계약종료 후 미수 ${v.count}건`
         : (v.overdueDays ? `대여료 ${v.count}회 미납 · ${v.overdueDays}일 연체` : `대여료 ${v.count}회 미납`),
       phone: phoneOf(fr, String(v.rec.contractorPhone || '')),
       carName: fr ? carNameOf(fr) : String(v.rec.carName || LEDGER_EMPTY.dash),
       due: v.overdueDays ? `${v.overdueDays}일 연체` : ddayLabel(v.dday),
       dueDate: String(v.rec.endDate || '').slice(0, 10),
       amount: v.net,
-      status: v.ended ? '반환미수' : '미납',
+      // 상태는 계약 종료 여부를 반복하지 않고 실제 회수 단계를 보여준다.
+      status: collection.stage,
       contractKey: String(v.rec._key || ''),
     }));
   }

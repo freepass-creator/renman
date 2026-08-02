@@ -99,6 +99,7 @@ export function LedgerCreatePanel({
   fileIngest,
   initial,
   quick,
+  continuable,
   prefix,
   onClose,
   onSaved,
@@ -121,6 +122,8 @@ export function LedgerCreatePanel({
   initial?: EntityRecord;
   /** 회사만으로도 저장하되 아래 상세 입력은 선택적으로 유지한다. */
   quick?: boolean;
+  /** 내용부터 먼저 저장하고 분류·대상·담당·기한은 같은 건에서 이어서 보완한다. */
+  continuable?: boolean;
   prefix?: React.ReactNode;
   onClose: () => void;
   onSaved?: (record: EntityRecord) => void;
@@ -175,8 +178,11 @@ export function LedgerCreatePanel({
   const kindValue = String(form[kindField] || '');
   const gateway = kindGateways?.[kindValue];
   const companyReady = !scopeAll || !!String(form.companyId || '').trim();
+  const hasContinuableInput = ['title', 'description', 'note'].some((key) => String(form[key] || '').trim());
   const fieldsReady = gateway
     ? false
+    : continuable
+      ? hasContinuableInput
     : quick
       ? !!String(form.title || '').trim()
       : selectedFields.every((field) => !field.required || !!String(form[field.key] ?? '').trim());
@@ -204,11 +210,15 @@ export function LedgerCreatePanel({
       toast(NEED_COMPANY, 'error');
       return;
     }
-    if (quick && !String(form.title || '').trim()) {
+    if (continuable && !hasContinuableInput) {
+      toast('내용을 한 줄 이상 입력하세요. 분류·대상·담당자는 나중에 보완할 수 있습니다.', 'error');
+      return;
+    }
+    if (quick && !continuable && !String(form.title || '').trim()) {
       toast('업무 내용을 입력하세요.', 'error');
       return;
     }
-    const missing = quick
+    const missing = quick || continuable
       ? []
       : selectedFields.filter((field) => field.required && !String(form[field.key] ?? '').trim());
     if (missing.length) {
@@ -218,10 +228,21 @@ export function LedgerCreatePanel({
 
     setBusy(true);
     try {
+      const continuableWork = continuable && entityKey === 'work_item';
       const record = normalizedForm(selectedFields, {
         ...form,
+        ...(continuableWork ? {
+          category: String(form.category || '').trim() || '미분류',
+          status: String(form.status || '').trim() || '대기',
+          title: String(form.title || form.description || form.note || '').trim().slice(0, 80) || '내용 확인 필요',
+          intakeState: '미처리',
+          classificationState: String(form.category || '').trim() ? '분류됨' : '미분류',
+          assignmentState: String(form.assigneeName || '').trim() ? '배정됨' : '미배정',
+        } : {}),
         companyId: targetCompany,
-        workType: form.workType || form.category,
+        workType: continuableWork
+          ? String(form.workType || form.category || '').trim() || '미분류'
+          : form.workType || form.category,
         createdBy: user.email || user.name,
         createdAt: new Date().toISOString(),
         inputSource: '원장 직접입력',
@@ -319,6 +340,11 @@ export function LedgerCreatePanel({
                 }}
               />
             </label>
+            {continuable ? (
+              <div style={{ marginTop: 6, fontSize: 11.5, color: C.mute }}>
+                내용만 입력해도 미분류·미배정 업무로 먼저 저장됩니다. 분류·대상·담당자는 같은 업무에서 이어서 보완할 수 있습니다.
+              </div>
+            ) : null}
           </div>
         )}
 

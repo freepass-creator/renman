@@ -19,6 +19,7 @@ import { FUEL_LEVELS } from '@/lib/domain/fuel';
 import { Stepper, Btn, Message, won, C, toggleStyle, WizPanel, WizCard, WizField, WizPhotos, wizInput, type Step } from '@/components/ui';
 import { type EntityRecord } from '@/lib/intake/entities';
 import { todayKST as TODAY } from '@/lib/contracts/dates'; // KST 기준 오늘(반납일 기록)
+import { companyLabel } from '@/lib/companies';
 const STEP_LABELS = ['확인', '주행·연료', '정산', '사진·서명', '확정'];
 
 export function ReturnWizard({ contract, vehicle, onClose, onDone }: {
@@ -39,6 +40,7 @@ export function ReturnWizard({ contract, vehicle, onClose, onDone }: {
   const who = String(contract.contractorName || '—');
   const contractNo = String(contract._key || contract.contractNo || '');
   const carName = String(vehicle?.carName || vehicle?.model || contract.carName || '');
+  const company = companyLabel(String(target || contract.companyId || ''));
   const baseMileage = Number(contract.mileageOut) || 0;
   const baseFuel = String(contract.fuelOut || '');
   const eff = effectiveEndDate(contract);
@@ -121,7 +123,7 @@ export function ReturnWizard({ contract, vehicle, onClose, onDone }: {
   const last = step === STEP_LABELS.length - 1;
 
   return (
-    <WizPanel title={`반납 처리 · ${plate}`} meta={`${who}${carName ? ` · ${carName}` : ''}`} onClose={onClose}
+    <WizPanel title={`반납 처리 · ${plate}`} meta={`${company} · ${who}${carName ? ` · ${carName}` : ''}`} onClose={onClose}
       footer={<>
         <Btn variant="ghost" size="lg" onClick={() => (step === 0 ? onClose() : setStep((s) => s - 1))} disabled={saving}>{step === 0 ? '취소' : '이전'}</Btn>
         <span style={{ flex: 1 }} />
@@ -137,6 +139,7 @@ export function ReturnWizard({ contract, vehicle, onClose, onDone }: {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             <Message variant="info">이 계약을 <b>반납(입고)</b> 처리합니다. 반납 계기판·연료를 기록하고 정산을 확인한 뒤 사진·서명을 남깁니다.</Message>
             <WizCard>
+              <Row k="회사" v={company} />
               <Row k="차량" v={`${plate}${carName ? ` · ${carName}` : ''}`} />
               <Row k="계약자" v={who} />
               {contractNo && <Row k="계약번호" v={contractNo} mono />}
@@ -228,6 +231,7 @@ export function ReturnWizard({ contract, vehicle, onClose, onDone }: {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             <Message variant="info">아래 내용으로 반납을 확정하면 계약이 <b>반납</b> 상태로 전환되고 정산이 확정됩니다.</Message>
             <WizCard>
+              <Row k="회사" v={company} />
               <Row k="차량" v={`${plate}${carName ? ` · ${carName}` : ''}`} />
               <Row k="계약자" v={who} />
               <Row k="반납일" v={date} />

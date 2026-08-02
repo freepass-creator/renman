@@ -14,20 +14,8 @@ import { Modal, Btn, C, toggleStyle } from '@/components/ui';
 import { todayKST } from '@/lib/contracts/dates'; // KST 기준 오늘
 import { useIsMobile } from '@/lib/use-mobile';
 
-export type NotifyRecipient = {
-  contractKey: string; companyId: string;
-  name: string; plate: string; phone: string; contractNo?: string;
-  unpaidAmount: number; unpaidSeqCount: number; currentSeq: number; monthlyRent: number;
-  depositDue: number;
-  /** 보증금 «환불 예정액» — 받은 보증금 기준. 실수령을 모르면 이것도 모름(null). */
-  depositRefund: number | null;
-  /**
-   * 보증금 «실수령액». null = 기록이 없어 모른다는 뜻 — 0원으로 위장해서는 안 된다.
-   * 0으로 채우면 '미수령 0원'·'0원 입금 확인' 같은 사실과 다른 문자가 고객에게 발송된다.
-   */
-  depositReceived: number | null;
-  depositUnreceived: number | null;
-};
+import type { NotifyRecipient } from '@/lib/notify/types';
+export type { NotifyRecipient };
 
 /** needsDeposit=true 인 템플릿은 «보증금 실수령액»이 기록된 계약에만 쓸 수 있다. */
 /** needsDeposit = 실수령 기록 필요 · needsReceived = 실제로 받은 금액(>0)이 있어야 함. */
@@ -63,15 +51,22 @@ function fill(body: string, r: NotifyRecipient): string {
 }
 const today = todayKST;
 
-export function NotifyDialog({ recipients, onClose, onSent }: {
+export function NotifyDialog({ recipients, onClose, onSent, initialLabel }: {
   recipients: NotifyRecipient[];
   onClose: () => void;
   onSent?: () => void;
+  /** 열릴 때 고를 템플릿 라벨(TEMPLATES.label). 없으면 첫 항목. */
+  initialLabel?: string;
 }) {
   const { user } = useSession();
   const mobile = useIsMobile();
-  const [idx, setIdx] = useState(0);
-  const [body, setBody] = useState(TEMPLATES[0].body);
+  const startIdx = (() => {
+    if (!initialLabel) return 0;
+    const i = TEMPLATES.findIndex((t) => t.label === initialLabel);
+    return i >= 0 ? i : 0;
+  })();
+  const [idx, setIdx] = useState(startIdx);
+  const [body, setBody] = useState(TEMPLATES[startIdx].body);
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<string>('');
 

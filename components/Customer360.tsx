@@ -85,7 +85,7 @@ export function Customer360({ ckey, onTitle }: { ckey: string; onTitle?: (name: 
                 right={h.nextDate ? <span style={{ color: C.warn, fontSize: 11.5 }}>후속 {String(h.nextDate)}</span> : undefined}
                 fields={[['일자', String(h.date || '—')], ['작성', String(h.author || '—')]]} />
             ))}</Cards>
-          : <div style={{ fontSize: 12.5, color: C.faint }}>기록 없음 · 오른쪽 “+ 기록”으로 남기세요</div>}
+          : <div style={{ fontSize: 12.5, color: C.faint }}>기록 없음 · “+ 기록” 버튼으로 남기세요</div>}
       </Sec>
     </div>
   );

@@ -6,15 +6,18 @@ import { assetLifecycle, type AssetLifecycle } from './domain/asset-lifecycle';
 import { computeOverMileage } from './domain/over-mileage';
 import { contractRisks } from './risk-ops';
 import { rentalTypeOf, paymentTimingOf } from './schema/contract';
+import { TODAY } from './dashboard-consts';
+import { computeAssetLedgerEntry, vehicleRecordToAsset } from './payments/asset-ledger';
 
-const str = (v: unknown) => String(v ?? '').trim();
-const num = (v: unknown) => Number(v) || 0;
-/** 결측을 0으로 만들지 않음(주행거리·매물가 등). */
-const numOrNull = (v: unknown): number | null => {
+/** 결측을 0으로 만들지 않음(주행거리·매물가·보증금실수령 등). */
+export const numOrNull = (v: unknown): number | null => {
   if (v === '' || v == null) return null;
   const n = Number(v);
   return Number.isFinite(n) ? n : null;
 };
+
+const str = (v: unknown) => String(v ?? '').trim();
+const num = (v: unknown) => Number(v) || 0;
 
 export type AssetMasterRow = {
   raw: EntityRecord;
@@ -37,6 +40,7 @@ export type AssetMasterRow = {
   loanRemainingPrincipal: number; loanRate: number; loanStartDate: string;
   insuranceCompany: string; insurancePolicyNo: string; insuranceExpiryDate: string;
   gpsProvider: string; gpsDeviceId: string; gpsInstalledDate: string; gpsControl: string;
+  vehicleTaxDueDate: string; vehicleTaxPaidDate: string; vehicleTaxAmount: number;
   saleDate: string; salePrice: number; optionList: string;
   dealerAgency: string; dealerContact: string; dealerPhone: string;
   /** 금융구분 원값(예/아니오) — loanKind 파생의 소스. */
@@ -44,11 +48,14 @@ export type AssetMasterRow = {
   listRent: number; listDeposit: number; listTerm: number; insuranceIncluded: string;
   /** 정비비 함대 랭킹 — page가 fleetMaintRanking으로 채움(원장은 0). */
   maintCost: number; maintCount: number; maintLastDate: string; maintVsAvg: number;
+  /** 감가 장부가·처분손익 — computeAssetLedgerEntry 파생. incomplete면 null. */
+  bookValue: number | null; disposalGainLoss: number | null;
 };
 
 export function assetMasterRow(raw: EntityRecord): AssetMasterRow {
   const companyId = str(raw.companyId);
   const status = str(raw.status) || '미지정';
+  const ledger = computeAssetLedgerEntry(vehicleRecordToAsset(raw), TODAY);
   return {
     raw, companyId, company: companyShort(companyId),
     assetCode: str(raw.assetCode), plate: str(raw.plate), status, disposed: OUT.has(status),
@@ -78,11 +85,15 @@ export function assetMasterRow(raw: EntityRecord): AssetMasterRow {
     insurancePolicyNo: str(raw.insurancePolicyNo), insuranceExpiryDate: str(raw.insuranceExpiryDate),
     gpsProvider: str(raw.gpsProvider), gpsDeviceId: str(raw.gpsDeviceId),
     gpsInstalledDate: str(raw.gpsInstalledDate), gpsControl: str(raw.gpsControl),
+    vehicleTaxDueDate: str(raw.vehicleTaxDueDate), vehicleTaxPaidDate: str(raw.vehicleTaxPaidDate),
+    vehicleTaxAmount: num(raw.vehicleTaxAmount),
     saleDate: str(raw.saleDate), salePrice: num(raw.salePrice), optionList: str(raw.optionList),
     dealerAgency: str(raw.dealerAgency), dealerContact: str(raw.dealerContact), dealerPhone: str(raw.dealerPhone),
     listRent: num(raw.listRent), listDeposit: num(raw.listDeposit), listTerm: num(raw.listTerm),
     insuranceIncluded: str(raw.insuranceIncluded),
     maintCost: 0, maintCount: 0, maintLastDate: '', maintVsAvg: 0,
+    bookValue: ledger.incomplete ? null : ledger.bookValue,
+    disposalGainLoss: ledger.disposalGainLoss ?? null,
   };
 }
 

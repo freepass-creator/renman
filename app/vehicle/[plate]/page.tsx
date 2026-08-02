@@ -15,7 +15,9 @@ export const dynamic = 'force-dynamic';
 export default function Vehicle360Page() {
   const plate = decodeURIComponent(String(useParams().plate));
   const router = useRouter();
-  const focus = useSearchParams().get('do') || '';
+  const searchParams = useSearchParams();
+  const focus = searchParams.get('do') || '';
+  const targetCompanyId = searchParams.get('company') || '';
   const goBack = () => router.back();
 
   useAppBar({
@@ -27,7 +29,7 @@ export default function Vehicle360Page() {
 
   return (
     <Page frame noCompany>
-      <Vehicle360 plate={plate} focus={focus} />
+      <Vehicle360 plate={plate} focus={focus} companyId={targetCompanyId} />
     </Page>
   );
 }

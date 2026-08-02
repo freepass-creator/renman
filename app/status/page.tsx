@@ -4,6 +4,7 @@
  * 기본 스코프 = isVehicleHeld(실물 보유). 필터줄 = 검색·☰필터·기간.
  */
 import { useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { TODAY } from '@/lib/dashboard-consts';
 import { isVehicleHeld, linkFleet } from '@/lib/domain/model';
 import { buildFleetRows, statusRank, type FleetRow } from '@/lib/sheet-rows';
@@ -12,21 +13,25 @@ import { summarizeFleetStatusStats, latestDateOf } from '@/lib/ledger-stats';
 import { useEntityLists } from '@/lib/use-entity-lists';
 import { textMatch } from '@/lib/search-match';
 import {
-  C, LedgerFilterButton, LedgerFilterFields, LedgerFilterPanel, LedgerFrame, LedgerRecordPanel,
-  PeriodBar, Search, won,
+  Btn, C, ContextMenu, type ContextMenuItem, LedgerFilterButton, LedgerFilterFields, LedgerFilterPanel, LedgerFrame, LedgerRecordPanel,
+  PeriodBar, Search, useSheetExport, won,
   type LedgerColView,
 } from '@/components/ui';
 import { useIsMobile } from '@/lib/use-mobile';
+import { useSession } from '@/lib/session';
 import { LEDGER_EMPTY } from '@/lib/ledger-empty';
 import {
   FLEET_FILTER_DEFS, countActiveFilters, emptyFilterValues, matchLedgerFilters,
 } from '@/lib/ledger-filter-defs';
+import { openCar, openReceivables } from '@/lib/ui-bus';
 
 type ScopeChip = '전체' | '운행' | '정비' | '휴차' | '리스크';
 const SCOPE_OPTS = ['전체', '운행', '정비', '휴차', '리스크'] as const;
 
 export default function StatusPage() {
+  const router = useRouter();
   const mobile = useIsMobile();
+  const { isOperator } = useSession();
   const { data: [vs = [], cs = [], ins = [], hs = []], loading, error: loadError } = useEntityLists(['vehicle', 'contract', 'insurance', 'history']);
   const [q, setQ] = useState('');
   const [scope, setScope] = useState<ScopeChip>('전체');
@@ -35,6 +40,20 @@ export default function StatusPage() {
   const [selected, setSelected] = useState<FleetRow | null>(null);
   const [filterOpen, setFilterOpen] = useState(false);
   const [detailFilters, setDetailFilters] = useState(() => emptyFilterValues(FLEET_FILTER_DEFS));
+  const [ctxMenu, setCtxMenu] = useState<{ open: boolean; x: number; y: number }>({ open: false, x: 0, y: 0 });
+  const xl = useSheetExport<FleetRow>({
+    title: '운영현황',
+    filterSummary: () => {
+      const parts = [scope === '전체' ? '' : scope].filter(Boolean);
+      if (range.from || range.to) parts.push(`${range.from || '…'}~${range.to || '…'}`);
+      if (q.trim()) parts.push('검색');
+      return parts.join(' · ') || '전체';
+    },
+  });
+  const ctxItems: ContextMenuItem[] = [
+    xl.exportItem(),
+    ...(isOperator ? [xl.exportItem({ unmasked: true })] : []),
+  ];
 
   const allRows = useMemo(() => {
     const fleet = linkFleet(vs, cs, TODAY);
@@ -75,7 +94,7 @@ export default function StatusPage() {
     });
   }), [searched, activeScope, range.from, range.to, detailFilters]);
 
-  const { heldN, utilPct, netSum, inspSoon } = useMemo(
+  const { heldN, utilPct, maintainedNetSum, endedNetSum, inspSoon } = useMemo(
     () => summarizeFleetStatusStats(searched, rows),
     [searched, rows],
   );
@@ -86,6 +105,7 @@ export default function StatusPage() {
   );
 
   return (
+    <>
     <LedgerFrame
       title="운영현황"
       meta="차량 1대=1행·자산+계약+미수·조회 전용"
@@ -132,7 +152,8 @@ export default function StatusPage() {
         <span style={{ fontSize: 12.5, color: C.mute, whiteSpace: 'nowrap', display: 'inline-flex', gap: 12 }}>
           <span>보유 <b style={{ color: C.ink }}>{heldN}</b></span>
           <span>가동률 <b style={{ color: utilPct >= 70 ? 'var(--green-text)' : utilPct < 50 ? C.warn : C.ink }}>{utilPct}%</b></span>
-          {netSum > 0 && <span>미수 <b style={{ color: C.danger }}>{won(netSum)}</b></span>}
+          {maintainedNetSum > 0 && <span>보유차량·계약유지 미수 <b style={{ color: C.danger }}>{won(maintainedNetSum)}</b></span>}
+          {endedNetSum > 0 && <span>보유차량·계약종료 미수 <b style={{ color: C.danger }}>{won(endedNetSum)}</b></span>}
           {inspSoon > 0 && <span>검사임박 <b style={{ color: C.warn }}>{inspSoon}</b></span>}
         </span>
       }
@@ -143,8 +164,13 @@ export default function StatusPage() {
       empty="표시할 차량이 없습니다."
       cols={colView === '기본' ? FLEET_BASIC_COLS : FLEET_EXPANDED_COLS}
       rows={rows}
-      rowKey={(r) => r.plate || `${r.companyId}:${r.customer}`}
-      selectedRowKey={selected?.plate ?? null}
+      rowKey={(r) => `${r.companyId}:${r.plate || r.customer}`}
+      selectedRowKey={selected ? `${selected.companyId}:${selected.plate || selected.customer}` : null}
+      onView={xl.onView}
+      onRowContextMenu={(e) => {
+        e.preventDefault();
+        setCtxMenu({ open: true, x: e.clientX, y: e.clientY });
+      }}
       onRowDoubleClick={(row) => setSelected(row)}
       onCloseDetail={() => setSelected(null)}
       sidePanel={selected ? (
@@ -156,8 +182,23 @@ export default function StatusPage() {
           cols={FLEET_EXPANDED_COLS}
           sections={FLEET_DETAIL_SECTIONS}
           onClose={() => setSelected(null)}
+          actions={(
+            <>
+              {selected.plate ? <Btn size="sm" onClick={() => openCar(selected.plate, undefined, selected.companyId)}>차량 360</Btn> : null}
+              {selected.contractNo ? <Btn size="sm" variant="ghost" onClick={() => router.push(`/contract?open=${encodeURIComponent(selected.contractNo)}`)}>계약 열기</Btn> : null}
+              {selected.net > 0 ? <Btn size="sm" variant="ghost" onClick={() => openReceivables()}>미수 회수</Btn> : null}
+            </>
+          )}
         />
       ) : null}
     />
+    <ContextMenu
+      open={ctxMenu.open}
+      x={ctxMenu.x}
+      y={ctxMenu.y}
+      onClose={() => setCtxMenu((m) => ({ ...m, open: false }))}
+      items={ctxItems}
+    />
+    </>
   );
 }

@@ -10,6 +10,7 @@ import React from 'react';
 import { Badge, C, money, type SheetCol } from '@/components/ui';
 import { buildDetailSections, buildSheetViews, type DetailSectionDef, type SheetViewKeys } from '@/lib/ledger-ext';
 import { LEDGER_EMPTY } from '@/lib/ledger-empty';
+import { LEDGER_LABEL } from '@/lib/ledger-labels';
 import {
   WORK_SOURCE_LABEL,
   fmtStamp,
@@ -69,7 +70,7 @@ function detailNum(key: string, label: string, suffix = ''): SheetCol<WorkLedger
 const WORK_COL_CATALOG: SheetCol<WorkLedgerRow>[] = [
   { key: 'company', label: '회사명', pin: true, priority: 2, render: (r) => r.company || LEDGER_EMPTY.dash, text: (r) => r.company },
   {
-    key: 'kind', label: '업무분류', pin: true, priority: 1,
+    key: 'kind', label: LEDGER_LABEL.workCategory, pin: true, priority: 1,
     render: (r) => <KindCell kind={r.kind} />,
     text: (r) => r.kind,
   },
@@ -100,6 +101,7 @@ const WORK_COL_CATALOG: SheetCol<WorkLedgerRow>[] = [
     },
     text: (r) => r.customerName || LEDGER_EMPTY.none,
   },
+  { key: 'rentalType', label: LEDGER_LABEL.rentalType, priority: 2, render: (r) => r.rentalType || LEDGER_EMPTY.dash, text: (r) => r.rentalType || '' },
   { key: 'title', label: '업무내용', priority: 1, render: (r) => r.title || LEDGER_EMPTY.dash, text: (r) => r.title },
   {
     key: 'contractNo', label: '계약번호', priority: 1,
@@ -141,7 +143,7 @@ const WORK_COL_CATALOG: SheetCol<WorkLedgerRow>[] = [
   { key: 'source', label: '원천', render: (r) => WORK_SOURCE_LABEL[r.source], text: (r) => r.source },
 ];
 
-/** 상세 전용 25필드 — 사고14·상담4·정비2·문서2·일정2 (표 basic 비포함). */
+/** 업무구분별 상세 전용 필드. 표 basic에는 넣지 않고 상세패널에서만 노출한다. */
 const WORK_KIND_DETAIL_COLS: SheetCol<WorkLedgerRow>[] = [
   // 사고 14
   detailStr('accRole', '가해/피해'),
@@ -172,6 +174,22 @@ const WORK_KIND_DETAIL_COLS: SheetCol<WorkLedgerRow>[] = [
   // 일정 2
   detailStr('endDate', '종료일'),
   detailStr('location', '장소'),
+  // 검사·세차·보험·부품
+  detailStr('inspectionType', '검사유형'),
+  detailStr('inspectionResult', '검사결과'),
+  detailStr('nextInspectionDate', '다음검사일'),
+  detailStr('washType', '세차유형'),
+  detailStr('insuranceAction', '보험업무'),
+  detailStr('insuranceExpiryDate', '보험만기일'),
+  detailStr('partName', '부품명'),
+  detailNum('partQty', '수량'),
+  // 계약·고객 업무
+  detailStr('paymentIssueType', '수납이슈유형'),
+  detailMoney('expectedAmount', '예정금액'),
+  detailMoney('receivedAmount', '수납금액'),
+  detailStr('disputeType', '분쟁유형'),
+  detailStr('counterparty', '상대방'),
+  detailStr('claimType', '클레임유형'),
 ];
 
 const WORK_DETAIL_CATALOG: SheetCol<WorkLedgerRow>[] = [
@@ -261,6 +279,30 @@ export const WORK_DETAIL_DEFS: DetailSectionDef[] = [
   {
     title: '일정',
     keys: ['endDate', 'location'],
+  },
+  {
+    title: '검사',
+    keys: ['inspectionType', 'inspectionResult', 'nextInspectionDate'],
+  },
+  {
+    title: '세차',
+    keys: ['washType'],
+  },
+  {
+    title: '보험',
+    keys: ['insuranceAction', 'insuranceCompany', 'insuranceNo', 'insuranceExpiryDate'],
+  },
+  {
+    title: '부품교체',
+    keys: ['partName', 'partQty'],
+  },
+  {
+    title: '수납이슈',
+    keys: ['paymentIssueType', 'expectedAmount', 'receivedAmount'],
+  },
+  {
+    title: '분쟁·클레임',
+    keys: ['disputeType', 'counterparty', 'claimType'],
   },
 ];
 

@@ -7,6 +7,7 @@ import type { PenaltyKind, PenaltyProcess } from '@/lib/penalty-work';
 import type { WorkGroup } from '@/lib/work-form-sections';
 import { rentalTypeOf } from '@/lib/schema/contract';
 import { LEDGER_EMPTY } from '@/lib/ledger-empty';
+import { WORK_CATEGORIES } from '@/lib/work-taxonomy';
 
 export type WorkGroupFilter = '전체' | WorkGroup;
 export type WorkSource = 'work_item' | 'history' | 'penalty' | 'inbox';
@@ -51,7 +52,7 @@ export type WorkLedgerRow = {
   raw: EntityRecord;
 };
 
-export const WORK_GROUPS: WorkGroupFilter[] = ['전체', '일정', '고객상담', '정비·수선', '사고', '과태료', '문서', '기타'];
+export const WORK_GROUPS: WorkGroupFilter[] = ['전체', ...WORK_CATEGORIES];
 
 export const WORK_SOURCE_LABEL: Record<WorkSource, string> = {
   work_item: '업무',
@@ -114,11 +115,20 @@ export function workGroup(kind: unknown): WorkGroup {
   const value = String(kind || '');
   if (!value || value === '미분류' || value === '일반') return '기타';
   if (/일정|스케줄|예약/.test(value)) return '일정';
+  if (/연락기록/.test(value)) return '연락기록';
   if (/상담|통화|문자|연락|고객|민원/.test(value)) return '고객상담';
-  if (/정비|수선|검사|세차|부품|오일|타이어/.test(value)) return '정비·수선';
+  if (/검사/.test(value)) return '검사';
+  if (/세차/.test(value)) return '세차';
+  if (/부품교체/.test(value)) return '부품교체';
+  if (/정비|수선|부품|오일|타이어/.test(value)) return '정비·수선';
   if (/사고|파손|보험접수/.test(value)) return '사고';
+  if (/보험/.test(value)) return '보험';
+  if (/수납/.test(value)) return '수납이슈';
+  if (/분쟁/.test(value)) return '분쟁';
+  if (/클레임/.test(value)) return '클레임';
   if (/과태료|범칙|통행료|주차/.test(value)) return '과태료';
   if (/문서|증빙|서류|계약서|등록증|증권/.test(value)) return '문서';
+  if (/메모/.test(value)) return '메모';
   return '기타';
 }
 

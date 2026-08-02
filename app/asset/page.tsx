@@ -1,20 +1,22 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Pencil, Plus, UploadCloud } from 'lucide-react';
 import { assetMasterRow, type AssetMasterRow } from '@/lib/master-ledgers';
 import {
   ASSET_DETAIL_SECTIONS, ASSET_MASTER_BASIC_COLS, ASSET_MASTER_EXPANDED_COLS,
   ASSET_MAINT_BASIC_COLS,
+  assetStatusTone,
 } from '@/lib/master-ledger-cols';
 import { fleetMaintRanking } from '@/lib/asset-econ';
 import { useEntityLists } from '@/lib/use-entity-lists';
 import { textMatch } from '@/lib/search-match';
 import {
-  Btn, C, LedgerActions, LedgerCreatePanel, LedgerEditPanel, LedgerFilterButton, LedgerFilterFields, LedgerFilterPanel, LedgerFrame, LedgerRecordPanel, PeriodBar, PillTabs, Search, Select,
+  Btn, C, ContextMenu, type ContextMenuItem, LedgerActions, LedgerCreatePanel, LedgerEditPanel, LedgerFilterButton, LedgerFilterFields, LedgerFilterPanel, LedgerFrame, LedgerRecordPanel, PeriodBar, PillTabs, Search, Select, useSheetExport,
   type LedgerFormSection,
 } from '@/components/ui';
 import { useIsMobile } from '@/lib/use-mobile';
+import { useSession } from '@/lib/session';
 import { TODAY } from '@/lib/dashboard-consts';
 import { linkFleet, type Fleet } from '@/lib/domain/model';
 import { normPlate } from '@/lib/plate';
@@ -32,9 +34,9 @@ type AssetDateBasis = '취득일' | '처분일';
 type AssetSheetView = '기본' | '전체' | '정비비';
 const ASSET_QUICK_FILTERS: AssetQuickFilter[] = ['계약중', '휴차', '매각대기'];
 const ASSET_QUICK_FILTER_LABEL: Record<AssetQuickFilter, string> = {
-  계약중: '계약중',
-  휴차: '휴차중',
-  매각대기: '매각대기중',
+  계약중: '운행',
+  휴차: '휴차',
+  매각대기: '처분예정',
 };
 
 function matchesOwnership(row: AssetMasterRow, scope: AssetOwnershipScope): boolean {
@@ -57,10 +59,13 @@ const ASSET_CREATE_SECTIONS: LedgerFormSection[] = [
   { title: '취득정보', fields: ['supplier', 'purchasedDate', 'acquisitionDate', 'acquisitionPrice', 'consumerPrice', 'optionPrice', 'optionDiscount'] },
   { title: '금융·할부', fields: ['loanCashOnly', 'loanCompany', 'loanMonths', 'loanPrincipal', 'loanRate', 'loanStartDate'] },
   { title: '보험·GPS', fields: ['insuranceCompany', 'insurancePolicyNo', 'insuranceExpiryDate', 'gpsProvider', 'gpsDeviceId', 'gpsInstalledDate', 'gpsControl'] },
+  { title: '세금', fields: ['vehicleTaxDueDate', 'vehicleTaxPaidDate', 'vehicleTaxAmount'] },
+  { title: '처분·매각', fields: ['saleDate', 'salePrice'] },
 ];
 
 export default function AssetLedgerPage() {
   const mobile = useIsMobile();
+  const { isOperator } = useSession();
   const { data: [vehicles = [], contracts = [], history = []], loading, error: loadError } = useEntityLists(['vehicle', 'contract', 'history']);
   const [q, setQ] = useState('');
   const [ownershipScope, setOwnershipScope] = useState<AssetOwnershipScope>('보유자산');
@@ -71,9 +76,29 @@ export default function AssetLedgerPage() {
   const [detailFilters, setDetailFilters] = useState(() => emptyFilterValues(ASSET_FILTER_DEFS));
   const [filterOpen, setFilterOpen] = useState(false);
   const [sheetView, setSheetView] = useState<AssetSheetView>('기본');
+  useEffect(() => {
+    if (mobile && sheetView === '전체') setSheetView('기본');
+  }, [mobile, sheetView]);
   const [selected, setSelected] = useState<ReturnType<typeof assetMasterRow> | null>(null);
   const [creating, setCreating] = useState(false);
   const [editing, setEditing] = useState(false);
+  const [ctxMenu, setCtxMenu] = useState<{ open: boolean; x: number; y: number }>({ open: false, x: 0, y: 0 });
+
+  const xl = useSheetExport<AssetMasterRow>({
+    title: '자산관리',
+    filterSummary: () => {
+      const parts: string[] = [ownershipScope];
+      if (quickFilter) parts.push(ASSET_QUICK_FILTER_LABEL[quickFilter]);
+      if (allAssetQuickFilter) parts.push(allAssetQuickFilter);
+      if (range.from || range.to) parts.push(`${range.from || '…'}~${range.to || '…'}`);
+      if (q.trim()) parts.push(`검색`);
+      return parts.join(' · ') || '전체';
+    },
+  });
+  const ctxItems: ContextMenuItem[] = [
+    xl.exportItem(),
+    ...(isOperator ? [xl.exportItem({ unmasked: true })] : []),
+  ];
 
   const maintByPlate = useMemo(() => {
     const map = new Map(fleetMaintRanking(vehicles, history).map((m) => [m.plate, m]));
@@ -146,6 +171,7 @@ export default function AssetLedgerPage() {
       : ASSET_MASTER_EXPANDED_COLS;
 
   return (
+    <>
     <LedgerFrame
       title="자산관리"
       meta="차량 원장"
@@ -240,7 +266,7 @@ export default function AssetLedgerPage() {
           )}
         </LedgerFilterPanel>
       ) : null}
-      stats={<span style={{ fontSize: 12.5, color: C.mute }}>보유 <b>{held}</b> · 계약중 <b style={{ color: C.ok }}>{contracted}</b> · 휴차 <b style={{ color: C.warn }}>{idle}</b> · 매각대기 <b>{salePending}</b> · 처분 <b>{disposed}</b></span>}
+      stats={<span style={{ fontSize: 12.5, color: C.mute }}>보유중 <b>{held}</b> · 운행 <b style={{ color: C.ok }}>{contracted}</b> · 휴차 <b style={{ color: C.warn }}>{idle}</b> · 처분예정 <b>{salePending}</b> · 처분완료 <b>{disposed}</b></span>}
       showColView={false}
       colView={sheetView === '기본' ? '기본' : '전체'}
       view={(
@@ -248,7 +274,10 @@ export default function AssetLedgerPage() {
           size="sm"
           value={sheetView}
           onChange={(v) => setSheetView((v as AssetSheetView) || '기본')}
-          tabs={[
+          tabs={mobile ? [
+            { key: '기본', label: '목록' },
+            { key: '정비비', label: '정비비' },
+          ] : [
             { key: '기본', label: '기본' },
             { key: '전체', label: '전체' },
             { key: '정비비', label: '정비비' },
@@ -258,16 +287,34 @@ export default function AssetLedgerPage() {
       loading={loading}
       error={loadError}
       empty={<>
-        등록된 자산이 없습니다. 등록증은 데이터관리에서 담으세요.
+        등록된 자산이 없습니다. 등록증은 데이터센터에서 담으세요.
         <div style={{ marginTop: 14, display: 'flex', justifyContent: 'center', gap: 8 }}>
-          <Btn size="sm" variant="ghost" onClick={() => openIngest('vehicle')}><UploadCloud size={14} /> 데이터관리</Btn>
+          <Btn size="sm" variant="ghost" onClick={() => openIngest('vehicle')}><UploadCloud size={14} /> 데이터센터</Btn>
           <MigrateDataButton size="sm" />
         </div>
       </>}
       cols={sheetCols}
       rows={rows}
+      mobileCard={(r) => ({
+        co: r.company,
+        badge: r.status,
+        badgeTone: assetStatusTone(r),
+        plate: r.plate || undefined,
+        name: r.plate ? undefined : (r.assetCode || r.carName || LEDGER_EMPTY.none),
+        carType: r.plate ? (r.carName || r.modelLine) : r.modelLine,
+        fields: [
+          ['운영상태', r.lifecycle],
+          ['소유자', r.ownerName || LEDGER_EMPTY.dash],
+          ['주행거리', r.mileage ? `${r.mileage.toLocaleString()}km` : LEDGER_EMPTY.dash],
+        ],
+      })}
       rowKey={(r) => r.plate}
       selectedRowKey={selected?.plate}
+      onView={xl.onView}
+      onRowContextMenu={(e) => {
+        e.preventDefault();
+        setCtxMenu({ open: true, x: e.clientX, y: e.clientY });
+      }}
       onRowDoubleClick={(row) => {
         setCreating(false);
         setEditing(false);
@@ -281,7 +328,7 @@ export default function AssetLedgerPage() {
           title="자산 생성"
           sections={ASSET_CREATE_SECTIONS}
           initial={{ status: '등록대기' }}
-          fileIngest={{ label: '파일로 투입 (데이터관리)', onClick: () => openIngest('vehicle') }}
+          fileIngest={{ label: '파일로 투입 (데이터센터)', onClick: () => openIngest('vehicle') }}
           onClose={() => setCreating(false)}
         />
       ) : selected && editing ? (
@@ -309,5 +356,13 @@ export default function AssetLedgerPage() {
         />
       ) : null}
     />
+    <ContextMenu
+      open={ctxMenu.open}
+      x={ctxMenu.x}
+      y={ctxMenu.y}
+      onClose={() => setCtxMenu((m) => ({ ...m, open: false }))}
+      items={ctxItems}
+    />
+    </>
   );
 }

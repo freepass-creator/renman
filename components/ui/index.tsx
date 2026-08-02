@@ -18,6 +18,7 @@ export * from './ledger-edit-panel';
 export * from './ledger-actions';
 export * from './ledger-selection-bar';
 export * from './context-menu';
+export * from './use-sheet-export';
 export * from './detail';
 export * from './overlays';
 export * from './bottom-sheet';

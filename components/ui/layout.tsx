@@ -241,7 +241,7 @@ export function Sec({ id, title, n, desc, tone, right, hideable = true, collapsi
           desc가 flex:1 말줄임으로 폭을 흡수, 버튼은 flexShrink:0으로 제자리. 모바일은 wrap 유지(터치·스택). */}
       <div style={{ display: 'flex', alignItems: 'center', gap: mobile ? SPACE_M : 8, marginBottom: mobile ? SPACE_M : 9, flexWrap: mobile ? 'wrap' : 'nowrap', minHeight: ctrlH(mobile) }}>
         {collapsible ? (
-          <button type="button" onClick={() => set(state === 'open' ? 'collapsed' : 'open')} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, border: 'none', background: 'none', cursor: 'pointer', padding: 0, minHeight: mobile ? 32 : undefined, maxWidth: '100%', WebkitTapHighlightColor: 'transparent' }}>
+          <button type="button" onClick={() => set(state === 'open' ? 'collapsed' : 'open')} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, border: 'none', background: 'none', cursor: 'pointer', padding: 0, minHeight: mobile ? 44 : undefined, maxWidth: '100%', WebkitTapHighlightColor: 'transparent' }}>
             <ChevronDown size={mobile ? 18 : 15} color={C.sub} style={{ flexShrink: 0, transform: state === 'open' ? 'none' : 'rotate(-90deg)', transition: 'transform .15s' }} />
             <span style={{ fontSize: mobile ? 15 : 13.5, fontWeight: 800, letterSpacing: '-0.01em', color: C.ink }}>{title}</span>
             {n != null && <span style={{ fontSize: mobile ? 15 : 13, fontWeight: 800, color: nc, fontFamily: NUM, fontVariantNumeric: 'tabular-nums' }}>{n}</span>}

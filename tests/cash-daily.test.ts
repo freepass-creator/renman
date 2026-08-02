@@ -19,7 +19,7 @@ function row(patch: Partial<CashRow>): CashRow {
     memo: "",
     inAmt: 0,
     outAmt: 0,
-    category: "임대료수입",
+    category: "기타수입",
     raw: {},
     ...patch,
   };
@@ -55,5 +55,28 @@ describe("자금일보 마감", () => {
     );
     expect(validateCashDailyClose(daily)).toHaveLength(3);
     expect(() => closeCashDaily(daily)).toThrow();
+  });
+
+  it("계약성 입금이 계약·회차에 연결되지 않으면 마감을 막는다", () => {
+    const daily = calculateCashDaily(
+      [row({ inAmt: 550_000, category: "대여료수입" })],
+      "2026-07-26",
+      1_000_000,
+      1_550_000,
+    );
+    expect(daily.unmatchedContractCount).toBe(1);
+    expect(validateCashDailyClose(daily)).toContain("계약 미연결 입금 1건을 연결해야 합니다.");
+  });
+
+  it("일반 묶음 분해가 미완료면 일마감을 막는다", () => {
+    const daily = calculateCashDaily(
+      [row({ category: '', outAmt: 120_000, nest: 'bundle-parent', raw: { bundleReviewStatus: '미완료', evidenceUrl: 'evidence' } })],
+      "2026-07-26",
+      1_000_000,
+      880_000,
+    );
+    expect(daily.unclassifiedCount).toBe(0);
+    expect(daily.bundleIncompleteCount).toBe(1);
+    expect(validateCashDailyClose(daily)).toContain("묶음 분해 미완료 1건을 자금관리에서 마쳐야 합니다.");
   });
 });

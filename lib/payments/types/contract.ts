@@ -19,7 +19,7 @@ export type AdditionalDriver = {
 
 export type Contract = {
   id: string;
-  contractNo: string;          // ICR-YYMM-XXXX
+  contractNo: string;          // C-YYMM-#### (lib/domain/contract-no.ts 발번)
   company: CompanyCode;
   manager?: string;            // 담당자
   // 고객 (임베드)

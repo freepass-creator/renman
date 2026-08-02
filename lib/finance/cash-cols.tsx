@@ -16,27 +16,32 @@ import { LEDGER_EMPTY } from '@/lib/ledger-empty';
 const coName = (r: CashRow) => companyDisplay(r.companyId);
 /** 내용 = 메모(거래 설명). 상대방은 party 열. */
 const content = (r: CashRow) => (r.memo || '').trim();
+const settlementKind = (r: CashRow): string => r.nest === 'cms-dep' ? 'CMS집금'
+  : r.nest === 'card-dep' ? '카드정산'
+    : r.nest === 'bundle-parent' ? String(r.raw.bundleType || '일반묶음') : '';
 
 /* 자금상태 = «매칭됐는가». 판정은 lib/finance/money-status.ts 가 유일한 정의처다.
    ★이전 구현은 상태가 3개뿐이라 «계정과목이 없는 돈»과 «분류는 됐지만 계약에 안 붙은 돈»이
      똑같이 «미매칭»으로 보였다 — 해야 할 일이 다른데 같은 상태로 표시됐다. */
-const moneyStatus = (r: CashRow): MoneyStatus => moneyStatusOf({
+export const cashMoneyStatus = (r: CashRow): MoneyStatus => moneyStatusOf({
   category: r.category,
   inAmount: r.inAmt,
   outAmount: r.outAmt,
   matchedContractId: r.raw.matchedContractId,
   matchedScheduleSeq: r.raw.matchedScheduleSeq,
   isCmsItem: r.nest === 'cms-item' || r.nest === 'cms-pending',
-  isCmsDeposit: r.nest === 'cms-dep',
-  cmsSettled: String(r.raw.settlementRole || '') === 'deposit',
+  // CMS·카드사 정산 모두 «묶음 원본 ↔ 구성건» 대사가 먼저다.
+  isCmsDeposit: r.nest === 'cms-dep' || r.nest === 'card-dep' || r.nest === 'bundle-parent',
+  cmsSettled: r.nest === 'bundle-parent'
+    ? String(r.raw.bundleReviewStatus || '') === '대사완료'
+    : String(r.raw.settlementRole || '') === 'deposit',
 });
 
 /* 자금분류 = «뭐로 입금됐는가». 계정과목(무슨 돈인가)과 다른 축 — 같은 칸에 담지 않는다. */
 const moneyClass = (r: CashRow): MoneyClass => moneyClassOf({
-  // 적요(은행 채널 코드) — 스키마에 전용 필드가 없어 counterparty 를 폴백으로 본다.
-  //   ★bank_tx.counterparty 라벨이 「거래상대/적요」로 두 값을 한 칸에 섞고 있다(스키마 결함).
-  //     전용 필드 신설은 커서 오더(docs/CURSOR-ORDER-daily-ledger.md)로 넘겼다.
-  jeokyo: r.raw.jeokyo || r.raw.counterparty,
+  // 은행 채널코드 전용 필드만 근거로 쓴다. 거래상대(counterparty)를 적요로 오인하면
+  // 모든 고객명이 미지 채널이 되어 실제 계좌이체도 전부 «기타»로 잘못 분류된다.
+  jeokyo: r.raw.jeokyo,
   isCms: r.nest === 'cms-item' || r.nest === 'cms-pending' || r.nest === 'cms-dep',
   isCard: !!r.raw.approvalNo || !!r.raw.cardNo,
   source: r.raw.method || r.raw.source,
@@ -103,8 +108,8 @@ const CASH_COL_CATALOG: SheetCol<CashRow>[] = [
   {
     // 행 문법 5번 — 자금상태(매칭됐는가). 색 신호는 여기가 담당.
     key: 'match', label: '자금상태', align: 'c', priority: 1,
-    render: (r) => <Badge tone={MONEY_STATUS_TONE[moneyStatus(r)]}>{moneyStatus(r)}</Badge>,
-    text: (r) => moneyStatus(r),
+    render: (r) => <Badge tone={MONEY_STATUS_TONE[cashMoneyStatus(r)]}>{cashMoneyStatus(r)}</Badge>,
+    text: (r) => cashMoneyStatus(r),
     values: () => [...MONEY_STATUS],
   },
   { key: 'date', label: '일자', align: 'c', priority: 1, xf: 'date', render: (r) => r.date || LEDGER_EMPTY.dash, text: (r) => r.date },
@@ -145,6 +150,21 @@ const CASH_COL_CATALOG: SheetCol<CashRow>[] = [
     text: (r) => String(r.raw.dataAlert || r.raw.reconciliationStatus || ''),
   },
   {
+    key: 'bundle', label: '묶음구성', align: 'c', priority: 2,
+    render: (r) => {
+      const kind = settlementKind(r);
+      if (!kind) return LEDGER_EMPTY.dash;
+      const count = Number(r.raw.bundleItemCount ?? r.raw.settlementItemCount) || 0;
+      const complete = r.nest !== 'bundle-parent' || String(r.raw.bundleReviewStatus || '') === '대사완료';
+      return <Badge tone={complete ? 'blue' : 'amber'}>{kind}{count ? ` ${count}건` : ''}{complete ? '' : '·미완료'}</Badge>;
+    },
+    text: (r) => {
+      const kind = settlementKind(r);
+      const count = Number(r.raw.bundleItemCount ?? r.raw.settlementItemCount) || 0;
+      return kind ? `${kind}${count ? ` ${count}건` : ''}` : '';
+    },
+  },
+  {
     key: 'flowNature', label: '수지구분', align: 'c', priority: 2,
     render: (r) => {
       const value = kindOfLabel(r.category) || (r.inAmt > 0 ? '수입' : r.outAmt > 0 ? '지출' : LEDGER_EMPTY.dash);
@@ -178,12 +198,12 @@ const CASH_COL_CATALOG: SheetCol<CashRow>[] = [
 export const CASH_SHEET_KEYS: SheetViewKeys = {
   basic: [
     'company', 'acctName', 'party', 'moneyClass', 'match',
-    'cat', 'flowNature', 'date', 'content', 'in', 'out', 'balance',
+    'bundle', 'cat', 'flowNature', 'date', 'content', 'in', 'out', 'balance',
     'matchedContract', 'matchedSchedule', 'alert',
   ],
   all: [
     'company', 'acctName', 'party', 'moneyClass', 'match', 'cat',
-    'acct', 'date', 'content', 'flowNature', 'in', 'out', 'balance', 'alert',
+    'bundle', 'acct', 'date', 'content', 'flowNature', 'in', 'out', 'balance', 'alert',
     'fundNature', 'matchedContract', 'matchedSchedule', 'src', 'ent', 'key',
   ],
 };
@@ -200,6 +220,32 @@ const CASH_TX_DETAIL_CATALOG: SheetCol<CashRow>[] = [
     render: (r) => String(r.raw.method || '').trim() || LEDGER_EMPTY.dash,
     text: (r) => String(r.raw.method || '').trim(),
   },
+  {
+    key: 'settlementGross', label: '구성 합계', align: 'r', xf: 'money',
+    render: (r) => Number(r.raw.bundleItemSum ?? r.raw.settlementGrossAmount) ? money(Number(r.raw.bundleItemSum ?? r.raw.settlementGrossAmount)) : LEDGER_EMPTY.dash,
+    text: (r) => Number(r.raw.bundleItemSum ?? r.raw.settlementGrossAmount) || 0,
+  },
+  {
+    key: 'settlementFee', label: '수수료·차액', align: 'r', xf: 'money',
+    render: (r) => Number(r.raw.bundleFeeAmount ?? r.raw.settlementFeeAmount) ? money(Number(r.raw.bundleFeeAmount ?? r.raw.settlementFeeAmount)) : LEDGER_EMPTY.dash,
+    text: (r) => Number(r.raw.bundleFeeAmount ?? r.raw.settlementFeeAmount) || 0,
+  },
+  {
+    key: 'settlementCheck', label: '묶음 대사', align: 'c',
+    render: (r) => {
+      const count = Number(r.raw.bundleItemCount ?? r.raw.settlementItemCount) || 0;
+      if (!settlementKind(r)) return LEDGER_EMPTY.dash;
+      if (r.nest === 'bundle-parent') {
+        const status = String(r.raw.bundleReviewStatus || '미완료');
+        return <Badge tone={status === '대사완료' ? 'green' : 'amber'}>{status}</Badge>;
+      }
+      const gross = Number(r.raw.settlementGrossAmount) || 0;
+      const fee = Number(r.raw.settlementFeeAmount) || 0;
+      const diff = gross - fee - r.inAmt;
+      return <Badge tone={count > 0 && Math.abs(diff) < 1 ? 'green' : 'amber'}>{count > 0 && Math.abs(diff) < 1 ? '대사완료' : '확인필요'}</Badge>;
+    },
+    text: (r) => settlementKind(r) ? `${Number(r.raw.settlementItemCount) || 0}건` : '',
+  },
 ];
 
 export const CASH_TX_DETAIL_DEFS: DetailSectionDef[] = [
@@ -209,8 +255,12 @@ export const CASH_TX_DETAIL_DEFS: DetailSectionDef[] = [
     keys: ['company', 'acctName', 'acct', 'date', 'content', 'party', 'method', 'in', 'out', 'balance'],
   },
   {
-    title: '분류·수납정보',
+    title: '분류·연결정보',
     keys: ['cat', 'match', 'flowNature', 'fundNature', 'matchedContract', 'matchedSchedule', 'alert'],
+  },
+  {
+    title: '묶음·대사',
+    keys: ['bundle', 'settlementGross', 'settlementFee', 'settlementCheck'],
   },
 ];
 export const CASH_TX_DETAIL_SECTIONS = buildDetailSections(CASH_TX_DETAIL_CATALOG, CASH_TX_DETAIL_DEFS);

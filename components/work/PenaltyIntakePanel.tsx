@@ -7,7 +7,7 @@ import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import FileDrop from '@/components/FileDrop';
 import { Badge, Btn, Input, Message, Select, C } from '@/components/ui';
-import { ALL_COMPANIES, COMPANIES, companyLabel, companyShort } from '@/lib/companies';
+import { ALL_COMPANIES, COMPANIES, companyLabel } from '@/lib/companies';
 import type { EntityRecord } from '@/lib/intake/entities';
 import {
   PENALTY_OCR_MAX,
@@ -140,7 +140,7 @@ export function PenaltyIntakePanel({
           <span style={{ fontSize: 12, fontWeight: 700, color: C.sub }}>회사 <span style={{ color: C.danger }}>*</span></span>
           <Select size="sm" value={co} onChange={(e) => setCo(e.target.value)}>
             <option value="">— 회사 선택 —</option>
-            {COMPANIES.map((c) => <option key={c} value={c}>{companyShort(c)} · {companyLabel(c)}</option>)}
+            {COMPANIES.map((c) => <option key={c} value={c}>{companyLabel(c)}</option>)}
           </Select>
         </label>
       )}

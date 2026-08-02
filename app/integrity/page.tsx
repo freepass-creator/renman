@@ -10,7 +10,8 @@ import { ENTITIES, type EntityRecord } from '@/lib/intake/entities';
 import { FacetPage, Sec, Cards, Metric, EmptyState, Badge, RISK_TONE, SevTag, ExcelSheet, won, C, type SheetCol, PageLoading } from '@/components/ui';
 import { FacetRail } from '@/components/FacetRail';
 import { WorkbenchBar } from '@/components/WorkbenchBar';
-import { companyLabel } from '@/lib/companies';
+import { companyLabel, companyShort } from '@/lib/companies';
+import { openCar } from '@/lib/ui-bus';
 import { scanRisks } from '@/lib/risk-ops';
 import { selectReceivables } from '@/lib/snapshot/selectors';
 import { riskKindMatch } from '@/lib/lens-filters';
@@ -29,6 +30,8 @@ type RiskItem = {
   id: string;
   sev: Sev;
   kind: string;
+  plate: string;
+  customer: string;
   target: string;
   detail: string;
   href: string;
@@ -49,6 +52,8 @@ function dataChecks(data: Record<string, EntityRecord[]>): RiskItem[] {
     out.push({
       id: `${kind}:${entity}:${rec._key || plate || detail}`,
       sev, kind,
+      plate,
+      customer: String(rec.contractorName || ''),
       target: `${ENTITIES[entity]?.label || entity}${plate ? ' · ' + plate : ''}`,
       detail, href, co: rec.companyId,
     });
@@ -99,6 +104,8 @@ function complianceItems(contracts: EntityRecord[], vehicles: EntityRecord[]): R
       id: riskComplianceOpenId(c),
       sev: top.severity === 'high' ? 'high' : 'mid',
       kind: top.label,
+      plate,
+      customer: String(c.contractorName || ''),
       target: `${plate || LEDGER_EMPTY_NONE} · ${c.contractorName || ''}`.trim(),
       detail: flags.map((f) => f.detail || f.label).filter(Boolean).join(' · '),
       href: plate ? `/vehicle/${encodeURIComponent(plate)}` : `/contract?open=${encodeURIComponent(String(c._key || ''))}`,
@@ -129,6 +136,8 @@ function IntegrityInner() {
         id: `scan:${r.rec._key || r.rec.plate}:${f.kind}`,
         sev: f.sev === 'high' ? 'high' as Sev : 'mid' as Sev,
         kind: f.kind,
+        plate: String(r.rec.plate || ''),
+        customer: String(r.rec.contractorName || ''),
         target: `${r.rec.plate || ''} · ${r.rec.contractorName || ''}`,
         detail: f.detail,
         href: r.rec.plate ? `/vehicle/${encodeURIComponent(String(r.rec.plate))}?do=unpaid` : `/contract`,
@@ -143,6 +152,8 @@ function IntegrityInner() {
       id: `서류:${c.kind}:${c.plate}`,
       sev: c.sev === 'high' ? 'high' as Sev : 'mid' as Sev,
       kind: c.kind,
+      plate: c.plate,
+      customer: '',
       target: c.plate,
       detail: `${c.detail} — ${c.evidence.join(' · ')}`,
       href: c.plate ? `/vehicle/${encodeURIComponent(c.plate)}` : '/asset',
@@ -187,17 +198,14 @@ function IntegrityInner() {
   }, [items]);
 
   const cols: SheetCol<RiskItem>[] = [
-    ...(scopeAll ? [{ key: '_co', label: '회사', render: (it: RiskItem) => <span style={{ color: C.mute }}>{companyLabel(it.co)}</span>, text: (it: RiskItem) => companyLabel(it.co) }] : []),
-    { key: 'sev', label: '위험도', render: (it) => <SevTag high={it.sev === 'high'} />, text: (it) => (it.sev === 'high' ? '위험' : '주의') },
-    { key: 'target', label: '대상', render: (it) => it.target, text: (it) => it.target },
-    { key: 'risk', label: '내용', text: (it) => `${it.kind} ${it.detail}`, render: (it) => {
+    ...(scopeAll ? [{ key: 'company', label: '회사명', pin: true, render: (it: RiskItem) => <span style={{ color: C.mute }}>{companyShort(String(it.co || ''))}</span>, text: (it: RiskItem) => companyShort(String(it.co || '')) }] : []),
+    { key: 'plate', label: '차량번호', pin: true, render: (it) => it.plate || LEDGER_EMPTY_NONE, text: (it) => it.plate },
+    { key: 'customer', label: '계약자', render: (it) => it.customer || LEDGER_EMPTY_NONE, text: (it) => it.customer },
+    { key: 'kind', label: '정합성분류', render: (it) => <Badge tone={RISK_TONE[it.kind] || 'gray'}>{it.kind}</Badge>, text: (it) => it.kind },
+    { key: 'sev', label: '정합성상태', render: (it) => <SevTag high={it.sev === 'high'} />, text: (it) => (it.sev === 'high' ? '위험' : '주의') },
+    { key: 'risk', label: '정합성내용', text: (it) => it.detail, render: (it) => {
         const col = it.sev === 'high' ? C.danger : C.warn;
-        return (
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7 }}>
-            <Badge tone={RISK_TONE[it.kind] || 'gray'}>{it.kind}</Badge>
-            <span style={{ color: col, fontWeight: 700 }}>{it.detail}</span>
-          </span>
-        );
+        return <span style={{ color: col, fontWeight: 700 }}>{it.detail}</span>;
       } },
   ];
 
@@ -205,7 +213,7 @@ function IntegrityInner() {
     <FacetPage
       title="정합성"
       meta={`${scopeAll ? '전체 회사' : companyLabel(companyId)} · ${items.length}건 · 컴플 ${compCount}`}
-      tools={<WorkbenchBar search={{ value: q, onChange: setQ, placeholder: '대상·내용·종류' }} stat={<span style={{ fontSize: 13, fontWeight: 800, color: highCount ? C.danger : C.ok, whiteSpace: 'nowrap' }}>위험 {highCount}</span>} />}
+      tools={<WorkbenchBar search={{ value: q, onChange: setQ, placeholder: '대상·내용·종류' }} stat={<span role="status" aria-live="polite" style={{ fontSize: 13, fontWeight: 800, color: loading ? C.mute : highCount ? C.danger : C.ok, whiteSpace: 'nowrap' }}>{loading ? '검사 중' : `위험 ${highCount}`}</span>} />}
       rail={!loading ? <FacetRail lensKey="정합성" facets={facets} onToggle={toggleFacet} onReset={resetFacets} counts={counts} /> : null}
     >
       <Sec id="i-summary" title="요약">
@@ -227,7 +235,11 @@ function IntegrityInner() {
               rows={shown}
               rowKey={(it) => it.id}
               selectedRowKey={selectedId}
-              onRow={(it) => { setSelectedId(it.id); router.push(it.href); }}
+              onRow={(it) => setSelectedId(it.id)}
+              onRowDoubleClick={(it) => {
+                if (it.plate) openCar(it.plate, 'inspect', it.co);
+                else router.push(it.href);
+              }}
             />
           )}
       </Sec>

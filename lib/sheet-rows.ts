@@ -32,7 +32,15 @@ export type FleetRow = {
   // 보험
   insurer: string; insEnd: string; insPremium: number;
   // 미수
-  net: number; overdueDays: number;
+  /** 차량에 연결된 전체 미수. 현재 계약자 미수로 오인하지 않도록 화면에서는 maintainedNet/endedNet을 함께 표시한다. */
+  net: number;
+  /** 반납·해지되지 않은 계약에서 발생한 미수. */
+  maintainedNet: number;
+  /** 반납·해지된 계약에 남은 채권. */
+  endedNet: number;
+  /** 차량 기준 현재 계약 관계. 미수의 출처 구분은 maintainedNet/endedNet이 담당한다. */
+  contractState: '계약유지' | '계약예정' | '계약종료' | '계약없음';
+  overdueDays: number;
   // 인라인 경고(무보험·검사만료·반납지남·미수단계·면허 등) — sheet-warnings 합성. ⚠ 열·'경고' 필터가 씀.
   warnings: SheetWarning[];
   tone: 'ok' | 'warn' | 'danger' | 'mute';
@@ -41,16 +49,18 @@ export type FleetRow = {
 /** contracts(전체)를 넘기면 «차량 없는 계약»(고아: plate가 차량목록에 없음)도 별도 행으로 노출 →
  *  마스터 미수 총액이 실제와 일치(계약 미수를 조용히 누락시키지 않음). */
 export function buildFleetRows(vehicles: VehicleNode[], insurance: EntityRecord[] = [], contracts: ContractNode[] = [], history: EntityRecord[] = [], today = ''): FleetRow[] {
+  const joinKey = (companyId: unknown, plate: unknown) => `${String(companyId || '')}::${normPlate(plate)}`;
   // 보험: 번호판별 최신(만기 늦은) 1건
   const insByPlate = new Map<string, EntityRecord>();
   for (const ins of insurance) {
     const p = normPlate(ins.plate);
     if (!p) continue;
-    const cur = insByPlate.get(p);
-    if (!cur || String(ins.endDate || '') > String(cur.endDate || '')) insByPlate.set(p, ins);
+    const key = joinKey(ins.companyId, p);
+    const cur = insByPlate.get(key);
+    if (!cur || String(ins.endDate || '') > String(cur.endDate || '')) insByPlate.set(key, ins);
   }
   const histByPlate = new Map<string, EntityRecord[]>();
-  for (const h of history) { const p = normPlate(h.plate); if (!p) continue; const a = histByPlate.get(p); if (a) a.push(h); else histByPlate.set(p, [h]); }
+  for (const h of history) { const p = normPlate(h.plate); if (!p) continue; const key = joinKey(h.companyId, p); const a = histByPlate.get(key); if (a) a.push(h); else histByPlate.set(key, [h]); }
   const isCash = (v: EntityRecord) => /(예|현금|Y)/i.test(String(v.loanCashOnly || ''));
 
   // 한 plate(차량 1대 또는 고아 계약군)의 계약 파생 필드 + 보험/미수.
@@ -58,16 +68,26 @@ export function buildFleetRows(vehicles: VehicleNode[], insurance: EntityRecord[
     plate: string, veh: EntityRecord | null, active: ContractNode | null, plateContracts: ContractNode[],
     asset: Pick<FleetRow, 'companyId' | 'ownership' | 'util' | 'status' | 'location' | 'tone'>,
   ): FleetRow => {
-    const v = active?.view;
-    const net = plateContracts.reduce((s, c) => s + Math.max(0, c.net), 0);
+    // 운행 계약이 없더라도 인도대기 계약은 계약자·조건을 숨기지 않는다.
+    // 다만 차량 가동/위치와 경고의 active 판정은 실제 운행 계약(active)만 사용한다.
+    const pending = [...plateContracts].reverse().find((c) => c.phase === '대기') ?? null;
+    const displayContract = active ?? pending;
+    const v = displayContract?.view;
+    const maintainedNet = plateContracts.reduce((s, c) => c.phase !== '종료' ? s + Math.max(0, c.net) : s, 0);
+    const endedNet = plateContracts.reduce((s, c) => c.phase === '종료' ? s + Math.max(0, c.net) : s, 0);
+    const net = maintainedNet + endedNet;
+    const contractState: FleetRow['contractState'] = active
+      ? '계약유지'
+      : pending ? '계약예정'
+      : plateContracts.some((c) => c.phase === '종료') ? '계약종료' : '계약없음';
     const overdueDays = plateContracts.reduce((m, c) => Math.max(m, c.view.overdueDays), 0);
-    const ins = insByPlate.get(plate);
+    const ins = insByPlate.get(joinKey(asset.companyId, plate));
     return {
       plate,
       companyId: asset.companyId,
       company: companyShort(asset.companyId),
       ownership: asset.ownership, util: asset.util, status: asset.status, location: asset.location,
-      carName: String(veh?.carName || veh?.model || active?.view.rec.carName || ''),
+      carName: String(veh?.carName || veh?.model || displayContract?.view.rec.carName || ''),
       maker: String(veh?.maker || ''),
       subModel: String(veh?.subModel || veh?.modelLine || ''),
       year: String(veh?.firstReg || veh?.yearMonth || '').slice(0, 4),
@@ -83,7 +103,7 @@ export function buildFleetRows(vehicles: VehicleNode[], insurance: EntityRecord[
       loanRate: Number(veh?.loanRate) || 0,
       loanMonths: Number(veh?.loanMonths) || 0,
       loanStart: String(veh?.loanStartDate || ''),
-      customer: active?.customer || '',
+      customer: displayContract?.customer || '',
       phone: String(v?.rec.contractorPhone || ''),
       rentalType: rentalTypeOf(v?.rec),
       rent: Number(v?.rec.monthlyRent) || 0,
@@ -92,19 +112,19 @@ export function buildFleetRows(vehicles: VehicleNode[], insurance: EntityRecord[
       start: String(v?.rec.startDate || v?.rec.deliveredDate || ''),
       end: String(v?.rec.endDate || ''),
       dday: v?.dday ?? null,
-      paymentDay: active ? (Number(v?.rec.paymentDay) >= 1 && Number(v?.rec.paymentDay) <= 31 ? Number(v?.rec.paymentDay) : 25) : 0,
-      paymentTiming: active ? paymentTimingOf(v?.rec.paymentTiming) : '',
+      paymentDay: displayContract ? (Number(v?.rec.paymentDay) >= 1 && Number(v?.rec.paymentDay) <= 31 ? Number(v?.rec.paymentDay) : 25) : 0,
+      paymentTiming: displayContract ? paymentTimingOf(v?.rec.paymentTiming) : '',
       roundDue: v?.roundDue ?? 0,
       roundTotal: v?.roundTotal ?? 0,
       contractNo: String(v?.rec.contractNo || ''),
       insurer: String(ins?.insurer || ''),
       insEnd: String(ins?.endDate || ''),
       insPremium: Number(ins?.totalPremium) || 0,
-      net, overdueDays,
+      net, maintainedNet, endedNet, contractState, overdueDays,
       warnings: rowWarnings({
         held: asset.ownership !== '처분완료' && asset.status !== '차량없음',
-        active: !!active, contractRec: active?.view.rec ?? null, veh,
-        util: asset.util, customer: active?.customer || '',
+        active: !!active, contractRec: displayContract?.view.rec ?? null, veh,
+        util: asset.util, customer: displayContract?.customer || '',
         dday: v?.dday ?? null, rent: Number(v?.rec.monthlyRent) || 0,
         overdueDays, insEnd: String(ins?.endDate || ''), inspectionTo: String(veh?.inspectionTo || ''), today,
       }),
@@ -116,21 +136,26 @@ export function buildFleetRows(vehicles: VehicleNode[], insurance: EntityRecord[
   const rows: FleetRow[] = vehicles.map((n) =>
     rowFrom(n.plate || String(n.veh.plate || ''), n.veh, n.activeContract, n.contracts, {
       companyId: String(n.veh.companyId || ''), ownership: n.ownership, util: n.utilization ?? n.label, status: n.label,
-      // 현위치 = 한 칸에 하나. 대여중=계약자(차가 그 손님에게), 아니면 최근 이동처/차고지. 활성계약은 linkFleet SSOT와 일치.
-      location: n.activeContract ? (n.activeContract.customer || '차고지') : deriveLocation(n.veh, [], histByPlate.get(n.plate) || [], today).location,
+      // 사용처 칸에 계약자명이 있으므로 현위치는 같은 이름을 반복하지 않고 운영 위치를 표시한다.
+      location: n.activeContract ? '고객 운행' : deriveLocation(n.veh, [], histByPlate.get(joinKey(n.veh.companyId, n.plate)) || [], today).location,
       tone: n.tone,
     }));
 
   // 고아 계약(차량 목록에 없는 plate) → plate별 1행(자산=차량없음). 미수 누락 방지.
-  const vplates = new Set(vehicles.map((n) => n.plate));
-  const orphanByPlate = new Map<string, ContractNode[]>();
-  for (const c of contracts) if (c.plate && !vplates.has(c.plate)) {
-    const arr = orphanByPlate.get(c.plate); if (arr) arr.push(c); else orphanByPlate.set(c.plate, [c]);
+  const vplates = new Set(vehicles.map((n) => joinKey(n.veh.companyId, n.plate)));
+  const orphanByPlate = new Map<string, { plate: string; companyId: string; rows: ContractNode[] }>();
+  for (const c of contracts) {
+    const companyId = String(c.view.rec.companyId || '');
+    const key = joinKey(companyId, c.plate);
+    if (!c.plate || vplates.has(key)) continue;
+    const hit = orphanByPlate.get(key);
+    if (hit) hit.rows.push(c);
+    else orphanByPlate.set(key, { plate: c.plate, companyId, rows: [c] });
   }
-  for (const [plate, cs] of orphanByPlate) {
+  for (const { plate, companyId, rows: cs } of orphanByPlate.values()) {
     const active = cs.find((c) => c.phase === '운행') ?? cs[cs.length - 1] ?? null;
     rows.push(rowFrom(plate, null, active, cs, {
-      companyId: String(active?.view.rec.companyId || ''), ownership: '처분완료', util: '차량없음', status: '차량없음', location: '차량없음', tone: 'mute',
+      companyId, ownership: '처분완료', util: '차량없음', status: '차량없음', location: '차량없음', tone: 'mute',
     }));
   }
 

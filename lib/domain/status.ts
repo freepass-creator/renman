@@ -66,13 +66,17 @@ export function isDeliveryPending(c: EntityRecord): boolean {
   return !!c.plate && !c.deliveredDate && !c.returnedDate && String(c.status || '') === '대기';
 }
 
-/** 반납 대상 — 인도완료 + 미반납 + 종료상태 아님 */
+/** 반납 대상 — 인도완료 + 미반납 + 종료상태 아님.
+ *  과거 이관 데이터는 deliveredDate 없이 status=운행만 남은 경우가 있으므로
+ *  명시적 운행 상태도 인도 완료 증거로 인정한다. */
 export function isReturnable(c: EntityRecord): boolean {
-  return !!c.plate && !!c.deliveredDate && !c.returnedDate && !isContractEndedStatus(c.status);
+  const status = String(c.status || '');
+  const delivered = !!c.deliveredDate || CONTRACT_ACTIVE.has(status);
+  return !!c.plate && delivered && !c.returnedDate && !isContractEndedStatus(status);
 }
 
 /* ── 미수 회수 SLA (구 collection.ts) ── */
-export type CollectionStage = '정상' | '경고' | '시동제어' | '내용증명' | '채권화';
+export type CollectionStage = '회수대기' | '경고' | '시동제어' | '내용증명' | '채권화';
 export interface CollectionInfo {
   stage: CollectionStage;
   tone: 'gray' | 'amber' | 'orange' | 'red' | 'purple';
@@ -85,7 +89,7 @@ export interface CollectionSLA { warn?: number; engineLock?: number; notice?: nu
 export function collectionStage(overdueDays: number, sla?: CollectionSLA): CollectionInfo {
   const warn = sla?.warn ?? 1, lock = sla?.engineLock ?? 3, notice = sla?.notice ?? 10, debt = sla?.debt ?? 30;
   const d = Math.max(0, Math.round(overdueDays));
-  if (d < warn) return { stage: '정상', tone: 'gray', nextAction: '', overdueDays: d };
+  if (d < warn) return { stage: '회수대기', tone: 'gray', nextAction: '납부·정산 확인', overdueDays: d };
   if (d < lock) return { stage: '경고', tone: 'amber', nextAction: '독촉 연락', overdueDays: d };
   if (d < notice) return { stage: '시동제어', tone: 'orange', nextAction: '시동 제어', overdueDays: d };
   if (d < debt) return { stage: '내용증명', tone: 'red', nextAction: '내용증명 발송', overdueDays: d };

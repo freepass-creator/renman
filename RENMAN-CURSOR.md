@@ -70,6 +70,10 @@ curl -s -o /dev/null -w "%{http_code}" http://localhost:6006/<route>   # 200
 
 | 날짜 | 작업자 | 내용 | 상태 |
 |---|---|---|---|
+| 2026-07-31 | Cursor | 오더4 자산공백: 자동차세필드·agenda/홈 · 매각입력·VEHICLE_OUT·재무처분손익 · rowKey=_key (②B store스탬프·③발번은 Claude점유 skip) | tsc0 · vitest48게이트 · curl200 |
+| 2026-07-31 | Cursor | 오더3 회차원장: schedule-ledger·계약「회차」탭·notify recipients·리스크만기문자 · tests+6 | tsc0 · vitest170 · rules36 · curl200 |
+| 2026-07-31 | Cursor | 오더2 엑셀내보내기: onView·useMemo cols · sheet-export·useSheetExport · PII_MASKERS · 6원장 우클릭메뉴 | tsc0 · vitest+8 · curl200 |
+| 2026-07-31 | Cursor | 오더1 직원콘솔: API list/role/reset/delete + suspend uid·마지막hq·audit · 경영관리「직원」탭 · /admin StaffConsole 제거 | tsc0 · vitest156 · rules36 · curl200 |
 | 2026-07-31 | Cursor | 오픈게이트: `open:scan`·`open:gate`(curl.exe)·`open:snapshot` · companyId flat경로 수정 · 스냅샷 switchplan 미수1.27억/과오납0/레거시0 | scan0 · vitest27 · tsc0 · curl200 |
 | 2026-07-31 | Cursor | QA돈잔여 R5·R7·R8·R6: _charges초주행·synthetic입금제외·과오납·reconcile보존 + 백필dry-run0건 | tsc0 · vitest135 · curl200 · 커밋분리 |
 | 2026-07-31 | Cursor | QA돈3: 보증금충당→_payments·레거시net · CMS집금과목유지·복구 · bank_tx txKey(잔액·#n) | tsc0 · curl200 · vitest7 · 커밋3 |

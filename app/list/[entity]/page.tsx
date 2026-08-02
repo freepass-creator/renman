@@ -2,8 +2,7 @@
 import { useParams, useRouter } from 'next/navigation';
 import { useSession } from '@/lib/session';
 import { ENTITIES, type EntityRecord } from '@/lib/intake/entities';
-import { computeAssetLedgerEntry } from '@/lib/payments/asset-ledger';
-import type { Vehicle } from '@/lib/payments/types';
+import { computeAssetLedgerEntry, vehicleRecordToAsset } from '@/lib/payments/asset-ledger';
 import { UploadCloud } from 'lucide-react';
 import { openIngest } from '@/lib/ui-bus';
 import { Page, Sec, Cards, Metric, DataTable, Btn, EmptyState, TextLink, won, C, Panel, LedgerActions, type Col, PageLoading } from '@/components/ui';
@@ -12,15 +11,12 @@ import { companyLabel } from '@/lib/companies';
 import { TODAY } from '@/lib/dashboard-consts';
 import { useEntityList } from '@/lib/use-entity-lists';
 
-// v6 차량 레코드 → 감가엔진(장부가). 증명서 OCR 데이터로 v5 Vehicle 타입 매핑.
+// v6 차량 레코드 → 감가엔진(장부가).
 function bookValue(rec: EntityRecord): number | null {
   const price = Number(rec.acquisitionPrice);
   if (!price) return null;
-  const v = {
-    id: String(rec._key || ''), plate: String(rec.plate || ''), model: String(rec.carName || ''),
-    status: '운행', purchasePrice: price, firstRegisteredDate: String(rec.firstReg || ''),
-  } as unknown as Vehicle;
-  return computeAssetLedgerEntry(v, TODAY).bookValue;
+  const entry = computeAssetLedgerEntry(vehicleRecordToAsset(rec), TODAY);
+  return entry.incomplete ? null : entry.bookValue;
 }
 
 export default function ListPage() {

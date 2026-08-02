@@ -139,7 +139,7 @@ export function buildHomeRiskRows(D: Dashboard): HomeQueueRow[] {
       id: riskUnpaidOpenId(v.rec),
       company: companyDisplay(v.rec.companyId),
       companyId: String(v.rec.companyId || ''),
-      kind: v.ended ? '종료미수' : '운행중미수',
+      kind: v.ended ? '계약종료 미수' : '계약유지 미수',
       plate: String(v.rec.plate || ''),
       title: String(v.rec.contractorName || '계약자 미정'),
       detail: v.overdueDays ? `${v.overdueDays}일 연체` : '미납',
@@ -337,8 +337,8 @@ export function hrefForTodayRow(row: HomeQueueRow): string {
       return '/risk?group=만기';
     case '반납지남':
     case '만기경과':
-    case '운행중미수':
-    case '종료미수':
+    case '계약유지 미수':
+    case '계약종료 미수':
     default:
       // 리스크 표 row id SSOT와 일치 — 그 건이 바로 열림.
       return `/risk?open=${open}`;

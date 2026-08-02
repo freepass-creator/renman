@@ -1,5 +1,8 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // QA/CI can build into an isolated directory without corrupting a running
+  // developer server's .next output (NEXT_DIST_DIR=.next-qa).
+  distDir: process.env.NEXT_DIST_DIR || '.next',
   poweredByHeader: false,
   reactStrictMode: false,
   async headers() {

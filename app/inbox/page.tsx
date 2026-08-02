@@ -25,12 +25,21 @@ import { WorkHubBack } from '@/components/WorkHubTabs';
 import { SignaturePad, dataUrlToFile } from '@/components/SignaturePad';
 import { Camera, Paperclip, PenLine } from 'lucide-react';
 import { useEntityLists } from '@/lib/use-entity-lists';
+import { DATA_CENTER_QUEUE_TITLE, MOBILE_CAPTURE_TITLE } from '@/lib/data-center-terms';
+import { useIsMobile } from '@/lib/use-mobile';
 
 type Target = 'vehicle' | 'contract' | 'bank_tx';
+type QueueFilter = '전체' | '확인필요' | '미분류' | '중복';
 const TARGET_LABEL: Record<Target, string> = { vehicle: '차량', contract: '계약', bank_tx: '자금' };
 const norm = (s: unknown) => String(s || '').replace(/\s/g, '');
+const processingState = (r: EntityRecord) => String(r.processingState || (r.status === '매칭' ? '처리완료' : '미분류'));
+const suggestedTarget = (r: EntityRecord): Target => {
+  const entity = String(r.suggestedEntity || '');
+  return entity === 'contract' ? 'contract' : entity === 'bank_tx' ? 'bank_tx' : 'vehicle';
+};
 
 export default function InboxPage() {
+  const mobile = useIsMobile();
   const { companyId, user } = useSession();
   const { data: [rows = [], vs = [], cs = [], bts = []], loading, reload } = useEntityLists(['inbox', 'vehicle', 'contract', 'bank_tx']);
   const [busy, setBusy] = useState(false);
@@ -39,20 +48,30 @@ export default function InboxPage() {
   const [matchRec, setMatchRec] = useState<EntityRecord | null>(null);
   const [mTarget, setMTarget] = useState<Target>('vehicle');
   const [mq, setMq] = useState('');
+  const [queueFilter, setQueueFilter] = useState<QueueFilter>('전체');
   const camRef = useRef<HTMLInputElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const pending = rows.filter((r) => String(r.status || '대기') === '대기')
     .sort((a, b) => String(b.createdAt || b.date || '').localeCompare(String(a.createdAt || a.date || '')));
+  const queueCounts = {
+    전체: pending.length,
+    확인필요: pending.filter((r) => processingState(r) === '확인필요').length,
+    미분류: pending.filter((r) => processingState(r) === '미분류').length,
+    중복: pending.filter((r) => processingState(r) === '중복').length,
+  };
+  const visiblePending = queueFilter === '전체' ? pending : pending.filter((r) => processingState(r) === queueFilter);
   const matched = rows.filter((r) => String(r.status) === '매칭')
     .sort((a, b) => String(b.matchedAt || b.createdAt || '').localeCompare(String(a.matchedAt || a.createdAt || '')));
 
   async function upload(file: File, kind: string) {
+    const target = resolveWriteCompany(companyId, null);
+    if (!target) { toast(NEED_COMPANY, 'error'); return; }
     setBusy(true);
-    const r = await uploadToInbox(file, kind, companyId, String(user.name || ''));
+    const r = await uploadToInbox(file, kind, target, String(user.name || ''));
     setBusy(false);
     if (!r.ok) { toast(r.reason === 'unconfigured' ? '저장소(Firebase) 미설정 — 업로드하려면 설정 필요' : '업로드 실패', 'error'); return; }
-    toast(`${kind} 업로드 완료 — 수집함 대기`, 'success'); reload();
+    toast(r.duplicate ? '동일 원본 확인 — 중복 접수 이력으로 보관' : `${kind} 업로드 완료 — 원본 처리함 대기`, r.duplicate ? 'info' : 'success'); reload();
   }
   async function saveSignature() {
     if (!signData) { setSign(false); return; }
@@ -89,7 +108,11 @@ export default function InboxPage() {
     }
     ops.push({
       entity: 'inbox', sessionCompanyId: companyId, rec: matchRec, key: String(matchRec._key || matchRec.inboxKey),
-      patch: { status: '매칭', matchedEntity: target, matchedKey: String(targetRec._key), plate: String(targetRec.plate || ''), matchedAt: new Date().toISOString() },
+      patch: {
+        status: '매칭', processingState: '처리완료', classificationState: '분류됨', intakeState: '처리완료',
+        assignmentState: '배정됨', matchedEntity: target, matchedKey: String(targetRec._key),
+        plate: String(targetRec.plate || ''), matchedAt: new Date().toISOString(),
+      },
     });
     try {
       await commitAll(ops);
@@ -107,9 +130,9 @@ export default function InboxPage() {
   }
 
   return (
-    <Page title="증빙수집" meta={`${user.name} · 대기 ${pending.length} · 매칭 ${matched.length}`}
+    <Page title={mobile ? MOBILE_CAPTURE_TITLE : DATA_CENTER_QUEUE_TITLE} meta={`${user.name} · 대기 ${pending.length} · 매칭 ${matched.length}`}
       tools={<WorkbenchBar mid={<WorkHubBack />} />}>
-      <Sec title="업로드" desc="현장에서 먼저 올리고, 나중에 차량·계약·자금에 매칭">
+      <Sec title={mobile ? '촬영·업로드' : '원본 추가'} desc={mobile ? '현장에서 먼저 수집하고 데이터센터에서 이어서 처리' : '원본을 먼저 보관하고 차량·계약·자금에 연결'}>
         <input ref={camRef} type="file" accept="image/*" capture="environment" style={{ display: 'none' }} onChange={(e) => { const f = e.target.files?.[0]; if (f) upload(f, '사진'); e.currentTarget.value = ''; }} />
         <input ref={fileRef} type="file" accept="image/*,application/pdf" style={{ display: 'none' }} onChange={(e) => { const f = e.target.files?.[0]; if (f) upload(f, '문서'); e.currentTarget.value = ''; }} />
         <div style={{ display: 'flex', gap: SPACE_M, flexWrap: 'wrap' }}>
@@ -134,9 +157,17 @@ export default function InboxPage() {
       </Sec>
 
       <Sec title="대기" n={pending.length} desc="차량·계약·자금에 매칭하면 정리됩니다">
+        <div style={{ marginBottom: 12 }}>
+          <PillTabs
+            size="sm"
+            tabs={(Object.keys(queueCounts) as QueueFilter[]).map((key) => ({ key, label: `${key} ${queueCounts[key]}` }))}
+            value={queueFilter}
+            onChange={setQueueFilter}
+          />
+        </div>
         {loading ? <PageLoading />
-          : pending.length === 0 ? <EmptyState>대기 중인 업로드 없음</EmptyState>
-            : <div style={{ display: 'flex', flexDirection: 'column', gap: SPACE_M }}>{pending.map((r) => {
+          : visiblePending.length === 0 ? <EmptyState>{pending.length ? `${queueFilter} 자료 없음` : '대기 중인 업로드 없음'}</EmptyState>
+            : <div style={{ display: 'flex', flexDirection: 'column', gap: SPACE_M }}>{visiblePending.map((r) => {
               // 매칭 = 그 자리 인라인 패널(팝업 아님). payments 수동연결 패턴.
               const isMatching = !!matchRec && String(matchRec._key || matchRec.inboxKey) === String(r._key || r.inboxKey);
               return (
@@ -144,8 +175,8 @@ export default function InboxPage() {
                   <ObjCard
                     badge={String(r.kind || '문서')}
                     title={String(r.filename || '—')}
-                    sub={`${String(r.uploadedBy || '')} · ${String(r.uploadedAt || '').slice(0, 16).replace('T', ' ')}`}
-                    right={<Btn size="sm" variant="ghost" onClick={() => { if (isMatching) { setMatchRec(null); setMq(''); } else { setMatchRec(r); setMTarget('vehicle'); setMq(''); } }}>{isMatching ? '닫기' : '매칭'}</Btn>}
+                    sub={`${String(r.processingState || '미분류')} · ${String(r.classificationReason || '내용 확인 필요')} · ${String(r.uploadedBy || '')} · ${String(r.uploadedAt || '').slice(0, 16).replace('T', ' ')}`}
+                    right={<Btn size="sm" variant="ghost" onClick={() => { if (isMatching) { setMatchRec(null); setMq(''); } else { setMatchRec(r); setMTarget(suggestedTarget(r)); setMq(String(r.plate || '')); } }}>{isMatching ? '닫기' : '확인·매칭'}</Btn>}
                   />
                   {isMatching && (
                     <div style={{ padding: 12, border: `1px solid ${C.accent}`, borderRadius: 'var(--radius)', background: 'var(--bg-card)' }}>

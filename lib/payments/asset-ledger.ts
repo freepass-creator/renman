@@ -14,6 +14,8 @@
  */
 
 import type { Vehicle } from './types';
+import type { EntityRecord } from '@/lib/intake/entities';
+import { VEHICLE_OUT } from '@/lib/domain/status';
 
 export type DepreciationPolicy = {
   /** 내용연수 (개월). 기본 60 (5년). */
@@ -26,6 +28,30 @@ export const DEFAULT_POLICY: DepreciationPolicy = {
   usefulLifeMonths: 60,
   salvageRate: 0.10,
 };
+
+/** EntityRecord(vehicle) → 감가엔진 Vehicle. status·saleDate·salePrice 실값 전달. */
+export function vehicleRecordToAsset(rec: EntityRecord): Vehicle {
+  const saleRaw = rec.salePrice;
+  let salePrice: number | undefined;
+  if (saleRaw !== undefined && saleRaw !== null && saleRaw !== '') {
+    const n = Number(saleRaw);
+    if (Number.isFinite(n)) salePrice = n;
+  }
+  return {
+    id: String(rec._key || rec.plate || ''),
+    plate: String(rec.plate || ''),
+    model: String(rec.carName || ''),
+    company: String(rec.companyId || '') as Vehicle['company'],
+    status: (String(rec.status || '') || '구매대기') as Vehicle['status'],
+    createdAt: String(rec.createdAt || ''),
+    purchasePrice: Number(rec.acquisitionPrice) || undefined,
+    firstRegisteredDate: String(rec.firstReg || '') || undefined,
+    purchasedDate: String(rec.purchasedDate || '') || undefined,
+    acquisitionDate: String(rec.acquisitionDate || '') || undefined,
+    saleDate: String(rec.saleDate || '') || undefined,
+    salePrice,
+  };
+}
 
 export type AssetLedgerEntry = {
   vehicleId: string;
@@ -66,8 +92,6 @@ function monthsBetween(startISO: string, endISO: string): number {
   return Math.floor((b - a) / (1000 * 60 * 60 * 24 * 30.4375));
 }
 
-const DISPOSED_STATUSES = new Set(['매각', '폐차']);
-
 export function computeAssetLedgerEntry(
   v: Vehicle,
   asOfDate: string,
@@ -76,7 +100,7 @@ export function computeAssetLedgerEntry(
   const acquisitionCost = v.purchasePrice ?? v.contractDocPrice ?? 0;
   // 취득일 우선순위: 매입완료일(purchasedDate) > 명시 취득일(acquisitionDate) > 최초등록일
   const acquisitionDate = v.purchasedDate ?? v.acquisitionDate ?? v.firstRegisteredDate;
-  const disposed = !!v.saleDate || DISPOSED_STATUSES.has(v.status ?? '');
+  const disposed = !!v.saleDate || VEHICLE_OUT.has(v.status ?? '');
   const cutoffDate = disposed && v.saleDate ? v.saleDate : asOfDate;
   const incomplete = acquisitionCost <= 0 || !acquisitionDate;
 

@@ -20,13 +20,24 @@ export type ReceivableActionStats = {
   noticeTodo: number;
   immob: number;
   lockTodo: number;
+  endedLockReview: number;
 };
 
 /** FacetRail「미수」칩 건수 — lens-filters 라벨과 동일 키. */
 export type ReceivableFacetCounts = Record<string, number>;
 
+/** 계약종료 채권에는 신규 시동제어 단계가 없다. 같은 SLA 구간은 정산·회수 경고로 처리한다. */
+export function collectionInfoForReceivable(v: Pick<ContractView, 'overdueDays' | 'ended'>): CollectionInfo {
+  const base = collectionStage(v.overdueDays);
+  if (v.ended && base.stage === '시동제어') {
+    return { ...base, stage: '경고', nextAction: '보증금 정산·잔존채권 확인' };
+  }
+  return base;
+}
+
 const EMPTY_FACET_COUNTS = (): ReceivableFacetCounts => ({
-  정상: 0, 경고: 0, 시동제어: 0, 내용증명: 0, 채권화: 0,
+  계약유지: 0, 계약종료: 0,
+  회수대기: 0, 경고: 0, 시동제어: 0, 내용증명: 0, 채권화: 0,
   '1~29일': 0, '30~89일': 0, '90일+': 0,
   미조치: 0, 내용증명발송: 0, 시동제어중: 0,
 });
@@ -57,7 +68,7 @@ export function buildReceivableRows(
       return {
         rec: c,
         v,
-        st: collectionStage(v.overdueDays),
+        st: collectionInfoForReceivable(v),
         contact: lastContact.get(String(c.plate || '')) || null,
       };
     })
@@ -67,22 +78,24 @@ export function buildReceivableRows(
 
 /** 현황 Metric — 내용증명 대상·시동제어 필요/중. */
 export function summarizeReceivableActions(rows: ReceivableRow[]): ReceivableActionStats {
-  let noticeTodo = 0, immob = 0, lockTodo = 0;
+  let noticeTodo = 0, immob = 0, lockTodo = 0, endedLockReview = 0;
   for (const r of rows) {
     const stage = r.st.stage;
     if ((stage === '내용증명' || stage === '채권화') && !r.rec.noticeSentDate) noticeTodo++;
-    if (r.rec.engineDisabled) immob++;
+    if (r.rec.engineDisabled && r.v.ended) endedLockReview++;
+    else if (r.rec.engineDisabled) immob++;
     if (!r.v.ended && !r.rec.engineDisabled && (stage === '시동제어' || stage === '내용증명' || stage === '채권화')) {
       lockTodo++;
     }
   }
-  return { noticeTodo, immob, lockTodo };
+  return { noticeTodo, immob, lockTodo, endedLockReview };
 }
 
 /** Facet 칩 건수 — 필터 술어와 동일 기준. */
 export function countReceivableFacets(rows: ReceivableRow[]): ReceivableFacetCounts {
   const c = EMPTY_FACET_COUNTS();
   for (const r of rows) {
+    c[r.v.ended ? '계약종료' : '계약유지']++;
     if (c[r.st.stage] != null) c[r.st.stage]++;
     const d = r.v.overdueDays;
     if (d >= 1 && d <= 29) c['1~29일']++;

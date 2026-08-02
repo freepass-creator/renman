@@ -1,6 +1,6 @@
 'use client';
 /**
- * 재무원장 — 계좌·CMS 같이 반영, 매칭은 자동+수동.
+ * 자금관리 원장 — 계좌·법인카드·자동이체와 일반 묶음 입출금을 함께 관리한다.
  *   · CMS 업로드 → CMS미연결 로 원장 표시(계좌 입금과 별도, 이중합산 X)
  *   · 통장 CMS집금 → CMS집금·미매칭 / 매칭 후 하위행 CMS연결
  *   · 집금 또는 미연결 클릭 → 수동 매칭 패널
@@ -9,16 +9,20 @@ import { useMemo, useState, useCallback, type MouseEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { Plus, X, Link2, Unlink, UploadCloud } from 'lucide-react';
 import { buildCashLedger, withCmsItemRows, buildBankAccountLedger, type CashRow, type BankAccountRow } from '@/lib/finance/cash-ledger';
-import { CASH_BASIC_COLS, CASH_CARD_DETAIL_SECTIONS, CASH_EXPANDED_COLS, CASH_TX_DETAIL_SECTIONS } from '@/lib/finance/cash-cols';
+import { CASH_BASIC_COLS, CASH_CARD_DETAIL_SECTIONS, CASH_EXPANDED_COLS, CASH_TX_DETAIL_SECTIONS, cashMoneyStatus } from '@/lib/finance/cash-cols';
 import {
   ACCOUNT_ALL_COLS, ACCOUNT_BASIC_COLS, ACCOUNT_DETAIL_SECTIONS,
 } from '@/lib/finance/account-cols';
 import { isUnclassified } from '@/lib/payments/ledger-subjects';
+import { LEDGER_SUBJECTS } from '@/lib/payments/ledger-subjects';
+import {
+  CASH_BUNDLE_TYPES, summarizeCashBundle, type CashBundleItem, type CashBundleType,
+} from '@/lib/finance/cash-bundle';
 import { latestDateOf, summarizeAccountLedgerStats, summarizeCashTxStats } from '@/lib/ledger-stats';
 import { useCashLedgerLists } from '@/lib/use-cash-ledger-lists';
 import { useEntityList } from '@/lib/use-entity-lists';
 import { textMatch } from '@/lib/search-match';
-import { notifySaved, openIngest, openCar } from '@/lib/ui-bus';
+import { notifySaved, openIngest, openCar, openPayments } from '@/lib/ui-bus';
 import { MigrateDataButton } from '@/components/MigrateDataButton';
 import { companyDisplay } from '@/lib/companies';
 import { TODAY } from '@/lib/dashboard-consts';
@@ -32,6 +36,8 @@ import {
 import { useSession } from '@/lib/session';
 import { resolveWriteCompany, NEED_COMPANY } from '@/lib/scope';
 import { toast } from '@/lib/toast';
+import { commitUpdate } from '@/lib/commit';
+import { safeUpdate } from '@/lib/safe-update';
 import {
   LedgerActions, LedgerActiveFilters, LedgerCreatePanel, LedgerFilterButton, LedgerFilterFields, LedgerFilterPanel, LedgerFrame, LedgerPanelFooter, LedgerRecordPanel, Btn, Input, Select, Search, PillTabs, PeriodBar, Badge, Message, ListBox, ListRow,
   C, ContextMenu, type ContextMenuItem, useSheetExport, won, type LedgerColView, type LedgerFormSection,
@@ -127,7 +133,7 @@ function CashBulkInputPanel({ onClose }: { onClose: () => void }) {
           )}
         </div>
       </div>
-      <LedgerPanelFooter hint={ready ? '입력원이 준비되었습니다. 분석·검토 단계는 데이터관리와 연결됩니다.' : '파일·링크·텍스트 중 하나를 입력하세요.'}>
+      <LedgerPanelFooter hint={ready ? '입력원이 준비되었습니다. 분석·검토 단계는 데이터센터와 연결됩니다.' : '파일·링크·텍스트 중 하나를 입력하세요.'}>
         <Btn size="sm" variant="ghost" onClick={onClose}>취소</Btn>
         <Btn size="sm" disabled>분석 준비</Btn>
       </LedgerPanelFooter>
@@ -280,10 +286,147 @@ function CmsMatchPanel({
   );
 }
 
+function CashBundlePanel({ row, companyId, actor, onClose, onDone }: {
+  row: CashRow;
+  companyId: string;
+  actor: string;
+  onClose: () => void;
+  onDone: () => void;
+}) {
+  const flow: '입금' | '출금' = row.inAmt > 0 ? '입금' : '출금';
+  const actualAmount = row.inAmt || row.outAmt;
+  const initialItems = Array.isArray(row.raw.bundleItems)
+    ? (row.raw.bundleItems as Array<Record<string, unknown>>).map((item, index): CashBundleItem => ({
+      id: String(item.id || `saved-${index + 1}`),
+      party: String(item.party || ''), memo: String(item.memo || ''),
+      amount: Number(item.amount) || 0, category: String(item.category || ''),
+      referenceId: String(item.referenceId || ''),
+    }))
+    : [];
+  const [bundleType, setBundleType] = useState<CashBundleType>(() => {
+    const saved = String(row.raw.bundleType || '');
+    return CASH_BUNDLE_TYPES.includes(saved as CashBundleType)
+      ? saved as CashBundleType
+      : flow === '입금' ? '일괄입금' : '일괄출금';
+  });
+  const [items, setItems] = useState<CashBundleItem[]>(initialItems);
+  const [fee, setFee] = useState(String(Number(row.raw.bundleFeeAmount) || ''));
+  const [saving, setSaving] = useState(false);
+  const summary = useMemo(() => summarizeCashBundle({
+    flow, actualAmount, feeAmount: Number(fee) || 0, items,
+  }), [flow, actualAmount, fee, items]);
+  const categories = LEDGER_SUBJECTS.filter((subject) =>
+    flow === '입금' ? subject.kind !== '지출' : subject.kind !== '수입');
+
+  const updateItem = (id: string, patch: Partial<CashBundleItem>) =>
+    setItems((current) => current.map((item) => item.id === id ? { ...item, ...patch } : item));
+  const addItem = () => setItems((current) => [...current, {
+    id: `bundle-${Date.now()}-${current.length + 1}`, party: '', memo: '', amount: 0, category: '',
+  }]);
+  const removeItem = (id: string) => setItems((current) => current.filter((item) => item.id !== id));
+
+  async function save() {
+    if (row.entity !== 'bank_tx') { toast('계좌 입출금만 묶음 분해할 수 있습니다.', 'error'); return; }
+    if (!resolveWriteCompany(companyId, row.raw)) { toast(NEED_COMPANY, 'error'); return; }
+    setSaving(true);
+    const cleaned = items.map((item) => ({
+      ...item,
+      party: item.party.trim(), memo: item.memo.trim(), category: item.category.trim(),
+      amount: Math.max(0, Number(item.amount) || 0),
+    }));
+    const nextSummary = summarizeCashBundle({ flow, actualAmount, feeAmount: Number(fee) || 0, items: cleaned });
+    const ok = await safeUpdate(async () => {
+      await commitUpdate({
+        entity: 'bank_tx', sessionCompanyId: companyId, rec: row.raw, key: row.recKey,
+        patch: {
+          bundleType,
+          bundleItems: cleaned,
+          bundleItemCount: nextSummary.itemCount,
+          bundleItemSum: nextSummary.itemSum,
+          bundleFeeAmount: nextSummary.feeAmount,
+          bundleExpectedAmount: nextSummary.expectedAmount,
+          bundleDifference: nextSummary.difference,
+          bundleReviewStatus: nextSummary.status,
+          bundleUpdatedAt: new Date().toISOString(),
+          bundleUpdatedBy: actor,
+        },
+      });
+    });
+    setSaving(false);
+    if (ok == null) return;
+    toast(`${bundleType} ${nextSummary.itemCount}건 · ${nextSummary.status}`, nextSummary.status === '대사완료' ? 'success' : 'info');
+    onDone();
+  }
+
+  return (
+    <section className="ledger-record-panel" aria-label="묶음 입출금 분해">
+      <header className="ledger-record-panel__header">
+        <span className="ledger-record-panel__icon" aria-hidden="true"><Link2 size={16} /></span>
+        <div className="ledger-record-panel__heading">
+          <div className="ledger-record-panel__eyebrow">자금 1차 분류</div>
+          <div className="ledger-record-panel__title">묶음 입출금 분해</div>
+          <div className="ledger-record-panel__identity">{row.date} · {row.party || row.accountName || '거래'} · {flow} {won(actualAmount)}</div>
+        </div>
+        <button type="button" className="ledger-record-panel__close" onClick={onClose} aria-label="묶음 분해 패널 닫기"><X size={16} /></button>
+      </header>
+      <div className="ledger-create-panel__body">
+        <Message variant="info">실제 계좌 거래는 한 번만 반영하고, 여기서는 구성내역과 수수료를 분해합니다. 덜 채운 상태도 미완료로 저장해 이어서 작업할 수 있습니다.</Message>
+        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(150px, 1fr) minmax(140px, 1fr)', gap: 10, marginTop: 12 }}>
+          <label className="ledger-create-panel__field"><span>묶음 유형</span>
+            <Select value={bundleType} onChange={(event) => setBundleType(event.target.value as CashBundleType)}>
+              {CASH_BUNDLE_TYPES.map((type) => <option key={type} value={type}>{type}</option>)}
+            </Select>
+          </label>
+          <label className="ledger-create-panel__field"><span>수수료·차감액</span>
+            <Input inputMode="numeric" value={fee} onChange={(event) => setFee(event.target.value.replace(/[^\d]/g, ''))} placeholder="0" />
+          </label>
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 16, marginBottom: 8 }}>
+          <b style={{ fontSize: 12.5 }}>구성내역</b>
+          <Badge tone={summary.status === '대사완료' ? 'green' : 'amber'}>{summary.status}</Badge>
+          <span style={{ flex: 1 }} />
+          <Btn size="sm" variant="ghost" onClick={addItem}><Plus size={14} /> 구성 추가</Btn>
+        </div>
+        {items.length === 0 ? <div style={{ padding: 14, border: `1px dashed ${C.line}`, color: C.mute, fontSize: 12.5 }}>아직 구성내역이 없습니다. 유형만 정해 미완료로 저장하거나 구성건을 추가하세요.</div> : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {items.map((item, index) => (
+              <div key={item.id} style={{ padding: 10, border: `1px solid ${C.line}`, borderRadius: 8, background: C.card }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '28px minmax(100px, 1fr) minmax(110px, 1fr) minmax(100px, 0.8fr) 34px', gap: 7, alignItems: 'end' }}>
+                  <b style={{ fontSize: 12, color: C.mute, alignSelf: 'center' }}>{index + 1}</b>
+                  <label className="ledger-create-panel__field"><span>거래처·대상</span><Input size="sm" value={item.party} onChange={(event) => updateItem(item.id, { party: event.target.value })} /></label>
+                  <label className="ledger-create-panel__field"><span>계정과목</span><Select size="sm" value={item.category} onChange={(event) => updateItem(item.id, { category: event.target.value })}><option value="">미분류</option>{categories.map((subject) => <option key={subject.code} value={subject.label}>{subject.label}</option>)}</Select></label>
+                  <label className="ledger-create-panel__field"><span>금액</span><Input size="sm" inputMode="numeric" value={item.amount || ''} onChange={(event) => updateItem(item.id, { amount: Number(event.target.value.replace(/[^\d]/g, '')) || 0 })} /></label>
+                  <Btn size="sm" variant="ghost" iconOnly tip={`${index + 1}번 구성 삭제`} onClick={() => removeItem(item.id)}><X size={14} /></Btn>
+                </div>
+                <label className="ledger-create-panel__field" style={{ marginTop: 7 }}><span>내용·근거</span><Input size="sm" value={item.memo} onChange={(event) => updateItem(item.id, { memo: event.target.value })} placeholder="급여명세·정비내역·정산 근거" /></label>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(120px, 1fr))', gap: 6, marginTop: 12, padding: 10, borderRadius: 8, background: C.head, fontSize: 12.5 }}>
+          <span>실제 {flow} <b>{won(summary.actualAmount)}</b></span>
+          <span>구성 합계 <b>{won(summary.itemSum)}</b></span>
+          <span>수수료 <b>{won(summary.feeAmount)}</b></span>
+          <span>계산 금액 <b>{won(summary.expectedAmount)}</b></span>
+          <span>차이 <b style={{ color: Math.abs(summary.difference) < 1 ? C.ok : C.danger }}>{won(summary.difference)}</b></span>
+          <span>미분류 <b style={{ color: summary.unclassifiedCount ? C.warn : C.ok }}>{summary.unclassifiedCount}건</b></span>
+          <span>필수누락 <b style={{ color: summary.requiredMissingCount ? C.warn : C.ok }}>{summary.requiredMissingCount}건</b></span>
+        </div>
+      </div>
+      <LedgerPanelFooter hint={summary.status === '대사완료' ? '원본 금액과 구성내역이 일치합니다.' : '미완료로 저장되며 자금일보 마감 전 계속 보완할 수 있습니다.'}>
+        <Btn size="sm" variant="ghost" onClick={onClose}>닫기</Btn>
+        <Btn size="sm" onClick={() => void save()} disabled={saving}>{saving ? '저장 중…' : `${summary.status} 저장`}</Btn>
+      </LedgerPanelFooter>
+    </section>
+  );
+}
+
 export default function CashLedgerPage() {
   const mobile = useIsMobile();
   const router = useRouter();
-  const { companyId, isOperator } = useSession();
+  const { companyId, isOperator, user } = useSession();
   const { bank, card, loading, error: loadError, reload } = useCashLedgerLists();
   const { rows: accountRecords, loading: accountLoading } = useEntityList('bank_account');
   const [ctxMenu, setCtxMenu] = useState<{ open: boolean; x: number; y: number }>({ open: false, x: 0, y: 0 });
@@ -331,6 +474,7 @@ export default function CashLedgerPage() {
   const [selected, setSelected] = useState<CashRow | null>(null);
   const [selectedAccount, setSelectedAccount] = useState<BankAccountRow | null>(null);
   const [creating, setCreating] = useState<'account' | 'transaction' | 'bulk' | null>(null);
+  const [bundleEditing, setBundleEditing] = useState(false);
   const [singleKind, setSingleKind] = useState<CashInputKind>('계좌거래');
   const scopedCashRows = useMemo(() => allRows.filter((row) => {
     if (row.nest === 'cms-item') return false;
@@ -392,9 +536,10 @@ export default function CashLedgerPage() {
       if (unclassifiedOnly && !isUnclassified(r.category)) return false;
       if (!matchLedgerFilters(r, txFilters, {
         category: eqFilter<CashRow>((row) => row.category),
-        match: eqFilter<CashRow>((row) => String(row.raw.reconciliationStatus || '')),
+        match: eqFilter<CashRow>((row) => cashMoneyStatus(row)),
+        bundleStatus: eqFilter<CashRow>((row) => row.nest === 'bundle-parent' ? String(row.raw.bundleReviewStatus || '미완료') : ''),
       })) return false;
-      if (!textMatch(q, r.party, r.account, r.category, r.memo, r.date, r.raw.dataAlert, r.raw.reconciliationStatus, companyDisplay(r.companyId), r.companyId)) return false;
+      if (!textMatch(q, r.party, r.account, r.category, r.memo, r.date, r.raw.dataAlert, cashMoneyStatus(r), r.raw.bundleType, r.raw.bundleReviewStatus, companyDisplay(r.companyId), r.companyId)) return false;
       return true;
     };
     const out: CashRow[] = [];
@@ -406,7 +551,6 @@ export default function CashLedgerPage() {
     return out;
   }, [allRows, ledgerKind, flow, sourceQuickFilter, unclassifiedOnly, txFilters, q, range.from, range.to]);
   const cashCategories = useMemo(() => [...new Set(allRows.map((r) => r.category).filter(Boolean))].sort(), [allRows]);
-  const matchStatuses = useMemo(() => [...new Set(allRows.map((r) => String(r.raw.reconciliationStatus || '')).filter(Boolean))].sort(), [allRows]);
   const accountTypes = useMemo(() => [...new Set(accountRows.map((r) => r.accountType).filter(Boolean))].sort(), [accountRows]);
 
   /** 통장 현금흐름·CMS·알람 — ledger-stats SSOT. */
@@ -489,6 +633,7 @@ export default function CashLedgerPage() {
     unclassified: unclassifiedOnly ? '예' : '',
     category: txFilters.category,
     match: txFilters.match,
+    bundleStatus: txFilters.bundleStatus,
   };
   const cashFilterCount = countActiveFilters(
     { ...cashFilterValues, accountStatus: accountStatusFilter === '사용중' ? '' : cashFilterValues.accountStatus },
@@ -551,7 +696,8 @@ export default function CashLedgerPage() {
           sourceQuick: ledgerKind === 'CMS 원천내역' ? ['정산완료', '미정산'] : ['승인', '취소'],
           unclassified: [{ value: '예', label: '미분류만' }],
           category: cashCategories,
-          match: matchStatuses,
+          match: ['미분류', '집금대기', '미매칭', '제안있음', '매칭완료', '해당없음'],
+          bundleStatus: ['미완료', '대사완료'],
         }}
       />
     </LedgerFilterPanel>
@@ -630,7 +776,7 @@ export default function CashLedgerPage() {
       <>
       <LedgerFrame
         title="자금관리"
-        meta="계좌·입출금·CMS"
+        meta="계좌·입출금·법인카드·자동이체 · 묶음 1차 분류"
         right={createActions}
         colView={colView}
         onColView={setColView}
@@ -643,14 +789,6 @@ export default function CashLedgerPage() {
             style={{ width: mobile ? 160 : 280, flexShrink: 0 }}
           />
           <LedgerFilterButton open={filterOpen} count={cashFilterCount} onClick={() => setFilterOpen((o) => !o)} />
-          {!filterOpen && (
-            <LedgerActiveFilters
-              defs={cashFilterDefs} values={cashFilterValues}
-              onClear={(key: string) => onCashFilterChange(key, '')}
-              onClearAll={() => cashFilterDefs.forEach((d) => onCashFilterChange(d.key, ''))}
-            />
-          )}
-          {/* 필터 창이 닫혀 있어도 «무엇을 보고 있는지» 알아야 한다 — 칩을 누르면 그 축만 해제. */}
           {!filterOpen && (
             <LedgerActiveFilters
               defs={cashFilterDefs} values={cashFilterValues}
@@ -687,7 +825,7 @@ export default function CashLedgerPage() {
             sections={ACCOUNT_CREATE_SECTIONS}
             initial={{ status: '사용중', importMethod: '수기' }}
             prefix={singleKindTabs}
-            fileIngest={{ label: '통장 담기 (데이터관리)', onClick: () => openIngest('bank_tx') }}
+            fileIngest={{ label: '통장 담기 (데이터센터)', onClick: () => openIngest('bank_tx') }}
             onClose={() => setCreating(null)}
           />
         ) : selectedAccount ? (
@@ -735,7 +873,7 @@ export default function CashLedgerPage() {
     );
   }
 
-  const ledgerMeta = '계좌·입출금·CMS';
+  const ledgerMeta = '계좌·입출금·법인카드·자동이체 · 묶음 1차 분류';
   const ledgerEmpty = (
     <>
       {ledgerKind === 'CMS 원천내역'
@@ -780,7 +918,7 @@ export default function CashLedgerPage() {
       }
       stats={
         <span style={{ fontSize: 12.5, whiteSpace: 'nowrap', display: 'inline-flex', gap: 12, flexWrap: 'wrap' }}>
-          <span>{ledgerKind === 'CMS 원천내역' ? 'CMS' : ledgerKind === '법인카드 원천내역' ? '카드' : '계좌'} <b>{rows.length}</b></span>
+          <span>{ledgerKind === 'CMS 원천내역' ? 'CMS' : ledgerKind === '법인카드 원천내역' ? '카드' : '거래'} <b>{rows.length.toLocaleString('ko-KR')}</b>건</span>
           {ledgerKind === '입출금내역' && <span>입금 <b style={{ color: C.ok }}>{amt(inSum)}</b></span>}
           {ledgerKind === '입출금내역' && <span>출금 <b>{amt(outSum)}</b></span>}
           {ledgerKind === 'CMS 원천내역' && cmsPendingCount > 0 && (
@@ -799,9 +937,10 @@ export default function CashLedgerPage() {
       onRowContextMenu={openCtx}
       onRowDoubleClick={(row) => {
         setCreating(null);
+        setBundleEditing(false);
         setSelected(row);
       }}
-      onCloseDetail={() => setSelected(null)}
+      onCloseDetail={() => { setSelected(null); setBundleEditing(false); }}
       sidePanel={creating === 'bulk' ? (
         <CashBulkInputPanel onClose={() => setCreating(null)} />
       ) : creating === 'transaction' ? (
@@ -812,7 +951,7 @@ export default function CashLedgerPage() {
           sections={singleKind === '법인카드' ? CARD_TX_CREATE_SECTIONS : CASH_TX_CREATE_SECTIONS}
           initial={{ txDate: new Date().toISOString().slice(0, 10), method: singleKind === 'CMS' ? 'CMS' : '계좌' }}
           prefix={singleKindTabs}
-          fileIngest={{ label: '통장 담기 (데이터관리)', onClick: () => openIngest('bank_tx') }}
+          fileIngest={{ label: '통장 담기 (데이터센터)', onClick: () => openIngest('bank_tx') }}
           onClose={() => setCreating(null)}
         />
       ) : selected?.nest === 'cms-dep' ? (
@@ -824,6 +963,15 @@ export default function CashLedgerPage() {
           onClose={() => setSelected(null)}
           onDone={onDoneMatch}
         />
+      ) : selected && bundleEditing ? (
+        <CashBundlePanel
+          key={selected.id}
+          row={selected}
+          companyId={companyId}
+          actor={user.email}
+          onClose={() => setBundleEditing(false)}
+          onDone={() => { setSelected(null); setBundleEditing(false); reload(); }}
+        />
       ) : selected ? (
         <LedgerRecordPanel
           title={`${selected.date || '일자 없음'} · ${selected.category || '거래'}`}
@@ -833,19 +981,22 @@ export default function CashLedgerPage() {
           cols={CASH_EXPANDED_COLS}
           sections={selected.entity === 'card_tx' ? CASH_CARD_DETAIL_SECTIONS : CASH_TX_DETAIL_SECTIONS}
           onClose={() => setSelected(null)}
-          actions={String(selected.raw.matchedContractId || selected.raw.plate || '') ? (
-            <Btn
-              size="sm"
-              variant="ghost"
-              onClick={() => {
-                const plate = String(selected.raw.plate || '');
-                if (plate) openCar(plate);
-                else router.push('/contract');
-              }}
-            >
-              연결 계약
-            </Btn>
-          ) : undefined}
+          actions={(
+            <>
+              {selected.entity === 'bank_tx' && (!selected.nest || selected.nest === 'bundle-parent') ? (
+                <Btn size="sm" onClick={() => setBundleEditing(true)}>{selected.nest === 'bundle-parent' ? '묶음 수정' : '묶음 분해'}</Btn>
+              ) : null}
+              {String(selected.raw.plate || '') ? (
+                <Btn size="sm" variant="ghost" onClick={() => openCar(selected.raw.plate, undefined, selected.companyId)}>차량 360</Btn>
+              ) : null}
+              {String(selected.raw.matchedContractId || '') ? (
+                <Btn size="sm" variant="ghost" onClick={() => router.push(`/contract?open=${encodeURIComponent(String(selected.raw.matchedContractId))}`)}>연결 계약</Btn>
+              ) : null}
+              {selected.inAmt > 0 && !String(selected.raw.matchedContractId || '') ? (
+                <Btn size="sm" onClick={() => openPayments()}>입금 매칭</Btn>
+              ) : null}
+            </>
+          )}
         />
       ) : null}
     />

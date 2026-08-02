@@ -5,7 +5,7 @@ import { useIsMobile } from '@/lib/use-mobile';
 import { useSession } from '@/lib/session';
 import { haptic } from '@/lib/haptics';
 import { C, R, SH, thX, thXR, thXC, thXPin, tdX, tdXR, tdXC, tdXPin, ctrlH, ctrlFs } from './tokens';
-import { ObjCard, Cards } from './misc';
+import { ObjCard, Cards, type ObjCardProps } from './misc';
 import { Search } from './controls';
 
 /**
@@ -17,7 +17,7 @@ import { Search } from './controls';
  *   · 열 간 AND · 열 안 OR (엑셀과 동일)
  *   · 체크리스트 값 = **셀에 보이는 문자열 그대로**(col.text). 보이는 것만 고를 수 있어야 헷갈리지 않는다.
  *   · 개수는 «다른 열 필터를 반영한» 교차집계 — 내 열만 빼고 센다. 그래야 숫자가 실제 결과와 맞는다.
- *   · 필터는 원자 안에 산다. 페이지는 onFiltered 로 결과만 받아 건수·CSV에 쓴다(집계 손롤 금지).
+ *   · 필터는 원자 안에 산다. 페이지는 onView 로 보이는 rows·cols 를 받아 건수·엑셀에 쓴다(집계 손롤 금지).
  *
  * 회사열: key=`company` 는 다회사(scopeAll)만. 단일회사 세션은 ExcelSheet가 숨김(페이지 손롤 금지).
  */
@@ -33,12 +33,14 @@ export type SheetCol<T> = {
   /** 좌측 틀고정 — 고정 칸은 자기 배경이 필요해 행 호버가 끊긴다. 꼭 필요할 때만. */
   pin?: boolean;
   render: (row: T) => React.ReactNode;
-  /** CSV·검색·헤더필터 공용 평문. 없으면 그 열은 필터 불가. */
+  /** CSV·검색·헤더필터·엑셀 공용 평문. 없으면 그 열은 필터·내보내기 불가. */
   text?: (row: T) => string | number;
   /** 숫자 정렬 허용(정렬 바 노출). 기본=문자 정렬만. */
   sortNum?: boolean;
   /** 한 칸에 값이 여럿(옵션·태그) — 체크리스트를 값 단위로 쪼갠다. */
   values?: (row: T) => string[];
+  /** 엑셀 셀 서식. 화면 render에 영향 없음. 없으면 text() 타입으로 추론. */
+  xf?: 'money' | 'int' | 'rate' | 'date' | 'text';
 };
 
 type ColSort = { key: string; dir: 'asc' | 'desc' } | null;
@@ -138,9 +140,9 @@ function FilterPop<T>({ col, x, y, rows, sel, onSel, sort, onSort, onClose }: {
 
 export function ExcelSheet<T>({
   cols, rows, onRow, onRowDoubleClick, rowKey, selectedRowKey,
-  onFiltered, mode = 'excel', fit = false, rowClickable,
+  onView, mode = 'excel', fit = false, rowClickable,
   selectedKeys,
-  onRowMouseDown, onRowClickEvent, onRowContextMenu,
+  onRowMouseDown, onRowClickEvent, onRowContextMenu, mobileCard,
 }: {
   cols: SheetCol<T>[];
   rows: T[];
@@ -152,8 +154,8 @@ export function ExcelSheet<T>({
   onRowDoubleClick?: (row: T) => void;
   rowKey?: (row: T, i: number) => string;
   selectedRowKey?: string | null;
-  /** 필터·정렬 적용 결과 — 페이지 건수·CSV가 이걸 쓴다. */
-  onFiltered?: (rows: T[]) => void;
+  /** 헤더필터·정렬·회사열 규칙이 반영된 «지금 보이는» rows·cols. */
+  onView?: (v: { rows: T[]; cols: SheetCol<T>[] }) => void;
   /** 보기 모드 — 같은 cols로 표/카드를 그린다. 모바일은 항상 카드(표는 손가락으로 못 읽는다). */
   mode?: 'excel' | 'card';
   /** 기본보기: 가로 스크롤 없이 현재 표 영역에 맞추고 낮은 중요도 열을 자동 숨김. */
@@ -168,6 +170,8 @@ export function ExcelSheet<T>({
   onRowClickEvent?: (e: React.MouseEvent, row: T, index: number) => void;
   /** 우클릭 메뉴. */
   onRowContextMenu?: (e: React.MouseEvent, row: T, index: number) => void;
+  /** Mobile task card identity, status and priority values; independent of desktop column order. */
+  mobileCard?: (row: T) => Omit<ObjCardProps, 'onClick' | 'style'>;
 }) {
   const mobile = useIsMobile();
   const { scopeAll } = useSession();
@@ -181,6 +185,7 @@ export function ExcelSheet<T>({
   const [colFilter, setColFilter] = React.useState<Record<string, Set<string>>>({});
   const [colSort, setColSort] = React.useState<ColSort>(null);
   const [openCol, setOpenCol] = React.useState<{ key: string; x: number; y: number } | null>(null);
+  const [mobileLimit, setMobileLimit] = React.useState(25);
   const clickTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
   const byKey = React.useMemo(() => new Map(visibleCols.map((c) => [c.key, c])), [visibleCols]);
 
@@ -205,21 +210,25 @@ export function ExcelSheet<T>({
     return out;
   }, [rows, colFilter, colSort, byKey]);
 
-  React.useEffect(() => { onFiltered?.(view); }, [view, onFiltered]);
+  React.useEffect(() => { onView?.({ rows: view, cols: visibleCols }); }, [view, visibleCols, onView]);
+  React.useEffect(() => { setMobileLimit(25); }, [rows, colFilter, colSort]);
 
   if (mobile || mode === 'card') {
     // 목록 = 그룹 카드 규격(Cards). 체크박스 없음.
     return (
       <Cards>
-        {view.map((r, i) => {
+        {view.slice(0, mobileLimit).map((r, i) => {
           const key = rowKey?.(r, i) ?? String(i);
           const multi = !!selectedKeys?.has(key);
+          const mobileProps = mobileCard?.(r);
           return (
             <div key={key} style={{ display: 'flex', alignItems: 'stretch', gap: 8 }}>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <ObjCard
-                  title={visibleCols[0]?.render(r)}
-                  fields={visibleCols.slice(1, 5).map((c) => [c.label, c.render(r)] as [React.ReactNode, React.ReactNode])}
+                  {...(mobileProps ?? {
+                    title: visibleCols[0]?.render(r),
+                    fields: visibleCols.slice(1, 5).map((c) => [c.label, c.render(r)] as [React.ReactNode, React.ReactNode]),
+                  })}
                   style={multi ? { background: 'var(--bg-selected)' } : undefined}
                   onClick={(onRowDoubleClick || onRow) ? () => {
                     haptic.tap();
@@ -230,6 +239,16 @@ export function ExcelSheet<T>({
             </div>
           );
         })}
+        {view.length > mobileLimit && (
+          <button
+            type="button"
+            className="excel-sheet__load-more"
+            onClick={() => setMobileLimit((limit) => Math.min(limit + 25, view.length))}
+          >
+            {Math.min(25, view.length - mobileLimit)}개 더 보기
+            <span>{mobileLimit.toLocaleString()} / {view.length.toLocaleString()}</span>
+          </button>
+        )}
       </Cards>
     );
   }

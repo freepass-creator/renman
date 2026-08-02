@@ -168,10 +168,10 @@ export function computeDashboard(input: DashboardInput, today: string) {
     loanCount,                      // 할부(상환) 차량수
     misuTotal: totalUnpaid,         // 현재 미수 총액(운행중+반납추심)
     misuCount: recv.unpaidCount,    // 현재 미수 건수(net>0)
-    misuActive,                     // 운행중 미수
-    misuActiveCount,                // 운행중 미수 건수
-    misuReturned,                   // 반납 추심잔여
-    misuReturnedCount,              // 반납 추심 건수
+    misuActive,                     // 계약유지 미수
+    misuActiveCount,                // 계약유지 미수 건수
+    misuReturned,                   // 계약종료 추심잔여
+    misuReturnedCount,              // 계약종료 추심 건수
     overpayTotal: recv.overpayTotal, // 과오납 합
     cashIn, cashOut, cashNet: cashIn - cashOut, // 자금 입/출/순증감
     txCount: bankTx.length,         // 자금(계좌거래) 건수

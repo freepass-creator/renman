@@ -58,7 +58,7 @@ const Add = ({ type, plate, label }: { type: string; plate: string; label: strin
 );
 
 /** freepass-style 차량 상세 — 고정 스크롤 레이아웃(DnD/순서 없음). embed=원장 우측 패널. */
-export function VehicleDetail({ plate, focus, embed }: { plate: string; focus?: string; embed?: boolean }) {
+export function VehicleDetail({ plate, focus, embed, companyId: targetCompanyId }: { plate: string; focus?: string; embed?: boolean; companyId?: string }) {
   const {
     loading, companyId, v, contracts, penalties, history, active, waiting, totalUnpaid, d, schedule,
     master, status, statusTone, loan, loanSum, lastReturn, idleDays, loc, locStr, target, workList,
@@ -69,7 +69,7 @@ export function VehicleDetail({ plate, focus, embed }: { plate: string; focus?: 
     delVehicle, commitTx, commitDeliver, logIgnition, settleDeposit, chg, startEdit, cancelEdit,
     saveInfo, registerProduct, insChg, startEditIns, saveIns, onReplaceReg, onReplaceIns,
     saveRecord, goSec, doTransition,
-  } = useVehicleDetail(plate, focus);
+  } = useVehicleDetail(plate, focus, targetCompanyId);
 
   if (loading) return <PageLoading />;
 
@@ -252,7 +252,7 @@ export function VehicleDetail({ plate, focus, embed }: { plate: string; focus?: 
             </div>
           ) : (
             <div id="v-contract" style={{ marginTop: 12 }}>
-              <EmptyState variant="sec">진행 중 계약 없음 · 오른쪽 “+ 계약”으로 담기</EmptyState>
+              <EmptyState variant="sec">진행 중 계약 없음 · “+ 계약” 버튼으로 담기</EmptyState>
             </div>
           )}
         </Sec>
@@ -616,7 +616,7 @@ export function VehicleDetail({ plate, focus, embed }: { plate: string; focus?: 
                 </div>
               </div>
             );
-          })}</div> : <EmptyState variant="sec">수선/작업 이력 없음 · 오른쪽 “+ 수선/작업”으로 남기세요</EmptyState>}
+          })}</div> : <EmptyState variant="sec">수선/작업 이력 없음 · “+ 수선/작업” 버튼으로 남기세요</EmptyState>}
         </Sec>
 
         <Sec id="v-history" title="활동 · 이력" n={history.length} tone={logOpen ? 'ok' : undefined} right={<Btn variant="ghost" onClick={() => setLogOpen((o) => !o)}>{logOpen ? '닫기' : '+ 기록'}</Btn>}>
@@ -628,7 +628,7 @@ export function VehicleDetail({ plate, focus, embed }: { plate: string; focus?: 
             const tone = (cat === '사고' ? 'red' : cat === '이동' ? 'blue' : (cat === '통화' || cat === '문자') ? 'green' : (cat === '방문' || cat === '상담') ? 'purple' : cat === '메모' ? 'gray' : cat === '검사' ? 'teal' : 'amber') as 'red' | 'blue' | 'green' | 'purple' | 'gray' | 'teal' | 'amber';
             const who = isComm(h) ? (contracts.find((c) => matchesContract(h, c))?.contractorName || h.customer || '') : '';
             return <ObjCard key={i} badge={cat} badgeTone={tone} title={String(h.title || '—')} right={h.cost ? won(h.cost) : (h.nextDate ? <span style={{ color: C.warn, fontSize: 11.5 }}>후속 {String(h.nextDate)}</span> : undefined)} fields={[['일자', String(h.date || '—')], ...(who ? [['상대', String(who)] as [string, string]] : []), [h.author ? '작성' : '업체', String(h.author || h.vendor || '—')]]} />;
-          })}</Cards> : <EmptyState variant="sec">기록 없음 · 오른쪽 “+ 기록”으로 남기세요</EmptyState>}
+          })}</Cards> : <EmptyState variant="sec">기록 없음 · “+ 기록” 버튼으로 남기세요</EmptyState>}
         </Sec>
       </div>
 

@@ -16,7 +16,7 @@ import { useEntityList } from '@/lib/use-entity-lists';
 import { commitSave } from '@/lib/commit';
 import { toast } from '@/lib/toast';
 import {
-  listTemplates, getTemplate, renderBody, buildDocNo, computeNextSeq, fmtKDate, fmtKMoney,
+  listTemplates, getTemplate, renderBody, buildCompanyDocNo, computeNextCompanySeq, fmtKDate, fmtKMoney,
   DOC_CATEGORIES, DOC_PRINT_CSS, type DocCategory,
 } from '@/lib/doc-templates';
 import { todayKST } from '@/lib/contracts/dates';
@@ -64,8 +64,10 @@ export default function DocIssuePage() {
         ? { name: fieldData._targetName || '', bizRegNo: fieldData._targetBizRegNo || '', ceo: fieldData._targetCeo || '', mainPhone: fieldData._targetPhone || '', address: fieldData._targetAddress || '' }
         : undefined;
 
-  const nextSeq = template ? computeNextSeq(issued as { docNo?: string }[], template.prefix) : 1;
-  const docNo = template ? buildDocNo(template.prefix, nextSeq) : '';
+  const nextSeq = template && issuerId
+    ? computeNextCompanySeq(issued as { docNo?: string; companyId?: unknown }[], issuerId, template.prefix)
+    : 1;
+  const docNo = template && issuerId ? buildCompanyDocNo(issuerId, template.prefix, nextSeq) : '';
 
   const previewBody = useMemo(() => {
     if (!template) return '';
@@ -122,11 +124,11 @@ export default function DocIssuePage() {
       meta={template?.title || '재직·거래사실·입금확인·위임장'}
       tools={
         <WorkbenchBar
-          mid={<span style={{ fontSize: 11.5, color: C.faint, whiteSpace: 'nowrap' }}>문서번호 <b style={{ fontFamily: 'var(--font-mono)' }}>{docNo}</b> · {fmtKDate(today())}</span>}
+          mid={<span style={{ fontSize: 11.5, color: C.faint, whiteSpace: 'nowrap' }}>문서번호 <b style={{ fontFamily: 'var(--font-mono)' }}>{docNo || '회사 선택 후 채번'}</b> · {fmtKDate(today())}</span>}
           actions={<>
             <Btn variant="ghost" href="/docs">← 발급 이력</Btn>
-            <Btn variant="ghost" onClick={print} disabled={!template}>인쇄 / PDF</Btn>
-            <Btn onClick={issue} disabled={saving || !template}>{saving ? '발급 중…' : '발급 (기록 저장)'}</Btn>
+            <Btn variant="ghost" onClick={print} disabled={!template || !issuerId}>인쇄 / PDF</Btn>
+            <Btn onClick={issue} disabled={saving || !template || !issuerId}>{saving ? '발급 중…' : '발급 (기록 저장)'}</Btn>
           </>}
         />
       }

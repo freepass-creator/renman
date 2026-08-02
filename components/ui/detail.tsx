@@ -180,7 +180,7 @@ export function FormGrid({
         const emptyHint = f.manual && empty ? { backgroundColor: 'var(--orange-bg)' } as const : undefined;
         return (
           <label key={f.key} style={{ fontSize: 12, color: C.mute }}>
-            {f.label}{f.required && <span style={{ color: C.danger }}> *</span>}{f.manual && <span style={{ color: 'var(--orange-text)' }}> ·직접</span>}
+            {f.label}{f.required && <span style={{ color: C.danger }}> *</span>}
             {f.type === 'select' ? (
               <Select value={val} onChange={(e) => onChange(f.key, e.target.value)} style={{ width: '100%', marginTop: 6, ...emptyHint }}>
                 <option value="">—</option>

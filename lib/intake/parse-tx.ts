@@ -192,24 +192,45 @@ export function assignBankTxKeys(rows: EntityRecord[]): EntityRecord[] {
   return rows;
 }
 
-export async function parseTxFile(file: File): Promise<EntityRecord[]> {
+export type TxParseRejection = { sheet: string; row: number; reason: string; values: Record<string, unknown> };
+export type TxParseReport = {
+  records: EntityRecord[];
+  rejected: TxParseRejection[];
+  warnings: string[];
+};
+
+function bankRejectReason(row: Record<string, unknown>, cms: boolean): string {
+  const status = get(row, '수납상태', '납부상태', '결제상태');
+  if (status && /미납|연체|미수|취소|정지|보류|실패/.test(status)) return `미완료 거래 상태(${status})`;
+  const date = normalizeKoreanDate(get(row, '거래일자', '거래일', '거래일시', '거래시각', '거래시간', '입금일', '출금일', '일자', '발생일', '처리일', '결제일', '청구완납일자', '수납일'));
+  if (!date) return '거래일을 판독할 수 없음';
+  if (cms && !get(row, '회원명', '고객명', '납부자', '납부자명')) return 'CMS 회원·납부자 없음';
+  return '입금·출금 금액을 판독할 수 없음';
+}
+
+export async function parseTxFileReport(file: File): Promise<TxParseReport> {
   const buf = await file.arrayBuffer();
   const wb = XLSX.read(buf, { type: 'array', cellDates: true });
   const bankHint = detectBankFromFileName(file.name);
   const out: EntityRecord[] = [];
+  const rejected: TxParseRejection[] = [];
+  const warnings: string[] = [];
   for (const sheetName of wb.SheetNames) {
     const ws = wb.Sheets[sheetName];
     if (!ws) continue;
     const aoa = XLSX.utils.sheet_to_json<unknown[]>(ws, { header: 1, blankrows: false, defval: null }) as unknown[][];
     if (aoa.length < 2) continue;
     const det = detectHeaderRow(aoa);
-    if (det.kind === 'unknown') continue;
+    if (det.kind === 'unknown') {
+      warnings.push(`${sheetName}: 거래내역 헤더를 찾지 못함`);
+      continue;
+    }
     const rawHeaders = (aoa[det.headerRow] || []).map((v, i) => (v == null || v === '' ? `col${i + 1}` : String(v).trim().replace(/\s*\*\s*$/, '')));
     const dropIdx = new Set<number>();
     rawHeaders.forEach((h, i) => { if (CHECKBOX_RE.test(h)) dropIdx.add(i); });
     const headers = rawHeaders.filter((_, i) => !dropIdx.has(i));
     const isCms = det.kind === 'auto-debit';
-    for (const r of aoa.slice(det.headerRow + 1)) {
+    for (const [offset, r] of aoa.slice(det.headerRow + 1).entries()) {
       if (!r.some((v) => v != null && String(v).trim() !== '')) continue;
       if (FOOTER_RE.test(String(r[0] ?? '').trim()) || FOOTER_RE.test(String(r[1] ?? '').trim())) continue;
       const filtered = dropIdx.size === 0 ? r : r.filter((_, i) => !dropIdx.has(i));
@@ -217,7 +238,12 @@ export async function parseTxFile(file: File): Promise<EntityRecord[]> {
       headers.forEach((h, i) => { obj[h] = filtered[i] ?? null; });
       const rec = isCms ? parseCmsRow(obj, file.name) : parseBankRow(obj, file.name, bankHint);
       if (rec) out.push(rec);
+      else rejected.push({ sheet: sheetName, row: det.headerRow + offset + 2, reason: bankRejectReason(obj, isCms), values: obj });
     }
   }
-  return assignBankTxKeys(out);
+  return { records: assignBankTxKeys(out), rejected, warnings };
+}
+
+export async function parseTxFile(file: File): Promise<EntityRecord[]> {
+  return (await parseTxFileReport(file)).records;
 }

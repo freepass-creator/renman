@@ -235,12 +235,14 @@ export function contractSchedules(rec: EntityRecord, today: string) {
       seq: s.seq, dueDate: s.dueDate, amount: s.amount, discount, paid,
       balance: Math.max(0, s.amount - discount - paid),
       paidAt: s.paidAt || '',
+      discountReasons: [...new Set((s.discounts || []).map((d) => String(d.reason || '')).filter(Boolean))],
       payments: (s.payments || []).map((p) => ({
         date: p.date,
         amount: p.amount,
         source: (p as { kind?: string }).kind === 'deposit-offset' || String(p.memo || '').includes('보증금충당')
           ? '보증금충당'
           : p.source,
+        txId: (p as { txId?: string }).txId,
       })),
       method: methodLabel,
       status: s.status,
@@ -263,3 +265,7 @@ export function isReturnable(c: EntityRecord): boolean {
 export { computeReturnSettlement, type ReturnSettlement, earlyTerminationFee, type EarlyTermCalc } from './contracts/settlement';
 export { patchDeliver, patchReturn, patchTerminate, patchExtend, patchEngineLock } from './contracts/patches';
 export { passesFilter, type ContractFilter } from './contracts/filters';
+export {
+  buildScheduleLedger, summarizeScheduleLedger, countScheduleStatuses,
+  type ScheduleLedgerRow, type ScheduleKind,
+} from './contracts/schedule-ledger';

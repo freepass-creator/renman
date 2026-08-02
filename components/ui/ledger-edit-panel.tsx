@@ -31,6 +31,9 @@ export function LedgerEditPanel({
   entityKey,
   title,
   sections,
+  sectionsByKind,
+  kindField = 'category',
+  fallbackKind = '기타',
   record,
   onClose,
   onSaved,
@@ -38,6 +41,9 @@ export function LedgerEditPanel({
   entityKey: string;
   title: string;
   sections: LedgerFormSection[];
+  sectionsByKind?: Record<string, LedgerFormSection[]>;
+  kindField?: string;
+  fallbackKind?: string;
   record: EntityRecord;
   onClose: () => void;
   onSaved?: (record: EntityRecord) => void;
@@ -46,10 +52,15 @@ export function LedgerEditPanel({
   const entity = ENTITIES[entityKey];
   const [form, setForm] = useState<EntityRecord>(() => ({ ...record }));
   const [busy, setBusy] = useState(false);
+  const activeSections = useMemo(() => {
+    if (!sectionsByKind) return sections;
+    const kind = String(form[kindField] || '');
+    return sectionsByKind[kind] || sectionsByKind[fallbackKind] || sections;
+  }, [sections, sectionsByKind, form, kindField, fallbackKind]);
   const selectedFields = useMemo(() => {
-    const wanted = new Set(sections.flatMap((section) => section.fields));
+    const wanted = new Set(activeSections.flatMap((section) => section.fields));
     return entity?.fields.filter((field) => wanted.has(field.key)) || [];
-  }, [entity, sections]);
+  }, [entity, activeSections]);
   const fieldByKey = useMemo(() => new Map(selectedFields.map((field) => [field.key, field])), [selectedFields]);
   const docKey = String(record._key || record.id || '');
 
@@ -69,7 +80,11 @@ export function LedgerEditPanel({
     );
   }
 
-  const change = (key: string, value: string) => setForm((current) => ({ ...current, [key]: value }));
+  const change = (key: string, value: string) => setForm((current) => ({
+    ...current,
+    [key]: value,
+    ...(key === 'category' ? { workType: value } : {}),
+  }));
   const patch = (next: Record<string, string>) => setForm((current) => ({ ...current, ...next }));
 
   async function save() {
@@ -88,6 +103,12 @@ export function LedgerEditPanel({
     try {
       const next = normalizedForm(selectedFields, {
         ...form,
+        ...(entityKey === 'work_item' ? {
+          category: String(form.category || '').trim() || '미분류',
+          workType: String(form.workType || form.category || '').trim() || '미분류',
+          classificationState: String(form.category || '').trim() ? '분류됨' : '미분류',
+          assignmentState: String(form.assigneeName || '').trim() ? '배정됨' : '미배정',
+        } : {}),
         companyId: targetCompany,
         updatedAt: new Date().toISOString(),
         updatedBy: user.email || user.name,
@@ -116,14 +137,14 @@ export function LedgerEditPanel({
       </header>
 
       <div className="ledger-create-panel__body">
-        {sections.map((section, sectionIndex) => {
+        {activeSections.map((section, sectionIndex) => {
           const sectionFields = section.fields
             .map((key) => fieldByKey.get(key))
             .filter((field): field is Field => !!field);
           if (!sectionFields.length) return null;
           return (
             <CreateSection
-              key={section.title}
+              key={`${String(form[kindField] || '')}::${section.title}`}
               title={section.title}
               initiallyOpen={section.open ?? sectionIndex === 0}
             >

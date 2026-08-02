@@ -1,15 +1,15 @@
 'use client';
 /**
  * 경영관리 — 하단 그룹 단일 페이지.
- *   탭: 법인(CompanyMaster) · 계좌(bank_account SSOT) · 임대차(lease).
+ *   탭: 법인(CompanyMaster) · 계좌(bank_account SSOT) · 임대차(lease) · 직원(Auth).
  *   첫 판 = 골격 + 법인 우선. 과설계 금지.
  */
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import {
-  Badge, Btn, C, DetailGrid, LedgerFrame, LedgerRecordPanel, PillTabs, Search, won,
+  Badge, Btn, C, LedgerActions, LedgerFrame, LedgerRecordPanel, PillTabs, Search, won,
   type LedgerColView, type SheetCol,
 } from '@/components/ui';
-import { COMPANY_DEFS, companyLabel, companyShort } from '@/lib/companies';
+import { COMPANY_DEFS, companyLabel } from '@/lib/companies';
 import { loadMaster, type CompanyMaster } from '@/lib/company-master';
 import { useEntityList } from '@/lib/use-entity-lists';
 import { buildBankAccountLedger, type BankAccountRow } from '@/lib/finance/cash-ledger';
@@ -18,13 +18,15 @@ import { dday, TODAY } from '@/lib/dashboard-consts';
 import { LEDGER_EMPTY } from '@/lib/ledger-empty';
 import { textMatch } from '@/lib/search-match';
 import { useIsMobile } from '@/lib/use-mobile';
+import { useSession } from '@/lib/session';
+import { StaffTab } from '@/components/management/StaffTab';
+import { openIngest } from '@/lib/ui-bus';
 
-type Tab = '법인' | '계좌' | '임대차';
+type Tab = '법인' | '계좌' | '임대차' | '직원';
 
 type CompanyRow = {
   id: string;
   name: string;
-  short: string;
   ceo: string;
   bizNo: string;
   address: string;
@@ -47,12 +49,12 @@ type LeaseRow = {
 };
 
 const COMPANY_COLS: SheetCol<CompanyRow>[] = [
-  { key: 'short', label: '표시명', priority: 1, render: (r) => <b style={{ fontFamily: 'var(--font-mono)' }}>{r.short}</b>, text: (r) => r.short },
-  { key: 'name', label: '법인명', priority: 1, render: (r) => r.name, text: (r) => r.name },
+  { key: 'name', label: '회사명', priority: 1, pin: true, render: (r) => <b>{r.name}</b>, text: (r) => r.name },
   { key: 'ceo', label: '대표', priority: 2, render: (r) => r.ceo || LEDGER_EMPTY.dash, text: (r) => r.ceo },
   { key: 'bizNo', label: '사업자번호', priority: 2, render: (r) => r.bizNo || LEDGER_EMPTY.dash, text: (r) => r.bizNo },
-  { key: 'garages', label: '차고지', align: 'r', priority: 3, render: (r) => r.garages || LEDGER_EMPTY.dash, text: (r) => r.garages },
   { key: 'phone', label: '전화', priority: 3, render: (r) => r.phone || LEDGER_EMPTY.dash, text: (r) => r.phone },
+  { key: 'address', label: '본점', priority: 3, render: (r) => r.address || LEDGER_EMPTY.dash, text: (r) => r.address },
+  { key: 'garages', label: '차고지', align: 'r', priority: 3, render: (r) => `${r.garages}곳`, text: (r) => r.garages },
 ];
 
 const LEASE_COLS: SheetCol<LeaseRow>[] = [
@@ -60,9 +62,10 @@ const LEASE_COLS: SheetCol<LeaseRow>[] = [
   { key: 'address', label: '소재지', priority: 1, render: (r) => r.address || LEDGER_EMPTY.dash, text: (r) => r.address },
   { key: 'deposit', label: '보증금', align: 'r', priority: 2, render: (r) => r.deposit ? won(r.deposit) : LEDGER_EMPTY.dash, text: (r) => r.deposit },
   { key: 'monthlyRent', label: '월세', align: 'r', priority: 2, render: (r) => r.monthlyRent ? won(r.monthlyRent) : LEDGER_EMPTY.dash, text: (r) => r.monthlyRent },
+  { key: 'startDate', label: '시작일', priority: 2, render: (r) => r.startDate || LEDGER_EMPTY.dash, text: (r) => r.startDate },
   { key: 'endDate', label: '만기일', priority: 1, render: (r) => r.endDate || LEDGER_EMPTY.dash, text: (r) => r.endDate },
   {
-    key: 'status', label: '상태', priority: 1,
+    key: 'status', label: '임대차상태', priority: 1,
     render: (r) => <Badge tone={r.status.includes('경과') || r.status.includes('임박') ? 'amber' : 'gray'}>{r.status}</Badge>,
     text: (r) => r.status,
   },
@@ -79,6 +82,7 @@ function leaseStatus(end: string): string {
 
 export default function ManagementPage() {
   const mobile = useIsMobile();
+  const { isOperator } = useSession();
   const [tab, setTab] = useState<Tab>('법인');
   const [q, setQ] = useState('');
   const [colView, setColView] = useState<LedgerColView>('기본');
@@ -100,6 +104,11 @@ export default function ManagementPage() {
     };
   }, []);
 
+  // 본사가 아니면 직원 탭 진입 불가
+  useEffect(() => {
+    if (tab === '직원' && !isOperator) setTab('법인');
+  }, [tab, isOperator]);
+
   const companyRows = useMemo(() => {
     void masterTick;
     return COMPANY_DEFS.map((c) => {
@@ -107,7 +116,6 @@ export default function ManagementPage() {
       return {
         id: c.id,
         name: companyLabel(c.id),
-        short: companyShort(c.id),
         ceo: String(m.ceo || ''),
         bizNo: String(m.bizNo || ''),
         address: String(m.address || ''),
@@ -140,7 +148,7 @@ export default function ManagementPage() {
   }).sort((a, b) => a.endDate.localeCompare(b.endDate)), [leaseRecords]);
 
   const shownCompanies = useMemo(
-    () => companyRows.filter((r) => textMatch(q, r.name, r.short, r.ceo, r.bizNo, r.address, r.phone)),
+    () => companyRows.filter((r) => textMatch(q, r.name, r.ceo, r.bizNo, r.address, r.phone)),
     [companyRows, q],
   );
   const shownAccounts = useMemo(
@@ -154,27 +162,41 @@ export default function ManagementPage() {
 
   const loading = tab === '계좌' ? acctLoading : tab === '임대차' ? leaseLoading : false;
 
+  const tabBar: ReactNode = (
+    <PillTabs
+      size="sm"
+      value={tab}
+      onChange={(v) => {
+        setTab(v as Tab);
+        setSelectedCo(null);
+        setSelectedAcct(null);
+        setSelectedLease(null);
+      }}
+      tabs={[
+        { key: '법인', label: '법인' },
+        { key: '계좌', label: '계좌' },
+        { key: '임대차', label: '임대차' },
+        ...(isOperator ? [{ key: '직원', label: '직원' }] : []),
+      ]}
+    />
+  );
+
+  if (tab === '직원' && isOperator) {
+    return <StaffTab view={tabBar} />;
+  }
+
   return (
     <LedgerFrame
       title="경영관리"
-      meta="법인 · 계좌 · 임대차"
-      view={(
-        <PillTabs
-          size="sm"
-          value={tab}
-          onChange={(v) => {
-            setTab(v as Tab);
-            setSelectedCo(null);
-            setSelectedAcct(null);
-            setSelectedLease(null);
-          }}
-          tabs={[
-            { key: '법인', label: '법인' },
-            { key: '계좌', label: '계좌' },
-            { key: '임대차', label: '임대차' },
-          ]}
-        />
+      meta="법인 · 계좌 · 임대차 · 직원"
+      right={(
+        <LedgerActions aria-label="관리 작업">
+          {tab === '법인' ? <Btn size="sm" variant="ghost" href="/admin">관리 회사 설정</Btn> : null}
+          {tab === '계좌' ? <Btn size="sm" variant="ghost" href="/cash">자금관리에서 계좌 등록</Btn> : null}
+          {tab === '임대차' ? <Btn size="sm" variant="solid" onClick={() => openIngest('lease')}>임대차 계약 담기</Btn> : null}
+        </LedgerActions>
       )}
+      view={tabBar}
       showColView={tab !== '법인'}
       colView={colView}
       onColView={setColView}
@@ -195,9 +217,12 @@ export default function ManagementPage() {
         </span>
       )}
       loading={loading}
-      // 오류 배너도 loading과 같이 «보고 있는 탭»만 — 법인 탭이 무관한 조회 실패로 막히지 않게
       error={tab === '계좌' ? acctError : tab === '임대차' ? leaseError : null}
-      empty={tab === '법인' ? '등록된 법인이 없습니다' : tab === '계좌' ? '계좌 없음 — 자금관리에서 등록' : '임대차 계약 없음'}
+      empty={tab === '법인'
+        ? '등록된 법인이 없습니다 — 법인 정보 설정에서 기본정보를 입력하세요'
+        : tab === '계좌'
+          ? '계좌 없음 — 자금관리에서 등록하세요'
+          : '임대차 계약 없음 — 데이터센터에서 계약서를 먼저 담으세요'}
       cols={(
         tab === '법인' ? COMPANY_COLS
           : tab === '계좌' ? (colView === '기본' ? ACCOUNT_BASIC_COLS : ACCOUNT_ALL_COLS)
@@ -227,22 +252,14 @@ export default function ManagementPage() {
       sidePanel={
         tab === '법인' && selectedCo ? (
           <LedgerRecordPanel
-            title={selectedCo.short}
-            identity={selectedCo.name}
+            title={selectedCo.name}
+            identity={selectedCo.bizNo || '사업자번호 미등록'}
             statusBadge={<Badge tone="blue">법인</Badge>}
             row={selectedCo}
             cols={COMPANY_COLS}
             onClose={() => setSelectedCo(null)}
             actions={<Btn size="sm" variant="ghost" href="/settings">설정에서 편집</Btn>}
-          >
-            <DetailGrid rows={[
-              ['대표', selectedCo.ceo || LEDGER_EMPTY.dash],
-              ['사업자번호', selectedCo.bizNo || LEDGER_EMPTY.dash],
-              ['전화', selectedCo.phone || LEDGER_EMPTY.dash],
-              ['본점', selectedCo.address || LEDGER_EMPTY.dash],
-              ['차고지', `${selectedCo.garages}곳`],
-            ]} />
-          </LedgerRecordPanel>
+          />
         ) : tab === '계좌' && selectedAcct ? (
           <LedgerRecordPanel
             title={selectedAcct.accountAlias || selectedAcct.bankName}
@@ -261,13 +278,7 @@ export default function ManagementPage() {
             row={selectedLease}
             cols={LEASE_COLS}
             onClose={() => setSelectedLease(null)}
-          >
-            <DetailGrid rows={[
-              ['보증금', selectedLease.deposit ? won(selectedLease.deposit) : LEDGER_EMPTY.dash],
-              ['월세', selectedLease.monthlyRent ? won(selectedLease.monthlyRent) : LEDGER_EMPTY.dash],
-              ['기간', `${selectedLease.startDate || '—'} ~ ${selectedLease.endDate || '—'}`],
-            ]} />
-          </LedgerRecordPanel>
+          />
         ) : null
       }
     />

@@ -5,15 +5,16 @@ import { CircleDollarSign, Pencil, Plus, UploadCloud } from 'lucide-react';
 import { useSearchParams } from 'next/navigation';
 import { TODAY, dday } from '@/lib/dashboard-consts';
 import { contractMasterRow } from '@/lib/master-ledgers';
-import { CONTRACT_DETAIL_SECTIONS, CONTRACT_MASTER_BASIC_COLS, CONTRACT_MASTER_EXPANDED_COLS } from '@/lib/master-ledger-cols';
+import { CONTRACT_DETAIL_SECTIONS, CONTRACT_MASTER_BASIC_COLS, CONTRACT_MASTER_EXPANDED_COLS, SCHEDULE_LEDGER_ALL_COLS, SCHEDULE_LEDGER_COLS } from '@/lib/master-ledger-cols';
 import { latestDateOf, summarizeContractLedgerStats } from '@/lib/ledger-stats';
 import { useEntityList } from '@/lib/use-entity-lists';
 import { textMatch } from '@/lib/search-match';
 import {
-  Badge, Btn, C, LedgerActions, LedgerCreatePanel, LedgerEditPanel, LedgerFilterButton, LedgerFilterFields, LedgerFilterPanel, LedgerFrame, LedgerRecordPanel, PageLoading, PeriodBar, Search, Select, won,
-  type LedgerColView, type LedgerFormSection,
+  Badge, Btn, C, ContextMenu, type ContextMenuItem, LedgerActions, LedgerCreatePanel, LedgerEditPanel, LedgerFilterButton, LedgerFilterFields, LedgerFilterPanel, LedgerFrame, LedgerRecordPanel, Message, PageLoading, PeriodBar, PillTabs, Search, Select, useSheetExport, won,
+  type LedgerFormSection,
 } from '@/components/ui';
 import { useIsMobile } from '@/lib/use-mobile';
+import { useSession } from '@/lib/session';
 import { MigrateDataButton } from '@/components/MigrateDataButton';
 import { openIngest, openReceivables } from '@/lib/ui-bus';
 import { sendNoticeCert } from '@/lib/docs/send-notice';
@@ -23,11 +24,18 @@ import {
 import { RENTAL_TYPES } from '@/lib/schema/contract';
 import { LEDGER_EMPTY } from '@/lib/ledger-empty';
 import { depositView } from '@/lib/deposit';
+import {
+  buildScheduleLedger, summarizeScheduleLedger, type ScheduleLedgerRow,
+} from '@/lib/contract-ops';
+import { NotifyDialog } from '@/components/NotifyDialog';
+import { notifyRecipients } from '@/lib/notify/recipients';
 
 type RentalChip = '전체' | (typeof RENTAL_TYPES)[number];
 /** 계약범위 — 전체·진행·만기임박·미납·종료 (riskLabel·net·dday 판정). */
 type ContractBucket = '전체' | '진행' | '만기임박' | '미납' | '종료';
+type ContractSheetView = '기본' | '전체' | '회차';
 const CONTRACT_BUCKETS: ContractBucket[] = ['진행', '만기임박', '미납', '종료'];
+const ROW_DISPLAY_CAP = 200;
 
 function matchContractBucket(r: ReturnType<typeof contractMasterRow>, bucket: ContractBucket): boolean {
   if (bucket === '전체') return true;
@@ -52,8 +60,9 @@ const CONTRACT_CREATE_SECTIONS: LedgerFormSection[] = [
 
 function ContractLedgerInner() {
   const mobile = useIsMobile();
+  const { isOperator } = useSession();
   const searchParams = useSearchParams();
-  const { rows: contracts, loading, error: loadError } = useEntityList('contract');
+  const { rows: contracts, loading, error: loadError, reload } = useEntityList('contract');
   const [q, setQ] = useState('');
   const [bucket, setBucket] = useState<ContractBucket>('진행');
   const [dateBasis, setDateBasis] = useState<'계약일' | '종료일'>('계약일');
@@ -61,10 +70,16 @@ function ContractLedgerInner() {
   const [range, setRange] = useState({ from: '', to: '' });
   const [detailFilters, setDetailFilters] = useState(() => emptyFilterValues(CONTRACT_FILTER_DEFS));
   const [filterOpen, setFilterOpen] = useState(false);
-  const [colView, setColView] = useState<LedgerColView>('기본');
+  const [sheetView, setSheetView] = useState<ContractSheetView>('기본');
+  useEffect(() => {
+    if (mobile && sheetView === '전체') setSheetView('기본');
+  }, [mobile, sheetView]);
   const [selected, setSelected] = useState<ReturnType<typeof contractMasterRow> | null>(null);
   const [creating, setCreating] = useState(false);
   const [editing, setEditing] = useState(false);
+  const [ctxMenu, setCtxMenu] = useState<{ open: boolean; x: number; y: number }>({ open: false, x: 0, y: 0 });
+  const [smsOpen, setSmsOpen] = useState(false);
+  const [smsRecipients, setSmsRecipients] = useState<ReturnType<typeof notifyRecipients>>([]);
   const allRows = useMemo(() => contracts
     .map((record) => contractMasterRow(record, TODAY))
     .sort((a, b) => Number(a.ended) - Number(b.ended) || a.endDate.localeCompare(b.endDate)), [contracts]);
@@ -121,6 +136,27 @@ function ContractLedgerInner() {
     if (range.to && (!date || date > range.to)) return false;
     return true;
   }), [searchedRows, bucket, rentalChip, detailFilters, contractFilterMatchers, dateBasis, range.from, range.to]);
+
+  const scheduleAll = useMemo(
+    () => (sheetView === '회차' ? buildScheduleLedger(contracts, TODAY) : []),
+    [contracts, sheetView],
+  );
+  const scheduleRows = useMemo(() => {
+    if (sheetView !== '회차') return [] as ScheduleLedgerRow[];
+    return scheduleAll.filter((r) => {
+      if (detailFilters.scheduleStatus && r.status !== detailFilters.scheduleStatus) return false;
+      if (range.from && (!r.dueDate || r.dueDate < range.from)) return false;
+      if (range.to && (!r.dueDate || r.dueDate > range.to)) return false;
+      return textMatch(q, r.company, r.contractNo, r.contractorName, r.plate, r.kind, r.status, r.dueDate);
+    });
+  }, [sheetView, scheduleAll, detailFilters.scheduleStatus, range.from, range.to, q]);
+  const scheduleStats = useMemo(() => summarizeScheduleLedger(scheduleRows), [scheduleRows]);
+  const scheduleDisplay = useMemo(
+    () => (scheduleRows.length > ROW_DISPLAY_CAP ? scheduleRows.slice(0, ROW_DISPLAY_CAP) : scheduleRows),
+    [scheduleRows],
+  );
+  const scheduleMore = Math.max(0, scheduleRows.length - ROW_DISPLAY_CAP);
+
   const contractStatuses = useMemo(() => [...new Set(allRows.map((r) => r.status).filter(Boolean))].sort(), [allRows]);
   const endReasons = useMemo(() => [...new Set(allRows.map((r) => r.endReason).filter(Boolean))].sort(), [allRows]);
   const { active, riskCount, riskDebtSum, endedRiskCount, endedRiskDebtSum } = useMemo(
@@ -128,16 +164,48 @@ function ContractLedgerInner() {
     [searchedRows],
   );
 
+  const xl = useSheetExport<ReturnType<typeof contractMasterRow> | ScheduleLedgerRow>({
+    title: sheetView === '회차' ? '회차별청구' : '계약관리',
+    filterSummary: () => {
+      if (sheetView === '회차') {
+        const parts: string[] = [];
+        if (detailFilters.scheduleStatus) parts.push(detailFilters.scheduleStatus);
+        if (range.from || range.to) parts.push(`${range.from || '…'}~${range.to || '…'}`);
+        if (q.trim()) parts.push('검색');
+        return parts.join(' · ') || '전체';
+      }
+      const parts = [bucket === '전체' ? '' : bucket, rentalChip === '전체' ? '' : rentalChip].filter(Boolean);
+      if (range.from || range.to) parts.push(`${range.from || '…'}~${range.to || '…'}`);
+      if (q.trim()) parts.push('검색');
+      return parts.join(' · ') || '전체';
+    },
+    sumLine: () => (sheetView === '회차'
+      ? `청구 ${won(scheduleStats.charge)} · 납부 ${won(scheduleStats.paid)} · 잔액 ${won(scheduleStats.balance)}`
+      : (riskDebtSum ? `미수합 ${won(riskDebtSum)}` : '')),
+  });
+  const ctxItems: ContextMenuItem[] = [
+    xl.exportItem(),
+    ...(isOperator ? [xl.exportItem({ unmasked: true })] : []),
+  ];
+
   const filterCount = countActiveFilters(
     {
       ...detailFilters,
-      bucket: bucket === '전체' ? '' : bucket,
-      rentalType: rentalChip === '전체' ? '' : rentalChip,
+      // '진행'은 계약 원장의 기본 업무 범위다. 사용자가 건 필터로 세지 않는다.
+      bucket: sheetView === '회차' || bucket === '전체' || bucket === '진행' ? '' : bucket,
+      rentalType: sheetView === '회차' || rentalChip === '전체' ? '' : rentalChip,
     },
     CONTRACT_FILTER_DEFS,
   );
 
+  const isSchedule = sheetView === '회차';
+  const frameCols = isSchedule
+    ? SCHEDULE_LEDGER_COLS
+    : (sheetView === '전체' ? CONTRACT_MASTER_EXPANDED_COLS : CONTRACT_MASTER_BASIC_COLS);
+  const frameRows = isSchedule ? scheduleDisplay : rows;
+
   return (
+    <>
     <LedgerFrame
       title="계약관리"
       meta="계약 1건=1행·손님·기간·미수"
@@ -162,11 +230,11 @@ function ContractLedgerInner() {
           style={{ width: mobile ? 160 : 280, flexShrink: 0 }}
         />
         <LedgerFilterButton open={filterOpen} count={filterCount} onClick={() => setFilterOpen((o) => !o)} />
-        <PeriodBar latest={latest} initial="전체" size="sm" onRange={setRange} />
+        <PeriodBar key={sheetView} latest={latest} initial={isSchedule ? '월간' : '전체'} size="sm" onRange={setRange} />
       </>}
       filterPanel={filterOpen ? (
         <LedgerFilterPanel
-          title="계약 필터"
+          title={isSchedule ? '회차 필터' : '계약 필터'}
           onReset={() => {
             setDetailFilters(emptyFilterValues(CONTRACT_FILTER_DEFS));
             setBucket('진행');
@@ -176,7 +244,9 @@ function ContractLedgerInner() {
           onClose={() => setFilterOpen(false)}
         >
           <LedgerFilterFields
-            defs={CONTRACT_FILTER_DEFS}
+            defs={isSchedule
+              ? CONTRACT_FILTER_DEFS.filter((d) => d.key === 'scheduleStatus')
+              : CONTRACT_FILTER_DEFS.filter((d) => d.key !== 'scheduleStatus')}
             values={{
               ...detailFilters,
               bucket: bucket === '전체' ? '' : bucket,
@@ -201,8 +271,10 @@ function ContractLedgerInner() {
               status: contractStatuses,
               endReason: endReasons,
               deposit: ['보증금미반환'],
+              scheduleStatus: ['예정', '연체', '부분납', '완료', '면제'],
             }}
           />
+          {!isSchedule && (
           <label>
             <span style={{ display: 'block', fontSize: 12, fontWeight: 800, marginBottom: 6 }}>날짜 기준</span>
             <Select value={dateBasis} onChange={(event) => setDateBasis(event.target.value as typeof dateBasis)} style={{ width: '100%' }}>
@@ -210,28 +282,74 @@ function ContractLedgerInner() {
               <option value="종료일">종료일 기준</option>
             </Select>
           </label>
+          )}
         </LedgerFilterPanel>
       ) : null}
-      stats={<span style={{ fontSize: 12.5, color: C.mute }}>유지 <b style={{ color: C.ok }}>{active}</b> · 리스크 <b style={{ color: C.danger }}>{riskCount}건</b>{riskDebtSum > 0 ? <> · 미수 {won(riskDebtSum)}</> : null} · 종료 리스크 <b>{endedRiskCount}건</b>{endedRiskDebtSum > 0 ? <> · 미수 {won(endedRiskDebtSum)}</> : null}</span>}
-      colView={colView}
-      onColView={setColView}
+      hint={isSchedule && scheduleMore > 0 ? (
+        <Message variant="warning">
+          표는 상위 {ROW_DISPLAY_CAP}건만 표시합니다 (외 {scheduleMore.toLocaleString('ko-KR')}건). 월간·검색으로 좁히면 전부 볼 수 있습니다.
+        </Message>
+      ) : null}
+      stats={isSchedule ? (
+        <span style={{ fontSize: 12.5, color: C.mute }}>
+          회차 <b>{scheduleStats.count}</b>
+          {' · '}청구 <b>{won(scheduleStats.charge)}</b>
+          {' · '}납부 <b style={{ color: C.ok }}>{won(scheduleStats.paid)}</b>
+          {' · '}잔액 <b style={{ color: scheduleStats.balance ? C.danger : C.ink }}>{won(scheduleStats.balance)}</b>
+          {' · '}연체 <b style={{ color: scheduleStats.overdueCount ? C.danger : C.ink }}>{scheduleStats.overdueCount}</b>
+        </span>
+      ) : (
+        <span style={{ fontSize: 12.5, color: C.mute }}>진행 계약 <b style={{ color: C.ok }}>{active}건</b> · 진행 리스크 <b style={{ color: C.danger }}>{riskCount}건</b>{riskDebtSum > 0 ? <> · 진행 미수 {won(riskDebtSum)}</> : null} · 종료 후 리스크 <b>{endedRiskCount}건</b>{endedRiskDebtSum > 0 ? <> · 종료 미수 {won(endedRiskDebtSum)}</> : null}</span>
+      )}
+      showColView={false}
+      colView={sheetView === '전체' ? '전체' : '기본'}
+      view={(
+        <PillTabs
+          size="sm"
+          value={sheetView}
+          onChange={(v) => setSheetView((v as ContractSheetView) || '기본')}
+          tabs={mobile ? [
+            { key: '기본', label: '목록' },
+            { key: '회차', label: '회차' },
+          ] : [
+            { key: '기본', label: '기본' },
+            { key: '전체', label: '전체' },
+            { key: '회차', label: '회차' },
+          ]}
+        />
+      )}
       loading={loading}
       error={loadError}
-      empty={<>
-        등록된 계약이 없습니다. 계약서는 데이터관리에서 담으세요.
-        <div style={{ marginTop: 14, display: 'flex', justifyContent: 'center', gap: 8 }}>
-          <Btn size="sm" variant="ghost" onClick={() => openIngest('contract')}><UploadCloud size={14} /> 데이터관리</Btn>
-          <MigrateDataButton size="sm" />
-        </div>
-      </>}
-      cols={colView === '기본' ? CONTRACT_MASTER_BASIC_COLS : CONTRACT_MASTER_EXPANDED_COLS}
-      rows={rows}
-      rowKey={(r) => r.contractNo || `${r.plate}:${r.startDate}`}
-      selectedRowKey={selected ? (selected.contractNo || `${selected.plate}:${selected.startDate}`) : null}
+      empty={isSchedule
+        ? '해당 기간에 도래하는 회차 없음'
+        : <>
+          등록된 계약이 없습니다. 계약서는 데이터센터에 먼저 담으세요.
+          <div style={{ marginTop: 14, display: 'flex', justifyContent: 'center', gap: 8 }}>
+            <Btn size="sm" variant="ghost" onClick={() => openIngest('contract')}><UploadCloud size={14} /> 데이터센터</Btn>
+            <MigrateDataButton size="sm" />
+          </div>
+        </>}
+      cols={frameCols as typeof CONTRACT_MASTER_BASIC_COLS}
+      rows={frameRows as typeof rows}
+      rowKey={(r) => {
+        if (isSchedule) return (r as unknown as ScheduleLedgerRow).id;
+        const c = r as ReturnType<typeof contractMasterRow>;
+        return String(c.raw._key || c.contractNo || '');
+      }}
+      selectedRowKey={selected ? String(selected.raw._key || selected.contractNo || '') : null}
+      onView={xl.onView as (v: { rows: typeof rows; cols: typeof CONTRACT_MASTER_BASIC_COLS }) => void}
+      onRowContextMenu={(e) => {
+        e.preventDefault();
+        setCtxMenu({ open: true, x: e.clientX, y: e.clientY });
+      }}
       onRowDoubleClick={(row) => {
         setCreating(false);
         setEditing(false);
-        setSelected(row);
+        if (isSchedule) {
+          setSelected(contractMasterRow((row as unknown as ScheduleLedgerRow).rec, TODAY));
+        } else {
+          setSelected(row as ReturnType<typeof contractMasterRow>);
+        }
       }}
       onCloseDetail={() => { setSelected(null); setEditing(false); }}
       sidePanel={creating ? (
@@ -241,7 +359,7 @@ function ContractLedgerInner() {
           title="계약 생성"
           sections={CONTRACT_CREATE_SECTIONS}
           initial={{ status: '대기', paymentTiming: '선납' }}
-          fileIngest={{ label: '파일로 투입 (데이터관리)', onClick: () => openIngest('contract') }}
+          fileIngest={{ label: '파일로 투입 (데이터센터)', onClick: () => openIngest('contract') }}
           onClose={() => setCreating(false)}
         />
       ) : selected && editing ? (
@@ -279,12 +397,38 @@ function ContractLedgerInner() {
                 >
                   내용증명
                 </Btn>
+                <Btn
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => {
+                    setSmsRecipients(notifyRecipients([selected.raw], TODAY));
+                    setSmsOpen(true);
+                  }}
+                >
+                  문자
+                </Btn>
               </>
             )}
           </>}
         />
       ) : null}
     />
+    <ContextMenu
+      open={ctxMenu.open}
+      x={ctxMenu.x}
+      y={ctxMenu.y}
+      onClose={() => setCtxMenu((m) => ({ ...m, open: false }))}
+      items={ctxItems}
+    />
+    {smsOpen && (
+      <NotifyDialog
+        onClose={() => setSmsOpen(false)}
+        recipients={smsRecipients}
+        initialLabel="대여료 청구"
+        onSent={reload}
+      />
+    )}
+    </>
   );
 }
 

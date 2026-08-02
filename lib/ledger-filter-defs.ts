@@ -4,6 +4,8 @@
  *
  * 반영: 1) 여기 DEFS 2) 페이지 matcher·options.
  */
+import { LEDGER_LABEL } from '@/lib/ledger-labels';
+
 export type LedgerFilterFieldDef = {
   key: string;
   label: string;
@@ -55,7 +57,7 @@ export const ASSET_FILTER_DEFS: LedgerFilterFieldDef[] = [
 /** 계약 세부필터. */
 export const CONTRACT_FILTER_DEFS: LedgerFilterFieldDef[] = [
   { key: 'bucket', label: '계약범위' },
-  { key: 'rentalType', label: '계약분류' },
+  { key: 'rentalType', label: LEDGER_LABEL.rentalType },
   { key: 'status', label: '계약상태' },
   { key: 'endReason', label: '종료사유' },
   { key: 'deposit', label: '보증금', emptyLabel: '보증금 전체' },
@@ -76,7 +78,7 @@ export const AGENDA_FILTER_DEFS: LedgerFilterFieldDef[] = [
 
 /** 업무 세부필터. */
 export const WORK_FILTER_DEFS: LedgerFilterFieldDef[] = [
-  { key: 'group', label: '업무분류' },
+  { key: 'group', label: LEDGER_LABEL.workCategory },
   { key: 'penProcess', label: '과태료상태' },
   { key: 'penKind', label: '과태료분류' },
   { key: 'status', label: '업무상태' },
@@ -106,6 +108,7 @@ export const CASH_TX_FILTER_DEFS: LedgerFilterFieldDef[] = [
   { key: 'flow', label: '수지구분' },
   { key: 'sourceQuick', label: '원천필터' },
   { key: 'unclassified', label: '미분류만' },
-  { key: 'category', label: '자금분류' },
+  { key: 'category', label: '계정과목' },
   { key: 'match', label: '자금상태' },
+  { key: 'bundleStatus', label: '묶음대사' },
 ];

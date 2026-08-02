@@ -110,7 +110,12 @@ export function InfoDoc({
     <div id={id} style={{ marginTop: 22, scrollMarginTop: 62, order }}>
       {/* 헤더: 접기토글(제목) + 첨부상태 배지 + 우측 액션(수정 / 서류 교체·재발급). 접히면 본문 숨김. */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 9, flexWrap: mobile ? 'wrap' : 'nowrap', minHeight: ctrlH(mobile) }}>
-        <button type="button" onClick={toggleCollapse} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, border: 'none', background: 'none', cursor: 'pointer', padding: 0, WebkitTapHighlightColor: 'transparent' }}>
+        <button
+          type="button"
+          onClick={toggleCollapse}
+          aria-expanded={!collapsed}
+          style={{ display: 'inline-flex', alignItems: 'center', gap: 7, minHeight: mobile ? 44 : undefined, border: 'none', background: 'none', cursor: 'pointer', padding: 0, WebkitTapHighlightColor: 'transparent' }}
+        >
           <ChevronDown size={15} color={C.sub} style={{ flexShrink: 0, transform: collapsed ? 'rotate(-90deg)' : 'none', transition: 'transform .15s' }} />
           <span style={{ fontSize: 13.5, fontWeight: 800, letterSpacing: '-0.01em', color: C.ink }}>{title}</span>
         </button>

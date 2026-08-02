@@ -5,8 +5,11 @@ import {
 } from './ledger-ext';
 import { paymentTimingOf } from './schema/contract';
 import { LEDGER_EMPTY } from './ledger-empty';
+import { LEDGER_LABEL } from './ledger-labels';
 import { assetLifecycleTone } from './domain/asset-lifecycle';
 import { openCar } from './ui-bus';
+import type { ScheduleLedgerRow, ScheduleKind } from '@/lib/contracts/schedule-ledger';
+import type { ScheduleStatus } from '@/lib/payments/types/banking';
 
 const dash = (v: unknown) => (v === '' || v === null || v === undefined || v === 0 ? LEDGER_EMPTY.dash : String(v));
 const date = (v: string) => (v ? v.slice(0, 10) : LEDGER_EMPTY.dash);
@@ -17,7 +20,7 @@ const numberOrNull = (v: number | null, suffix = '') => (
   v == null ? LEDGER_EMPTY.dash : `${v.toLocaleString('ko-KR')}${suffix}`
 );
 
-function assetStatusTone(r: Pick<AssetMasterRow, 'disposed' | 'status' | 'vehicleType'>): 'gray' | 'green' | 'amber' | 'red' | 'blue' | 'purple' {
+export function assetStatusTone(r: Pick<AssetMasterRow, 'disposed' | 'status' | 'vehicleType'>): 'gray' | 'green' | 'amber' | 'red' | 'blue' | 'purple' {
   if (r.disposed) return 'gray';
   if (r.status === '사고') return 'red';
   if (r.status === '정비') return 'amber';
@@ -51,11 +54,12 @@ const A = {
   ownerName: { key: 'ownerName', label: '소유자', priority: 3, render: (r) => dash(r.ownerName), text: (r) => r.ownerName },
   firstReg: { key: 'firstReg', label: '최초등록일', priority: 4, render: (r) => date(r.firstReg), text: (r) => r.firstReg },
   inspectionTo: { key: 'inspectionTo', label: '검사만료일', priority: 2, render: (r) => date(r.inspectionTo), text: (r) => r.inspectionTo },
-  mileage: { key: 'mileage', label: '주행거리', align: 'r', priority: 3, render: (r) => number(r.mileage, 'km'), text: (r) => r.mileage },
+  mileage: { key: 'mileage', label: '주행거리', align: 'r', priority: 3, xf: 'int', render: (r) => number(r.mileage, 'km'), text: (r) => r.mileage },
 } satisfies Record<string, SheetCol<AssetMasterRow>>;
 
 const ax = (key: keyof AssetMasterRow, label: string, opts?: { date?: boolean; money?: boolean; num?: string; align?: 'l' | 'c' | 'r'; priority?: 1 | 2 | 3 | 4 }): SheetCol<AssetMasterRow> => ({
   key: String(key), label, align: opts?.align, priority: opts?.priority,
+  xf: opts?.money ? 'money' : opts?.num === '%' ? 'rate' : opts?.num != null ? 'int' : opts?.date ? 'date' : undefined,
   render: (r) => opts?.date ? date(String(r[key] || '')) : opts?.money ? moneyCell(Number(r[key]) || 0) : opts?.num != null ? number(Number(r[key]) || 0, opts.num) : dash(r[key]),
   text: (r) => r[key] as string | number,
 });
@@ -85,8 +89,19 @@ const ASSET_COL_CATALOG: SheetCol<AssetMasterRow>[] = [
   ax('loanRate', '연이율', { num: '%', align: 'r' }), ax('loanStartDate', '할부개시일', { date: true }),
   ax('insuranceCompany', '보험사'), ax('insurancePolicyNo', '보험증권번호'), ax('insuranceExpiryDate', '보험만기', { date: true, priority: 2 }),
   ax('gpsProvider', 'GPS 공급사'), ax('gpsDeviceId', 'GPS 단말번호'), ax('gpsInstalledDate', 'GPS 설치일', { date: true }), ax('gpsControl', '시동제어'),
+  ax('vehicleTaxDueDate', '자동차세 납기', { date: true, priority: 2 }), ax('vehicleTaxPaidDate', '자동차세 납부일', { date: true }),
+  ax('vehicleTaxAmount', '자동차세', { money: true, align: 'r' }),
   ax('dealerAgency', '취급대리점'), ax('dealerContact', '딜러담당자'), ax('dealerPhone', '딜러연락처'),
   ax('optionList', '선택옵션'), ax('saleDate', '매각일', { date: true }), ax('salePrice', '매각가', { money: true, align: 'r' }),
+  {
+    key: 'bookValue', label: '장부가', align: 'r', priority: 3, xf: 'money',
+    render: (r) => moneyOrNull(r.bookValue), text: (r) => r.bookValue ?? '',
+  },
+  {
+    key: 'disposalGainLoss', label: '처분손익', align: 'r', priority: 3, xf: 'money',
+    render: (r) => (r.disposalGainLoss == null ? LEDGER_EMPTY.dash : money(r.disposalGainLoss)),
+    text: (r) => r.disposalGainLoss ?? '',
+  },
   ax('listRent', '매물 월대여료', { money: true, align: 'r' }), ax('listDeposit', '매물 보증금', { money: true, align: 'r' }),
   ax('listTerm', '매물 기준기간', { num: '개월', align: 'r' }), ax('insuranceIncluded', '보험료 포함'),
   {
@@ -97,22 +112,22 @@ const ASSET_COL_CATALOG: SheetCol<AssetMasterRow>[] = [
     text: (r) => (r.plate ? '차량360으로' : ''),
   },
   {
-    key: 'maintCost', label: '정비비누계', align: 'r', priority: 1,
+    key: 'maintCost', label: '정비비누계', align: 'r', priority: 1, xf: 'money',
     render: (r) => (r.maintCost ? <b style={{ color: r.maintVsAvg >= 2 ? C.danger : r.maintVsAvg >= 1.5 ? C.warn : C.ink }}>{money(r.maintCost)}</b> : LEDGER_EMPTY.dash),
     text: (r) => r.maintCost,
   },
   {
-    key: 'maintVsAvg', label: '평균대비', align: 'r', priority: 1,
+    key: 'maintVsAvg', label: '평균대비', align: 'r', priority: 1, xf: 'rate',
     render: (r) => (r.maintVsAvg ? `${r.maintVsAvg.toFixed(1)}×` : LEDGER_EMPTY.dash),
     text: (r) => r.maintVsAvg,
   },
   {
-    key: 'maintCount', label: '정비건수', align: 'r', priority: 2,
+    key: 'maintCount', label: '정비건수', align: 'r', priority: 2, xf: 'int',
     render: (r) => (r.maintCount ? `${r.maintCount}건` : LEDGER_EMPTY.dash),
     text: (r) => r.maintCount,
   },
   {
-    key: 'maintLastDate', label: '최근정비', align: 'c', priority: 2,
+    key: 'maintLastDate', label: '최근정비', align: 'c', priority: 2, xf: 'date',
     render: (r) => (r.maintLastDate ? date(r.maintLastDate) : LEDGER_EMPTY.dash),
     text: (r) => r.maintLastDate,
   },
@@ -130,8 +145,8 @@ export const ASSET_SHEET_KEYS: SheetViewKeys = {
     'insuranceExpiryDate', 'inspectionTo',
   ],
   all: [
-    'company', 'assetCode', 'plate', 'carName', 'lifecycle', 'status', 'maker', 'modelLine',
-    'subModel', 'trim', 'modelYear', 'yearMonth', 'vin', 'ownerName', 'firstReg', 'inspectionTo', 'mileage',
+    'company', 'plate', 'carName', 'lifecycle', 'status',
+    'assetCode', 'maker', 'modelLine', 'subModel', 'trim', 'modelYear', 'yearMonth', 'vin', 'ownerName', 'firstReg', 'inspectionTo', 'mileage',
     'documentNo', 'certIssueDate', 'vehicleType', 'usage', 'typeNumber', 'engineType',
     'ownerBizNo', 'useAddress', 'approvalNumber',
     'fuel', 'displacement', 'ratedOutput', 'cylinders', 'driveType', 'transmission',
@@ -143,7 +158,9 @@ export const ASSET_SHEET_KEYS: SheetViewKeys = {
     'loanKind', 'loanCashOnly', 'loanCompany', 'loanMonths', 'loanPrincipal', 'loanRemainingPrincipal', 'loanRate', 'loanStartDate',
     'insuranceCompany', 'insurancePolicyNo', 'insuranceExpiryDate',
     'gpsProvider', 'gpsDeviceId', 'gpsInstalledDate', 'gpsControl',
+    'vehicleTaxDueDate', 'vehicleTaxPaidDate', 'vehicleTaxAmount',
     'dealerAgency', 'dealerContact', 'dealerPhone', 'optionList', 'saleDate', 'salePrice',
+    'bookValue', 'disposalGainLoss',
     'listRent', 'listDeposit', 'listTerm', 'insuranceIncluded',
     'maintCost', 'maintVsAvg', 'maintCount', 'maintLastDate',
   ],
@@ -206,7 +223,7 @@ export const ASSET_DETAIL_DEFS: DetailSectionDef[] = [
   },
   {
     title: '처분·매각',
-    keys: ['saleDate', 'salePrice'],
+    keys: ['saleDate', 'salePrice', 'bookValue', 'disposalGainLoss'],
   },
   {
     title: '매물',
@@ -223,12 +240,16 @@ export const ASSET_DETAIL_DEFS: DetailSectionDef[] = [
     keys: ['insuranceCompany', 'insurancePolicyNo', 'insuranceExpiryDate'],
   },
   {
+    title: '세금',
+    keys: ['vehicleTaxDueDate', 'vehicleTaxPaidDate', 'vehicleTaxAmount'],
+  },
+  {
     title: 'GPS',
     keys: ['gpsProvider', 'gpsDeviceId', 'gpsInstalledDate', 'gpsControl'],
   },
   {
     title: '수선·이력',
-    keys: ['vehicle360Link'],
+    keys: ['maintCost', 'maintVsAvg', 'maintCount', 'maintLastDate', 'vehicle360Link'],
   },
 ];
 
@@ -238,16 +259,20 @@ const C0 = {
   company: { key: 'company', label: '회사명', pin: true, priority: 2, render: (r) => r.company, text: (r) => r.company },
   contractNo: { key: 'contractNo', label: '계약번호', pin: true, priority: 1, render: (r) => dash(r.contractNo), text: (r) => r.contractNo },
   status: { key: 'status', label: '계약상태', align: 'c', priority: 1, render: (r) => <Badge tone={r.ended ? 'gray' : 'green'}>{r.status}</Badge>, text: (r) => r.status },
-  rentalType: { key: 'rentalType', label: '대여형태', align: 'c', priority: 2, render: (r) => dash(r.rentalType), text: (r) => r.rentalType },
+  rentalType: {
+    key: 'rentalType', label: LEDGER_LABEL.rentalType, align: 'c', priority: 2,
+    render: (r) => (r.rentalType ? String(r.rentalType) : <Badge tone="amber">미분류</Badge>),
+    text: (r) => r.rentalType || '미분류',
+  },
   contractorName: { key: 'contractorName', label: '계약자', priority: 1, render: (r) => (r.contractorName ? String(r.contractorName) : LEDGER_EMPTY.none), text: (r) => r.contractorName },
   contractorPhone: { key: 'contractorPhone', label: '연락처', priority: 2, render: (r) => dash(r.contractorPhone), text: (r) => r.contractorPhone },
-  plate: { key: 'plate', label: '계약차량', priority: 1, render: (r) => (r.plate ? String(r.plate) : LEDGER_EMPTY.unassigned), text: (r) => r.plate },
-  carName: { key: 'carName', label: '계약차종', priority: 2, render: (r) => dash(r.carName), text: (r) => r.carName },
-  contractDate: { key: 'contractDate', label: '계약일', priority: 4, render: (r) => date(r.contractDate), text: (r) => r.contractDate },
-  startDate: { key: 'startDate', label: '시작일', priority: 2, render: (r) => date(r.startDate), text: (r) => r.startDate },
-  endDate: { key: 'endDate', label: '종료일', priority: 2, render: (r) => date(r.endDate), text: (r) => r.endDate },
-  monthlyRent: { key: 'monthlyRent', label: '월대여료', align: 'r', priority: 1, render: (r) => moneyCell(r.monthlyRent), text: (r) => r.monthlyRent },
-  deposit: { key: 'deposit', label: '보증금', align: 'r', priority: 2, render: (r) => moneyCell(r.deposit), text: (r) => r.deposit },
+  plate: { key: 'plate', label: LEDGER_LABEL.plate, priority: 1, render: (r) => (r.plate ? String(r.plate) : LEDGER_EMPTY.unassigned), text: (r) => r.plate },
+  carName: { key: 'carName', label: LEDGER_LABEL.carName, priority: 2, render: (r) => dash(r.carName), text: (r) => r.carName },
+  contractDate: { key: 'contractDate', label: '계약일', priority: 4, xf: 'date', render: (r) => date(r.contractDate), text: (r) => r.contractDate },
+  startDate: { key: 'startDate', label: '시작일', priority: 2, xf: 'date', render: (r) => date(r.startDate), text: (r) => r.startDate },
+  endDate: { key: 'endDate', label: '종료일', priority: 2, xf: 'date', render: (r) => date(r.endDate), text: (r) => r.endDate },
+  monthlyRent: { key: 'monthlyRent', label: '월대여료', align: 'r', priority: 1, xf: 'money', render: (r) => moneyCell(r.monthlyRent), text: (r) => r.monthlyRent },
+  deposit: { key: 'deposit', label: '보증금', align: 'r', priority: 2, xf: 'money', render: (r) => moneyCell(r.deposit), text: (r) => r.deposit },
   paymentDay: {
     key: 'paymentDay', label: '결제일', align: 'c', priority: 2,
     render: (r) => (r.paymentDay ? `${r.paymentDay}일` : LEDGER_EMPTY.dash),
@@ -267,12 +292,13 @@ const C0 = {
     text: (r) => r.paymentMethod,
   },
   risk: { key: 'riskLabel', label: '리스크', priority: 1, render: (r) => r.atRisk ? <Badge tone="red">{r.riskLabel}</Badge> : LEDGER_EMPTY.dash, text: (r) => r.riskLabel },
-  net: { key: 'net', label: '미수금액', align: 'r', priority: 1, render: (r) => r.net ? <span style={{ color: C.danger, fontWeight: 700 }}>{money(r.net)}</span> : LEDGER_EMPTY.dash, text: (r) => r.net },
+  net: { key: 'net', label: '미수금액', align: 'r', priority: 1, xf: 'money', render: (r) => r.net ? <span style={{ color: C.danger, fontWeight: 700 }}>{money(r.net)}</span> : LEDGER_EMPTY.dash, text: (r) => r.net },
   alert: { key: 'alert', label: '데이터알람', priority: 2, render: (r) => r.dataAlert ? <Badge tone="amber">{r.dataAlert}</Badge> : <Badge tone="green">원본 대사완료</Badge>, text: (r) => r.dataAlert || '원본 대사완료' },
 } satisfies Record<string, SheetCol<ContractMasterRow>>;
 
 const cx = (key: keyof ContractMasterRow, label: string, opts?: { date?: boolean; money?: boolean; num?: string; align?: 'l' | 'c' | 'r'; priority?: 1 | 2 | 3 | 4 }): SheetCol<ContractMasterRow> => ({
   key: String(key), label, align: opts?.align, priority: opts?.priority,
+  xf: opts?.money ? 'money' : opts?.num === '%' ? 'rate' : opts?.num != null ? 'int' : opts?.date ? 'date' : undefined,
   render: (r) => opts?.date ? date(String(r[key] || '')) : opts?.money ? moneyCell(Number(r[key]) || 0) : opts?.num != null ? number(Number(r[key]) || 0, opts.num) : dash(r[key]),
   text: (r) => r[key] as string | number,
 });
@@ -290,37 +316,37 @@ const CONTRACT_COL_CATALOG: SheetCol<ContractMasterRow>[] = [
   cx('returnedDate', '반납/해지일', { date: true }), cx('pickupPlace', '인수장소'), cx('returnPlace', '반환장소'),
   cx('reservationFee', '예약금', { money: true, align: 'r' }),
   {
-    key: 'mileageOut', label: '출고주행', align: 'r',
+    key: 'mileageOut', label: '출고주행', align: 'r', xf: 'int',
     render: (r) => numberOrNull(r.mileageOut, 'km'),
     text: (r) => r.mileageOut ?? '',
   },
   {
-    key: 'returnMileage', label: '반납주행', align: 'r',
+    key: 'returnMileage', label: '반납주행', align: 'r', xf: 'int',
     render: (r) => numberOrNull(r.returnMileage, 'km'),
     text: (r) => r.returnMileage ?? '',
   },
   {
-    key: 'overMileageRate', label: '초과주행 단가', align: 'r',
+    key: 'overMileageRate', label: '초과주행 단가', align: 'r', xf: 'money',
     render: (r) => (r.overMileageRate == null ? LEDGER_EMPTY.dash : `${money(r.overMileageRate)}/km`),
     text: (r) => r.overMileageRate ?? '',
   },
   {
-    key: 'drivenKm', label: '실주행', align: 'r',
+    key: 'drivenKm', label: '실주행', align: 'r', xf: 'int',
     render: (r) => numberOrNull(r.drivenKm, 'km'),
     text: (r) => r.drivenKm ?? '',
   },
   {
-    key: 'allowedKm', label: '허용주행', align: 'r',
+    key: 'allowedKm', label: '허용주행', align: 'r', xf: 'int',
     render: (r) => numberOrNull(r.allowedKm, 'km'),
     text: (r) => r.allowedKm ?? '',
   },
   {
-    key: 'excessKm', label: '초과km', align: 'r',
+    key: 'excessKm', label: '초과km', align: 'r', xf: 'int',
     render: (r) => numberOrNull(r.excessKm, 'km'),
     text: (r) => r.excessKm ?? '',
   },
   {
-    key: 'overMileageFee', label: '초과주행료', align: 'r',
+    key: 'overMileageFee', label: '초과주행료', align: 'r', xf: 'money',
     render: (r) => moneyOrNull(r.overMileageFee),
     text: (r) => r.overMileageFee ?? '',
   },
@@ -343,13 +369,14 @@ const CONTRACT_COL_CATALOG: SheetCol<ContractMasterRow>[] = [
 export const CONTRACT_SHEET_KEYS: SheetViewKeys = {
   // 회사·계약번호·계약자·연락처·차·차명·대여형태·상태·시작·종료·기간·월대여·보증·결제·납부시기·미납회차·연체·미수·리스크
   basic: [
-    'company', 'contractNo', 'contractorName', 'contractorPhone', 'plate', 'carName', 'rentalType', 'status',
+    'company', 'contractNo', 'contractorName', 'rentalType', 'status',
+    'plate', 'carName', 'contractorPhone',
     'startDate', 'endDate', 'rentalMonths', 'monthlyRent', 'deposit', 'paymentDay', 'paymentTiming',
     'unpaidCount', 'overdueDays', 'net', 'riskLabel',
   ],
   all: [
-    'company', 'contractNo', 'status', 'rentalType', 'contractorName', 'contractorPhone',
-    'plate', 'carName', 'contractDate', 'startDate', 'endDate',
+    'company', 'contractNo', 'contractorName', 'rentalType', 'status',
+    'plate', 'carName', 'contractorPhone', 'contractDate', 'startDate', 'endDate',
     'monthlyRent', 'deposit', 'paymentDay', 'paymentTiming', 'paymentMethod', 'riskLabel', 'net', 'alert',
     'contractorBirth', 'contractorLicenseNo', 'contractorLicenseExpiry', 'licenseType', 'contractorAddress',
     'rentalMonths', 'annualMileageLimit', 'mileageOut', 'returnMileage', 'overMileageRate',
@@ -423,3 +450,62 @@ export const CONTRACT_DETAIL_DEFS: DetailSectionDef[] = [
 ];
 
 export const CONTRACT_DETAIL_SECTIONS = buildDetailSections(CONTRACT_COL_CATALOG, CONTRACT_DETAIL_DEFS);
+
+/* ── 회차 원장 열 (계약관리 「회차」보기) ── */
+function scheduleKindTone(k: ScheduleKind): 'gray' | 'blue' | 'amber' | 'purple' {
+  if (k === '선납개시') return 'blue';
+  if (k === '일할정산') return 'amber';
+  if (k === '이월승계') return 'purple';
+  return 'gray';
+}
+function scheduleStatusTone(s: ScheduleStatus): 'green' | 'red' | 'amber' | 'blue' | 'gray' {
+  if (s === '완료') return 'green';
+  if (s === '연체') return 'red';
+  if (s === '부분납') return 'amber';
+  if (s === '예정') return 'blue';
+  return 'gray';
+}
+
+const SCHEDULE_COL_CATALOG: SheetCol<ScheduleLedgerRow>[] = [
+  { key: 'company', label: '회사명', pin: true, priority: 2, render: (r) => r.company, text: (r) => r.company },
+  { key: 'contractNo', label: '계약번호', priority: 1, render: (r) => dash(r.contractNo), text: (r) => r.contractNo },
+  { key: 'contractorName', label: '계약자', priority: 1, render: (r) => r.contractorName || LEDGER_EMPTY.none, text: (r) => r.contractorName },
+  { key: 'plate', label: LEDGER_LABEL.plate, priority: 1, render: (r) => r.plate || LEDGER_EMPTY.unassigned, text: (r) => r.plate },
+  {
+    key: 'seq', label: '회차', align: 'c', priority: 1,
+    render: (r) => `${r.seq}/${r.seqTotal}`,
+    text: (r) => `${r.seq}/${r.seqTotal}`,
+  },
+  {
+    key: 'kind', label: '회차분류', align: 'c', priority: 1,
+    render: (r) => <Badge tone={scheduleKindTone(r.kind)}>{r.kind}</Badge>,
+    text: (r) => r.kind,
+  },
+  {
+    key: 'status', label: '회차상태', align: 'c', priority: 1,
+    render: (r) => <Badge tone={scheduleStatusTone(r.status)}>{r.status}</Badge>,
+    text: (r) => r.status,
+  },
+  { key: 'dueDate', label: '납부기일', priority: 1, xf: 'date', render: (r) => date(r.dueDate), text: (r) => r.dueDate },
+  { key: 'charge', label: '청구액', align: 'r', priority: 1, xf: 'money', sortNum: true, render: (r) => moneyCell(r.charge), text: (r) => r.charge },
+  { key: 'discount', label: '할인', align: 'r', priority: 2, xf: 'money', sortNum: true, render: (r) => moneyCell(r.discount), text: (r) => r.discount },
+  { key: 'paid', label: '납부액', align: 'r', priority: 1, xf: 'money', sortNum: true, render: (r) => moneyCell(r.paid), text: (r) => r.paid },
+  { key: 'balance', label: '잔액', align: 'r', priority: 1, xf: 'money', sortNum: true, render: (r) => moneyCell(r.balance), text: (r) => r.balance },
+  {
+    key: 'overdueDays', label: '연체일', align: 'r', priority: 2, xf: 'int', sortNum: true,
+    render: (r) => (r.overdueDays ? `${r.overdueDays}일` : LEDGER_EMPTY.dash),
+    text: (r) => r.overdueDays,
+  },
+  { key: 'paidAt', label: '납부완료일', priority: 3, xf: 'date', render: (r) => date(r.paidAt), text: (r) => r.paidAt },
+  { key: 'method', label: '수단', priority: 3, render: (r) => dash(r.method), text: (r) => r.method },
+];
+
+export const SCHEDULE_SHEET_KEYS: SheetViewKeys = {
+  // 열 순서 기준 = 자산관리: 회사(1) · 식별자(2) · 이름(3) · 분류(4) · 상태(5) · 나머지
+  basic: ['company', 'contractNo', 'contractorName', 'kind', 'status', 'plate', 'seq', 'dueDate', 'charge', 'paid', 'balance', 'overdueDays'],
+  all: ['company', 'contractNo', 'contractorName', 'kind', 'status', 'plate', 'seq', 'dueDate', 'charge', 'discount', 'paid', 'balance', 'overdueDays', 'paidAt', 'method'],
+};
+
+const _scheduleViews = buildSheetViews(SCHEDULE_COL_CATALOG, SCHEDULE_SHEET_KEYS);
+export const SCHEDULE_LEDGER_COLS = _scheduleViews.basic;
+export const SCHEDULE_LEDGER_ALL_COLS = _scheduleViews.expanded;

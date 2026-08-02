@@ -12,7 +12,7 @@ import { wipeCompany, wipeAllData } from '@/lib/reset';
 import { reflectCompany } from '@/lib/reflect';
 import { type OperatingSummary } from '@/lib/operating-snapshot';
 import { OperatingSummaryView } from '@/components/OperatingSummary';
-import { COMPANIES, companyLabel, companyShort } from '@/lib/companies';
+import { COMPANIES, companyLabel } from '@/lib/companies';
 import { Page, Panel, Btn, C, LoadingOverlay, th, td, useConfirm, usePrompt } from '@/components/ui';
 
 import { seedDemoData } from '@/lib/seed';
@@ -107,7 +107,7 @@ export default function DevDataPage() {
         await wipeCompany(c);
         const r = await seedDemoData(c);
         total += r.total;
-        parts.push(`${companyShort(c) || c} ${r.total}`);
+        parts.push(`${companyLabel(c) || c} ${r.total}`);
       }
       setMsg(`데모 샘플 ${total}건 적재 (${parts.join(' · ')})`);
       await load();
@@ -172,7 +172,7 @@ export default function DevDataPage() {
                   return (
                     <tr key={c}>
                       <td style={td}>
-                        <b>{companyLabel(c)}</b> <span style={{ fontSize: 11, color: C.faint }}>{companyShort(c)}</span>
+                        <b>{companyLabel(c)}</b>
                         {REAL.has(c) && <span style={{ marginLeft: 6, fontSize: 10.5, fontWeight: 700, color: 'var(--green-text)', background: 'var(--bg-stripe)', padding: '1px 6px', borderRadius: 4 }}>실데이터</span>}
                       </td>
                       <td style={{ ...td, textAlign: 'right' }}>{num(cnt?.vehicle)}</td>

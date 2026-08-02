@@ -69,7 +69,7 @@ const ACCOUNT_COL_CATALOG: SheetCol<BankAccountRow>[] = [
 export const ACCOUNT_SHEET_KEYS: SheetViewKeys = {
   basic: ['company', 'bank', 'holder', 'type', 'status', 'account', 'alias', 'totalIn', 'totalOut', 'currentBalance'],
   all: [
-    'company', 'bank', 'account', 'alias', 'holder', 'type', 'status',
+    'company', 'bank', 'holder', 'type', 'status', 'account', 'alias',
     'totalIn', 'totalOut', 'currentBalance', 'createdAt', 'createdBy',
     'opened', 'closed', 'balance', 'method', 'memo', 'updated',
   ],

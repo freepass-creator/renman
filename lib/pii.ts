@@ -48,3 +48,39 @@ export function maskAddress(s: unknown): string {
 function maskAll(s: string): string {
   return s.length > 2 ? s.slice(0, 1) + '●'.repeat(s.length - 1) : '●'.repeat(s.length);
 }
+
+/** 계좌·카드번호 — 뒤 4자리만. */
+export function maskAccount(s: unknown): string {
+  const v = String(s ?? '').trim();
+  if (!v) return '';
+  const d = v.replace(/\D/g, '');
+  if (d.length <= 4) return '●'.repeat(v.length);
+  return `•••• ${d.slice(-4)}`;
+}
+
+/** 열 key → 마스커. 화면 render는 원문 유지, 파일 내보내기에서만 사용. */
+export const PII_MASKERS: Record<string, (v: unknown) => string> = {
+  phone: maskPhone,
+  contractorPhone: maskPhone,
+  dealerPhone: maskPhone,
+  contractorLicenseNo: maskLicense,
+  contractorBirth: maskResident,
+  ownerBizNo: maskResident,
+  contractorAddress: maskAddress,
+  useAddress: maskAddress,
+  account: maskAccount,
+  acct: maskAccount,
+  cardLast4: maskAccount,
+};
+
+/** 휴대폰 패턴(미등록 열 최종 방어). */
+export function looksLikePhone(v: unknown): boolean {
+  const s = String(v ?? '').trim();
+  return /^01\d[- ]?\d{3,4}[- ]?\d{4}$/.test(s);
+}
+
+/** 주민·사업자 13자리 숫자 패턴. */
+export function looksLikeResident(v: unknown): boolean {
+  const d = String(v ?? '').replace(/\D/g, '');
+  return d.length === 13;
+}

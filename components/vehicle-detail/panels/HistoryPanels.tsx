@@ -75,7 +75,7 @@ export function WorkPanel({ plate, vd }: PanelProps) {
             </div>
           </div>
         );
-      })}</div> : <EmptyState variant="sec">수선/작업 이력 없음 · 오른쪽 “+ 수선/작업”으로 남기세요</EmptyState>}
+      })}</div> : <EmptyState variant="sec">수선/작업 이력 없음 · “+ 수선/작업” 버튼으로 남기세요</EmptyState>}
     </Sec>
   );
 }
@@ -92,7 +92,7 @@ export function HistoryPanel({ plate, vd }: PanelProps) {
         const tone = (cat === '사고' ? 'red' : cat === '이동' ? 'blue' : (cat === '통화' || cat === '문자') ? 'green' : (cat === '방문' || cat === '상담') ? 'purple' : cat === '메모' ? 'gray' : cat === '검사' ? 'teal' : 'amber') as 'red' | 'blue' | 'green' | 'purple' | 'gray' | 'teal' | 'amber';
         const who = isComm(h) ? (contracts.find((c) => matchesContract(h, c))?.contractorName || h.customer || '') : '';
         return <ObjCard key={i} badge={cat} badgeTone={tone} title={String(h.title || '—')} right={h.cost ? won(h.cost) : (h.nextDate ? <span style={{ color: C.warn, fontSize: 11.5 }}>후속 {String(h.nextDate)}</span> : undefined)} fields={[['일자', String(h.date || '—')], ...(who ? [['상대', String(who)] as [string, string]] : []), [h.author ? '작성' : '업체', String(h.author || h.vendor || '—')]]} />;
-      })}</Cards> : <EmptyState variant="sec">기록 없음 · 오른쪽 “+ 기록”으로 남기세요</EmptyState>}
+      })}</Cards> : <EmptyState variant="sec">기록 없음 · “+ 기록” 버튼으로 남기세요</EmptyState>}
     </Sec>
   );
 }

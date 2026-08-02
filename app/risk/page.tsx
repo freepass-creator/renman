@@ -7,7 +7,7 @@
  */
 import { Suspense, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { FileWarning, HandCoins } from 'lucide-react';
+import { FileWarning, HandCoins, MessageSquare } from 'lucide-react';
 import { TODAY } from '@/lib/dashboard-consts';
 import { useDashboardData } from '@/lib/use-dashboard-data';
 import { textMatch } from '@/lib/search-match';
@@ -18,18 +18,20 @@ import { latestDateOf } from '@/lib/ledger-stats';
 import { sendNoticeCert, sendNoticeCertBulk } from '@/lib/docs/send-notice';
 import { useSession } from '@/lib/session';
 import { toast } from '@/lib/toast';
-import { openReceivables } from '@/lib/ui-bus';
+import { openCar, openFinance, openIngest, openReceivables } from '@/lib/ui-bus';
 import { useTableSelection } from '@/lib/use-table-selection';
 import { useRowSelection, useCtrlASelectAll } from '@/lib/use-row-selection';
 import {
-  Badge, Btn, C, ContextMenu, type ContextMenuItem, LedgerFilterButton, LedgerFilterFields, LedgerFilterPanel, LedgerFrame, LedgerRecordPanel, LedgerSelectionBar, PageLoading, PeriodBar, Search,
-  useConfirm, won,
+  Badge, Btn, C, ContextMenu, type ContextMenuItem, LedgerFilterButton, LedgerFilterFields, LedgerFilterPanel, LedgerFrame, LedgerRecordPanel, LedgerSelectionBar, PageLoading, PeriodBar, Search, useSheetExport, won,
+  useConfirm,
   type LedgerColView,
 } from '@/components/ui';
 import { useIsMobile } from '@/lib/use-mobile';
 import {
   RISK_FILTER_DEFS, countActiveFilters, emptyFilterValues,
 } from '@/lib/ledger-filter-defs';
+import { NotifyDialog } from '@/components/NotifyDialog';
+import { notifyRecipients } from '@/lib/notify/recipients';
 
 type GroupFilter = '전체' | RiskSheetGroup;
 
@@ -39,7 +41,7 @@ function RiskLedgerInner() {
   const mobile = useIsMobile();
   const confirm = useConfirm();
   const searchParams = useSearchParams();
-  const { companyId } = useSession();
+  const { companyId, isOperator } = useSession();
   const { contracts, vehicles, insurances, penalties, history, bankTx, loading, error: loadError } = useDashboardData();
   const [q, setQ] = useState('');
   const [group, setGroup] = useState<GroupFilter>('전체');
@@ -49,6 +51,18 @@ function RiskLedgerInner() {
   const [filterOpen, setFilterOpen] = useState(false);
   const [detailFilters, setDetailFilters] = useState(() => emptyFilterValues(RISK_FILTER_DEFS));
   const [ctxMenu, setCtxMenu] = useState<{ open: boolean; x: number; y: number }>({ open: false, x: 0, y: 0 });
+  const [smsOpen, setSmsOpen] = useState(false);
+  const [smsRecipients, setSmsRecipients] = useState<ReturnType<typeof notifyRecipients>>([]);
+
+  const xl = useSheetExport<RiskSheetRow>({
+    title: '리스크관리',
+    filterSummary: () => {
+      const parts = [group === '전체' ? '' : group, detailFilters.kind, detailFilters.status].filter(Boolean);
+      if (range.from || range.to) parts.push(`${range.from || '…'}~${range.to || '…'}`);
+      if (q.trim()) parts.push('검색');
+      return parts.join(' · ') || '전체';
+    },
+  });
 
   const sel = useTableSelection();
   const { clear: clearSel } = sel;
@@ -58,23 +72,36 @@ function RiskLedgerInner() {
     [vehicles, contracts, insurances, penalties, history, bankTx],
   );
   const searched = useMemo(() => allRows.filter((r) =>
-    textMatch(q, r.company, r.group, r.kind, r.plate, r.customer, r.carName, r.status, r.due),
+    textMatch(q, r.company, r.group, r.kind, r.plate, r.customer, r.subject, r.carName, r.status, r.due),
   ), [allRows, q]);
+  /* 필터 옵션 — 실제 데이터에서 수집한다(분류·상태 값을 바꿔도 필터가 따라오게).
+     구분 필터가 걸려 있으면 그 구분 안의 분류·상태만 보여준다(빈 조합 선택 방지). */
+  const kindOptions = useMemo(() => {
+    const base = group === '전체' ? allRows : allRows.filter((r) => r.group === group);
+    return [...new Set(base.map((r) => r.kind).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'ko'));
+  }, [allRows, group]);
+  const statusOptions = useMemo(() => {
+    const base = group === '전체' ? allRows : allRows.filter((r) => r.group === group);
+    return [...new Set(base.map((r) => r.status).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'ko'));
+  }, [allRows, group]);
+
   const rows = useMemo(() => searched.filter((r) => {
     if (group !== '전체' && r.group !== group) return false;
+    if (detailFilters.kind && r.kind !== detailFilters.kind) return false;
+    if (detailFilters.status && r.status !== detailFilters.status) return false;
     if (range.from || range.to) {
       if (!r.dueDate) return false;
       if (range.from && r.dueDate < range.from) return false;
       if (range.to && r.dueDate > range.to) return false;
     }
     return true;
-  }), [searched, group, range.from, range.to]);
+  }), [searched, group, detailFilters.kind, detailFilters.status, range.from, range.to]);
 
   const rowIds = useMemo(() => rows.map((r) => r.id), [rows]);
   const rowSel = useRowSelection({ ids: rowIds, selection: sel });
   useCtrlASelectAll(rowSel, sel);
 
-  useEffect(() => { clearSel(); }, [group, q, range.from, range.to, clearSel]);
+  useEffect(() => { clearSel(); }, [group, q, range.from, range.to, detailFilters.kind, detailFilters.status, clearSel]);
 
   // ?group= · ?open= — 지시 스트립·홈 딥링크.
   useEffect(() => {
@@ -119,6 +146,7 @@ function RiskLedgerInner() {
     [sel.selectedIds, rowById],
   );
   const noticeTargets = selectedRows.filter((r) => r.group === '미납' && r.contractKey);
+  const smsTargets = selectedRows.filter((r) => r.group === '만기' && r.kind === '만기임박' && r.contractKey);
   const unpaidInView = useMemo(
     () => rows.filter((r) => r.group === '미납' && r.contractKey),
     [rows],
@@ -132,7 +160,7 @@ function RiskLedgerInner() {
   async function sendOne(row: RiskSheetRow) {
     const rec = row.contractKey ? contractByKey.get(row.contractKey) : undefined;
     if (!rec) { toast('계약 키 없음', 'error'); return; }
-    const r = await sendNoticeCert({ rec, companyId });
+    const r = await sendNoticeCert({ rec, companyId: row.companyId || companyId });
     toast(`내용증명 ${r.docNo} · 청구 ${won(r.claim)}`, 'success');
   }
 
@@ -141,25 +169,30 @@ function RiskLedgerInner() {
       .map((r) => (r.contractKey ? contractByKey.get(r.contractKey) : undefined))
       .filter(Boolean) as typeof contracts;
     if (!recs.length) return;
+    const companies = new Set(recs.map((rec) => String(rec.companyId || companyId)).filter(Boolean));
+    if (companies.size > 1) {
+      toast('내용증명 일괄 처리는 한 법인씩 선택해 주세요', 'error');
+      return;
+    }
     if (!(await confirm({ message: `내용증명 ${recs.length}건을 일괄 생성(인쇄)·기록합니까?` }))) return;
-    const r = await sendNoticeCertBulk({ recs, companyId });
+    const r = await sendNoticeCertBulk({ recs, companyId: [...companies][0] || companyId });
     toast(`내용증명 일괄 ${r.count}건 · 청구합 ${won(r.totalClaim)}`, 'success');
     clearSel();
   }
 
   const ctxItems: ContextMenuItem[] = (() => {
     if (!ctxMenu.open || !selectedRows.length) return [];
+    const first = selectedRows[0];
     const items: ContextMenuItem[] = [
       {
         label: '상세 열기',
         onClick: () => setSelected(selectedRows[0]),
       },
-      {
-        label: '회수 큐 열기',
-        icon: <HandCoins size={14} />,
-        onClick: () => openReceivables(),
-      },
     ];
+    if (first.group === '미납') items.push({ label: '회수 큐 열기', icon: <HandCoins size={14} />, onClick: () => openReceivables() });
+    else if (first.kind === '자금미분류') items.push({ label: '자금 분류 열기', onClick: () => openFinance({ unclassified: true }) });
+    else if (first.kind === '서류미첨부') items.push({ label: '데이터센터 열기', onClick: () => openIngest('vehicle', first.plate) });
+    else if (first.plate) items.push({ label: '차량 360 열기', onClick: () => openCar(first.plate, undefined, first.companyId) });
     if (noticeTargets.length) {
       items.push({ type: 'separator' });
       items.push({
@@ -170,6 +203,29 @@ function RiskLedgerInner() {
         danger: true,
         onClick: () => { void sendBulk(noticeTargets); },
       });
+    }
+    if (smsTargets.length) {
+      items.push({ type: 'separator' });
+      items.push({
+        label: smsTargets.length > 1
+          ? `문자 발송 (${smsTargets.length})`
+          : '문자 발송',
+        icon: <MessageSquare size={14} />,
+        onClick: () => {
+          const recs = smsTargets
+            .map((r) => (r.contractKey ? contractByKey.get(r.contractKey) : undefined))
+            .filter(Boolean) as typeof contracts;
+          setSmsRecipients(notifyRecipients(recs, TODAY));
+          setSmsOpen(true);
+        },
+      });
+    }
+    items.push({ type: 'separator' });
+    items.push(xl.exportItem());
+    if (sel.size >= 1) items.push(xl.exportItem({ selected: selectedRows }));
+    if (isOperator) {
+      items.push(xl.exportItem({ unmasked: true }));
+      if (sel.size >= 1) items.push(xl.exportItem({ selected: selectedRows, unmasked: true }));
     }
     return items;
   })();
@@ -207,13 +263,16 @@ function RiskLedgerInner() {
               onChange={(key, value) => {
                 if (key === 'group') {
                   setGroup((value || '전체') as GroupFilter);
-                  setDetailFilters((prev) => ({ ...prev, group: value }));
+                  // 구분을 바꾸면 그 구분에 없는 분류·상태는 해제 — 빈 표가 되는 조합을 막는다.
+                  setDetailFilters((prev) => ({ ...prev, group: value, kind: '', status: '' }));
                   return;
                 }
                 setDetailFilters((prev) => ({ ...prev, [key]: value }));
               }}
               options={{
                 group: RISK_GROUPS,
+                kind: kindOptions,
+                status: statusOptions,
               }}
             />
           </LedgerFilterPanel>
@@ -233,9 +292,31 @@ function RiskLedgerInner() {
         empty={group === '전체' ? '지금 챙길 위험이 없습니다' : `${group} 없음`}
         cols={colView === '기본' ? RISK_BASIC_COLS : RISK_EXPANDED_COLS}
         rows={rows}
+        mobileCard={(r) => {
+          const plate = r.plate && r.plate !== LEDGER_EMPTY.dash ? r.plate : undefined;
+          const customer = r.customer && r.customer !== LEDGER_EMPTY.none && r.customer !== LEDGER_EMPTY.dash
+            ? r.customer
+            : undefined;
+          const carName = r.carName && r.carName !== LEDGER_EMPTY.dash ? r.carName : undefined;
+          return {
+            co: r.company,
+            badge: r.status,
+            badgeTone: r.badgeTone,
+            rail: r.tone === 'danger' ? 'danger' : 'none',
+            plate,
+            name: plate ? undefined : (customer || r.subject),
+            carType: plate ? (customer || carName) : carName,
+            fields: [
+              ['리스크분류', r.kind],
+              ['기한', r.due],
+            ],
+            right: r.amount > 0 ? won(r.amount) : undefined,
+          };
+        }}
         rowKey={(r) => r.id}
         selectedRowKey={selected?.id ?? null}
         selectedKeys={sel.selectedIds}
+        onView={xl.onView}
         onRowMouseDown={(e) => rowSel.onRowMouseDown(e)}
         onRowClickEvent={(e, r, idx) => {
           rowSel.onRowClick(e, r.id, idx);
@@ -251,7 +332,7 @@ function RiskLedgerInner() {
             onSelectAll={() => sel.selectAll(unpaidInView.length ? unpaidInView.map((r) => r.id) : rowIds)}
             onClear={() => clearSel()}
           >
-            <Btn size="sm" variant="ghost" onClick={() => openReceivables()}>회수 큐 열기</Btn>
+            {noticeTargets.length > 0 ? <Btn size="sm" variant="ghost" onClick={() => openReceivables()}>회수 큐 열기</Btn> : null}
             <Btn
               size="sm"
               variant="danger"
@@ -275,7 +356,12 @@ function RiskLedgerInner() {
             onClose={() => setSelected(null)}
             actions={(
               <>
-                <Btn size="sm" variant="ghost" onClick={() => openReceivables()}>회수 큐</Btn>
+                {selected.group === '미납' ? <Btn size="sm" variant="ghost" onClick={() => openReceivables()}>회수 큐</Btn> : null}
+                {selected.kind === '자금미분류' ? <Btn size="sm" variant="ghost" onClick={() => openFinance({ unclassified: true })}>자금 분류</Btn> : null}
+                {selected.kind === '서류미첨부' ? <Btn size="sm" variant="ghost" onClick={() => openIngest('vehicle', selected.plate)}>서류 보완</Btn> : null}
+                {selected.group !== '미납' && selected.kind !== '자금미분류' && selected.kind !== '서류미첨부' && selected.plate ? (
+                  <Btn size="sm" variant="ghost" onClick={() => openCar(selected.plate, undefined, selected.companyId)}>차량 360</Btn>
+                ) : null}
                 {selected.group === '미납' && selected.contractKey && (
                   <Btn size="sm" variant="danger" onClick={() => void sendOne(selected)}>내용증명</Btn>
                 )}
@@ -291,6 +377,13 @@ function RiskLedgerInner() {
         onClose={() => setCtxMenu((c) => ({ ...c, open: false }))}
         items={ctxItems}
       />
+      {smsOpen && (
+        <NotifyDialog
+          onClose={() => setSmsOpen(false)}
+          recipients={smsRecipients}
+          initialLabel="반납 임박"
+        />
+      )}
     </>
   );
 }

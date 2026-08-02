@@ -54,8 +54,8 @@ export const SCRIM_FG = '#fff';
 export type CtrlSize = 'md' | 'sm';
 
 export const CTRL = {
-  md: { web: 32, mobile: 40, fsWeb: 12.5, fsMobile: 16 },
-  sm: { web: 28, mobile: 36, fsWeb: 12, fsMobile: 16 },
+  md: { web: 32, mobile: 44, fsWeb: 12.5, fsMobile: 16 },
+  sm: { web: 28, mobile: 44, fsWeb: 12, fsMobile: 16 },
 } as const;
 
 export function ctrlH(mobile: boolean, size: CtrlSize = 'md'): number {

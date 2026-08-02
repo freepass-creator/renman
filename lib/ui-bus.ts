@@ -1,7 +1,9 @@
 // 전역 UI 이벤트 버스 — 어디서든 차 열기/담기/팔레트/새로고침. 사이드바 없는 단일화면의 접착제.
 // focus = 온 이유(task): unpaid(수납)·return(반납)·inspect(검사)·deploy(투입)·doc(서류)·loan|insurance → 360이 해당 액션을 띄움
 // 세계관: 차번·기간·계약자 축이 끊기지 않게 열기 — openCar / openCustomer / openPayments.
-export const openCar = (plate: unknown, focus?: string) => window.dispatchEvent(new CustomEvent('jpk:open-car', { detail: { plate: String(plate || ''), focus: focus || '' } }));
+export const openCar = (plate: unknown, focus?: string, companyId?: unknown) => window.dispatchEvent(new CustomEvent('jpk:open-car', {
+  detail: { plate: String(plate || ''), focus: focus || '', companyId: String(companyId || '') },
+}));
 /** 홈 렌즈 전환 — 전용 페이지로. */
 export const openLens = (lens: string) => {
   if (typeof window === 'undefined') return;

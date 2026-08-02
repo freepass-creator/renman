@@ -1,5 +1,5 @@
-// 자금일보 통합 원장 — 데이터센터로 수집된 계좌(bank_tx)·CMS·카드매출·법인카드(card_tx)를
-// 단일 자금 스트림(CashRow)으로 합친다. 각 건은 계정과목(category)으로 분류. 분류 저장은 원본 엔티티로.
+// 자금관리 통합 원장 — 데이터센터로 수집된 계좌(bank_tx)·CMS·카드매출·법인카드(card_tx)를
+// 단일 자금 스트림(CashRow)으로 합친다. 묶음 원천을 1차 대사하고, 자금일보는 이 원장을 날짜별로 가공한다.
 import { type EntityRecord } from '@/lib/intake/entities';
 import { companyDisplay } from '@/lib/companies';
 import { type LedgerKind, kindOfLabel, isUnclassified, UNCLASSIFIED } from '@/lib/payments/ledger-subjects';
@@ -11,7 +11,7 @@ export type CashSource = '계좌' | 'CMS' | '카드매출' | '법인카드';
  *   cms-item    — 집금에 붙은 성공분(상시 하위행, 집계 제외)
  *   cms-pending — 업로드된 CMS 성공·아직 집금 미연결(원장에 반영, 매칭 대기)
  */
-export type CashNest = 'cms-dep' | 'cms-item' | 'cms-pending';
+export type CashNest = 'cms-dep' | 'cms-item' | 'cms-pending' | 'card-dep' | 'card-item' | 'bundle-parent';
 export type CashRow = {
   id: string;
   entity: 'bank_tx' | 'card_tx';
@@ -180,22 +180,38 @@ export function isCmsMethod(b: EntityRecord): boolean {
 }
 
 export function isCmsDepositLabel(b: EntityRecord): boolean {
+  if (isCardSettlementDeposit(b)) return false;
   if (String(b.settlementRole || '') === 'deposit') return true;
   const blob = `${b.counterparty || ''} ${b.memo || ''} ${b.category || ''}`;
-  return /CMS집금|카드자동집금/.test(blob) || String(b.category || '') === 'CMS집금';
+  return /CMS집금/.test(blob) || String(b.category || '') === 'CMS집금';
+}
+
+/** 카드 승인 N건이 한 번에 들어온 카드사 정산입금. CMS 집금과 같은 deposit 역할이지만 원천은 다르다. */
+export function isCardSettlementDeposit(b: EntityRecord): boolean {
+  const sid = String(b.settlementId || '');
+  if (sid.startsWith('card_')) return true;
+  const blob = `${b.counterparty || ''} ${b.memo || ''} ${b.category || ''}`;
+  if (/카드(자동)?집금|카드정산/.test(blob)) return true;
+  return String(b.settlementRole || '') === 'deposit' && /카드매출/.test(blob);
 }
 
 function bankSource(b: EntityRecord): CashSource {
+  if (isCardSettlementDeposit(b)) return '카드매출';
   if (isCmsDepositLabel(b) || isCmsMethod(b)) return 'CMS';
   if (String(b.method || '') === '카드') return '카드매출';
   return '계좌';
+}
+
+/** 화면 행 식별자 — 회사별로 같은 원천키가 존재할 수 있으므로 회사까지 포함한다. */
+export function cashRowId(entity: 'bank' | 'card', rec: EntityRecord): string {
+  return `${entity}:${String(rec.companyId || 'unknown')}:${String(rec._key || rec.txKey || '')}`;
 }
 
 function rowFromBank(b: EntityRecord, nest?: CashNest, parentId?: string): CashRow {
   const fullAccountNumber = String(b.accountNumber || '');
   const sourceAccountLabel = String(b.account || '');
   return {
-    id: `bank:${String(b._key || b.txKey || '')}`, entity: 'bank_tx', recKey: String(b._key || ''),
+    id: cashRowId('bank', b), entity: 'bank_tx', recKey: String(b._key || ''),
     companyId: String(b.companyId || ''), date: String(b.txDate || ''), source: bankSource(b),
     // 원본 시트명이 account에 들어온 과거 자료는 계좌명으로 취급한다.
     // 전체 계좌번호는 accountNumber가 명시된 경우에만 표시(끝 4자리로 전체 번호를 추정하지 않음).
@@ -223,11 +239,14 @@ export function buildCashLedger(bank: EntityRecord[], card: EntityRecord[]): Cas
       continue;
     }
 
-    rows.push(rowFromBank(b, isCmsDepositLabel(b) ? 'cms-dep' : undefined));
+    rows.push(rowFromBank(b,
+      b.bundleType ? 'bundle-parent'
+        : isCardSettlementDeposit(b) ? 'card-dep'
+          : isCmsDepositLabel(b) ? 'cms-dep' : undefined));
   }
   for (const c of card) {
     rows.push({
-      id: `card:${String(c._key || c.txKey || '')}`, entity: 'card_tx', recKey: String(c._key || ''),
+      id: cashRowId('card', c), entity: 'card_tx', recKey: String(c._key || ''),
       companyId: String(c.companyId || ''), date: String(c.txDate || ''), source: '법인카드',
       account: `법인카드${c.cardLast4 ? ' ' + String(c.cardLast4) : ''}`,
       accountName: String(c.cardName || c.accountAlias || '법인카드'),

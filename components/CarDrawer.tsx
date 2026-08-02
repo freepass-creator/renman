@@ -6,7 +6,15 @@ import { useRouter } from 'next/navigation';
 export function CarDrawer() {
   const router = useRouter();
   useEffect(() => {
-    function on(e: Event) { const d = ((e as CustomEvent).detail || {}) as { plate?: string; focus?: string }; const p = String(d.plate || ''); if (p) router.push('/vehicle/' + encodeURIComponent(p) + (d.focus ? '?do=' + d.focus : '')); }
+    function on(e: Event) {
+      const d = ((e as CustomEvent).detail || {}) as { plate?: string; focus?: string; companyId?: string };
+      const p = String(d.plate || '');
+      if (!p) return;
+      const qs = new URLSearchParams();
+      if (d.focus) qs.set('do', d.focus);
+      if (d.companyId) qs.set('company', d.companyId);
+      router.push('/vehicle/' + encodeURIComponent(p) + (qs.size ? `?${qs.toString()}` : ''));
+    }
     function onCust(e: Event) { const k = String(((e as CustomEvent).detail || {}).key || ''); if (k) router.push('/customer/' + encodeURIComponent(k)); }
     function onNav(e: Event) { const href = String(((e as CustomEvent).detail || {}).href || ''); if (href) router.push(href); }
     window.addEventListener('jpk:open-car', on);

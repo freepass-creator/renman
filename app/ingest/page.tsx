@@ -5,6 +5,8 @@
  */
 import { Suspense, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
+import { DATA_CENTER_TITLE } from '@/lib/data-center-terms';
+import { uploadToInbox } from '@/lib/inbox-upload';
 import { ENTITY_LIST, ENTITIES, mapOcrToEntity, type EntityRecord } from '@/lib/intake/entities';
 import { parseCsv } from '@/lib/intake/csv';
 import { saveIntake } from '@/lib/intake';
@@ -25,6 +27,12 @@ import {
 import type { CrosscheckResult } from '@/lib/ocr-crosscheck';
 import { useIsMobile } from '@/lib/use-mobile';
 import { textMatch } from '@/lib/search-match';
+import { storageReady } from '@/lib/storage';
+import { commitUpdate } from '@/lib/commit';
+import { getStore } from '@/lib/store';
+import { buildMatchContract } from '@/lib/contract-ops';
+import { analyzeMatchProposal, proposalPatch, toBankTransaction } from '@/lib/payments/match-proposal';
+import { TODAY } from '@/lib/dashboard-consts';
 
 export const dynamic = 'force-dynamic';
 
@@ -45,18 +53,28 @@ const ENTITY_GROUPS = (['ledger', 'event', 'system'] as const)
   }))
   .filter((g) => g.items.length > 0);
 
+/** 직접입력 첫 화면에는 실제 한 건 등록에 자주 쓰는 필드만 노출한다. */
+const MANUAL_PRIMARY_KEYS: Record<string, readonly string[]> = {
+  vehicle: ['plate', 'carName', 'status', 'ownerName', 'firstReg', 'vin', 'mileage', 'acquisitionPrice', 'acquisitionDate', 'maker', 'modelLine', 'modelYear'],
+  contract: ['contractNo', 'contractorName', 'plate', 'status', 'rentalType', 'startDate', 'endDate', 'monthlyRent', 'deposit', 'paymentDay'],
+  customer: ['name', 'phone', 'birth', 'licenseNo', 'licenseType', 'licenseExpiry', 'address'],
+  work_item: ['date', 'category', 'status', 'priority', 'title', 'plate', 'contractKey', 'dueDate', 'assigneeName'],
+};
+
 function newRid() {
   return `p_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`;
 }
 
 function IngestInner() {
   const mobile = useIsMobile();
-  const { companyId } = useSession();
+  const { companyId, user } = useSession();
   const sp = useSearchParams();
   const [entityKey, setEntityKey] = useState(() => sp.get('type') || 'vehicle');
   const [saving, setSaving] = useState(false);
   const [sheetView, setSheetView] = useState<SheetView>('대기');
   const [panelOpen, setPanelOpen] = useState(true);
+  const [universalOpen, setUniversalOpen] = useState(false);
+  const [universalBusy, setUniversalBusy] = useState(false);
   const { rows: savedList, loading: savedLoading, reload: reloadSaved } = useEntityList(entityKey);
   const [tab, setTab] = useState<Tab>(() => (sp.get('plate') ? 'manual' : 'ocr'));
   const [records, setRecords] = useState<PendingRow[]>([]);
@@ -72,8 +90,15 @@ function IngestInner() {
   });
   const [savedQ, setSavedQ] = useState('');
   const [picked, setPicked] = useState<string | null>(null);
+  const [parseNotice, setParseNotice] = useState('');
 
   const entity = ENTITIES[entityKey];
+  const [manualPrimaryFields, manualMoreFields] = useMemo(() => {
+    const preferred = new Set(MANUAL_PRIMARY_KEYS[entityKey] || []);
+    const primary = entity.fields.filter((field, index) => field.required || preferred.has(field.key) || (!MANUAL_PRIMARY_KEYS[entityKey] && index < 8));
+    const primaryKeys = new Set(primary.map((field) => field.key));
+    return [primary, entity.fields.filter((field) => !primaryKeys.has(field.key))];
+  }, [entity, entityKey]);
   useEffect(() => {
     if (tab === 'ocr' && !entity.ocrType) setTab('excel');
   }, [tab, entity.ocrType]);
@@ -89,6 +114,35 @@ function IngestInner() {
     setOcrCrosscheck(null);
     setPicked(null);
     setFile(null);
+  }
+
+  async function uploadOriginals(files: FileList) {
+    const target = resolveWriteCompany(companyId, null);
+    if (!target) { toast(NEED_COMPANY, 'error'); return; }
+    const list = [...files];
+    if (!list.length) return;
+    setUniversalBusy(true);
+    let saved = 0;
+    let duplicates = 0;
+    try {
+      for (const original of list) {
+        const result = await uploadToInbox(original, '기타', target, String(user.name || user.email || ''));
+        if (result.ok) {
+          saved += 1;
+          if (result.duplicate) duplicates += 1;
+        }
+      }
+      if (saved) {
+        toast(`원본 ${saved}건 접수${duplicates ? ` · 중복 ${duplicates}건` : ' · 처리대기'}`, 'success');
+        setEntityKey('inbox');
+        setSheetView('저장본');
+        setUniversalOpen(false);
+        setPanelOpen(false);
+      }
+      if (saved < list.length) toast(`${list.length - saved}건은 저장하지 못했습니다`, 'error');
+    } finally {
+      setUniversalBusy(false);
+    }
   }
 
   async function saveRecords() {
@@ -137,13 +191,53 @@ function IngestInner() {
   }
 
   async function onExcelFile(f: File) {
-    setError(''); setParsing(true); setOcrRaw(null); setOcrCrosscheck(null);
+    setError(''); setParseNotice(''); setParsing(true); setOcrRaw(null); setOcrCrosscheck(null);
     toast(`${f.name} 읽는 중…`, 'info');
     try {
       const isCsv = /\.csv$/i.test(f.name);
-      const recs = isCsv
-        ? parseCsv(entityKey, await f.text())
-        : await (await import('@/lib/intake/xlsx')).parseSpreadsheet(entityKey, f);
+      const target = resolveWriteCompany(companyId, null);
+      let originalInboxKey = '';
+      if (target && storageReady()) {
+        const original = await uploadToInbox(f, entityKey === 'bank_tx' ? '계좌거래내역' : entity.label, target, String(user.name || user.email || ''));
+        originalInboxKey = String(original.key || '');
+        if (!original.ok) setParseNotice('원본 보관 실패 · 분석 결과는 저장 전 검토하세요.');
+      } else if (!target) {
+        setParseNotice('회사를 선택해야 원본과 분석 결과를 함께 보관할 수 있습니다.');
+      } else {
+        setParseNotice('Storage 미설정 · 현재는 분석만 가능하며 원본은 보관되지 않습니다.');
+      }
+      let recs: EntityRecord[];
+      if (entityKey === 'bank_tx' && !isCsv) {
+        const report = await (await import('@/lib/intake/parse-tx')).parseTxFileReport(f);
+        if (target) {
+          const contracts = (await getStore().list('contract', target).catch(() => [] as EntityRecord[]))
+            .map((contract) => buildMatchContract(contract, TODAY));
+          recs = report.records.map((record) => ({
+            ...record,
+            ...proposalPatch(analyzeMatchProposal(toBankTransaction(record), contracts)),
+          }));
+        } else {
+          recs = report.records;
+        }
+        const notices = [
+          report.rejected.length ? `확인 필요 ${report.rejected.length}행` : '',
+          ...report.warnings,
+        ].filter(Boolean);
+        if (notices.length) setParseNotice((prev) => [prev, ...notices].filter(Boolean).join(' · '));
+        if (target && originalInboxKey) {
+          await commitUpdate({
+            entity: 'inbox', sessionCompanyId: target, key: originalInboxKey,
+            patch: {
+              processingState: report.rejected.length || report.warnings.length ? '확인필요' : '분석중',
+              analyzedAt: new Date().toISOString(), parsedRowCount: report.records.length,
+              rejectedRowCount: report.rejected.length, analysisWarnings: report.warnings,
+              rejectedRowSummary: report.rejected.slice(0, 20).map((row) => ({ sheet: row.sheet, row: row.row, reason: row.reason })),
+            },
+          });
+        }
+      } else {
+        recs = isCsv ? parseCsv(entityKey, await f.text()) : await (await import('@/lib/intake/xlsx')).parseSpreadsheet(entityKey, f);
+      }
       if (!recs.length) {
         setError(`인식된 행이 없습니다 — "${entity.label}" 형식 확인`);
         toast('인식된 행 0', 'error');
@@ -179,10 +273,11 @@ function IngestInner() {
   }, [entity.ocrType]);
 
   const pendingCols = useMemo<SheetCol<PendingRow>[]>(() => {
-    const fields = entity.fields.slice(0, sheetView === '대기' ? 10 : 6);
+    const pendingLimit = entityKey === 'bank_tx' ? 13 : 10;
+    const fields = entity.fields.slice(0, sheetView === '대기' ? pendingLimit : 6);
     return fields.map((f, i) => ({
       key: f.key,
-      label: f.manual ? `${f.label}·직접` : f.label,
+      label: f.manual ? `${f.label}·확인` : f.label,
       pin: i === 0,
       priority: (i < 4 ? 1 : i < 7 ? 2 : 3) as 1 | 2 | 3,
       text: (r) => String(r[f.key] ?? ''),
@@ -206,7 +301,7 @@ function IngestInner() {
         )
       ),
     }));
-  }, [entity.fields, sheetView]);
+  }, [entity.fields, entityKey, sheetView]);
 
   const savedRows = useMemo(() => {
     if (sheetView !== '저장본') return [];
@@ -240,7 +335,17 @@ function IngestInner() {
   ) : sheetView === '대기' ? (
     !records.length ? (
       <EmptyState variant="sheet">
-        대기 행이 없습니다. 오른쪽에서 {tab === 'ocr' ? 'OCR' : tab === 'excel' ? '엑셀' : '직접입력'} 후 검토·저장하세요.
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
+          <strong style={{ color: C.ink }}>{isAllScope(companyId) ? '대상 회사를 먼저 선택하세요' : '분석 대기 자료가 없습니다'}</strong>
+          <span>{isAllScope(companyId)
+            ? '상단의 전체 회사에서 원본과 분석 결과를 보관할 법인을 선택하세요.'
+            : <>오른쪽에서 {tab === 'ocr' ? '문서를 선택해 OCR을 실행' : tab === 'excel' ? '엑셀을 올려 행을 검토' : '기본정보를 입력'}하거나, 종류를 모르면 원본부터 보관하세요.</>}</span>
+          {!isAllScope(companyId) && (
+            <Btn size="sm" variant="ghost" onClick={() => { setUniversalOpen(true); setPanelOpen(false); }}>
+              <UploadCloud size={14} /> 원본 먼저 올리기
+            </Btn>
+          )}
+        </div>
       </EmptyState>
     ) : (
       <ExcelSheet
@@ -279,7 +384,34 @@ function IngestInner() {
     </>
   );
 
-  const inputPanel = panelOpen ? (
+  const universalPanel = universalOpen ? (
+    <section className="ledger-record-panel" aria-label="원본 자료 투입">
+      <header className="ledger-record-panel__header">
+        <div className="ledger-record-panel__heading">
+          <div className="ledger-record-panel__title">무엇이든 올리기</div>
+          <div className="ledger-record-panel__subtitle">종류를 몰라도 먼저 등록 · 이후 분석과 분류를 이어서 처리</div>
+        </div>
+        <button type="button" className="ledger-record-panel__close" onClick={() => setUniversalOpen(false)} aria-label="원본 투입패널 닫기">
+          <X size={14} />
+        </button>
+      </header>
+      <div className="ledger-record-panel__body" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        {isAllScope(companyId) && (
+          <Message variant="warning">원본 자료가 잘못 귀속되지 않도록 상단에서 보관할 회사를 먼저 선택하세요.</Message>
+        )}
+        {!isAllScope(companyId) && <FileDrop
+          multiple
+          onFiles={(files) => { void uploadOriginals(files); }}
+          accept=".pdf,.jpg,.jpeg,.png,.webp,.xlsx,.xls,.csv"
+          hint="등록증 · 계약서 · 보험증권 · 계좌엑셀 · 영수증 · 일반문서"
+          note={universalBusy ? '원본 보관 중…' : undefined}
+        />}
+        <Message variant="info">파일은 즉시 원본 건으로 보관됩니다. 아직 판정할 수 없는 자료는 미분류·미처리·미배정 상태로 남습니다.</Message>
+      </div>
+    </section>
+  ) : null;
+
+  const inputPanel = panelOpen && !universalOpen ? (
     <section className="ledger-record-panel">
       <header className="ledger-record-panel__header">
         <div className="ledger-record-panel__heading">
@@ -294,6 +426,10 @@ function IngestInner() {
       </header>
 
       <div className="ledger-record-panel__body" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        {isAllScope(companyId) ? (
+          <Message variant="warning">분석 결과와 원본이 잘못 귀속되지 않도록 상단에서 대상 회사를 먼저 선택하세요.</Message>
+        ) : (
+          <>
         {tab === 'ocr' && (
           <>
             <FileDrop
@@ -312,11 +448,26 @@ function IngestInner() {
           </>
         )}
         {tab === 'manual' && (
-          <FormGrid fields={entity.fields} form={form} onChange={(k, v) => setForm({ ...form, [k]: v })} />
+          <>
+            <div style={{ fontSize: 12, fontWeight: 800, color: C.ink }}>필수·기본정보</div>
+            <FormGrid fields={manualPrimaryFields} form={form} onChange={(k, v) => setForm({ ...form, [k]: v })} />
+            {manualMoreFields.length > 0 ? (
+              <details style={{ borderTop: `1px solid ${C.line}`, paddingTop: 10 }}>
+                <summary style={{ cursor: 'pointer', fontSize: 12.5, fontWeight: 800, color: C.ink, padding: '6px 0' }}>
+                  추가 운영정보 {manualMoreFields.length}개
+                </summary>
+                <div style={{ marginTop: 10 }}>
+                  <FormGrid fields={manualMoreFields} form={form} onChange={(k, v) => setForm({ ...form, [k]: v })} />
+                </div>
+              </details>
+            ) : null}
+          </>
+        )}
+          </>
         )}
       </div>
 
-      <LedgerPanelFooter hint={records.length ? `대기 ${records.length}건 · 제목줄 저장` : undefined}>
+      {!isAllScope(companyId) && <LedgerPanelFooter hint={records.length ? `대기 ${records.length}건 · 제목줄 저장` : undefined}>
         {tab === 'ocr' && (
           <Btn size="sm" variant="solid" onClick={runOcr} disabled={loading || !file}>
             {loading ? '추출 중…' : 'OCR 추출'}
@@ -340,14 +491,14 @@ function IngestInner() {
         {records.length > 0 && sheetView === '대기' && (
           <Btn size="sm" variant="ghost" onClick={resetQueue}>대기 비우기</Btn>
         )}
-      </LedgerPanelFooter>
+      </LedgerPanelFooter>}
     </section>
   ) : null;
 
   return (
     <LedgerFrame
-      title="데이터관리"
-      meta="OCR·엑셀·직접 투입"
+      title={DATA_CENTER_TITLE}
+      meta="원본 투입 · 분석 · 연결 · 원장 반영"
       showColView={false}
       filters={(
         <>
@@ -400,10 +551,13 @@ function IngestInner() {
             size="sm"
             variant="ghost"
             iconOnly
-            tip={panelOpen ? '투입패널 닫기' : '투입패널 열기'}
-            onClick={() => setPanelOpen((o) => !o)}
+            tip={panelOpen || universalOpen ? '투입패널 숨기기' : '투입패널 표시하기'}
+            onClick={() => {
+              if (universalOpen) setUniversalOpen(false);
+              else setPanelOpen((o) => !o);
+            }}
           >
-            {panelOpen ? <PanelRightClose size={14} /> : <PanelRight size={14} />}
+            {panelOpen || universalOpen ? <PanelRightClose size={14} /> : <PanelRight size={14} />}
           </Btn>
           <Btn
             size="sm"
@@ -429,13 +583,22 @@ function IngestInner() {
         <LedgerActions aria-label="쓰기">
           <Btn
             size="sm"
-            variant="solid"
-            tip={records.length ? `대기 ${records.length}건 저장` : '저장할 대기 행 없음'}
-            disabled={!records.length || saving || sheetView !== '대기'}
-            onClick={saveRecords}
+            variant={records.length ? 'ghost' : 'solid'}
+            onClick={() => { setUniversalOpen(true); setPanelOpen(false); }}
           >
-            {saving ? '저장 중…' : records.length ? `저장 ${records.length}건` : '저장'}
+            <UploadCloud size={14} /> 무엇이든 올리기
           </Btn>
+          {records.length > 0 ? (
+            <Btn
+              size="sm"
+              variant="solid"
+              tip={`대기 ${records.length}건 저장`}
+              disabled={saving || sheetView !== '대기'}
+              onClick={saveRecords}
+            >
+              {saving ? '저장 중…' : `저장 ${records.length}건`}
+            </Btn>
+          ) : null}
         </LedgerActions>
       )}
       hint={error || (ocrCrosscheck && sheetView === '대기') ? (
@@ -443,9 +606,9 @@ function IngestInner() {
           {error ? <Message variant="danger">{error}</Message> : null}
           {ocrCrosscheck && sheetView === '대기' ? <OcrCrosscheck result={ocrCrosscheck} /> : null}
         </>
-      ) : undefined}
+      ) : parseNotice ? <Message variant="warning">{parseNotice}</Message> : undefined}
       body={sheetBody}
-      sidePanel={inputPanel}
+      sidePanel={universalPanel || inputPanel}
     />
   );
 }

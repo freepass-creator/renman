@@ -70,7 +70,11 @@ export function resolveMigrateMode(override?: string): MigrateMode {
 async function loadLivePack(): Promise<SwitchplanEntityPack | null> {
   if (typeof window === 'undefined') return null;
   try {
-    const r = await fetch('/api/migrate-source', { cache: 'no-store' });
+    const { apiAuthHeaders } = await import('@/lib/api-headers');
+    const r = await fetch('/api/migrate-source', {
+      cache: 'no-store',
+      headers: await apiAuthHeaders(),
+    });
     const j = await r.json();
     if (!j?.ok || !j.biz?.b64) return null;
     const [{ buildSwitchplanPackFromBuffer }, { parseSwitchplanJbo }] = await Promise.all([

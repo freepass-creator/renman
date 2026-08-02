@@ -13,7 +13,7 @@ import { customerKey } from '@/lib/customers';
 import { companyLabel } from '@/lib/companies';
 import { type EntityRecord } from '@/lib/intake/entities';
 import { buildMatchContract, computeContractView } from '@/lib/contract-ops';
-import { autoMatchAll, type AutoMatchResult } from '@/lib/payments/receipt-match';
+import type { AutoMatchResult } from '@/lib/payments/receipt-match';
 import { findDuplicateCashPayment } from '@/lib/payments/duplicate-cash';
 import { findCmsMatchCandidates, buildSettlementPatches, type CmsMatchCandidate } from '@/lib/payments/cms-matching';
 import { toast } from '@/lib/toast';
@@ -23,7 +23,7 @@ import { safeUpdate } from '@/lib/safe-update';
 import { useBusyAction } from '@/lib/use-busy-action';
 import { resolveWriteCompany, NEED_COMPANY } from '@/lib/scope';
 import { commitUpdate, commitAll } from '@/lib/commit';
-import { FacetPage, Sec, Cards, Metric, Badge, Btn, EmptyState, ListBox, ListRow, Input, TextLink, C, won, SPACE_M, TOUCH, type BadgeTone, PageLoading } from '@/components/ui';
+import { FacetPage, Sec, Cards, Metric, Badge, Btn, EmptyState, ListBox, ListRow, Input, Select, TextLink, C, won, SPACE_M, TOUCH, type BadgeTone, PageLoading } from '@/components/ui';
 import { FacetRail } from '@/components/FacetRail';
 import { WorkbenchBar } from '@/components/WorkbenchBar';
 import { WorkHubBack } from '@/components/WorkHubTabs';
@@ -32,11 +32,17 @@ import { TODAY } from '@/lib/dashboard-consts';
 import { useEntityLists } from '@/lib/use-entity-lists';
 import { useSecOrder } from '@/lib/use-sec-order';
 import { useConfirm } from '@/components/ui/confirm';
+import { autoMatchScoped } from '@/lib/payments/match-proposal';
+import { buildCashLedger } from '@/lib/finance/cash-ledger';
+import { calculateCashDaily, requiresContractLink } from '@/lib/finance/cash-daily';
+import { CashDailyClose } from '@/components/CashDailyClose';
+import { isUnclassified, LEDGER_SUBJECTS } from '@/lib/payments/ledger-subjects';
+import { DocUpload, type DocUploadResult } from '@/components/ui/doc-upload';
 
 const CONF_TONE: Record<string, BadgeTone> = { high: 'green', medium: 'amber', low: 'gray' };
 const EMPTY = new Set<string>();
-const PAY_SECS = ['pay-status', 'pay-cms', 'pay-match', 'pay-matched', 'pay-pending'] as const;
-const FACET_SEC: Record<string, string> = { CMS: 'pay-cms', 매칭제안: 'pay-match', 매칭됨: 'pay-matched', 미매칭: 'pay-pending' };
+const PAY_SECS = ['pay-status', 'pay-review', 'pay-cms', 'pay-match', 'pay-matched', 'pay-pending'] as const;
+const FACET_SEC: Record<string, string> = { 미완료: 'pay-review', CMS: 'pay-cms', 매칭제안: 'pay-match', 매칭됨: 'pay-matched', 미매칭: 'pay-pending' };
 
 function toBankTx(rec: EntityRecord): BankTransaction {
   const method = String(rec.method || '계좌');
@@ -59,10 +65,20 @@ function toBankTx(rec: EntityRecord): BankTransaction {
   } as BankTransaction;
 }
 
+const txScopeKey = (tx: Pick<BankTransaction, 'id' | 'companyCode'>) => String(tx.companyCode || '') + ':' + tx.id;
+const recordScopeKey = (record: EntityRecord) => String(record.companyId || '') + ':' + String(record._key || '');
+const cmsScopeKey = (candidate: Pick<CmsMatchCandidate, 'companyCode' | 'depositId'>) => candidate.companyCode + ':' + candidate.depositId;
+const moveDate = (iso: string, days: number) => {
+  const [year, month, day] = iso.split('-').map(Number);
+  const d = new Date(Date.UTC(year, month - 1, day));
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
+};
+
 export default function PaymentsPage() {
-  const { companyId, scopeAll } = useSession();
+  const { companyId, scopeAll, user } = useSession();
   // work hub back only — no sibling tabs
-  const { data: [cs = [], txs = []], loading, error: loadError, reload } = useEntityLists(['contract', 'bank_tx']);
+  const { data: [cs = [], txs = [], cardTxs = []], loading, error: loadError, reload } = useEntityLists(['contract', 'bank_tx', 'card_tx']);
   const confirm = useConfirm();
   const [results, setResults] = useState<AutoMatchResult[] | null>(null);
   const [cmsResults, setCmsResults] = useState<CmsMatchCandidate[] | null>(null);
@@ -74,6 +90,8 @@ export default function PaymentsPage() {
   const [manualTx, setManualTx] = useState<BankTransaction | null>(null);
   const [mq, setMq] = useState('');
   const [facets, setFacets] = useState<Set<string>>(EMPTY);
+  const [journalDate, setJournalDate] = useState(TODAY);
+  const [evidenceRowId, setEvidenceRowId] = useState('');
   const [order, reorder] = useSecOrder('jpk:order:payments', [...PAY_SECS]);
   const toggleFacet = (label: string) => setFacets((s) => {
     const n = new Set(s);
@@ -89,33 +107,69 @@ export default function PaymentsPage() {
   };
 
   const allBank = useMemo(() => txs.map(toBankTx), [txs]);
+  const latestTxDate = useMemo(() => txs.reduce((latest, tx) => {
+    const date = String(tx.txDate || '').slice(0, 10);
+    return date > latest ? date : latest;
+  }, ''), [txs]);
+  const cashRows = useMemo(() => buildCashLedger(txs, cardTxs), [txs, cardTxs]);
+  const daily = useMemo(() => calculateCashDaily(cashRows, journalDate, 0), [cashRows, journalDate]);
+  const dailyWorkRows = useMemo(() => cashRows.filter((row) =>
+    row.date.slice(0, 10) === journalDate
+    && row.nest !== 'cms-item' && row.nest !== 'cms-pending' && row.nest !== 'card-item'
+    && ((row.nest === 'bundle-parent' && String(row.raw.bundleReviewStatus || '') !== '대사완료')
+      || (row.nest !== 'bundle-parent' && isUnclassified(row.category))
+      || (row.outAmt > 0 && !row.raw.documentId && !row.raw.evidenceUrl))),
+  [cashRows, journalDate]);
+  const datedBank = useMemo(() => allBank.filter((t) => t.txDate.slice(0, 10) === journalDate), [allBank, journalDate]);
+  const txCategoryByKey = useMemo(() => new Map(txs.map((record) => [recordScopeKey(record), String(record.category || '')])), [txs]);
   // CMS 집금(deposit)=통장 묶음입금 → 대여료 매칭 제외.
   // CMS 성공건(item)=손님별 출금 → 정산 여부와 무관하게 대여료 매칭 대상(미수↓).
-  const deposits = useMemo(() => allBank.filter((t) => t.amount > 0 && !(t.withdraw && t.withdraw > 0) && t.settlementRole !== 'deposit'), [allBank]);
-  const pending = deposits.filter((t) => !t.matchedContractId);
-  const matched = deposits.filter((t) => t.matchedContractId);
-  const csByKey = useMemo(() => new Map(cs.map((r) => [String(r._key), r])), [cs]);
-  const cmsSettled = useMemo(() => allBank.filter((t) => t.settlementRole === 'deposit').length, [allBank]);
+  const deposits = useMemo(() => datedBank.filter((t) =>
+    t.amount > 0 && !(t.withdraw && t.withdraw > 0) && t.settlementRole !== 'deposit'
+    && requiresContractLink(txCategoryByKey.get(txScopeKey(t)))),
+  [datedBank, txCategoryByKey]);
+  const pending = deposits.filter((t) => !t.matchedContractId)
+    .sort((a, b) => b.txDate.localeCompare(a.txDate) || b.id.localeCompare(a.id));
+  const matched = deposits.filter((t) => t.matchedContractId)
+    .sort((a, b) => b.txDate.localeCompare(a.txDate) || b.id.localeCompare(a.id));
+  const csByKey = useMemo(() => new Map(cs.map((r) => [recordScopeKey(r), r])), [cs]);
+  const contractRecordFor = (companyId: string, key: string) => csByKey.get(companyId + ':' + key);
+  const cmsSettled = useMemo(() => datedBank.filter((t) => t.settlementRole === 'deposit').length, [datedBank]);
+  const proposalById = useMemo(() => new Map(
+    txs.map((record) => [recordScopeKey(record), {
+      state: String(record.matchProposalState || ''),
+      reason: String(record.matchProposalReason || ''),
+    }]),
+  ), [txs]);
+  const storedResults = useMemo(() => {
+    const ids = new Set(txs
+      .filter((record) => String(record.matchProposalState) === '자동후보')
+      .map((record) => recordScopeKey(record)));
+    if (!ids.size) return [];
+    return autoMatchScoped(pending.filter((tx) => ids.has(txScopeKey(tx))), cs, TODAY);
+  }, [cs, pending, txs]);
+  const displayResults = results ?? storedResults;
+  const displayedProposalIds = new Set(displayResults.map((result) => txScopeKey(result.tx)));
+  const unmatchedPending = pending.filter((tx) => !displayedProposalIds.has(txScopeKey(tx)));
 
   function run() {
-    const matchCs = cs.map((r) => buildMatchContract(r, TODAY));
-    const res = autoMatchAll(pending, matchCs);
+    const res = autoMatchScoped(pending, cs, TODAY);
     setResults(res);
     // ★현장수납과 겹치는 제안은 기본 선택에서 뺀다 — 그대로 적용하면 같은 돈이 두 번 차감된다.
     //   («일괄 적용»이 기본 전체선택이므로 여기서 빼지 않으면 사람이 볼 기회 없이 통과한다.)
     const dupIds = new Set(
-      res.filter((r) => findDuplicateCashPayment(csByKey.get(r.candidate.contract.id), r.tx)).map((r) => r.tx.id),
+      res.filter((r) => findDuplicateCashPayment(contractRecordFor(String(r.tx.companyCode || ''), r.candidate.contract.id), r.tx)).map((r) => txScopeKey(r.tx)),
     );
-    setSel(new Set(res.filter((r) => !dupIds.has(r.tx.id)).map((r) => r.tx.id)));
+    setSel(new Set(res.filter((r) => !dupIds.has(txScopeKey(r.tx))).map((r) => txScopeKey(r.tx))));
     setMsg(res.length === 0
       ? '자동매칭 제안 없음 — 이름·금액 일치 입금이 없습니다(수동 검토).'
       : dupIds.size ? `중복 입금 의심 ${dupIds.size}건은 선택에서 제외했습니다 — 현장수납과 같은 돈인지 확인 후 개별 선택하세요.` : '');
   }
 
   function runCms() {
-    const cands = findCmsMatchCandidates(allBank);
+    const cands = findCmsMatchCandidates(allBank).filter((candidate) => candidate.depositDate === journalDate);
     setCmsResults(cands);
-    setCmsSel(new Set(cands.filter((c) => c.confidence === 'high').map((c) => c.depositId)));
+    setCmsSel(new Set(cands.filter((c) => c.confidence === 'high').map(cmsScopeKey)));
     setMsg(cands.length === 0
       ? 'CMS 집금 후보 없음 — CMS 명세·통장 집금이 같은 회사·±7일·수수료≤3.5%로 맞아야 합니다.'
       : '');
@@ -128,15 +182,15 @@ export default function PaymentsPage() {
     if (!cmsResults?.length) return;
     await runBusy(async () => {
       setApplying(true);
-      const txByKey = new Map(txs.map((r) => [String(r._key), r]));
+      const txByKey = new Map(txs.map((r) => [recordScopeKey(r), r]));
       let applied = 0, skipped = 0, locked = 0;
       for (const cand of cmsResults) {
-        if (!cmsSel.has(cand.depositId)) continue;
+        if (!cmsSel.has(cmsScopeKey(cand))) continue;
         if (lockReason(companyId, cand.depositDate)) { locked++; skipped++; continue; }
         const patches = buildSettlementPatches(cand);
         let okAll = true;
         for (const { id, patch } of patches) {
-          const trec = txByKey.get(id);
+          const trec = txByKey.get(cand.companyCode + ':' + id);
           if (!trec || trec.settlementId) { okAll = false; break; }
           if (!resolveWriteCompany(companyId, trec)) { okAll = false; break; }
           const ok = await safeUpdate(async () => {
@@ -155,19 +209,27 @@ export default function PaymentsPage() {
   }
 
   async function apply() {
-    if (!results) return;
+    if (!displayResults.length) return;
+    const selected = displayResults.filter((result) => sel.has(txScopeKey(result.tx)));
+    if (!selected.length) return;
+    const selectedAmount = selected.reduce((sum, result) => sum + result.tx.amount, 0);
+    if (!(await confirm({
+      title: '입금 매칭 일괄 적용',
+      message: `${selected.length}건 · ${won(selectedAmount)}을 계약 회차에 반영합니다.\n법인과 계약·회차를 확인했나요?`,
+      confirmLabel: '확인 후 적용',
+    }))) return;
     await runBusy(async () => {
       setApplying(true);
-      const txByKey = new Map(txs.map((r) => [String(r._key), r]));
+      const txByKey = new Map(txs.map((r) => [recordScopeKey(r), r]));
       // ★같은 계약에 입금 2건 이상을 적용할 때, 직전 append 결과를 누적해야 앞선 입금이 안 지워진다.
       //   (csByKey는 페이지 로드 스냅샷 → 매 루프 같은 _payments를 읽어 전체 교체하면 1건만 남음: QA 출시차단 #2)
       const appliedPayments = new Map<string, Array<Record<string, unknown>>>();
       let applied = 0, skipped = 0, locked = 0;
-      for (const r of results) {
-        if (!sel.has(r.tx.id)) continue;
+      for (const r of displayResults) {
+        if (!sel.has(txScopeKey(r.tx))) continue;
         if (lockReason(companyId, r.tx.txDate)) { locked++; skipped++; continue; }
-        const crec = csByKey.get(r.candidate.contract.id);
-        const trec = txByKey.get(r.tx.id);
+        const crec = contractRecordFor(String(r.tx.companyCode || ''), r.candidate.contract.id);
+        const trec = txByKey.get(txScopeKey(r.tx));
         if (!crec || !trec || trec.matchedContractId) { skipped++; continue; }
         const ckey = String(crec._key);
         const existing = appliedPayments.get(ckey)
@@ -185,7 +247,10 @@ export default function PaymentsPage() {
           await commitAll([
             {
               entity: 'bank_tx', sessionCompanyId: companyId, rec: trec, key: String(trec._key),
-              patch: { matchedContractId: ckey, matchedScheduleSeq: r.candidate.scheduleSeq, matchedAt: new Date().toISOString(), subject: '대여료수입', category: '대여료수입' },
+              patch: {
+                matchedContractId: ckey, matchedScheduleSeq: r.candidate.scheduleSeq, matchedAt: new Date().toISOString(),
+                subject: '대여료수입', category: '대여료수입', matchProposalState: '', matchProposalReason: '', matchProposalCount: 0,
+              },
             },
             { entity: 'contract', sessionCompanyId: companyId, rec: crec, key: ckey, patch: { _payments: newPayments } },
           ]);
@@ -203,7 +268,7 @@ export default function PaymentsPage() {
   async function unmatch(t: BankTransaction) {
     const lr = lockReason(companyId, t.txDate);
     if (lr) { toast(lr, 'error'); return; }
-    const trec = txs.find((r) => String(r._key) === t.id);
+    const trec = txs.find((r) => recordScopeKey(r) === txScopeKey(t));
     if (!trec) return;
     const crec = cs.find((r) => String(r._key) === String(t.matchedContractId));
     /* ★쓰기 순서 = bank_tx → contract (apply와 동일 규칙).
@@ -235,7 +300,7 @@ export default function PaymentsPage() {
   async function manualMatch(t: BankTransaction, crec: EntityRecord) {
     const lr = lockReason(companyId, t.txDate);
     if (lr) { toast(lr, 'error'); return; }
-    const trec = txs.find((r) => String(r._key) === t.id);
+    const trec = txs.find((r) => recordScopeKey(r) === txScopeKey(t));
     if (!trec || trec.matchedContractId) { toast('이미 처리된 입금', 'info'); return; }
     const existing = Array.isArray(crec._payments) ? (crec._payments as Array<Record<string, unknown>>) : [];
     if (existing.some((p) => p.txId === t.id)) { toast('이미 연결됨', 'info'); return; }
@@ -262,7 +327,10 @@ export default function PaymentsPage() {
       await commitAll([
         {
           entity: 'bank_tx', sessionCompanyId: companyId, rec: trec, key: String(trec._key),
-          patch: { matchedContractId: String(crec._key), matchedScheduleSeq: seq, matchedAt: new Date().toISOString(), subject: '대여료수입', category: '대여료수입' },
+          patch: {
+            matchedContractId: String(crec._key), matchedScheduleSeq: seq, matchedAt: new Date().toISOString(),
+            subject: '대여료수입', category: '대여료수입', matchProposalState: '', matchProposalReason: '', matchProposalCount: 0,
+          },
         },
         {
           entity: 'contract', sessionCompanyId: companyId, rec: crec, key: String(crec._key),
@@ -275,18 +343,67 @@ export default function PaymentsPage() {
   }
   const mNorm = (s: unknown) => String(s || '').replace(/\s/g, '');
   const mCands = (manualTx && mq.trim())
-    ? cs.filter((c) => [c.contractorName, c.plate, c.contractNo, c.contractorPhone].some((f) => mNorm(f).includes(mNorm(mq)))).slice(0, 8)
+    ? cs.filter((c) => String(c.companyId || '') === String(manualTx.companyCode || '')
+      && [c.contractorName, c.plate, c.contractNo, c.contractorPhone].some((f) => mNorm(f).includes(mNorm(mq)))).slice(0, 8)
     : [];
 
-  const selCount = results ? results.filter((r) => sel.has(r.tx.id)).length : 0;
-  const cmsSelCount = cmsResults ? cmsResults.filter((c) => cmsSel.has(c.depositId)).length : 0;
+  const selCount = displayResults.filter((r) => sel.has(txScopeKey(r.tx))).length;
+  const cmsSelCount = cmsResults ? cmsResults.filter((c) => cmsSel.has(cmsScopeKey(c))).length : 0;
+
+  async function classifyDailyRow(row: (typeof cashRows)[number], category: string) {
+    const lr = lockReason(companyId, row.date);
+    if (lr) { toast(lr, 'error'); return; }
+    if (!category) return;
+    if (!resolveWriteCompany(companyId, row.raw)) { toast(NEED_COMPANY, 'error'); return; }
+    const ok = await safeUpdate(async () => {
+      await commitUpdate({
+        entity: row.entity,
+        sessionCompanyId: companyId,
+        rec: row.raw,
+        key: row.recKey,
+        patch: { category, subject: category, classifiedAt: new Date().toISOString(), classifiedBy: user.email },
+      });
+    });
+    if (ok == null) return;
+    toast(`${row.party || '거래'} · ${category} 분류 완료`, 'success');
+    reload();
+  }
+
+  async function attachDailyEvidence(row: (typeof cashRows)[number], result: DocUploadResult) {
+    if (!result.url) return;
+    if (!resolveWriteCompany(companyId, row.raw)) { toast(NEED_COMPANY, 'error'); return; }
+    const ok = await safeUpdate(async () => {
+      await commitUpdate({
+        entity: row.entity,
+        sessionCompanyId: companyId,
+        rec: row.raw,
+        key: row.recKey,
+        patch: {
+          evidenceUrl: result.url,
+          evidenceFileName: result.file.name,
+          evidenceAttachedAt: new Date().toISOString(),
+          evidenceAttachedBy: user.email,
+        },
+      });
+    });
+    if (ok == null) return;
+    setEvidenceRowId('');
+    toast(`${row.party || '거래'} · 증빙 연결 완료`, 'success');
+    reload();
+  }
 
   return (
     <FacetPage
       title="자금일보"
       error={loadError}
-      meta={`${scopeAll ? '전체 회사' : companyLabel(companyId)} · 입금→계약 · 재무현황 공급`}
-      tools={<WorkbenchBar mid={<WorkHubBack />} search actions={
+      meta={`${scopeAll ? '전체 회사' : companyLabel(companyId)} · ${journalDate} · 자금원장 가공 · 확인 후 일마감`}
+      tools={<WorkbenchBar mid={<>
+        <WorkHubBack />
+        <Btn size="sm" variant="ghost" tip="이전일" onClick={() => setJournalDate((date) => moveDate(date, -1))}>이전일</Btn>
+        <Input type="date" value={journalDate} onChange={(event) => setJournalDate(event.target.value || TODAY)} style={{ width: 142 }} />
+        <Btn size="sm" variant="ghost" tip="다음일" onClick={() => setJournalDate((date) => moveDate(date, 1))}>다음일</Btn>
+        {latestTxDate && latestTxDate !== journalDate ? <Btn size="sm" variant="ghost" onClick={() => setJournalDate(latestTxDate)}>최근 거래일</Btn> : null}
+      </>} search={false} actions={
         <>
           <Btn variant="ghost" onClick={() => openReceivables()}>미수관리</Btn>
           <Btn variant="ghost" onClick={runCms} disabled={loading || busy || applying}>CMS 집금정산</Btn>
@@ -299,15 +416,75 @@ export default function PaymentsPage() {
         if (!show(id)) return null;
         if (id === 'pay-status') {
           return (
-            <Sec key={id} id={id} title="현황" desc="미매칭 입금→계약 · CMS 명세→통장 집금 묶음" onReorder={reorder} right={<WorkPipe to="finance" />}>
+            <Sec key={id} id={id} title="일일 현황" desc="자금관리 원장을 기준일로 가공 · 미분류·증빙·입금매칭 확인 후 마감" onReorder={reorder} right={<WorkPipe to="finance" />}>
               <Cards min={128} fit>
-                <Metric label="입금 거래" value={`${deposits.length}건`} tone="ink" />
-                <Metric label="미매칭 입금" value={`${pending.length}건`} tone={pending.length ? 'warn' : 'ok'} />
-                <Metric label="매칭 제안" value={results ? `${results.length}건` : '대기'} tone={results && results.length ? 'ok' : 'ink'} />
+                <Metric label="전체 거래" value={`${daily.transactionCount}건`} tone="ink" />
+                <Metric label="입금" value={won(daily.inflow)} tone="ok" />
+                <Metric label="출금" value={won(daily.outflow)} tone="ink" />
+                <Metric label="미분류" value={`${daily.unclassifiedCount}건`} tone={daily.unclassifiedCount ? 'danger' : 'ok'} />
+                <Metric label="묶음 미완료" value={`${daily.bundleIncompleteCount}건`} tone={daily.bundleIncompleteCount ? 'warn' : 'ok'} />
+                <Metric label="증빙 누락" value={`${daily.missingEvidenceCount}건`} tone={daily.missingEvidenceCount ? 'warn' : 'ok'} />
+                <Metric label="계약 미연결" value={`${daily.unmatchedContractCount}건`} tone={daily.unmatchedContractCount ? 'warn' : 'ok'} />
+                <Metric label="매칭 제안" value={`${displayResults.length}건`} tone={displayResults.length ? 'ok' : 'ink'} />
                 <Metric label="CMS 후보" value={cmsResults ? `${cmsResults.length}건` : '대기'} tone={cmsResults && cmsResults.length ? 'ok' : 'ink'} />
                 <Metric label="CMS 정산됨" value={`${cmsSettled}건`} tone={cmsSettled ? 'ok' : 'ink'} />
               </Cards>
+              {scopeAll
+                ? <div style={{ marginTop: SPACE_M, fontSize: 12.5, color: C.mute }}>일마감은 회사를 선택한 뒤 진행합니다.</div>
+                : <div style={{ marginTop: SPACE_M }}><CashDailyClose rows={cashRows} date={journalDate} companyId={companyId} actor={user.name || user.email} /></div>}
               {msg && <div style={{ marginTop: SPACE_M, fontSize: 12.5, color: msg.startsWith('매칭 적용') || msg.startsWith('CMS') ? C.ok : C.mute }}>{msg}</div>}
+            </Sec>
+          );
+        }
+        if (id === 'pay-review') {
+          return (
+            <Sec key={id} id={id} title="미완료 처리" n={dailyWorkRows.length} desc="계정과목 확정 · 지출 증빙 확인 · 완료되지 않은 건은 일마감 차단" hideable={false} onReorder={reorder} right={<WorkPipe to="finance" />}>
+              {dailyWorkRows.length === 0 ? <EmptyState>미분류·증빙 누락 없음</EmptyState> : (
+                <ListBox>
+                  {dailyWorkRows.map((row) => {
+                    const bundleIncomplete = row.nest === 'bundle-parent' && String(row.raw.bundleReviewStatus || '') !== '대사완료';
+                    const missingCategory = !bundleIncomplete && isUnclassified(row.category);
+                    const missingEvidence = row.outAmt > 0 && !row.raw.documentId && !row.raw.evidenceUrl;
+                    const evidenceOpen = evidenceRowId === row.id;
+                    return (
+                      <div key={row.id}>
+                        <ListRow
+                          badge={bundleIncomplete ? '묶음미완료' : missingCategory ? '미분류' : '증빙누락'}
+                          badgeTone={missingCategory ? 'red' : 'amber'}
+                          main={`${scopeAll ? companyLabel(row.companyId) + ' · ' : ''}${row.party || row.memo || '(상대 미상)'}`}
+                          sub={`${row.accountName || row.account || '계좌 미확인'} · ${row.inAmt > 0 ? `입금 ${won(row.inAmt)}` : `출금 ${won(row.outAmt)}`}${missingEvidence ? ' · 증빙 연결 필요' : ''}`}
+                          right={<span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                            {bundleIncomplete ? <Badge tone="amber">자금관리에서 분해</Badge> : missingCategory ? (
+                              <Select
+                                size="sm"
+                                aria-label={`${row.party || '거래'} 계정과목`}
+                                value=""
+                                onChange={(event) => void classifyDailyRow(row, event.target.value)}
+                                style={{ width: 150 }}
+                              >
+                                <option value="">계정과목 선택</option>
+                                {LEDGER_SUBJECTS
+                                  .filter((subject) => row.inAmt > 0 ? subject.kind !== '지출' : subject.kind !== '수입')
+                                  .map((subject) => <option key={subject.code} value={subject.label}>{subject.label}</option>)}
+                              </Select>
+                            ) : null}
+                            {missingEvidence ? <Btn size="sm" variant={evidenceOpen ? 'solid' : 'ghost'} onClick={() => setEvidenceRowId(evidenceOpen ? '' : row.id)}>{evidenceOpen ? '닫기' : '증빙 연결'}</Btn> : null}
+                          </span>}
+                        />
+                        {evidenceOpen ? (
+                          <div style={{ padding: '10px 14px 14px 28px', borderBottom: `1px solid ${C.line}` }}>
+                            <DocUpload
+                              storeAt={{ company: row.companyId, entity: row.entity, key: row.recKey }}
+                              hint="영수증·세금계산서·거래명세서 · PDF/JPG/PNG"
+                              onDone={(result) => void attachDailyEvidence(row, result)}
+                            />
+                          </div>
+                        ) : null}
+                      </div>
+                    );
+                  })}
+                </ListBox>
+              )}
             </Sec>
           );
         }
@@ -318,19 +495,19 @@ export default function PaymentsPage() {
               right={<Btn onClick={applyCms} disabled={applying || busy || cmsSelCount === 0}>{applying || busy ? '적용 중…' : `선택 ${cmsSelCount}건 정산`}</Btn>}>
               <ListBox>
                 {cmsResults.map((c) => {
-                  const on = cmsSel.has(c.depositId);
+                  const on = cmsSel.has(cmsScopeKey(c));
                   return (
                     <ListRow
-                      key={c.depositId}
+                      key={cmsScopeKey(c)}
                       main={`${c.depositDate} · ${won(c.depositAmount)}`}
                       sub={`묶음 ${c.items.length}건 · 총액 ${won(c.itemsSum)} · 수수료 ${won(c.estimatedFee)} (${(c.feeRate * 100).toFixed(2)}%)`}
                       right={<span style={{ display: 'inline-flex', alignItems: 'center', gap: SPACE_M }}>
                         <Badge tone={CONF_TONE[c.confidence] || 'gray'}>{c.confidence}</Badge>
                         <label style={{ display: 'inline-flex', width: TOUCH, height: TOUCH, alignItems: 'center', justifyContent: 'center' }} onClick={(e) => e.stopPropagation()}>
-                          <input type="checkbox" checked={on} onChange={() => toggleCms(c.depositId)} />
+                          <input type="checkbox" checked={on} onChange={() => toggleCms(cmsScopeKey(c))} />
                         </label>
                       </span>}
-                      onClick={() => toggleCms(c.depositId)}
+                      onClick={() => toggleCms(cmsScopeKey(c))}
                     />
                   );
                 })}
@@ -339,18 +516,18 @@ export default function PaymentsPage() {
           );
         }
         if (id === 'pay-match') {
-          if (!results || results.length === 0) return null;
+          if (displayResults.length === 0) return null;
           return (
-            <Sec key={id} id={id} title="매칭 제안" n={results.length} desc="체크 확인 후 적용 · high=이름/차번+금액 일치 · 매칭은 미수를 줄이기만" hideable={false} onReorder={reorder}
+            <Sec key={id} id={id} title="매칭 제안" n={displayResults.length} desc="데이터센터 후보 포함 · 체크 확인 후 적용 · 매칭은 미수를 줄이기만" hideable={false} onReorder={reorder}
               right={<Btn onClick={apply} disabled={applying || busy || selCount === 0}>{applying || busy ? '적용 중…' : `선택 ${selCount}건 적용`}</Btn>}>
               <ListBox>
-                {results.map((r) => {
-                  const on = sel.has(r.tx.id);
+                {displayResults.map((r) => {
+                  const on = sel.has(txScopeKey(r.tx));
                   const plate = r.candidate.contract.vehiclePlate;
                   return (
                     <ListRow
-                      key={r.tx.id}
-                      main={`${r.tx.txDate} · ${r.tx.counterparty || '(적요없음)'} · ${won(r.tx.amount)}`}
+                      key={txScopeKey(r.tx)}
+                      main={`${scopeAll ? companyLabel(String(r.tx.companyCode || '')) + ' · ' : ''}${r.tx.txDate} · ${r.tx.counterparty || '(적요없음)'} · ${won(r.tx.amount)}`}
                       sub={
                         <span>
                           →{' '}
@@ -363,10 +540,10 @@ export default function PaymentsPage() {
                       right={<span style={{ display: 'inline-flex', alignItems: 'center', gap: SPACE_M }}>
                         <Badge tone={CONF_TONE[r.candidate.confidence] || 'gray'}>{r.candidate.confidence}</Badge>
                         <label style={{ display: 'inline-flex', width: TOUCH, height: TOUCH, alignItems: 'center', justifyContent: 'center' }} onClick={(e) => e.stopPropagation()}>
-                          <input type="checkbox" checked={on} onChange={() => toggle(r.tx.id)} />
+                          <input type="checkbox" checked={on} onChange={() => toggle(txScopeKey(r.tx))} />
                         </label>
                       </span>}
-                      onClick={() => toggle(r.tx.id)}
+                      onClick={() => toggle(txScopeKey(r.tx))}
                     />
                   );
                 })}
@@ -380,12 +557,12 @@ export default function PaymentsPage() {
             <Sec key={id} id={id} title="매칭된 입금" n={matched.length} desc="계약 회차에 붙은 입금 — 잘못 붙었으면 해제(미수 원복)" hideable={false} onReorder={reorder}>
               <ListBox>
                 {matched.slice(0, 60).map((t) => {
-                  const crec = csByKey.get(String(t.matchedContractId));
+                  const crec = contractRecordFor(String(t.companyCode || ''), String(t.matchedContractId));
                   const plate = crec ? String(crec.plate || '') : '';
                   const ck = crec ? customerKey(crec.contractorName, crec.contractorPhone) : '';
                   return (
                     <ListRow
-                      key={t.id}
+                      key={txScopeKey(t)}
                       main={`${t.txDate} · ${t.counterparty || '(적요없음)'}`}
                       sub={crec ? (
                         <span>
@@ -397,7 +574,9 @@ export default function PaymentsPage() {
                       ) : String(t.matchedContractId)}
                       right={<span style={{ display: 'inline-flex', alignItems: 'center', gap: SPACE_M }}>
                         <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 700 }}>{won(t.amount)}</span>
-                        <Btn size="sm" variant="ghost" onClick={() => unmatch(t)}>해제</Btn>
+                        <Btn size="sm" variant="ghost"
+                          tip={`${t.txDate} ${t.counterparty || '적요 없음'} ${won(t.amount)} 매칭 해제`}
+                          onClick={() => unmatch(t)}>해제</Btn>
                       </span>}
                     />
                   );
@@ -408,22 +587,25 @@ export default function PaymentsPage() {
           );
         }
         return (
-          <Sec key={id} id={id} title="미매칭 입금" n={pending.length} desc="자동매칭 안 된 입금 — 인라인 수동 연결" hideable={false} onReorder={reorder}>
-            {pending.length === 0 ? <EmptyState>미매칭 입금 없음</EmptyState>
+          <Sec key={id} id={id} title="미매칭 입금" n={unmatchedPending.length} desc="제안 후보를 제외한 입금 · 최신 거래 우선 · 인라인 수동 연결" hideable={false} onReorder={reorder}>
+            {unmatchedPending.length === 0 ? <EmptyState>미매칭 입금 없음</EmptyState>
               : (
                 <>
                   <ListBox>
-                    {pending.slice(0, 60).map((t) => {
-                      const suggested = results?.some((r) => r.tx.id === t.id);
-                      const open = manualTx?.id === t.id;
+                    {unmatchedPending.slice(0, 60).map((t) => {
+                      const suggested = displayResults.some((r) => r.tx.id === t.id);
+                      const storedProposal = proposalById.get(txScopeKey(t));
+                      const open = manualTx ? txScopeKey(manualTx) === txScopeKey(t) : false;
                       return (
-                        <div key={t.id}>
+                        <div key={txScopeKey(t)}>
                           <ListRow
-                            main={`${t.txDate} · ${t.counterparty || '(적요 없음)'}`}
-                            sub={suggested ? '제안됨↑' : open ? '연결 중…' : undefined}
+                            main={`${scopeAll ? companyLabel(String(t.companyCode || '')) + ' · ' : ''}${t.txDate} · ${t.counterparty || '(적요 없음)'}`}
+                            sub={suggested ? '자동후보 · 위 제안에서 확인' : storedProposal?.state ? `${storedProposal.state} · ${storedProposal.reason}` : open ? '연결 중…' : undefined}
                             right={<span style={{ display: 'inline-flex', alignItems: 'center', gap: SPACE_M, opacity: suggested ? 0.55 : 1 }}>
                               <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 700 }}>{won(t.amount)}</span>
-                              <Btn size="sm" variant={open ? 'solid' : 'ghost'} onClick={() => { if (open) { setManualTx(null); setMq(''); } else { setManualTx(t); setMq(''); } }}>{open ? '닫기' : '연결'}</Btn>
+                              <Btn size="sm" variant={open ? 'solid' : 'ghost'}
+                                tip={`${t.txDate} ${t.counterparty || '적요 없음'} ${won(t.amount)} ${open ? '연결창 닫기' : '계약 연결'}`}
+                                onClick={() => { if (open) { setManualTx(null); setMq(''); } else { setManualTx(t); setMq(''); } }}>{open ? '닫기' : '연결'}</Btn>
                             </span>}
                           />
                           {open && (
@@ -441,7 +623,7 @@ export default function PaymentsPage() {
                                             main={String(c.contractorName || '—')}
                                             sub={String(c.plate || '')}
                                             right={v.net > 0 ? <span style={{ fontSize: 11.5, color: C.danger, fontWeight: 700 }}>미수 {won(v.net)}</span> : <span style={{ fontSize: 11, color: C.faint }}>미수없음</span>}
-                                            onClick={() => manualMatch(manualTx, c)}
+                                            onClick={() => manualMatch(t, c)}
                                           />
                                         );
                                       })}
@@ -454,7 +636,7 @@ export default function PaymentsPage() {
                       );
                     })}
                   </ListBox>
-                  {pending.length > 60 && <div style={{ fontSize: 11.5, color: C.faint, padding: '4px 2px' }}>외 {pending.length - 60}건 …</div>}
+                  {unmatchedPending.length > 60 && <div style={{ fontSize: 11.5, color: C.faint, padding: '4px 2px' }}>외 {unmatchedPending.length - 60}건 …</div>}
                 </>
               )}
           </Sec>

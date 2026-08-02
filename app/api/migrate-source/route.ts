@@ -10,6 +10,7 @@
 import { NextResponse } from 'next/server';
 import { readFile, stat, readdir } from 'fs/promises';
 import path from 'path';
+import { requireAuth } from '@/lib/api-auth';
 
 export const runtime = 'nodejs';
 
@@ -57,9 +58,14 @@ async function resolveJboPath(): Promise<string> {
   );
 }
 
-export async function GET() {
+export async function GET(req: Request) {
   if (process.env.NODE_ENV === 'production') {
     return NextResponse.json({ ok: false, error: '로컬 dev 전용' }, { status: 403 });
+  }
+  const actor = await requireAuth(req);
+  if (actor instanceof NextResponse) return actor;
+  if (actor.systemRole !== 'hq' && actor.systemRole !== 'local') {
+    return NextResponse.json({ ok: false, error: 'forbidden' }, { status: 403 });
   }
   const bizPath = await resolveBizPath();
   const jboPath = await resolveJboPath();

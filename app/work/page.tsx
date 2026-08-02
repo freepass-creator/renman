@@ -1,15 +1,15 @@
 'use client';
 
 import { Suspense, useEffect, useMemo, useState } from 'react';
-import { Plus, FileText, Trash2 } from 'lucide-react';
+import { Plus, FileText, Pencil, Trash2 } from 'lucide-react';
 import { useEntityLists } from '@/lib/use-entity-lists';
 import { textMatch } from '@/lib/search-match';
 import { companyDisplay } from '@/lib/companies';
 import type { EntityRecord } from '@/lib/intake/entities';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
-  Badge, Btn, C, LedgerActions, LedgerCreatePanel, LedgerFilterButton, LedgerFilterFields, LedgerFilterPanel, LedgerFrame, LedgerRecordPanel, PageLoading, Search, won,
-  PeriodBar, useConfirm, type LedgerColView,
+  Badge, Btn, C, ContextMenu, type ContextMenuItem, LedgerActions, LedgerCreatePanel, LedgerEditPanel, LedgerFilterButton, LedgerFilterFields, LedgerFilterPanel, LedgerFrame, LedgerRecordPanel, PageLoading, Search, won,
+  PeriodBar, useConfirm, useSheetExport, type LedgerColView,
 } from '@/components/ui';
 import { useSession } from '@/lib/session';
 import { commitRemove } from '@/lib/commit';
@@ -30,7 +30,7 @@ import { LEDGER_EMPTY } from '@/lib/ledger-empty';
 import { PenaltyIntakePanel } from '@/components/work/PenaltyIntakePanel';
 import { latestDateOf } from '@/lib/ledger-stats';
 import { TODAY } from '@/lib/dashboard-consts';
-import { WORK_SECTIONS_BY_KIND } from '@/lib/work-form-sections';
+import { WORK_SECTIONS_BY_KIND, workSectionsFor } from '@/lib/work-form-sections';
 import { PenaltyBucketPanel } from '@/components/work/PenaltyBucketPanel';
 import {
   WORK_GROUPS, WORK_SOURCE_LABEL,
@@ -47,7 +47,7 @@ function WorkLedgerInner() {
   const mobile = useIsMobile();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { companyId } = useSession();
+  const { companyId, isOperator } = useSession();
   const confirm = useConfirm();
   const { data: [workItems = [], history = [], penalties = [], inbox = [], contracts = [], vehicles = []], loading, error: loadError, reload } =
     useEntityLists(['work_item', 'history', 'penalty', 'inbox', 'contract', 'vehicle']);
@@ -59,8 +59,23 @@ function WorkLedgerInner() {
   const [range, setRange] = useState({ from: '', to: '' });
   const [selected, setSelected] = useState<WorkLedgerRow | null>(null);
   const [creating, setCreating] = useState(false);
+  const [editing, setEditing] = useState(false);
   const [penProcess, setPenProcess] = useState<PenaltyProcess | null>(null);
   const [penKind, setPenKind] = useState<PenaltyKind | null>(null);
+  const [ctxMenu, setCtxMenu] = useState<{ open: boolean; x: number; y: number }>({ open: false, x: 0, y: 0 });
+  const xl = useSheetExport<WorkLedgerRow>({
+    title: '업무관리',
+    filterSummary: () => {
+      const parts = [group === '전체' ? '' : group].filter(Boolean);
+      if (range.from || range.to) parts.push(`${range.from || '…'}~${range.to || '…'}`);
+      if (q.trim()) parts.push('검색');
+      return parts.join(' · ') || '전체';
+    },
+  });
+  const ctxItems: ContextMenuItem[] = [
+    xl.exportItem(),
+    ...(isOperator ? [xl.exportItem({ unmasked: true })] : []),
+  ];
 
   useEffect(() => {
     setGroup(parseWorkGroup(searchParams.get('group')));
@@ -185,8 +200,9 @@ function WorkLedgerInner() {
       const plate = String(r.plate || meta.plate || '');
       const contractNo = String(r.contractNo || meta.contractNo || '');
       const carName = carNameOf(plate, vehicles);
-      const kind = String(r.workType || '').trim() || '문서검토';
+      const kind = String(r.workType || r.kind || '').trim() || '문서검토';
       let status = normalizeWorkStatus(r.status || (r.matchedAt ? '완료' : '대기'));
+      if (String(r.processingState) === '처리완료') status = '완료';
       if (!plate && status !== '완료' && status !== '보류') status = '미배정';
       return {
         id: `inbox:${String(r._key || r.id)}`,
@@ -194,15 +210,15 @@ function WorkLedgerInner() {
         companyId: String(r.companyId || ''),
         kind,
         group: '문서',
-        target: [plate, carName, meta.customerName, contractNo].filter(Boolean).join(' '),
-        title: String(r.title || r.fileName || r.memo || r.kind || '수집 문서 확인'),
+        target: [plate, carName, meta.customerName, contractNo, r.suggestedEntity].filter(Boolean).join(' '),
+        title: String(r.title || r.filename || r.fileName || r.memo || r.kind || '수집 문서 확인'),
         workAt: createdAt,
         workDate: createdAt.slice(0, 10),
         createdAt,
         updatedAt,
         dueDate: String(r.dueDate || r.uploadedAt || r.createdAt || '').slice(0, 10),
         status,
-        assignee: String(r.assignee || r.uploadedBy || ''),
+        assignee: String(r.assignmentState) === '배정됨' ? String(r.assignee || '') : '',
         amount: Number(r.amount) || 0,
         source: 'inbox',
         plate, carName, contractKey, contractNo,
@@ -343,6 +359,7 @@ function WorkLedgerInner() {
   );
 
   return (
+    <>
     <LedgerFrame
       title="업무관리"
       meta="일정·상담·정비·사고·과태료·문서와 처리 이력"
@@ -353,6 +370,7 @@ function WorkLedgerInner() {
           aria-pressed={creating}
           onClick={() => {
             setSelected(null);
+            setEditing(false);
             setCreating((open) => !open);
           }}
         ><Plus size={14} /> {creating ? '취소' : '업무 생성'}</Btn>
@@ -366,7 +384,7 @@ function WorkLedgerInner() {
           style={{ width: mobile ? 160 : 280, flexShrink: 0 }}
         />
         <LedgerFilterButton open={filterOpen} count={filterCount} onClick={() => setFilterOpen((o) => !o)} />
-        <PeriodBar latest={latest} initial="월간" size="sm" onRange={setRange} />
+        <PeriodBar latest={latest} initial="전체" size="sm" onRange={setRange} />
       </>}
       filterPanel={filterOpen ? (
         <LedgerFilterPanel
@@ -423,22 +441,44 @@ function WorkLedgerInner() {
       error={loadError}
       onRetry={reload}
       empty={penaltyMode
-        ? '과태료 고지서가 없습니다. «업무 생성»에서 업무구분=과태료로 업로드하세요.'
-        : '업무가 없습니다. 우측 «업무 생성»으로 담으세요.'}
+        ? '과태료 고지서가 없습니다. «업무 생성»에서 업무분류=과태료로 업로드하세요.'
+        : '업무가 없습니다. «업무 생성» 버튼으로 등록하세요.'}
       cols={cols}
       rows={rows}
+      mobileCard={(r) => ({
+        co: r.company,
+        badge: r.status,
+        badgeTone: workStatusTone(r.status),
+        rail: r.status === '미배정' ? 'danger' : 'none',
+        plate: r.plate || undefined,
+        name: r.plate ? undefined : (r.target || r.title),
+        carType: r.plate ? (r.customerName || r.carName) : r.carName,
+        fields: [
+          ['업무분류', r.kind || r.group],
+          ['일정', r.dueDate || r.workDate || LEDGER_EMPTY.dash],
+          ['담당', r.assignee || LEDGER_EMPTY.unassigned],
+        ],
+        right: r.amount > 0 ? won(r.amount) : undefined,
+      })}
       rowKey={(r) => r.id}
       selectedRowKey={selected?.id}
+      onView={xl.onView}
+      onRowContextMenu={(e) => {
+        e.preventDefault();
+        setCtxMenu({ open: true, x: e.clientX, y: e.clientY });
+      }}
       onRow={(row) => {
         // 표 클릭 = 우측 상세패널만 (다른 페이지 이동 없음)
         setCreating(false);
+        setEditing(false);
         setSelected(row);
       }}
       onRowDoubleClick={(row) => {
         setCreating(false);
+        setEditing(false);
         setSelected(row);
       }}
-      onCloseDetail={() => setSelected(null)}
+      onCloseDetail={() => { setSelected(null); setEditing(false); }}
       sidePanel={creating ? (
         <LedgerCreatePanel
           key="new-work"
@@ -468,15 +508,29 @@ function WorkLedgerInner() {
             if (kind === '과태료') setGroupAndUrl('과태료', { keepCreating: true });
           }}
           quick
+          continuable
           initial={{
             date: todayKST(),
-            status: '대기',
-            category: '기타',
-            workType: '기타',
+            status: '미배정',
+            category: '',
+            workType: '',
             title: '',
           }}
           onClose={() => setCreating(false)}
           onSaved={() => reload()}
+        />
+      ) : selected && editing && selected.source === 'work_item' ? (
+        <LedgerEditPanel
+          key={`edit-work:${selected.id}`}
+          entityKey="work_item"
+          title={selected.title || '업무'}
+          sections={workSectionsFor(selected.kind)}
+          sectionsByKind={WORK_SECTIONS_BY_KIND}
+          kindField="category"
+          fallbackKind="기타"
+          record={selected.raw}
+          onClose={() => setEditing(false)}
+          onSaved={() => { setEditing(false); setSelected(null); reload(); }}
         />
       ) : selected?.nest === 'penalty-bucket' ? (
         <PenaltyBucketPanel
@@ -504,6 +558,9 @@ function WorkLedgerInner() {
           onClose={() => setSelected(null)}
           actions={(
             <>
+              {selected.source === 'work_item' ? (
+                <Btn size="sm" onClick={() => setEditing(true)}><Pencil size={14} /> 이어서 수정</Btn>
+              ) : null}
               {selected.source === 'penalty' && matchedDocs > 0 ? (
                 <Btn size="sm" variant="ghost" href="/penalty/docs">
                   <FileText size={14} /> 변경부과 공문
@@ -523,6 +580,14 @@ function WorkLedgerInner() {
         />
       ) : null}
     />
+    <ContextMenu
+      open={ctxMenu.open}
+      x={ctxMenu.x}
+      y={ctxMenu.y}
+      onClose={() => setCtxMenu((m) => ({ ...m, open: false }))}
+      items={ctxItems}
+    />
+    </>
   );
 }
 

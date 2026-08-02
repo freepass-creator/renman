@@ -42,8 +42,11 @@ export const LENS_FILTERS: Record<string, FacetGroup[]> = {
     { dim: '부채·보험', chips: [{ label: '할부있음' }, { label: '보험없음' }] },
   ],
   미수: [
+    { dim: '계약상태', chips: [
+      { label: '계약유지' }, { label: '계약종료' },
+    ] },
     { dim: '연체단계', chips: [
-      { label: '정상' }, { label: '경고' }, { label: '시동제어' }, { label: '내용증명' }, { label: '채권화' },
+      { label: '회수대기' }, { label: '경고' }, { label: '시동제어' }, { label: '내용증명' }, { label: '채권화' },
     ] },
     { dim: '연체기간', chips: [
       { label: '1~29일' }, { label: '30~89일' }, { label: '90일+' },
@@ -61,6 +64,7 @@ export const LENS_FILTERS: Record<string, FacetGroup[]> = {
   ],
   자금일보: [
     { dim: '구간', chips: [
+      { label: '미완료' },
       { label: 'CMS' },
       { label: '매칭제안' },
       { label: '매칭됨' },

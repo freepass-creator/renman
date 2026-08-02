@@ -201,7 +201,7 @@ export default function BulkMatchPage() {
     <Page
       title="대량 자동매칭"
       tools={<WorkbenchBar actions={
-        <IconSeg value={kind} onChange={(k) => { setKind(k as DocKind); reset(); }} options={[
+        <IconSeg showLabels value={kind} onChange={(k) => { setKind(k as DocKind); reset(); }} options={[
           { key: 'vehicle', label: '등록증', icon: <Car size={15} /> },
           { key: 'insurance', label: '보험증권', icon: <ShieldCheck size={15} /> },
         ]} />
@@ -227,7 +227,7 @@ export default function BulkMatchPage() {
           accept="image/*,application/pdf"
           onFiles={(fs) => { setFiles(Array.from(fs)); setRows(null); }}
           hint={files.length ? `${files.length}장 선택됨` : `${KIND[kind].label} 이미지/PDF 여러 장`}
-          note="드래그하거나 클릭해 선택"
+          note="여러 파일 선택 가능"
         />
         <div style={{ display: 'flex', gap: SPACE_M, marginTop: 12, flexWrap: 'wrap', alignItems: 'center' }}>
           <Btn onClick={analyze} disabled={!files.length || busy}><UploadCloud size={15} /> {busy && !rows ? 'OCR 분석 중…' : `${files.length || ''}장 분석`}</Btn>

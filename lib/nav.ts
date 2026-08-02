@@ -19,6 +19,7 @@ import {
 import type { Tier } from './tier';
 import type { AssetKind, DataLayer } from './domain/layers';
 import { layerOfPageRole } from './domain/layers';
+import { DATA_CENTER_TITLE } from './data-center-terms';
 
 /** 페이지 역할 — 메뉴 그룹·CTA 규칙에도 쓰임. */
 export type PageRole = 'hub' | 'view' | 'work' | 'input' | 'system';
@@ -51,13 +52,13 @@ export const PAGE_IA: PageIA[] = [
   // ── 처리 ──
   { href: '/risk', label: '리스크관리', role: 'hub', layer: 'mixed', tier: '라이트', view: 'risk-ledger · LedgerFrame · 미완료·미납·만기·휴차', grab: 'none', grabHow: '—' },
   { href: '/work', label: '업무관리', role: 'work', layer: 'event', tier: '라이트', view: '정비·일정·과태료·상담 통합', grab: 'context', grabHow: '행·생성' },
-  { href: '/payments', label: '자금일보', role: 'work', layer: 'event', tier: '라이트', view: '입금↔계약 매칭', grab: 'none', grabHow: '매칭·분류' },
-  { href: '/ingest', label: '데이터관리', role: 'input', layer: 'mixed', tier: '라이트', view: 'OCR·엑셀·직접 투입', grab: 'batch', grabHow: '담기' },
+  { href: '/payments', label: '자금일보', role: 'work', layer: 'event', tier: '라이트', view: '원장 일별 가공 · 분류·증빙·계약매칭·일마감', grab: 'none', grabHow: '분류·연결·마감' },
+  { href: '/ingest', label: DATA_CENTER_TITLE, role: 'input', layer: 'mixed', tier: '라이트', view: '원본 투입·분석·연결·반영', grab: 'batch', grabHow: '담기' },
 
   // ── 원장 ──
   { href: '/asset', label: '자산관리', role: 'view', layer: 'ledger', tier: '라이트', assetKind: 'physical', view: '차량 1대=1행 · 더블클릭 상세패널', grab: 'both', grabHow: '생성·패널수정 · 마이그레이션' },
   { href: '/contract', label: '계약관리', role: 'view', layer: 'ledger', tier: '라이트', assetKind: 'contract', view: '계약 1건=1행 · 더블클릭 상세패널', grab: 'both', grabHow: '생성·패널수정' },
-  { href: '/cash', label: '자금관리', role: 'view', layer: 'ledger', tier: '라이트', assetKind: 'cash', view: '계좌+입출금 · CMS매칭', grab: 'batch', grabHow: '단건·대량 입력 · 담기' },
+  { href: '/cash', label: '자금관리', role: 'view', layer: 'ledger', tier: '라이트', assetKind: 'cash', view: '계좌·카드·자동이체 Cash-in/out · 묶음 1차 분류·대사', grab: 'batch', grabHow: '단건·대량 입력 · 담기' },
 
   // ── 하단 ──
   { href: '/management', label: '경영관리', role: 'system', layer: 'system', tier: '라이트', view: '법인·계좌·임대차 · LedgerFrame 탭', grab: 'none', grabHow: '—' },
@@ -134,7 +135,7 @@ export const ERP_MENU_TREE: ErpMenuNode[] = [
       { id: 'risk', label: '리스크관리', href: '/risk', icon: TriangleAlert },
       { id: 'work', label: '업무관리', href: '/work', icon: ListTodo },
       { id: 'payments', label: '자금일보', href: '/payments', icon: ArrowLeftRight },
-      { id: 'ingest', label: '데이터관리', href: '/ingest', icon: Upload },
+      { id: 'ingest', label: DATA_CENTER_TITLE, href: '/ingest', icon: Upload },
     ],
   },
   {
@@ -144,7 +145,7 @@ export const ERP_MENU_TREE: ErpMenuNode[] = [
     icon: Table2,
     children: [
       { id: 'asset-ledger', label: '자산관리', href: '/asset', icon: CarFront, views: [{ id: 'asset-status', label: '소유·가동 상태' }] },
-      { id: 'contract-ledger', label: '계약관리', href: '/contract', icon: FileText, views: [{ id: 'contract-status', label: '진행·만기·리스크' }] },
+      { id: 'contract-ledger', label: '계약관리', href: '/contract', icon: FileText, views: [{ id: 'contract-status', label: '진행·만기·리스크' }, { id: 'contract-schedule', label: '회차별 청구' }] },
       { id: 'money-ledger', label: '자금관리', href: '/cash', icon: Wallet, views: [{ id: 'accounts-daily', label: '계좌+일보' }] },
     ],
   },
@@ -171,7 +172,7 @@ export const NAV_GROUPS: NavGroup[] = [
     { href: '/risk', label: '리스크관리', icon: TriangleAlert, tier: '라이트' },
     { href: '/work', label: '업무관리', icon: ListTodo, tier: '라이트' },
     { href: '/payments', label: '자금일보', icon: ArrowLeftRight, tier: '라이트' },
-    { href: '/ingest', label: '데이터관리', icon: Upload, tier: '라이트' },
+    { href: '/ingest', label: DATA_CENTER_TITLE, icon: Upload, tier: '라이트' },
   ] },
   { title: '원장', items: [
     { href: '/asset', label: '자산관리', icon: CarFront, tier: '라이트' },

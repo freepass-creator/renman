@@ -245,6 +245,7 @@ function SignupForm({ onBack }: { onBack: () => void }) {
   const [businessNo, setBusinessNo] = useState('');
   const [password, setPassword] = useState('');
   const [password2, setPassword2] = useState('');
+  const [policyAccepted, setPolicyAccepted] = useState(false);
   const [err, setErr] = useState('');
   const [info, setInfo] = useState('');
   const [busy, setBusy] = useState(false);
@@ -253,6 +254,7 @@ function SignupForm({ onBack }: { onBack: () => void }) {
     if (!email.trim()) return '이메일을 입력하세요';
     if (password.length < 6) return '비밀번호는 6자 이상이어야 합니다';
     if (password !== password2) return '비밀번호가 일치하지 않습니다';
+    if (!policyAccepted) return '서비스 이용약관과 개인정보 처리방침에 동의해야 합니다';
     return null;
   }
   async function submit(e: FormEvent) {
@@ -316,6 +318,13 @@ function SignupForm({ onBack }: { onBack: () => void }) {
             value={businessNo} onChange={(e) => setBusinessNo(formatBusinessNo(e.target.value))} />
         </div>
         <p className="login-msg signup-guide">가입 신청 후 관리자 승인이 필요합니다. 승인되면 사업자번호에 맞는 회사와 권한이 배정됩니다.</p>
+        <label className="login-consent" htmlFor="su-policy">
+          <input id="su-policy" type="checkbox" checked={policyAccepted} onChange={(e) => setPolicyAccepted(e.target.checked)} required />
+          <span>
+            <a href="/terms" target="_blank" rel="noopener noreferrer">서비스 이용약관</a>과{' '}
+            <a href="/privacy" target="_blank" rel="noopener noreferrer">개인정보 처리방침</a>을 확인했으며 이에 동의합니다. (필수)
+          </span>
+        </label>
         <button type="submit" className="login-submit" disabled={busy || !!info}>계정 만들기</button>
       </div>
       <div className="login-links"><AuthLink onClick={onBack}>로그인으로 돌아가기</AuthLink></div>

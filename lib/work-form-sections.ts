@@ -4,16 +4,16 @@
  *   과태료 = 분류 유지 + kindGateways「고지서 업로드」섹션(폼 필드 없음).
  */
 
-export type WorkGroup = '일정' | '고객상담' | '정비·수선' | '사고' | '과태료' | '문서' | '기타';
+import { WORK_CATEGORIES, isWorkCategory, type WorkCategory } from '@/lib/work-taxonomy';
+
+export type WorkGroup = WorkCategory;
 /** 업무생성 Select 값 — 과태료 포함(선택 시 업로드 섹션으로 분기). */
 export type WorkCreateKind = WorkGroup;
 
 /** LedgerFormSection과 동일 형태(lib→components 순환 import 방지). */
 export type WorkFormSection = { title: string; fields: string[]; open?: boolean };
 
-export const WORK_CREATE_KINDS: WorkCreateKind[] = [
-  '일정', '고객상담', '정비·수선', '사고', '문서', '기타', '과태료',
-];
+export const WORK_CREATE_KINDS: WorkCreateKind[] = [...WORK_CATEGORIES];
 
 const CLASSIFY: WorkFormSection = {
   title: '업무 분류', open: true,
@@ -45,6 +45,10 @@ export const WORK_SECTIONS_BY_KIND: Record<WorkCreateKind, WorkFormSection[]> = 
     title: '상담', open: true,
     fields: ['callChannel', 'callDirection', 'callResult', 'nextActionDate', 'assigneeName', 'description'],
   }),
+  '연락기록': secs({
+    title: '연락기록', open: true,
+    fields: ['callChannel', 'callDirection', 'callResult', 'nextActionDate', 'assigneeName', 'description'],
+  }),
   '정비·수선': secs({
     title: '정비', open: true,
     fields: ['maintType', 'vendor', 'amount', 'mileage', 'nextMaintDate', 'description'],
@@ -66,9 +70,41 @@ export const WORK_SECTIONS_BY_KIND: Record<WorkCreateKind, WorkFormSection[]> = 
       ],
     },
   ),
+  '검사': secs({
+    title: '검사', open: true,
+    fields: ['inspectionType', 'inspectionResult', 'vendor', 'amount', 'mileage', 'nextInspectionDate', 'description'],
+  }),
+  '세차': secs({
+    title: '세차', open: true,
+    fields: ['washType', 'vendor', 'amount', 'assigneeName', 'description'],
+  }),
+  '보험': secs({
+    title: '보험', open: true,
+    fields: ['insuranceAction', 'insuranceCompany', 'insuranceNo', 'insuranceExpiryDate', 'amount', 'assigneeName', 'description'],
+  }),
+  '부품교체': secs({
+    title: '부품교체', open: true,
+    fields: ['partName', 'partQty', 'vendor', 'amount', 'mileage', 'nextMaintDate', 'description'],
+  }),
+  '수납이슈': secs({
+    title: '수납이슈', open: true,
+    fields: ['paymentIssueType', 'expectedAmount', 'receivedAmount', 'dueDate', 'nextActionDate', 'assigneeName', 'description'],
+  }),
+  '분쟁': secs({
+    title: '분쟁', open: true,
+    fields: ['disputeType', 'counterparty', 'dueDate', 'nextActionDate', 'assigneeName', 'description'],
+  }),
+  '클레임': secs({
+    title: '클레임', open: true,
+    fields: ['claimType', 'callChannel', 'dueDate', 'nextActionDate', 'assigneeName', 'description'],
+  }),
   '문서': secs({
     title: '문서', open: true,
     fields: ['docKind', 'docStatus', 'assigneeName', 'dueDate', 'description'],
+  }),
+  '메모': secs({
+    title: '메모', open: true,
+    fields: ['assigneeName', 'description'],
   }),
   '기타': secs({
     title: '처리정보', open: true,
@@ -81,7 +117,7 @@ export const WORK_SECTIONS_BY_KIND: Record<WorkCreateKind, WorkFormSection[]> = 
 /** category 문자열 → 생성용 kind (미지정·레거시 → 기타). */
 export function workCreateKindOf(category: unknown): WorkCreateKind {
   const v = String(category || '');
-  if ((WORK_CREATE_KINDS as string[]).includes(v)) return v as WorkCreateKind;
+  if (isWorkCategory(v)) return v;
   return '기타';
 }
 

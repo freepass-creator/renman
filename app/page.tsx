@@ -124,6 +124,7 @@ function TodoRow({ row, onGo, first }: { row: HomeQueueRow; onGo: (href: string)
       onClick={() => onGo(hrefForTodayRow(row))}
       style={{
         display: 'flex', alignItems: 'center', gap: 7, width: '100%', textAlign: 'left',
+        minHeight: 44,
         padding: '7px 10px', border: 'none', borderTop: first ? 'none' : `1px solid ${C.line2}`,
         background: 'transparent', cursor: 'pointer', fontFamily: 'inherit',
       }}
@@ -177,7 +178,7 @@ export default function DashboardPage() {
     { key: 'run', label: '운행', align: 'r', render: (r) => r.running, text: (r) => r.running },
     { key: 'idle', label: '휴차', align: 'r', render: (r) => r.idle, text: (r) => r.idle },
     {
-      key: 'misu', label: '운행미수', align: 'r',
+      key: 'misu', label: '유지계약 미수', align: 'r',
       render: (r) => r.misuActive ? <span style={{ color: C.danger, fontWeight: 700 }}>{won(r.misuActive)}</span> : '—',
       text: (r) => r.misuActive,
     },
@@ -195,7 +196,7 @@ export default function DashboardPage() {
   return (
     <LedgerFrame
       title="대시보드"
-      meta="한눈 지표 · 우측 = 할 일·미점검"
+      meta="한눈 지표 · 할 일·미점검"
       showColView={false}
       sidePanel={(
         <section className="ledger-record-panel" aria-label="할 일·미점검">
@@ -273,9 +274,9 @@ export default function DashboardPage() {
               onClick={() => go('/status')}
             />
             <KpiTile
-              label="운행중미수"
+              label="계약유지 미수"
               value={Soft(loading, won(kpi.misuActive))}
-              meta={loading ? undefined : `건수 ${kpi.unpaidCount} · 반환미수 ${won(kpi.misuReturned)}`}
+              meta={loading ? undefined : `유지 ${kpi.misuActiveCount}건 · 종료 ${kpi.misuReturnedCount}건 ${won(kpi.misuReturned)}`}
               bar={<Bar pct={loading || !kpi.monthlyBilled ? 0 : Math.min(100, Math.round((kpi.misuActive / kpi.monthlyBilled) * 100))} tone="danger" />}
               onClick={() => go('/risk')}
             />
