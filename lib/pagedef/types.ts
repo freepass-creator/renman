@@ -39,7 +39,7 @@ export interface PageDef<R = unknown> {
   archetype: Archetype;
   title: string;
   /** 데이터 취득 훅 — 기존 useEntityLists/linkFleet/build* 위임(도메인 불변). 렌더러가 1회 호출. */
-  useData: () => { rows: R[]; loading: boolean };
+  useData: () => { rows: R[]; loading: boolean; error?: string | null; reload?: () => void };
   rowKey: (r: R) => string;
   drill?: (r: R) => void;    // 웹 행 클릭 → 자산360 (openCar 등)
   mDrill?: (r: R) => string; // 모바일 행 클릭 → /m 상세 href (없으면 drill 사용)

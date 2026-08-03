@@ -930,7 +930,7 @@ input[type="radio"]:disabled {
   html, body { overflow-x: hidden; max-width: 100%; }
   html { scrollbar-gutter: auto; }
 
-  /* 페이지 툴바 SSOT (= freepass ERP4) — 아이콘+라벨 균등 행. 시트는 바닥.
+  /* 페이지 툴바 SSOT (= freepass ERP4) — 모바일은 아이콘 전용 균등 행. 시트는 바닥.
      sticky 헤더가 이미 풀블리드(bleed) — 추가 음수마진 금지. */
   .fp-page-toolbar.is-page-tools {
     display: flex; flex-direction: column; align-items: stretch; gap: 0;
@@ -959,6 +959,7 @@ input[type="radio"]:disabled {
   .fp-page-tool[data-active="1"] {
     color: var(--brand); font-weight: 700;
   }
+  .fp-page-tool > span:not(.fp-page-tool-badge) { display: none; }
   .fp-page-tool-badge {
     position: absolute; top: 4px; right: max(4px, 10%);
     pointer-events: none;

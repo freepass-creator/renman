@@ -6,7 +6,7 @@
  */
 import { useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import { Metric, Rows, ObjRow, EmptyState, PageLoading } from '@/components/ui';
+import { Metric, Rows, ObjRow, EmptyState, ErrorState, PageLoading } from '@/components/ui';
 import { MHead } from '@/components/m/MHead';
 import type { PageDef } from '@/lib/pagedef/types';
 
@@ -21,7 +21,7 @@ export function MobilePage<R>({ def, tabColor }: { def: PageDef<R>; tabColor?: s
 }
 
 function MGrid<R>({ def, tabColor }: { def: PageDef<R>; tabColor?: string }) {
-  const { rows: allRows, loading } = def.useData();
+  const { rows: allRows, loading, error, reload } = def.useData();
   const facets = useMemo(() => new Set(def.facetDefault ?? []), [def.facetDefault]);
   const rows = useMemo(() => {
     const f = def.filter;
@@ -41,6 +41,7 @@ function MGrid<R>({ def, tabColor }: { def: PageDef<R>; tabColor?: string }) {
     <>
       <MHead title={def.title} sub="전체 회사" color={tabColor} />
       {loading ? <PageLoading />
+        : error ? <div style={{ padding: 14 }}><ErrorState message={error} onRetry={reload} /></div>
         : (
           <div style={{ padding: '12px 14px 24px', display: 'flex', flexDirection: 'column', gap: 16 }}>
             {def.summary && def.summary.length > 0 && (

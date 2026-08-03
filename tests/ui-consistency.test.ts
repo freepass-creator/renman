@@ -90,6 +90,10 @@ describe('UI 공용 원자 규격', () => {
     const entry = readFileSync(join(root, 'app/m/entry/page.tsx'), 'utf8');
     const work = readFileSync(join(root, 'app/m/work/page.tsx'), 'utf8');
     const workDetail = readFileSync(join(root, 'app/m/work/[id]/page.tsx'), 'utf8');
+    const risk = readFileSync(join(root, 'app/m/risk/page.tsx'), 'utf8');
+    const settings = readFileSync(join(root, 'app/m/me/page.tsx'), 'utf8');
+    const vehicle = readFileSync(join(root, 'app/m/vehicle/[plate]/page.tsx'), 'utf8');
+    const workNew = readFileSync(join(root, 'app/m/work/new/page.tsx'), 'utf8');
 
     expect(tabBar).toContain("href: '/m/work'");
     expect(tabBar).not.toContain("href: '/m/risk', label: '리스크'");
@@ -100,6 +104,21 @@ describe('UI 공용 원자 규격', () => {
     expect(work).toContain('buildWorkItemLedgerRows');
     expect(workDetail).toContain('workCreateKindOf(record.workType || record.category)');
     expect(workDetail).toContain('record={editableRecord}');
+    expect(risk).toContain('const PAGE_SIZE = 30');
+    expect(risk).toContain("onClick={item.plate ? () => router.push");
+    expect(settings).toContain('<CompanyFilter size="sm" />');
+    expect(settings.match(/router\.push\('\/settings'\)/g)).toHaveLength(1);
+    expect(vehicle).not.toContain("from '@/components/Vehicle360'");
+    expect(vehicle).toContain('buildFleetRows');
+    expect(vehicle).toContain('buildRiskSheetRows');
+    expect(vehicle).toContain('buildWorkItemLedgerRows');
+    expect(vehicle).toContain('buildMobileVehicleScope(vehicles, contracts, plate, companyId)');
+    expect(vehicle).toContain('유지계약 미수');
+    expect(vehicle).toContain('종료계약 미수');
+    expect(workNew).toContain("params.get('plate')");
+    expect(workNew).toContain("params.get('company')");
+    expect(workNew).toContain("plate ? mobileVehicleHref(plate, companyId) : '/m/work'");
+    expect(risk).toContain('검색 조건에 맞는 리스크가 없습니다');
   });
 
   it('모바일 전용 셸에는 숨겨진 웹 상단바 여백이 남지 않는다', () => {
