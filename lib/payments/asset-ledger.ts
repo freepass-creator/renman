@@ -17,6 +17,9 @@ import type { Vehicle } from './types';
 import type { EntityRecord } from '@/lib/intake/entities';
 import { VEHICLE_OUT } from '@/lib/domain/status';
 
+/** 매각대금 없이 처분되는 상태 — 장부가 전액이 손실이 된다. */
+const WRITE_OFF_STATUSES = new Set(['말소', '폐차']);
+
 export type DepreciationPolicy = {
   /** 내용연수 (개월). 기본 60 (5년). */
   usefulLifeMonths: number;
@@ -79,6 +82,10 @@ export type AssetLedgerEntry = {
   disposalGainLoss?: number;
   /** 처분 여부 */
   disposed: boolean;
+  /** 말소·폐차 — 매각대금 없이 장부가 전액이 손실이 되는 처분. */
+  scrapped?: boolean;
+  /** 매각인데 매각가가 비어 있다 — 처분손익을 계산할 수 없다(입력 필요). */
+  salePriceMissing?: boolean;
   /** 정책 적용 안 됨 (취득가/취득일 미입력) */
   incomplete: boolean;
 };
@@ -133,9 +140,22 @@ export function computeAssetLedgerEntry(
     depreciableBase,
   );
   const bookValue = Math.max(salvageValue, acquisitionCost - accumulatedDepreciation);
-  const disposalGainLoss = disposed && v.salePrice !== undefined
-    ? v.salePrice - bookValue
-    : undefined;
+  /* 처분손익 = 매각가 − 장부가.
+     ★말소·폐차는 «매각대금이 없는 것이 정상»이다 → 남은 장부가를 전액 손실로 잡아야 한다.
+       이전 구현은 salePrice 가 없으면 undefined 를 돌려주고 합계가 그것을 0 으로 더했다.
+       그러면 처분 차량은 자산 총계에서 빠지는데 손실은 어디에도 안 나타나 «장부가가 조용히 사라진다»
+       (자기자본만 줄고 손익에 흔적이 없다 — 회계적으로 유형자산처분손실로 잡아야 한다).
+     ★단 «매각»인데 매각가가 비어 있으면 입력 누락이므로 손실로 단정하지 않고 salePriceMissing 으로
+       표시한다. 0원 손실도 아니고 전액 손실도 아니다 — 사람이 채워야 한다. */
+  const scrapped = disposed && WRITE_OFF_STATUSES.has(v.status ?? '');
+  const salePriceMissing = disposed && !scrapped && v.salePrice === undefined;
+  const disposalGainLoss = !disposed
+    ? undefined
+    : v.salePrice !== undefined
+      ? v.salePrice - bookValue
+      : scrapped
+        ? -bookValue          // 말소·폐차 = 장부가 전액 손실
+        : undefined;          // 매각가 미입력 = 판단 보류
 
   return {
     vehicleId: v.id,
@@ -153,6 +173,8 @@ export function computeAssetLedgerEntry(
     saleDate: v.saleDate,
     disposalGainLoss,
     disposed,
+    scrapped,
+    salePriceMissing,
     incomplete: false,
   };
 }
@@ -166,6 +188,8 @@ export type AssetLedgerSummary = {
   activeCount: number;
   disposedCount: number;
   incompleteCount: number;
+  /** 매각인데 매각가가 없어 처분손익에 반영되지 못한 건수 — 합계가 불완전하다는 표시. */
+  salePriceMissingCount: number;
 };
 
 export function summarizeLedger(entries: AssetLedgerEntry[]): AssetLedgerSummary {
@@ -177,12 +201,15 @@ export function summarizeLedger(entries: AssetLedgerEntry[]): AssetLedgerSummary
   let activeCount = 0;
   let disposedCount = 0;
   let incompleteCount = 0;
+  let salePriceMissingCount = 0;
   for (const e of entries) {
     if (e.incomplete) { incompleteCount += 1; continue; }
     if (e.disposed) {
       disposedCount += 1;
       totalSalePrice += e.salePrice ?? 0;
-      totalDisposalGainLoss += e.disposalGainLoss ?? 0;
+      // 말소·폐차는 −장부가가 들어온다. 매각가 미입력은 undefined 이므로 합계에 넣지 않고 따로 센다.
+      if (e.disposalGainLoss !== undefined) totalDisposalGainLoss += e.disposalGainLoss;
+      else if (e.salePriceMissing) salePriceMissingCount += 1;
     } else {
       activeCount += 1;
       totalAcquisition += e.acquisitionCost;
@@ -199,5 +226,6 @@ export function summarizeLedger(entries: AssetLedgerEntry[]): AssetLedgerSummary
     activeCount,
     disposedCount,
     incompleteCount,
+    salePriceMissingCount,
   };
 }

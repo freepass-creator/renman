@@ -66,6 +66,7 @@ export default function FinancialsPage() {
       totalSalePrice: S.totalSalePrice,
       totalDisposalGainLoss: S.totalDisposalGainLoss,
       disposedCount: S.disposedCount,
+      salePriceMissingCount: S.salePriceMissingCount,
       incompleteCount: S.incompleteCount,
     };
   }, [vs, cs, bank]);
@@ -96,7 +97,11 @@ export default function FinancialsPage() {
             value={F.totalDisposalGainLoss}
             strong
             tone={F.totalDisposalGainLoss >= 0 ? 'var(--green-text)' : C.danger}
-            hint={`처분 ${F.disposedCount}대`}
+            /* ★매각가 미입력 건은 손익에 반영되지 못한다 — 합계가 불완전함을 그 자리에서 알려야
+               «이게 전부»라고 오해하지 않는다(말소·폐차는 장부가 전액 손실로 이미 반영된다). */
+            hint={F.salePriceMissingCount
+              ? `처분 ${F.disposedCount}대 · ★매각가 미입력 ${F.salePriceMissingCount}대는 미반영`
+              : `처분 ${F.disposedCount}대`}
           />
         </Sec>
         <Sec id="f-liability" title="부채" desc="갚아야 할 것">
