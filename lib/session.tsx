@@ -184,15 +184,13 @@ function LoginScreen() {
 }
 
 function LoginForm({ onSignup, onReset }: { onSignup: () => void; onReset: () => void }) {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);
   async function submit(e: FormEvent) {
     e.preventDefault();
     const form = new FormData(e.currentTarget as HTMLFormElement);
-    const submittedEmail = String(form.get('email') || email);
-    const submittedPassword = String(form.get('password') || password);
+    const submittedEmail = String(form.get('email') || '');
+    const submittedPassword = String(form.get('password') || '');
     setErr(''); setBusy(true);
     try { await signInEmail(submittedEmail, submittedPassword); }
     catch (ex) {
@@ -213,12 +211,12 @@ function LoginForm({ onSignup, onReset }: { onSignup: () => void; onReset: () =>
         <div className="login-field">
           <label htmlFor="login-email">이메일</label>
           <input id="login-email" name="email" type="email" autoComplete="username" placeholder="name@company.com" required
-            value={email} onChange={(e) => setEmail(e.target.value)} />
+          />
         </div>
         <div className="login-field">
           <label htmlFor="login-password">비밀번호</label>
           <input id="login-password" name="password" type="password" autoComplete="current-password" placeholder="비밀번호 입력" required
-            value={password} onChange={(e) => setPassword(e.target.value)} />
+          />
         </div>
         <button type="submit" className="login-submit" disabled={busy}>로그인</button>
       </div>
