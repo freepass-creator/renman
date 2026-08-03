@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Plus } from 'lucide-react';
 import { MHead } from '@/components/m/MHead';
-import { Btn, C, EmptyState, ErrorState, ObjRow, PageLoading, PillTabs, Rows, Search } from '@/components/ui';
+import { C, EmptyState, ErrorState, IconBtn, ObjRow, PageLoading, PillTabs, Rows, Search } from '@/components/ui';
 import { useEntityLists } from '@/lib/use-entity-lists';
 import { textMatch } from '@/lib/search-match';
 import { todayKST } from '@/lib/contracts/dates';
@@ -44,7 +44,7 @@ export default function MWork() {
         title="업무"
         sub={`할 일 ${openCount} · 미배정 ${unassigned}`}
         color={C.warn}
-        right={<Btn size="sm" onClick={() => router.push('/m/work/new')}><Plus size={14} />업무 생성</Btn>}
+        right={<IconBtn title="업무 생성" onClick={() => router.push('/m/work/new')}><Plus size={18} /></IconBtn>}
       />
       <div style={{ padding: '12px 14px 24px', display: 'flex', flexDirection: 'column', gap: 10 }}>
         <Search

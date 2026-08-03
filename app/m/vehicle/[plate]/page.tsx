@@ -4,7 +4,7 @@ import { useMemo } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { Plus } from 'lucide-react';
 import { MHead } from '@/components/m/MHead';
-import { Btn, C, EmptyState, ErrorState, Metric, ObjRow, PageLoading, Rows, won } from '@/components/ui';
+import { C, EmptyState, ErrorState, IconBtn, Metric, ObjRow, PageLoading, Rows, won } from '@/components/ui';
 import { useEntityLists } from '@/lib/use-entity-lists';
 import { TODAY } from '@/lib/dashboard-consts';
 import { linkFleet } from '@/lib/domain/model';
@@ -80,7 +80,7 @@ export default function MVehicle() {
         title={row.plate}
         sub={`${row.company} · ${row.carName || '차종 미등록'}`}
         color={C.brand}
-        right={<Btn size="sm" onClick={createWork}><Plus size={14} />업무 생성</Btn>}
+        right={<IconBtn title="업무 생성" onClick={createWork}><Plus size={18} /></IconBtn>}
       />
       <div style={{ padding: '12px 14px 28px', display: 'flex', flexDirection: 'column', gap: 12 }}>
         <Rows>
