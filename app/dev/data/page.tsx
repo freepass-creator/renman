@@ -28,6 +28,8 @@ export default function DevDataPage() {
   const [busy, setBusy] = useState('');
   const [msg, setMsg] = useState('');
   const [snap, setSnap] = useState<{ companyId: string; summary: OperatingSummary } | null>(null);
+  const productionReflectLocked = process.env.NODE_ENV === 'production';
+  const productionHardWipeLocked = productionReflectLocked && process.env.NEXT_PUBLIC_ALLOW_HARD_WIPE !== '1';
 
   const load = useCallback(async () => {
     const store = getStore();
@@ -77,7 +79,7 @@ export default function DevDataPage() {
    *   (QA 긴급: 전체초기화에만 걸려 있어 반영·비우기·데모가 실데이터를 하드삭제할 수 있었음)
    */
   function hardWipeBlocked(what: string): boolean {
-    if (process.env.NODE_ENV === 'production' && process.env.NEXT_PUBLIC_ALLOW_HARD_WIPE !== '1') {
+    if (productionHardWipeLocked) {
       setMsg(`프로덕션 ${what} 차단 — NEXT_PUBLIC_ALLOW_HARD_WIPE=1 필요`);
       return true;
     }
@@ -147,8 +149,8 @@ export default function DevDataPage() {
 
       <Panel title="회사별 데이터 적재 / 초기화" action={
         <span style={{ display: 'inline-flex', gap: 8 }}>
-          <Btn onClick={loadDemoAll} disabled={!!busy}>데모 샘플 넣기</Btn>
-          <Btn variant="danger" onClick={clearAll} disabled={!!busy}>전체 초기화</Btn>
+          <Btn onClick={loadDemoAll} disabled={!!busy || productionHardWipeLocked} tip={productionHardWipeLocked ? '운영 데이터 보호 잠금' : undefined}>데모 샘플 넣기</Btn>
+          <Btn variant="danger" onClick={clearAll} disabled={!!busy || productionHardWipeLocked} tip={productionHardWipeLocked ? '운영 데이터 보호 잠금' : undefined}>전체 초기화</Btn>
         </span>
       }>
         <div style={{ padding: '4px 4px 10px' }}>
@@ -181,8 +183,8 @@ export default function DevDataPage() {
                       <td style={{ ...td, textAlign: 'right' }}>{num(cnt?.insurance)}</td>
                       <td style={td}>
                         <div style={{ display: 'flex', gap: 6 }}>
-                          <Btn size="sm" onClick={() => loadCompany(c)} disabled={!!busy}>반영</Btn>
-                          <Btn size="sm" variant="ghost" onClick={() => clearCompany(c)} disabled={!!busy}><span style={{ color: C.danger }}>비우기</span></Btn>
+                          <Btn size="sm" onClick={() => loadCompany(c)} disabled={!!busy || productionReflectLocked} tip={productionReflectLocked ? '운영에서는 검증된 마이그레이션 버튼만 사용합니다' : undefined}>반영</Btn>
+                          <Btn size="sm" variant="ghost" onClick={() => clearCompany(c)} disabled={!!busy || productionHardWipeLocked} tip={productionHardWipeLocked ? '운영 데이터 보호 잠금' : undefined}><span style={{ color: C.danger }}>비우기</span></Btn>
                         </div>
                       </td>
                     </tr>
