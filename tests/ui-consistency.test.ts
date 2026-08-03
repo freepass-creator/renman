@@ -89,6 +89,7 @@ describe('UI 공용 원자 규격', () => {
     const home = readFileSync(join(root, 'app/m/page.tsx'), 'utf8');
     const entry = readFileSync(join(root, 'app/m/entry/page.tsx'), 'utf8');
     const work = readFileSync(join(root, 'app/m/work/page.tsx'), 'utf8');
+    const workDetail = readFileSync(join(root, 'app/m/work/[id]/page.tsx'), 'utf8');
 
     expect(tabBar).toContain("href: '/m/work'");
     expect(tabBar).not.toContain("href: '/m/risk', label: '리스크'");
@@ -97,6 +98,8 @@ describe('UI 공용 원자 규격', () => {
     expect(entry).toContain('<QuickInput');
     expect(entry).not.toMatch(/router\.push\(['"]\/(?:ingest|inbox)/);
     expect(work).toContain('buildWorkItemLedgerRows');
+    expect(workDetail).toContain('workCreateKindOf(record.workType || record.category)');
+    expect(workDetail).toContain('record={editableRecord}');
   });
 
   it('모바일 전용 셸에는 숨겨진 웹 상단바 여백이 남지 않는다', () => {
