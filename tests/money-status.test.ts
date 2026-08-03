@@ -29,6 +29,13 @@ describe('자금상태 — 6단계 정의', () => {
   test('분류는 됐고 계약에 안 붙었으면 미매칭 · 제안이 있으면 제안있음', () => {
     expect(moneyStatusOf({ category: '대여료수입', inAmount: 500_000 })).toBe('미매칭');
     expect(moneyStatusOf({ category: '대여료수입', inAmount: 500_000, hasProposal: true })).toBe('제안있음');
+    expect(moneyStatusOf({ category: '보증금(예수)', inAmount: 500_000 })).toBe('미매칭');
+  });
+
+  test('일반 수입은 계약에 붙이지 않는다 — 대출·환급·캐시백은 해당없음', () => {
+    expect(moneyStatusOf({ category: '운영자금대출', inAmount: 18_000_000 })).toBe('해당없음');
+    expect(moneyStatusOf({ category: '보험료 환급', inAmount: 105_720 })).toBe('해당없음');
+    expect(moneyStatusOf({ category: '카드캐시백', inAmount: 14_772 })).toBe('해당없음');
   });
 
   test('계약에 붙었으면 매칭완료 — 제안 여부와 무관', () => {
@@ -38,6 +45,7 @@ describe('자금상태 — 6단계 정의', () => {
 
   test('지출·이체는 계약에 붙을 돈이 아니다 → 해당없음', () => {
     expect(moneyStatusOf({ category: '보험료', outAmount: 300_000 })).toBe('해당없음');
+    expect(moneyStatusOf({ category: '할부·리스료', outAmount: 412_438, matchedContractId: 'loan-contract' })).toBe('해당없음');
     expect(moneyStatusOf({ category: '계좌간이체', inAmount: 1_000_000 })).toBe('해당없음');
     expect(moneyStatusOf({ category: '보증금반환', outAmount: 500_000 })).toBe('해당없음');
   });

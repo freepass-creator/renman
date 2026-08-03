@@ -5,7 +5,7 @@
  *   · 통장 CMS집금 → CMS집금·미매칭 / 매칭 후 하위행 CMS연결
  *   · 집금 또는 미연결 클릭 → 수동 매칭 패널
  */
-import { useMemo, useState, useCallback, type MouseEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, useCallback, type MouseEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { Plus, X, Link2, Unlink, UploadCloud } from 'lucide-react';
 import { buildCashLedger, withCmsItemRows, buildBankAccountLedger, type CashRow, type BankAccountRow } from '@/lib/finance/cash-ledger';
@@ -18,9 +18,9 @@ import {
 import { isUnclassified } from '@/lib/payments/ledger-subjects';
 import { LEDGER_SUBJECTS } from '@/lib/payments/ledger-subjects';
 import {
-  CASH_BUNDLE_TYPES, summarizeCashBundle, type CashBundleItem, type CashBundleType,
+  CASH_BUNDLE_TYPES, cashBundleReviewStatus, createCashBundlePreset, requiresLoanRepaymentSplit, summarizeCashBundle, type CashBundleItem, type CashBundleType,
 } from '@/lib/finance/cash-bundle';
-import { requiresContractLink } from '@/lib/finance/cash-rules';
+import { reducesReceivable, requiresContractLink } from '@/lib/finance/cash-rules';
 import { latestDateOf, summarizeAccountLedgerStats, summarizeCashTxStats } from '@/lib/ledger-stats';
 import { useCashLedgerLists } from '@/lib/use-cash-ledger-lists';
 import { useEntityList, useEntityLists } from '@/lib/use-entity-lists';
@@ -51,6 +51,7 @@ import {
   type LedgerFilterFieldDef,
 } from '@/lib/ledger-filter-defs';
 import { LEDGER_EMPTY } from '@/lib/ledger-empty';
+import { hydrateContractsWithDepositReceipts } from '@/lib/payments/deposit-receipts';
 
 type Flow = '전체' | '입금' | '출금';
 type CashLedgerKind = '입출금내역' | '계좌관리' | 'CMS 원천내역' | '법인카드 원천내역' | '자금계획';
@@ -293,7 +294,7 @@ function CashClassificationPanel({ row, companyId, actor, onClose, onDone }: {
   companyId: string;
   actor: string;
   onClose: () => void;
-  onDone: () => void;
+  onDone: (next?: { transactionId: string; companyId: string }) => void;
 }) {
   const flow: '입금' | '출금' = row.inAmt > 0 ? '입금' : '출금';
   const categories = LEDGER_SUBJECTS.filter((subject) =>
@@ -311,6 +312,7 @@ function CashClassificationPanel({ row, companyId, actor, onClose, onDone }: {
     setSaving(true);
     const partyKey = row.entity === 'card_tx' ? 'merchant' : 'counterparty';
     const ok = await safeRun(async () => {
+      const classifiedAt = new Date().toISOString();
       await commitUpdate({
         entity: row.entity, sessionCompanyId: companyId, rec: row.raw, key: row.recKey,
         patch: {
@@ -318,15 +320,17 @@ function CashClassificationPanel({ row, companyId, actor, onClose, onDone }: {
           [partyKey]: party.trim(),
           memo: memo.trim(),
           plate: plate.trim(),
-          firstClassifiedAt: new Date().toISOString(),
-          firstClassifiedBy: actor,
+          firstClassifiedAt: row.raw.firstClassifiedAt || classifiedAt,
+          firstClassifiedBy: row.raw.firstClassifiedBy || actor,
+          lastClassifiedAt: classifiedAt,
+          lastClassifiedBy: actor,
         },
       });
     });
     setSaving(false);
     if (!ok) return;
     toast(category.trim() ? `1차 분류 · ${category.trim()}` : '미분류 상태로 저장', category.trim() ? 'success' : 'info');
-    onDone();
+    onDone(needsContract ? { transactionId: row.recKey, companyId: row.companyId } : undefined);
   }
 
   return (
@@ -357,7 +361,9 @@ function CashClassificationPanel({ row, companyId, actor, onClose, onDone }: {
       </div>
       <LedgerPanelFooter hint={category.trim() ? '분류 결과가 원장과 자금일보에 함께 반영됩니다.' : '미분류로 저장해도 사라지지 않고 계속 확인 대상으로 남습니다.'}>
         <Btn size="sm" variant="ghost" onClick={onClose}>닫기</Btn>
-        <Btn size="sm" onClick={() => void save()} disabled={saving}>{saving ? '저장 중…' : '1차 분류 저장'}</Btn>
+        <Btn size="sm" onClick={() => void save()} disabled={saving}>
+          {saving ? '저장 중…' : needsContract ? (reducesReceivable(category) ? '저장 후 입금 매칭' : '저장 후 계약 귀속') : '1차 분류 저장'}
+        </Btn>
       </LedgerPanelFooter>
     </section>
   );
@@ -373,6 +379,11 @@ function CashBundlePanel({ row, companyId, actor, contracts, onClose, onDone }: 
 }) {
   const flow: '입금' | '출금' = row.inAmt > 0 ? '입금' : '출금';
   const actualAmount = row.inAmt || row.outAmt;
+  const savedBundleType = String(row.raw.bundleType || '');
+  const suggestedBundleType: CashBundleType = CASH_BUNDLE_TYPES.includes(savedBundleType as CashBundleType)
+    ? savedBundleType as CashBundleType
+    : flow === '출금' && requiresLoanRepaymentSplit(row.category) ? '할부·리스상환'
+      : flow === '입금' ? '일괄입금' : '일괄출금';
   const initialItems = Array.isArray(row.raw.bundleItems)
     ? (row.raw.bundleItems as Array<Record<string, unknown>>).map((item, index): CashBundleItem => ({
       id: String(item.id || `saved-${index + 1}`),
@@ -380,13 +391,8 @@ function CashBundlePanel({ row, companyId, actor, contracts, onClose, onDone }: 
       amount: Number(item.amount) || 0, category: String(item.category || ''),
       referenceId: String(item.referenceId || ''),
     }))
-    : [];
-  const [bundleType, setBundleType] = useState<CashBundleType>(() => {
-    const saved = String(row.raw.bundleType || '');
-    return CASH_BUNDLE_TYPES.includes(saved as CashBundleType)
-      ? saved as CashBundleType
-      : flow === '입금' ? '일괄입금' : '일괄출금';
-  });
+    : createCashBundlePreset(suggestedBundleType, row.party, String(row.raw.matchedContractId || ''));
+  const [bundleType, setBundleType] = useState<CashBundleType>(suggestedBundleType);
   const [items, setItems] = useState<CashBundleItem[]>(initialItems);
   const [fee, setFee] = useState(String(Number(row.raw.bundleFeeAmount) || ''));
   const [saving, setSaving] = useState(false);
@@ -445,21 +451,29 @@ function CashBundlePanel({ row, companyId, actor, contracts, onClose, onDone }: 
   }
 
   return (
-    <section className="ledger-record-panel" aria-label="묶음 입출금 분해">
+    <section className="ledger-record-panel" aria-label={bundleType === '할부·리스상환' ? '할부·리스 원금·이자 분해' : '묶음 입출금 분해'}>
       <header className="ledger-record-panel__header">
         <span className="ledger-record-panel__icon" aria-hidden="true"><Link2 size={16} /></span>
         <div className="ledger-record-panel__heading">
           <div className="ledger-record-panel__eyebrow">자금 1차 분류</div>
-          <div className="ledger-record-panel__title">묶음 입출금 분해</div>
+          <div className="ledger-record-panel__title">{bundleType === '할부·리스상환' ? '할부·리스 원금·이자 분해' : '묶음 입출금 분해'}</div>
           <div className="ledger-record-panel__identity">{row.date} · {row.party || row.accountName || '거래'} · {flow} {won(actualAmount)}</div>
         </div>
         <LedgerPanelCloseButton onClose={onClose} label="묶음 분해 패널 닫기" />
       </header>
       <div className="ledger-create-panel__body">
         <Message variant="info">실제 계좌 거래는 한 번만 반영하고, 여기서는 구성내역과 수수료를 분해합니다. 덜 채운 상태도 미완료로 저장해 이어서 작업할 수 있습니다.</Message>
+        {bundleType === '할부·리스상환' ? <Message variant="warning">상환표·금융사 내역에 적힌 실제 원금과 이자만 입력하세요. 입력 전에는 0원 미완료로 유지됩니다.</Message> : null}
         <div style={{ display: 'grid', gridTemplateColumns: 'minmax(150px, 1fr) minmax(140px, 1fr)', gap: 10, marginTop: 12 }}>
           <label className="ledger-create-panel__field"><span>묶음 유형</span>
-            <Select value={bundleType} onChange={(event) => setBundleType(event.target.value as CashBundleType)}>
+            <Select value={bundleType} onChange={(event) => {
+              const nextType = event.target.value as CashBundleType;
+              setBundleType(nextType);
+              if (items.length === 0) {
+                const preset = createCashBundlePreset(nextType, row.party, String(row.raw.matchedContractId || ''));
+                if (preset.length) setItems(preset);
+              }
+            }}>
               {CASH_BUNDLE_TYPES.map((type) => <option key={type} value={type}>{type}</option>)}
             </Select>
           </label>
@@ -532,6 +546,10 @@ export default function CashLedgerPage() {
     data: [planContracts = [], planWork = [], planInsurances = [], planPenalties = [], planLeases = []],
     loading: planLoading, error: planLoadError, reload: reloadPlan,
   } = useEntityLists(['contract', 'work_item', 'insurance', 'penalty', 'lease']);
+  const hydratedPlanContracts = useMemo(
+    () => hydrateContractsWithDepositReceipts(planContracts, bank),
+    [bank, planContracts],
+  );
   const [ctxMenu, setCtxMenu] = useState<{ open: boolean; x: number; y: number }>({ open: false, x: 0, y: 0 });
   const xlTx = useSheetExport<CashRow>({
     title: '자금관리',
@@ -581,7 +599,33 @@ export default function CashLedgerPage() {
   const [creating, setCreating] = useState<'account' | 'transaction' | 'bulk' | null>(null);
   const [bundleEditing, setBundleEditing] = useState(false);
   const [classificationEditing, setClassificationEditing] = useState(false);
+  const queryFocusHandled = useRef(false);
   const [singleKind, setSingleKind] = useState<CashInputKind>('계좌거래');
+  useEffect(() => {
+    if (queryFocusHandled.current || loading || typeof window === 'undefined') return;
+    const params = new URLSearchParams(window.location.search);
+    const facet = params.get('facet') || '';
+    const txId = params.get('tx') || '';
+    const requestedCompany = params.get('company') || '';
+    if (!facet && !txId) { queryFocusHandled.current = true; return; }
+
+    if (facet === '미분류') setUnclassifiedOnly(true);
+    if (!txId) { queryFocusHandled.current = true; return; }
+    const target = allRows.find((row) => row.entity === 'bank_tx'
+      && row.recKey === txId
+      && (!requestedCompany || row.companyId === requestedCompany));
+    queryFocusHandled.current = true;
+    if (!target) return;
+
+    setLedgerKind('입출금내역');
+    setRange({ from: target.date, to: target.date });
+    setFlow('전체');
+    setSourceQuickFilter(null);
+    setSelected(target);
+    setCreating(null);
+    setBundleEditing(false);
+    setClassificationEditing(isUnclassified(target.category));
+  }, [allRows, loading]);
   const scopedCashRows = useMemo(() => allRows.filter((row) => {
     if (row.nest === 'cms-item') return false;
     if (row.entity !== 'bank_tx' || row.nest === 'cms-pending') return false;
@@ -624,7 +668,7 @@ export default function CashLedgerPage() {
     [planAccounts],
   );
   const cashPlan = useMemo(() => buildCashPlan({
-    contracts: planContracts,
+    contracts: hydratedPlanContracts,
     workItems: planWork,
     insurances: planInsurances,
     penalties: planPenalties,
@@ -633,7 +677,7 @@ export default function CashLedgerPage() {
     horizonDays: planHorizon,
     openingBalance: planOpeningBalance,
     openingBalanceKnown: planOpeningKnown,
-  }), [planContracts, planWork, planInsurances, planPenalties, planLeases, planHorizon, planOpeningBalance, planOpeningKnown]);
+  }), [hydratedPlanContracts, planWork, planInsurances, planPenalties, planLeases, planHorizon, planOpeningBalance, planOpeningKnown]);
   const planRows = useMemo(() => cashPlan.rows.filter((row) => textMatch(
     q, row.company, row.dueDate, row.direction, row.source, row.title, row.counterparty,
     row.status, row.certainty, row.reference, row.memo,
@@ -671,9 +715,9 @@ export default function CashLedgerPage() {
       if (!matchLedgerFilters(r, txFilters, {
         category: eqFilter<CashRow>((row) => row.category),
         match: eqFilter<CashRow>((row) => cashMoneyStatus(row)),
-        bundleStatus: eqFilter<CashRow>((row) => row.nest === 'bundle-parent' ? cashBundleStatus(row) : ''),
+        bundleStatus: eqFilter<CashRow>((row) => cashBundleReviewStatus(row) === '해당없음' ? '' : cashBundleStatus(row)),
       })) return false;
-      if (!textMatch(q, r.party, r.account, r.category, r.memo, r.date, r.raw.dataAlert, cashMoneyStatus(r), r.raw.bundleType, r.nest === 'bundle-parent' ? cashBundleStatus(r) : '', companyDisplay(r.companyId), r.companyId)) return false;
+      if (!textMatch(q, r.party, r.account, r.category, r.memo, r.date, r.raw.dataAlert, cashMoneyStatus(r), r.raw.bundleType, cashBundleReviewStatus(r) === '해당없음' ? '' : cashBundleStatus(r), companyDisplay(r.companyId), r.companyId)) return false;
       return true;
     };
     const out: CashRow[] = [];
@@ -1211,7 +1255,12 @@ export default function CashLedgerPage() {
           companyId={companyId}
           actor={user.email}
           onClose={() => setClassificationEditing(false)}
-          onDone={() => { setSelected(null); setClassificationEditing(false); reload(); }}
+          onDone={(next) => {
+            setSelected(null);
+            setClassificationEditing(false);
+            reload();
+            if (next) openPayments(next);
+          }}
         />
       ) : selected && bundleEditing ? (
         <CashBundlePanel
@@ -1219,7 +1268,7 @@ export default function CashLedgerPage() {
           row={selected}
           companyId={companyId}
           actor={user.email}
-          contracts={planContracts}
+          contracts={hydratedPlanContracts}
           onClose={() => setBundleEditing(false)}
           onDone={() => { setSelected(null); setBundleEditing(false); reload(); }}
         />
@@ -1238,7 +1287,11 @@ export default function CashLedgerPage() {
                 <Btn size="sm" variant={isUnclassified(selected.category) ? 'solid' : 'ghost'} onClick={() => setClassificationEditing(true)}>1차 분류</Btn>
               ) : null}
               {selected.entity === 'bank_tx' && (!selected.nest || selected.nest === 'bundle-parent') ? (
-                <Btn size="sm" variant={selected.nest ? 'solid' : 'ghost'} onClick={() => setBundleEditing(true)}>{selected.nest === 'bundle-parent' ? '묶음 수정' : '묶음 분해'}</Btn>
+                <Btn size="sm" variant={selected.nest ? 'solid' : 'ghost'} onClick={() => setBundleEditing(true)}>
+                  {requiresLoanRepaymentSplit(selected.category) || String(selected.raw.bundleType || '') === '할부·리스상환'
+                    ? '원금·이자 분해'
+                    : selected.nest === 'bundle-parent' ? '묶음 수정' : '묶음 분해'}
+                </Btn>
               ) : null}
               {String(selected.raw.plate || '') ? (
                 <Btn size="sm" variant="ghost" onClick={() => openCar(selected.raw.plate, undefined, selected.companyId)}>차량 360</Btn>
@@ -1246,8 +1299,12 @@ export default function CashLedgerPage() {
               {String(selected.raw.matchedContractId || '') ? (
                 <Btn size="sm" variant="ghost" onClick={() => router.push(`/contract?open=${encodeURIComponent(String(selected.raw.matchedContractId))}`)}>연결 계약</Btn>
               ) : null}
-              {selected.inAmt > 0 && !selected.nest && !String(selected.raw.matchedContractId || '') ? (
-                <Btn size="sm" variant={isUnclassified(selected.category) ? 'ghost' : 'solid'} onClick={() => openPayments()}>입금 매칭</Btn>
+              {selected.inAmt > 0 && !selected.nest && requiresContractLink(selected.category) && !String(selected.raw.matchedContractId || '') ? (
+                <Btn
+                  size="sm"
+                  variant={isUnclassified(selected.category) ? 'ghost' : 'solid'}
+                  onClick={() => openPayments({ transactionId: selected.recKey, companyId: selected.companyId })}
+                >{reducesReceivable(selected.category) ? '입금 매칭' : '계약 귀속'}</Btn>
               ) : null}
             </>
           )}

@@ -155,11 +155,22 @@ type MP = { m: CompanyMaster; set: (p: Partial<CompanyMaster>) => void };
 function BasicModule({ m, set }: MP) {
   return (
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(210px,1fr))', gap: 10 }}>
+      <div style={{ gridColumn: '1 / -1' }}><label style={lab}>사업자등록증 상호 원문</label><Input value={m.registeredNameRaw || ''} onChange={(e) => set({ registeredNameRaw: e.target.value })} placeholder="예: 주식회사 ○○" style={{ width: '100%' }} /></div>
       <div><label style={lab}>대표</label><Input value={m.ceo || ''} onChange={(e) => set({ ceo: e.target.value })} style={{ width: '100%' }} /></div>
       <div><label style={lab}>사업자등록번호</label><Input value={m.bizNo || ''} onChange={(e) => set({ bizNo: e.target.value })} style={{ width: '100%' }} /></div>
       <div><label style={lab}>법인등록번호</label><Input value={m.corpNo || ''} onChange={(e) => set({ corpNo: e.target.value })} style={{ width: '100%' }} /></div>
+      <div><label style={lab}>개업일</label><Input type="date" value={m.openDate || ''} onChange={(e) => set({ openDate: e.target.value })} style={{ width: '100%' }} /></div>
       <div><label style={lab}>대표 전화</label><Input value={m.phone || ''} onChange={(e) => set({ phone: e.target.value })} style={{ width: '100%' }} /></div>
       <div style={{ gridColumn: '1 / -1' }}><label style={lab}>본점(사무실) 소재지</label><Input value={m.address || ''} onChange={(e) => set({ address: e.target.value })} placeholder="예: 김포시 …" style={{ width: '100%' }} /></div>
+      <div><label style={lab}>업태</label><Input value={(m.industry || []).join(', ')} onChange={(e) => set({ industry: e.target.value.split(',').map((v) => v.trim()).filter(Boolean) })} placeholder="예: 서비스, 부동산업" style={{ width: '100%' }} /></div>
+      <div><label style={lab}>종목</label><Input value={(m.category || []).join(', ')} onChange={(e) => set({ category: e.target.value.split(',').map((v) => v.trim()).filter(Boolean) })} placeholder="예: 렌터카, 매매업" style={{ width: '100%' }} /></div>
+      {m.businessRegistration?.url && (
+        <div style={{ gridColumn: '1 / -1', fontSize: 12.5 }}>
+          <a href={m.businessRegistration.url} target="_blank" rel="noopener noreferrer" style={{ color: C.accent, fontWeight: 700 }}>
+            사업자등록증 원본 열기{m.businessRegistration.fileName ? ` · ${m.businessRegistration.fileName}` : ''}
+          </a>
+        </div>
+      )}
     </div>
   );
 }

@@ -3,7 +3,7 @@ import type { BankTransaction, Contract } from './types';
 import { findCandidates, type MatchCandidate } from './receipt-match';
 import { autoMatchAll, type AutoMatchResult } from './receipt-match';
 import { buildMatchContract } from '@/lib/contract-ops';
-import { canReviewReceivableMatch } from '@/lib/finance/cash-rules';
+import { canReviewReceivableMatch, isDepositReceiptCategory } from '@/lib/finance/cash-rules';
 
 export type MatchProposalState = '자동후보' | '복수후보' | '검토후보' | '미매칭' | '해당없음';
 export type MatchProposal = {
@@ -66,7 +66,7 @@ export function buildMatchBacklog(
       && tx.amount > 0
       && !(tx.withdraw && tx.withdraw > 0)
       && !tx.matchedContractId
-      && canReviewReceivableMatch(record.category || record.subject, tx.settlementRole)
+      && canReviewReceivableMatch(record.category || record.subject, tx.settlementRole, record.method || record.source)
       && isInScope(tx.txDate, anchorDate, scope));
 
   const contractsByCompany = new Map<string, Contract[]>();
@@ -81,6 +81,7 @@ export function buildMatchBacklog(
 
   // 오래된 입금부터 회차를 예약해야 최근 입금이 과거 회차를 먼저 차지하지 않는다.
   const matchingOrder = [...scoped]
+    .filter(({ record }) => !isDepositReceiptCategory(record.category || record.subject))
     .sort((a, b) => a.tx.txDate.localeCompare(b.tx.txDate) || a.tx.id.localeCompare(b.tx.id))
     .map(({ tx }) => tx);
   const automaticByTx = new Map(
@@ -88,8 +89,13 @@ export function buildMatchBacklog(
       .map((result) => [String(result.tx.companyCode || '') + ':' + result.tx.id, result]),
   );
 
-  return scoped.map(({ tx }) => {
-    const proposal = analyzeMatchProposal(tx, contractsByCompany.get(String(tx.companyCode || '')) || []);
+  return scoped.map(({ record, tx }) => {
+    // 미분류는 보증금으로 추정하지 않는다. 후보 분석을 먼저 거치고,
+    // 명시적인 보증금 과목만 회차 미수와 분리한다.
+    const affectsReceivable = !isDepositReceiptCategory(record.category || record.subject);
+    const proposal = affectsReceivable
+      ? analyzeMatchProposal(tx, contractsByCompany.get(String(tx.companyCode || '')) || [])
+      : { state: '미매칭' as const, candidates: [], reason: '계약 귀속 필요 · 대여료 미수 차감 없음' };
     const automatic = automaticByTx.get(String(tx.companyCode || '') + ':' + tx.id);
     const safeProposal = proposal.state === '자동후보' && !automatic
       ? { ...proposal, state: '검토후보' as const, preferred: undefined, reason: '동일 계약 회차에 다른 입금 후보가 있어 확인 필요' }

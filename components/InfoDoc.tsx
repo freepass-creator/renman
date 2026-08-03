@@ -59,7 +59,7 @@ export function InfoDoc({
   const mobile = useIsMobile();
   const [mode, setMode] = useState<'view' | 'replace'>('view');
   const [busy, setBusy] = useState(false);
-  const [pending, setPending] = useState<{ url: string; ocr?: Record<string, unknown>; ocrOriginal?: OcrOriginal; crosscheck?: CrosscheckResult; fileName: string } | null>(null);
+  const [pending, setPending] = useState<{ url: string; ocr?: Record<string, unknown>; ocrOriginal?: OcrOriginal; mapped?: EntityRecord; crosscheck?: CrosscheckResult; fileName: string } | null>(null);
   const [confirm, setConfirm] = useState<EntityRecord>({});
   const [reason, setReason] = useState(REASONS[0]);
   const [saving, setSaving] = useState(false);
@@ -90,7 +90,7 @@ export function InfoDoc({
     const seed: EntityRecord = {};
     for (const [, key] of editKeys) if (mapped[key] != null && mapped[key] !== '') seed[key] = mapped[key];
     setConfirm(seed);
-    setPending({ url: url || '', ocr: ocrRes.ok ? ocrRes.raw : undefined, ocrOriginal: ocrRes.ocrOriginal, crosscheck: ocrRes.crosscheck, fileName: file.name });
+    setPending({ url: url || '', ocr: ocrRes.ok ? ocrRes.raw : undefined, ocrOriginal: ocrRes.ocrOriginal, mapped, crosscheck: ocrRes.crosscheck, fileName: file.name });
     setBusy(false);
   }
 
@@ -100,6 +100,9 @@ export function InfoDoc({
     try {
       const merged: EntityRecord = {};
       for (const [k, val] of Object.entries(confirm)) if (val != null && String(val).trim() !== '') merged[k] = val;
+      // 분납표처럼 폼 한 칸으로 편집할 수 없는 반복 원자도 OCR 결과 그대로 보존한다.
+      // 스칼라 숨은 필드는 사용자 확인 없이 덮지 않고, 배열 구조만 이 경로에서 추가한다.
+      for (const [k, val] of Object.entries(pending.mapped || {})) if (Array.isArray(val)) merged[k] = val;
       await onReplaceDoc({ url: pending.url, ocr: pending.ocr, ocrOriginal: pending.ocrOriginal, fields: merged, reason });
       resetReplace();
     } finally { setSaving(false); }

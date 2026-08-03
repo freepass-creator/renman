@@ -87,7 +87,7 @@ describe('sheet-export', () => {
     expect(m.headerRow).toBe(3);
     expect(m.aoa[0]![0]!.v).toBe('자산관리');
     expect(String(m.aoa[1]![0]!.v)).toContain('1건');
-    expect(m.aoa[3]!.map((c) => c.v)).toContain('월대여료');
+    expect(m.aoa[3]!.map((c) => c.v)).toEqual(cols.filter((c) => c.text).map((c) => c.label));
     expect(m.fileName).toMatch(/자산관리-스위치플랜-20260731\.xlsx/);
     expect(m.sheetName.length).toBeLessThanOrEqual(31);
   });

@@ -13,7 +13,7 @@
  * | 축 | 의미 | 반영 위치 |
  * |---|---|---|
  * | `엑셀기본` | 기본 보기 열 | `*_SHEET_KEYS.basic` |
- * | `엑셀전체` 또는 `엑셀` | 전체 보기 열 순서 | `*_SHEET_KEYS.all` |
+ * | `엑셀전체` 또는 `엑셀` | 기본 열 뒤에 붙는 전체 보기 열 | `*_SHEET_KEYS.all` |
  * | `{섹션명}` (등록증정보 등) | 상세패널 섹션 | `*_DETAIL_DEFS` |
  * | `필터` | 세부필터 | `*_FILTER_DEFS` (+ matcher/options) |
  *
@@ -35,7 +35,7 @@ import type { SheetCol } from '@/components/ui';
 export type SheetViewKeys = {
   /** 기본 보기 */
   basic: readonly string[];
-  /** 전체 보기 순서(뒤로만 확장). basic 키를  squ 포함해도 됨. */
+  /** 전체 보기 후보. 출력은 basic 순서를 그대로 유지하고 여기에만 있는 키를 오른쪽에 붙인다. */
   all: readonly string[];
 };
 
@@ -73,9 +73,24 @@ export function buildSheetViews<T>(catalog: SheetCol<T>[], keys: SheetViewKeys):
   basic: SheetCol<T>[];
   expanded: SheetCol<T>[];
 } {
+  // 전체보기로 전환할 때 기본 열이 움직이면 같은 행을 다시 찾아야 하고,
+  // 현재 화면 열을 그대로 내보내는 엑셀 순서도 페이지마다 달라진다.
+  // 따라서 기본 열은 위치까지 불변으로 두고 상세 열만 오른쪽에 추가한다.
+  const seen = new Set<string>();
+  const basicKeys = keys.basic.filter((key) => {
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+  const expandedKeys = [...basicKeys];
+  for (const key of keys.all) {
+    if (seen.has(key)) continue;
+    seen.add(key);
+    expandedKeys.push(key);
+  }
   return {
-    basic: pickCols(catalog, keys.basic),
-    expanded: pickCols(catalog, keys.all),
+    basic: pickCols(catalog, basicKeys),
+    expanded: pickCols(catalog, expandedKeys),
   };
 }
 

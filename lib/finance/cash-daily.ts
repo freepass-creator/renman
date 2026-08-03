@@ -1,7 +1,8 @@
 import type { CashRow } from "./cash-ledger";
 import { isUnclassified } from "@/lib/payments/ledger-subjects";
-import { requiresContractLink } from "./cash-rules";
-import { summarizeStoredCashBundle } from "./cash-bundle";
+import { requiresContractLink, requiresExpenseEvidence } from "./cash-rules";
+import { cashBundleReviewStatus } from "./cash-bundle";
+import { reviewInternalTransfers } from "./internal-transfer";
 
 export { requiresContractLink } from "./cash-rules";
 
@@ -19,6 +20,9 @@ export type CashDaily = {
   bundleIncompleteCount: number;
   missingEvidenceCount: number;
   unmatchedContractCount: number;
+  unappliedReceiptCount: number;
+  unappliedReceiptAmount: number;
+  unpairedTransferCount: number;
   status: CashDailyStatus;
 };
 
@@ -28,6 +32,8 @@ export function calculateCashDaily(
   opening: number,
   actualClosing?: number,
 ): CashDaily {
+  const transferReview = reviewInternalTransfers(rows);
+  const unpairedTransferIds = new Set(transferReview.unpairedRows.map((row) => row.id));
   const selected = rows.filter(
     (r) =>
       r.date.slice(0, 10) === date &&
@@ -49,11 +55,9 @@ export function calculateCashDaily(
     transactionCount: selected.length,
     unclassifiedCount: selected.filter((r) => r.nest !== 'bundle-parent' && isUnclassified(r.category))
       .length,
-    bundleIncompleteCount: selected.filter((r) =>
-      r.nest === 'bundle-parent' && summarizeStoredCashBundle(r).status !== '대사완료',
-    ).length,
+    bundleIncompleteCount: selected.filter((r) => cashBundleReviewStatus(r) === '미완료').length,
     missingEvidenceCount: selected.filter(
-      (r) => r.outAmt > 0 && !r.raw.documentId && !r.raw.evidenceUrl,
+      (r) => r.outAmt > 0 && requiresExpenseEvidence(r.category) && !r.raw.documentId && !r.raw.evidenceUrl,
     ).length,
     unmatchedContractCount: selected.filter((r) =>
       r.inAmt > 0
@@ -61,6 +65,9 @@ export function calculateCashDaily(
       && requiresContractLink(r.category)
       && !r.raw.matchedContractId && !r.raw.matchedScheduleSeq,
     ).length,
+    unappliedReceiptCount: selected.filter((r) => Number(r.raw.matchedUnappliedAmount) > 0).length,
+    unappliedReceiptAmount: selected.reduce((sum, r) => sum + Math.max(0, Number(r.raw.matchedUnappliedAmount) || 0), 0),
+    unpairedTransferCount: selected.filter((r) => unpairedTransferIds.has(r.id)).length,
     status: "open",
   };
 }
@@ -75,13 +82,17 @@ export function validateCashDailyClose(daily: CashDaily): string[] {
   if (daily.unclassifiedCount)
     errors.push(`미분류 거래 ${daily.unclassifiedCount}건을 분류해야 합니다.`);
   if (daily.bundleIncompleteCount)
-    errors.push(`묶음 분해 미완료 ${daily.bundleIncompleteCount}건을 자금관리에서 마쳐야 합니다.`);
+    errors.push(`입출금 분해 미완료 ${daily.bundleIncompleteCount}건을 자금관리에서 마쳐야 합니다.`);
   if (daily.missingEvidenceCount)
     errors.push(
       `지출 증빙 누락 ${daily.missingEvidenceCount}건을 확인해야 합니다.`,
     );
   if (daily.unmatchedContractCount)
     errors.push(`계약 미연결 입금 ${daily.unmatchedContractCount}건을 연결해야 합니다.`);
+  if (daily.unappliedReceiptCount)
+    errors.push(`과오납·미배분 입금 ${daily.unappliedReceiptCount}건 ${daily.unappliedReceiptAmount.toLocaleString("ko-KR")}원을 확인해야 합니다.`);
+  if (daily.unpairedTransferCount)
+    errors.push(`내부이체 짝 미확인 ${daily.unpairedTransferCount}건을 확인해야 합니다.`);
   return errors;
 }
 
@@ -99,7 +110,7 @@ export function validateCashDailyCloseInput(
 const CLOSE_SNAPSHOT_FIELDS = [
   'opening', 'inflow', 'outflow', 'expectedClosing', 'actualClosing', 'difference',
   'transactionCount', 'unclassifiedCount', 'bundleIncompleteCount',
-  'missingEvidenceCount', 'unmatchedContractCount',
+  'missingEvidenceCount', 'unmatchedContractCount', 'unappliedReceiptCount', 'unappliedReceiptAmount', 'unpairedTransferCount',
 ] as const;
 
 /** 같은 회사·일자의 동일 마감 결과를 다시 저장하지 않기 위한 멱등성 판정. */

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { EntityRecord } from '@/lib/intake/entities';
-import { buildReceivableRows, collectionInfoForReceivable, countReceivableFacets, engineLockDue, mostUrgentCollectionInfo, summarizeReceivableActions } from '@/lib/receivables-ledger';
+import { buildReceivableRows, collectionInfoForReceivable, collectionTermsLabel, countReceivableFacets, engineLockDue, mostUrgentCollectionInfo, summarizeReceivableActions } from '@/lib/receivables-ledger';
 import { collectionStage } from '@/lib/domain/status';
 
 const TODAY = '2026-08-02';
@@ -46,6 +46,15 @@ describe('미수 계약상태와 계약별 연체조치 조건', () => {
       { overdueDays: 3, ended: false },
       contract({ engineLockAfterDays: 5 }),
     ).stage).toBe('회수대기');
+  });
+
+  it('계약서를 확인했지만 숫자 조건이 없으면 미확인이 아니라 수동 회수대기로 둔다', () => {
+    const rec = contract({ collectionTermsReviewedAt: '2026-08-02', arrearsClause: '연체 시 별도 협의' });
+    expect(collectionInfoForReceivable({ overdueDays: 30, ended: false }, rec)).toMatchObject({
+      stage: '회수대기',
+      nextAction: '계약서상 자동조치 없음 · 수동 회수',
+    });
+    expect(collectionTermsLabel(rec)).toBe('확인완료 · 숫자조건 없음');
   });
 
   it('계약조건 D+순서가 비정상이어도 도래한 조치 중 가장 강한 단계를 선택한다', () => {

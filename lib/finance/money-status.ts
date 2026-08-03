@@ -17,6 +17,7 @@
  *   그 둘은 해야 할 일이 다르다 — 앞은 분류 작업, 뒤는 매칭 작업.
  */
 import { isUnclassified, kindOfLabel } from '@/lib/payments/ledger-subjects';
+import { requiresContractLink } from '@/lib/finance/cash-rules';
 
 /** 처리 단계 — 앞에 있는 것부터 처리한다(정렬 우선순위와 동일). */
 export const MONEY_STATUS = [
@@ -72,9 +73,9 @@ export type MoneyStatusInput = {
  *
  * 판정 순서에 의미가 있다: «먼저 해야 할 일»이 앞에 온다.
  *   ① CMS 짝짓기(집금대기)는 계정과목보다 먼저다 — 짝이 맞아야 금액이 확정된다.
- *   ② 매칭완료면 더 볼 것이 없다.
- *   ③ 계정과목이 없으면 미분류(무슨 돈인지 모르면 매칭도 무의미).
- *   ④ 입금이 아니면(지출·이체) 계약에 붙을 돈이 아니다 → 해당없음.
+ *   ② 계정과목이 없으면 미분류(무슨 돈인지 모르면 매칭도 무의미).
+ *   ③ 입금이 아니면(지출·이체) 계약에 붙을 수납이 아니다 → 해당없음.
+ *   ④ 계약성 입금에 실제 계약·회차가 붙었을 때만 매칭완료다.
  */
 export function moneyStatusOf(input: MoneyStatusInput): MoneyStatus {
   const matched = !!input.matchedContractId || !!input.matchedScheduleSeq;
@@ -83,13 +84,16 @@ export function moneyStatusOf(input: MoneyStatusInput): MoneyStatus {
   if (input.isCmsItem) return matched ? '매칭완료' : '집금대기';
   if (input.isCmsDeposit) return input.cmsSettled ? '매칭완료' : '집금대기';
 
-  if (matched) return '매칭완료';
   if (isUnclassified(input.category)) return '미분류';
 
   const inAmt = Number(input.inAmount) || 0;
   const kind = kindOfLabel(String(input.category || ''));
   // 입금이 아니거나 계정과목이 지출·이체면 계약에 붙을 돈이 아니다.
   if (inAmt <= 0 || kind === '지출' || kind === '이체') return '해당없음';
+  if (matched) return '매칭완료';
+  // 대출금·환급·캐시백·잡이익 같은 일반 수입은 계약 수납이 아니다.
+  // «미매칭»으로 두면 직원에게 존재하지 않는 계약을 찾게 하고 오연결을 유도한다.
+  if (!requiresContractLink(input.category)) return '해당없음';
 
   return input.hasProposal ? '제안있음' : '미매칭';
 }

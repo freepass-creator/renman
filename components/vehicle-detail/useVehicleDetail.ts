@@ -345,8 +345,8 @@ export function useVehicleDetail(plate: string, focus?: string, targetCompanyId?
     const nextDocs = pushDocVersion(base, { type: 'vehicle', url, ocr, reason });
     const patch: EntityRecord = { ...fields, _docs: nextDocs, ...(ocrOriginal ? { _ocrOriginal: ocrOriginal } : {}) };
     try {
-      if (v?._key) await commitUpdate({ entity: 'vehicle', sessionCompanyId: companyId, rec: v, key: String(v._key), patch });
-      else await commitSave({ entity: 'vehicle', sessionCompanyId: companyId, rec: v, records: [{ ...base, ...patch, plate }] });
+      if (v?._key) await commitUpdate({ entity: 'vehicle', sessionCompanyId: companyId, rec: v, key: String(v._key), patch, source: 'ocr' });
+      else await commitSave({ entity: 'vehicle', sessionCompanyId: companyId, rec: v, records: [{ ...base, ...patch, plate }], source: 'ocr' });
     } catch { toast(NEED_COMPANY, 'error'); }
   };
 
@@ -355,8 +355,8 @@ export function useVehicleDetail(plate: string, focus?: string, targetCompanyId?
     const nextDocs = pushDocVersion(base, { type: 'insurance', url, ocr, reason });
     const patch: EntityRecord = { ...fields, _docs: nextDocs, ...(ocrOriginal ? { _ocrOriginal: ocrOriginal } : {}) };
     try {
-      if (curIns?._key) await commitUpdate({ entity: 'insurance', sessionCompanyId: companyId, rec: curIns, key: String(curIns._key), patch });
-      else await commitSave({ entity: 'insurance', sessionCompanyId: companyId, rec: v || curIns, records: [{ ...base, ...patch, plate }] });
+      if (curIns?._key) await commitUpdate({ entity: 'insurance', sessionCompanyId: companyId, rec: curIns, key: String(curIns._key), patch, source: 'ocr' });
+      else await commitSave({ entity: 'insurance', sessionCompanyId: companyId, rec: v || curIns, records: [{ ...base, ...patch, plate }], source: 'ocr' });
     } catch { toast(NEED_COMPANY, 'error'); }
   };
 

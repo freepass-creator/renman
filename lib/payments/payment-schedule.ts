@@ -150,7 +150,7 @@ export function distributeEntry<T extends PaymentScheduleInline>(
   // seq → 원본 인덱스 Map (find 반복 회피 — O(N²) → O(N))
   const idxBySeq = new Map<number, number>();
   list.forEach((s, i) => idxBySeq.set(s.seq, i));
-  // 미납 우선 (연체·부분납 → 예정), 같은 카테고리 안에서는 seq 오름차순
+  // 미납 우선 (연체·부분납은 같은 우선순위 → 오래된 회차부터), 그 다음 예정.
   const ordered = [...list].sort((a, b) => {
     const ra = rank(a.status);
     const rb = rank(b.status);
@@ -377,9 +377,8 @@ export function applyPayment<T extends PaymentScheduleInline>(
 }
 
 function rank(status: PaymentSchedule['status']): number {
-  if (status === '연체') return 0;
-  if (status === '부분납') return 1;
-  if (status === '예정') return 2;
-  if (status === '완료') return 3;
-  return 4;
+  if (status === '연체' || status === '부분납') return 0;
+  if (status === '예정') return 1;
+  if (status === '완료') return 2;
+  return 3;
 }

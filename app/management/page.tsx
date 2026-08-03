@@ -197,7 +197,7 @@ export default function ManagementPage() {
         </LedgerActions>
       )}
       view={tabBar}
-      showColView={tab !== '법인'}
+      showColView={tab === '계좌'}
       colView={colView}
       onColView={setColView}
       filters={(

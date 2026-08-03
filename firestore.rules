@@ -16,7 +16,8 @@ service cloud.firestore {
     function tenantOK(companyId) { return isHQ() || (isSignedIn() && myCompany() == companyId); }
     // ★ 민감 컬렉션 — 범용 규칙에서 반드시 제외. 각자의 명시 match만 지배(범용 OR 우회로 권한승격 차단).
     //   users: role 자기승격 방지 · period_locks: 마감 우회 방지 · audit_logs: 위변조 방지
-    //   · company_master: 대외문서에 인쇄되는 법인 신원 위조 방지.
+    //   · company_master: 대외문서에 인쇄되는 법인 신원 위조 방지
+    //   · company_registry: 서버 API에서만 관리하는 관리회사 범위.
     // 문서ID 소유권 — `{companyId}__…` 접두어. companyId 자체에 '__'가 없어야 유효(회사 id는 영숫자 slug).
     function docIdOwnedBy(docId, companyId) {
       return companyId is string
@@ -27,6 +28,7 @@ service cloud.firestore {
     function businessColl(coll) {
       return coll != 'users'
         && coll != 'company_master'
+        && coll != 'company_registry'
         && coll != 'period_locks'
         && coll != 'audit_logs'
         && coll != '_api_rate_limits';
@@ -34,6 +36,11 @@ service cloud.firestore {
 
     // 서버 Admin 전용. 클라이언트는 조회·변조할 수 없다.
     match /_api_rate_limits/{id} {
+      allow read, write: if false;
+    }
+
+    // 목록의 생성·이름변경·보관은 HQ 검증 API만 수행한다(Admin SDK).
+    match /company_registry/{companyId} {
       allow read, write: if false;
     }
 

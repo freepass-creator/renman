@@ -63,7 +63,8 @@ export function collectionTermsLabel(rec?: EntityRecord): string {
     t.legalNotice == null ? '' : `내용증명 D+${t.legalNotice}`,
     t.debtTransfer == null ? '' : `채권전환 D+${t.debtTransfer}`,
   ].filter(Boolean);
-  return parts.length ? parts.join(' · ') : '계약조건 미등록';
+  if (parts.length) return parts.join(' · ');
+  return rec?.collectionTermsReviewedAt ? '확인완료 · 숫자조건 없음' : '계약조건 미등록';
 }
 
 export function engineLockDue(row: { rec: EntityRecord; v: Pick<ContractView, 'ended' | 'overdueDays'> }): boolean {
@@ -111,6 +112,9 @@ export function collectionInfoForReceivable(
   const hasApplicableTerm = candidates.some((x) => x.day != null);
   if (!hasApplicableTerm) {
     if (v.ended) return { stage: '회수대기', tone: 'gray', nextAction: '보증금 정산·잔존채권 확인', overdueDays: d };
+    if (rec?.collectionTermsReviewedAt) {
+      return { stage: '회수대기', tone: 'gray', nextAction: '계약서상 자동조치 없음 · 수동 회수', overdueDays: d };
+    }
     return { stage: '계약조건 확인', tone: 'amber', nextAction: '계약서 연체조항 확인·등록', overdueDays: d };
   }
   return {

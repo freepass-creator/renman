@@ -129,6 +129,20 @@ describe('서버 전용 rate-limit 컬렉션', () => {
   });
 });
 
+describe('관리회사 레지스트리(company_registry) — 서버 API 전용', () => {
+  test('본사 Claim이어도 클라이언트 직접 조회·쓰기는 거부한다', async () => {
+    await assertFails(getDoc(doc(hq(), 'company_registry', 'C1')));
+    await assertFails(setDoc(doc(hq(), 'company_registry', 'C1'), {
+      id: 'C1', label: '주식회사 임의변경', status: 'active',
+    }));
+  });
+  test('법인 사용자도 자기 레지스트리를 직접 수정할 수 없다', async () => {
+    await assertFails(setDoc(doc(staffA(), 'company_registry', 'C1'), {
+      id: 'C1', label: '주식회사 임의변경', status: 'active',
+    }));
+  });
+});
+
 describe('가입(users create) — 셀프가입은 role/companyId 못 심는다', () => {
   test('신규 uid 셀프가입: role/companyId 없이 생성 → 허용', async () => {
     const u = env.authenticatedContext('newbie').firestore();

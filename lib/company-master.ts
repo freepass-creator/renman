@@ -21,10 +21,20 @@ export type OfficialDoc = {
 };
 
 export type CompanyMaster = {
+  registeredNameRaw?: string; // 사업자등록증 상호 원문(표시는 법인격만 제거)
   bizNo?: string;        // 사업자등록번호
   corpNo?: string;       // 법인등록번호
   ceo?: string;          // 대표
   address?: string;      // 본점(사무실) 소재지
+  businessAddress?: string;
+  headquartersAddress?: string;
+  openDate?: string;
+  entityType?: string;
+  industry?: string[];
+  category?: string[];
+  email?: string;
+  taxOffice?: string;
+  businessRegistration?: { fileName?: string; url?: string; uploadedAt?: string; issueDate?: string };
   phone?: string;        // 대표 전화
   garages?: Garage[];    // 차고지(들) — 주소 + 수용대수
   parking?: string[];    // 사무실 주차장(들)

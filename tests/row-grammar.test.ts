@@ -16,7 +16,6 @@ import { WORK_BASIC_COLS, PENALTY_BASIC_COLS } from '@/lib/work-cols';
 import { FLEET_BASIC_COLS } from '@/lib/sheet-cols';
 import { CASH_BASIC_COLS } from '@/lib/finance/cash-cols';
 import { ACCOUNT_BASIC_COLS } from '@/lib/finance/account-cols';
-import { AGENDA_BASIC_COLS } from '@/lib/agenda-cols';
 import { STAFF_COLS } from '@/lib/staff-cols';
 import { RECEIVABLE_BASIC_COLS } from '@/lib/receivables-cols';
 
@@ -33,7 +32,6 @@ const SCREENS: Array<{ name: string; cols: readonly Col[] }> = [
   { name: '운영현황', cols: FLEET_BASIC_COLS as readonly Col[] },
   { name: '자금관리', cols: CASH_BASIC_COLS as readonly Col[] },
   { name: '계좌', cols: ACCOUNT_BASIC_COLS as readonly Col[] },
-  { name: '일정', cols: AGENDA_BASIC_COLS as readonly Col[] },
   { name: '직원(경영관리)', cols: STAFF_COLS as readonly Col[] },
   { name: '미수관리', cols: RECEIVABLE_BASIC_COLS as readonly Col[] },
 ];

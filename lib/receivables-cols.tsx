@@ -4,6 +4,7 @@ import { collectionTermsLabel, type ReceivableRow } from './receivables-ledger';
 import { buildDetailSections, buildSheetViews, type DetailSectionDef, type SheetViewKeys } from './ledger-ext';
 import { LEDGER_EMPTY } from './ledger-empty';
 import { companyLabel } from './companies';
+import { LEDGER_LABEL } from './ledger-labels';
 
 const stageTone = (stage: string): 'gray' | 'amber' | 'orange' | 'red' | 'purple' => {
   if (stage === '채권화') return 'purple';
@@ -30,7 +31,7 @@ export const receivableNextAction = (row: ReceivableRow): string => {
 
 const CATALOG: SheetCol<ReceivableRow>[] = [
   {
-    key: 'company', label: '회사명', pin: true, priority: 2,
+    key: 'company', label: LEDGER_LABEL.company, pin: true, priority: 2,
     render: (r) => r.rec.companyId ? companyLabel(String(r.rec.companyId)) : LEDGER_EMPTY.dash,
     text: (r) => r.rec.companyId ? companyLabel(String(r.rec.companyId)) : '',
   },
@@ -45,12 +46,12 @@ const CATALOG: SheetCol<ReceivableRow>[] = [
     text: (r) => r.st.stage,
   },
   {
-    key: 'customer', label: '고객명', priority: 1,
+    key: 'customer', label: LEDGER_LABEL.contractor, priority: 1,
     render: (r) => String(r.rec.contractorName || LEDGER_EMPTY.none),
     text: (r) => String(r.rec.contractorName || ''),
   },
   {
-    key: 'plate', label: '차량번호', pin: true, priority: 1,
+    key: 'plate', label: LEDGER_LABEL.plate, pin: true, priority: 1,
     render: (r) => <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 700 }}>{String(r.rec.plate || LEDGER_EMPTY.dash)}</span>,
     text: (r) => String(r.rec.plate || ''),
   },
@@ -80,12 +81,12 @@ const CATALOG: SheetCol<ReceivableRow>[] = [
     text: (r) => collectionTermsLabel(r.rec),
   },
   {
-    key: 'contractNo', label: '계약번호', priority: 2,
+    key: 'contractNo', label: LEDGER_LABEL.contractNo, priority: 2,
     render: (r) => String(r.rec.contractNo || LEDGER_EMPTY.dash),
     text: (r) => String(r.rec.contractNo || ''),
   },
   {
-    key: 'phone', label: '연락처', priority: 2,
+    key: 'phone', label: LEDGER_LABEL.phone, priority: 2,
     render: (r) => String(r.rec.contractorPhone || LEDGER_EMPTY.dash),
     text: (r) => String(r.rec.contractorPhone || ''),
   },

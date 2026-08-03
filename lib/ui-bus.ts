@@ -22,21 +22,33 @@ export const openLens = (lens: string) => {
   window.dispatchEvent(new CustomEvent('jpk:navigate', { detail: { href } }));
 };
 export const openCustomer = (key: unknown) => window.dispatchEvent(new CustomEvent('jpk:open-customer', { detail: { key: String(key || '') } }));
-/** 수납매칭 — 입금→계약 파이프 입구. SPA push(CarDrawer jpk:navigate). 풀리로드 금지. */
-export const openPayments = () => {
+/** 수납매칭 — 입금→계약 파이프. 선택 거래가 있으면 화면 이동 뒤에도 이어서 처리한다. */
+export const paymentsHref = (opts?: { transactionId?: unknown; companyId?: unknown }) => {
+  const qs = new URLSearchParams();
+  if (opts?.transactionId) qs.set('tx', String(opts.transactionId));
+  if (opts?.companyId) qs.set('company', String(opts.companyId));
+  return '/payments' + (qs.toString() ? `?${qs.toString()}` : '');
+};
+export const openPayments = (opts?: { transactionId?: unknown; companyId?: unknown }) => {
   if (typeof window === 'undefined') return;
-  window.dispatchEvent(new CustomEvent('jpk:navigate', { detail: { href: '/payments' } }));
+  window.dispatchEvent(new CustomEvent('jpk:navigate', { detail: { href: paymentsHref(opts) } }));
 };
 /** 미수관리 — 회수 큐. */
 export const openReceivables = () => {
   if (typeof window === 'undefined') return;
   window.dispatchEvent(new CustomEvent('jpk:navigate', { detail: { href: '/receivables' } }));
 };
-/** 재무/자금 — /cash (구 /finance 흡수). facet=미분류면 미분류 필터. */
-export const openFinance = (opts?: { unclassified?: boolean }) => {
+/** 재무/자금 — /cash (구 /finance 흡수). 선택 거래가 있으면 1차 분류 패널까지 이어서 연다. */
+export const financeHref = (opts?: { unclassified?: boolean; transactionId?: unknown; companyId?: unknown }) => {
+  const qs = new URLSearchParams();
+  if (opts?.unclassified) qs.set('facet', '미분류');
+  if (opts?.transactionId) qs.set('tx', String(opts.transactionId));
+  if (opts?.companyId) qs.set('company', String(opts.companyId));
+  return '/cash' + (qs.toString() ? `?${qs.toString()}` : '');
+};
+export const openFinance = (opts?: { unclassified?: boolean; transactionId?: unknown; companyId?: unknown }) => {
   if (typeof window === 'undefined') return;
-  const href = opts?.unclassified ? '/cash?facet=미분류' : '/cash';
-  window.dispatchEvent(new CustomEvent('jpk:navigate', { detail: { href } }));
+  window.dispatchEvent(new CustomEvent('jpk:navigate', { detail: { href: financeHref(opts) } }));
 };
 // 문서 인쇄 오버레이(내용증명 등) — 라우트 없이 전역 PrintHost로
 // contractKeys = 내용증명 일괄(N건 한 오버레이·페이지브레이크)

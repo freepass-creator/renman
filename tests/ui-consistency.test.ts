@@ -80,7 +80,8 @@ describe('UI 공용 원자 규격', () => {
     expect(violations).toEqual([]);
 
     const frame = readFileSync(join(root, 'components/ui/ledger-frame.tsx'), 'utf8');
-    expect(frame).toContain("(!mobile && showColView");
+    expect(frame).toContain('const colViewControl = !mobile && showColView');
+    expect(frame).toContain('view != null && colViewControl != null');
   });
 
   it('일반 실행 버튼을 페이지에서 새로 손조립하지 않는다', () => {

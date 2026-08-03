@@ -109,7 +109,7 @@ export type ContractMasterRow = {
   /** computeOverMileage 소비값 — 재계산 금지. 산출불가/한도없음이면 null. */
   drivenKm: number | null; allowedKm: number | null; excessKm: number | null;
   overMileageFee: number | null; overMileageBasis: string;
-  monthlyRent: number; deposit: number; reservationFee: number;
+  monthlyRent: number; deposit: number; depositReceived: number | null; depositReceivedDate: string; reservationFee: number;
   paymentDay: number; paymentTiming: string; paymentMethod: string;
   driverAgeMin: number; driverAge: number; insuranceAge: number;
   lateFeeRate: number; earlyTerminationRate: number;
@@ -149,7 +149,8 @@ export function contractMasterRow(raw: EntityRecord, today: string): ContractMas
     overMileageFee: computable ? om.fee : null,
     overMileageBasis: om.basis,
     monthlyRent: view.monthlyRent,
-    deposit: num(raw.deposit), reservationFee: num(raw.reservationFee),
+    deposit: num(raw.deposit), depositReceived: numOrNull(raw.depositReceived),
+    depositReceivedDate: str(raw.depositReceivedDate), reservationFee: num(raw.reservationFee),
     paymentDay: num(raw.paymentDay), paymentTiming: paymentTimingOf(raw.paymentTiming),
     paymentMethod: str(raw.paymentMethod), driverAgeMin: num(raw.driverAgeMin),
     driverAge: num(raw.driverAge), insuranceAge: num(raw.insuranceAge),

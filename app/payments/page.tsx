@@ -6,9 +6,9 @@
  *   · 적용 = 계약 _payments append(computeContractView가 흡수→미수 자동감소) + bank_tx matched 표시.
  *   · 안전: high 신뢰만 제안 · operator 체크 확인 후 적용 · 이중적용 가드 · 매칭은 미수를 줄이기만(허위미수 불가) · 감사 자동기록.
  */
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSession } from '@/lib/session';
-import { openCar, openCustomer, openReceivables } from '@/lib/ui-bus';
+import { openCar, openCustomer, openFinance, openReceivables } from '@/lib/ui-bus';
 import { customerKey } from '@/lib/customers';
 import { companyLabel } from '@/lib/companies';
 import { type EntityRecord } from '@/lib/intake/entities';
@@ -34,10 +34,15 @@ import { useConfirm } from '@/components/ui/confirm';
 import { buildMatchBacklog, type MatchBacklogScope } from '@/lib/payments/match-proposal';
 import { buildCashLedger } from '@/lib/finance/cash-ledger';
 import { calculateCashDaily } from '@/lib/finance/cash-daily';
-import { reducesReceivable } from '@/lib/finance/cash-rules';
+import { isDepositReceiptCategory, reducesReceivable, requiresContractLink, requiresExpenseEvidence } from '@/lib/finance/cash-rules';
+import { appendDepositReceipt, listDepositReceipts, removeDepositReceipt } from '@/lib/payments/deposit-receipts';
+import { buildManualReceiptEntries, manualReceiptPlanLabel, planManualReceiptAllocation } from '@/lib/payments/manual-receipt-allocation';
 import { CashDailyClose } from '@/components/CashDailyClose';
 import { isUnclassified, LEDGER_SUBJECTS } from '@/lib/payments/ledger-subjects';
 import { DocUpload, type DocUploadResult } from '@/components/ui/doc-upload';
+import { reviewInternalTransfers } from '@/lib/finance/internal-transfer';
+import { relatedExpenseEvidenceRows } from '@/lib/finance/evidence-group';
+import { cashBundleReviewStatus, requiresLoanRepaymentSplit } from '@/lib/finance/cash-bundle';
 
 const CONF_TONE: Record<string, BadgeTone> = { high: 'green', medium: 'amber', low: 'gray' };
 const EMPTY = new Set<string>();
@@ -57,6 +62,15 @@ function toBankTx(rec: EntityRecord): BankTransaction {
     method,
     companyCode: String(rec.companyId || ''),
     matchedContractId: rec.matchedContractId ? String(rec.matchedContractId) : undefined,
+    matchedKind: rec.matchedKind === 'receivable' || rec.matchedKind === 'deposit' ? rec.matchedKind : undefined,
+    matchedScheduleSeq: rec.matchedScheduleSeq != null ? Number(rec.matchedScheduleSeq) : undefined,
+    matchedScheduleAllocations: Array.isArray(rec.matchedScheduleAllocations)
+      ? rec.matchedScheduleAllocations.map((allocation) => ({
+          seq: Number((allocation as Record<string, unknown>).seq) || 0,
+          amount: Number((allocation as Record<string, unknown>).amount) || 0,
+        })).filter((allocation) => allocation.seq > 0 && allocation.amount > 0)
+      : undefined,
+    matchedUnappliedAmount: rec.matchedUnappliedAmount != null ? Number(rec.matchedUnappliedAmount) : undefined,
     settlementId: rec.settlementId ? String(rec.settlementId) : undefined,
     settlementRole: rec.settlementRole === 'deposit' || rec.settlementRole === 'item' ? rec.settlementRole : undefined,
     settlementGrossAmount: rec.settlementGrossAmount != null ? Number(rec.settlementGrossAmount) : undefined,
@@ -93,6 +107,7 @@ export default function PaymentsPage() {
   const [matchScope, setMatchScope] = useState<MatchBacklogScope>('all');
   const [pendingVisible, setPendingVisible] = useState(60);
   const [evidenceRowId, setEvidenceRowId] = useState('');
+  const focusHandled = useRef(false);
   const [order, reorder] = useSecOrder('jpk:order:payments', [...PAY_SECS]);
   const toggleFacet = (label: string) => setFacets((s) => {
     const n = new Set(s);
@@ -113,20 +128,27 @@ export default function PaymentsPage() {
     return date > latest ? date : latest;
   }, ''), [txs]);
   const cashRows = useMemo(() => buildCashLedger(txs, cardTxs), [txs, cardTxs]);
+  const internalTransferReview = useMemo(() => reviewInternalTransfers(cashRows), [cashRows]);
+  const unpairedTransferIds = useMemo(
+    () => new Set(internalTransferReview.unpairedRows.map((row) => row.id)),
+    [internalTransferReview],
+  );
   const daily = useMemo(() => calculateCashDaily(cashRows, journalDate, 0), [cashRows, journalDate]);
   const dailyWorkRows = useMemo(() => cashRows.filter((row) =>
     row.date.slice(0, 10) === journalDate
     && row.nest !== 'cms-item' && row.nest !== 'cms-pending' && row.nest !== 'card-item'
-    && ((row.nest === 'bundle-parent' && String(row.raw.bundleReviewStatus || '') !== '대사완료')
+    && ((cashBundleReviewStatus(row) === '미완료')
       || (row.nest !== 'bundle-parent' && isUnclassified(row.category))
-      || (row.outAmt > 0 && !row.raw.documentId && !row.raw.evidenceUrl))),
-  [cashRows, journalDate]);
+      || (row.outAmt > 0 && requiresExpenseEvidence(row.category) && !row.raw.documentId && !row.raw.evidenceUrl)
+      || Number(row.raw.matchedUnappliedAmount) > 0
+      || unpairedTransferIds.has(row.id))),
+  [cashRows, journalDate, unpairedTransferIds]);
   const datedBank = useMemo(() => allBank.filter((t) => t.txDate.slice(0, 10) === journalDate), [allBank, journalDate]);
   const txCategoryByKey = useMemo(() => new Map(txs.map((record) => [recordScopeKey(record), String(record.category || record.subject || '')])), [txs]);
   // 일일 현황의 매칭 완료는 기준일만, 미처리 대기열은 별도 범위(선택일/30일/전체)로 본다.
   const datedDeposits = useMemo(() => datedBank.filter((t) =>
     t.amount > 0 && !(t.withdraw && t.withdraw > 0) && t.settlementRole !== 'deposit'
-    && reducesReceivable(txCategoryByKey.get(txScopeKey(t)))),
+    && requiresContractLink(txCategoryByKey.get(txScopeKey(t)))),
   [datedBank, txCategoryByKey]);
   const matched = datedDeposits.filter((t) => t.matchedContractId)
     .sort((a, b) => b.txDate.localeCompare(a.txDate) || b.id.localeCompare(a.id));
@@ -252,6 +274,7 @@ export default function PaymentsPage() {
               entity: 'bank_tx', sessionCompanyId: companyId, rec: trec, key: String(trec._key),
               patch: {
                 matchedContractId: ckey, matchedScheduleSeq: r.candidate.scheduleSeq, matchedAt: new Date().toISOString(),
+                matchedKind: 'receivable',
                 subject: '대여료수입', category: '대여료수입', matchProposalState: '', matchProposalReason: '', matchProposalCount: 0,
               },
             },
@@ -279,6 +302,8 @@ export default function PaymentsPage() {
     const trec = txs.find((r) => recordScopeKey(r) === txScopeKey(t));
     if (!trec) return;
     const crec = cs.find((r) => String(r._key) === String(t.matchedContractId));
+    const depositReceipt = String(trec.matchedKind || '') === 'deposit'
+      || !!crec && listDepositReceipts(crec).some((receipt) => receipt.txId === t.id);
     /* ★쓰기 순서 = bank_tx → contract (apply와 동일 규칙).
        commitAll은 트랜잭션이 아니라 앞선 쓰기가 남는다. 계약을 먼저 쓰면 부분 실패 시
        «수납은 지워졌는데 입금은 여전히 매칭 상태» = 미수가 잘못 늘고 되돌릴 버튼도 없다.
@@ -288,21 +313,26 @@ export default function PaymentsPage() {
       if (!resolveWriteCompany(companyId, trec)) { toast(NEED_COMPANY, 'error'); return false; }
       ops.push({
         entity: 'bank_tx', sessionCompanyId: companyId, rec: trec, key: String(trec._key),
-        patch: { matchedContractId: '', matchedScheduleSeq: '', matchedAt: '', subject: '', category: '' },
+        // 연결 해제는 귀속만 되돌린다. 1차 분류(계정과목)는 별도 판단 원자이므로 보존한다.
+        patch: {
+          matchedContractId: '', matchedScheduleSeq: '', matchedScheduleAllocations: [],
+          matchedUnappliedAmount: 0, matchedAt: '', matchedKind: '',
+        },
       });
       if (crec) {
-        const existing = Array.isArray(crec._payments) ? (crec._payments as Array<Record<string, unknown>>) : [];
         if (!resolveWriteCompany(companyId, crec)) { toast(NEED_COMPANY, 'error'); return false; }
         ops.push({
           entity: 'contract', sessionCompanyId: companyId, rec: crec, key: String(crec._key),
-          patch: { _payments: existing.filter((p) => p.txId !== t.id) },
+          patch: depositReceipt
+            ? removeDepositReceipt(crec, t.id)
+            : { _payments: (Array.isArray(crec._payments) ? (crec._payments as Array<Record<string, unknown>>) : []).filter((p) => p.txId !== t.id) },
         });
       }
       await commitAll(ops);
     });
     // ★실패했는데 «해제됨»이라고 말하면 안 된다(서버 마감·권한 거부가 조용히 삼켜졌다).
     if (!ok) { reload(); return; }
-    toast('매칭 해제 — 미수 원복', 'info'); reload();
+    toast(depositReceipt ? '계약 귀속 해제 — 보증금 수령액 원복' : '매칭 해제 — 미수 원복', 'info'); reload();
   }
 
   async function manualMatch(t: BankTransaction, crec: EntityRecord) {
@@ -310,6 +340,36 @@ export default function PaymentsPage() {
     if (lr) { toast(lr, 'error'); return; }
     const trec = txs.find((r) => recordScopeKey(r) === txScopeKey(t));
     if (!trec || trec.matchedContractId) { toast('이미 처리된 입금', 'info'); return; }
+    const depositReceipt = isDepositReceiptCategory(trec.category || trec.subject);
+    const contractLabel = [crec.contractorName, crec.plate, crec.contractNo].filter(Boolean).join(' · ') || '선택 계약';
+    if (depositReceipt) {
+      if (!(await confirm({
+        title: '보증금 계약 귀속 확인',
+        message: `${t.txDate} · ${t.counterparty || '적요 없음'} · ${won(t.amount)}\n→ ${contractLabel}\n\n보증금 실수령액에만 반영하며 대여료 미수는 차감하지 않습니다.`,
+        confirmLabel: '계약 귀속',
+      }))) return;
+      const co = resolveWriteCompany(companyId, crec);
+      const txCo = resolveWriteCompany(companyId, trec);
+      if (!co || !txCo) { toast(NEED_COMPANY, 'error'); return; }
+      const contractPatch = appendDepositReceipt(crec, {
+        txId: t.id, date: t.txDate, amount: t.amount, source: t.source || t.method || '계좌',
+      });
+      try {
+        await commitAll([
+          {
+            entity: 'bank_tx', sessionCompanyId: companyId, rec: trec, key: String(trec._key),
+            patch: {
+              matchedContractId: String(crec._key), matchedScheduleSeq: '', matchedAt: new Date().toISOString(),
+              matchedKind: 'deposit', matchProposalState: '', matchProposalReason: '', matchProposalCount: 0,
+            },
+          },
+          { entity: 'contract', sessionCompanyId: companyId, rec: crec, key: String(crec._key), patch: contractPatch },
+        ]);
+        toast(`${String(crec.contractorName || '')} · 보증금 ${won(t.amount)} 귀속 — 대여료 미수 차감 없음`, 'success');
+      } catch { toast('보증금 계약 귀속 실패', 'error'); }
+      setManualTx(null); setMq(''); reload();
+      return;
+    }
     const existing = Array.isArray(crec._payments) ? (crec._payments as Array<Record<string, unknown>>) : [];
     if (existing.some((p) => p.txId === t.id)) { toast('이미 연결됨', 'info'); return; }
     // ★현장에서 현금·카드로 이미 받아 기록한 돈일 수 있다 — 연결하면 미수가 두 번 차감된다.
@@ -322,11 +382,22 @@ export default function PaymentsPage() {
       confirmLabel: '연결', danger: true,
     }))) return;
     const mc = buildMatchContract(crec, TODAY);
-    const unpaid = (mc.schedules ?? []).filter((s: { status: string }) => s.status !== '완료') as Array<{ seq: number }>;
-    const seq = unpaid.length ? unpaid[0].seq : existing.length + 1;
+    const allocationPlan = planManualReceiptAllocation(mc.schedules ?? [], t.amount, t.txDate);
+    if (allocationPlan.allocations.length === 0) {
+      toast('배분 가능한 회차가 없습니다. 계약의 시작일·기간·월대여료를 먼저 확인하세요.', 'error');
+      return;
+    }
+    const allocationLabel = manualReceiptPlanLabel(allocationPlan);
+    if (!(await confirm({
+      title: '입금 매칭 확인',
+      message: `${t.txDate} · ${t.counterparty || '적요 없음'} · ${won(t.amount)}\n→ ${contractLabel}\n→ ${allocationLabel}\n\n여러 회차 입금은 오래된 미납부터 나누고, 남는 금액은 과오납·미배분으로 보존합니다.`,
+      confirmLabel: '입금 매칭',
+    }))) return;
     const co = resolveWriteCompany(companyId, crec);
     const txCo = resolveWriteCompany(companyId, trec);
     if (!co || !txCo) { toast(NEED_COMPANY, 'error'); return; }
+    const matchedAt = new Date().toISOString();
+    const paymentEntries = buildManualReceiptEntries(allocationPlan, { txId: t.id, txDate: t.txDate, matchedAt });
     try {
       /* ★쓰기 순서 = bank_tx → contract. apply()가 못박은 규칙과 같아야 한다.
          계약을 먼저 쓰면 bank_tx 실패 시(서버 회계마감 거부 등) «미수는 깎였는데 입금은 미매칭»이 되고,
@@ -336,16 +407,21 @@ export default function PaymentsPage() {
         {
           entity: 'bank_tx', sessionCompanyId: companyId, rec: trec, key: String(trec._key),
           patch: {
-            matchedContractId: String(crec._key), matchedScheduleSeq: seq, matchedAt: new Date().toISOString(),
+            matchedContractId: String(crec._key),
+            matchedScheduleSeq: allocationPlan.allocations[0]?.seq,
+            matchedScheduleAllocations: allocationPlan.allocations.map(({ seq, amount }) => ({ seq, amount })),
+            matchedUnappliedAmount: allocationPlan.unappliedAmount,
+            matchedAt,
+            matchedKind: 'receivable',
             subject: '대여료수입', category: '대여료수입', matchProposalState: '', matchProposalReason: '', matchProposalCount: 0,
           },
         },
         {
           entity: 'contract', sessionCompanyId: companyId, rec: crec, key: String(crec._key),
-          patch: { _payments: [...existing, { seq, date: t.txDate, amount: t.amount, source: '계좌', txId: t.id, manual: true }] },
+          patch: { _payments: [...existing, ...paymentEntries] },
         },
       ]);
-      toast(`${String(crec.contractorName || '')} · ${won(t.amount)} 연결 — 미수 반영`, 'success');
+      toast(`${String(crec.contractorName || '')} · ${won(t.amount)} 연결 — ${allocationLabel}`, 'success');
     } catch { toast('연결 실패', 'error'); }
     setManualTx(null); setMq(''); reload();
   }
@@ -358,6 +434,59 @@ export default function PaymentsPage() {
         ? [c.contractorName, c.plate, c.contractNo, c.contractorPhone].some((f) => mNorm(f).includes(mNorm(mq)))
         : proposedContractIds.has(String(c._key)))).slice(0, 8)
     : [];
+
+  useEffect(() => {
+    if (focusHandled.current || loading || typeof window === 'undefined') return;
+    const params = new URLSearchParams(window.location.search);
+    const txId = params.get('tx') || '';
+    const requestedCompany = params.get('company') || '';
+    if (!txId) { focusHandled.current = true; return; }
+
+    const target = allBank.find((tx) => tx.id === txId && (!requestedCompany || String(tx.companyCode || '') === requestedCompany));
+    focusHandled.current = true;
+    if (!target) {
+      setMsg('자금관리에서 선택한 거래를 현재 회사 범위에서 찾을 수 없습니다.');
+      return;
+    }
+
+    const targetKey = txScopeKey(target);
+    setMatchScope('all');
+    if (target.txDate) setJournalDate(target.txDate.slice(0, 10));
+    const reveal = (id: string) => window.setTimeout(() => {
+      document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 80);
+
+    if (target.matchedContractId) {
+      setFacets(new Set(['매칭됨']));
+      setMsg('자금관리에서 선택한 입금의 계약 귀속 결과입니다.');
+      reveal('pay-matched');
+      return;
+    }
+
+    const backlogRow = matchBacklog.find((row) => txScopeKey(row.tx) === targetKey);
+    if (!backlogRow) {
+      setMsg('선택 거래는 계약 수납 대상이 아닙니다. 자금관리에서 계정과목을 다시 확인하세요.');
+      return;
+    }
+    if (backlogRow.automatic) {
+      setFacets(new Set(['매칭제안']));
+      setSel(new Set([targetKey]));
+      setMsg('자금관리에서 선택한 입금의 안전후보 1건을 표시했습니다. 계약·회차 확인 후 적용하세요.');
+      reveal('pay-match');
+      return;
+    }
+
+    const targetIndex = unmatchedPending.findIndex((tx) => txScopeKey(tx) === targetKey);
+    if (targetIndex >= 0) setPendingVisible((count) => Math.max(count, targetIndex + 1));
+    const raw = txs.find((record) => recordScopeKey(record) === targetKey);
+    setFacets(new Set(['미매칭']));
+    setManualTx(target);
+    setMq(String(raw?.plate || raw?.renter || target.counterparty || ''));
+    setMsg(isDepositReceiptCategory(raw?.category || raw?.subject)
+      ? '자금관리에서 선택한 보증금의 계약 귀속을 이어서 표시했습니다. 대여료 미수는 차감하지 않습니다.'
+      : '자금관리에서 선택한 입금의 수동 계약 연결을 이어서 표시했습니다.');
+    reveal('pay-pending');
+  }, [allBank, loading, matchBacklog, txs, unmatchedPending]);
 
   const selCount = displayResults.filter((r) => sel.has(txScopeKey(r.tx))).length;
   const cmsSelCount = cmsResults ? cmsResults.filter((c) => cmsSel.has(cmsScopeKey(c))).length : 0;
@@ -384,23 +513,30 @@ export default function PaymentsPage() {
   async function attachDailyEvidence(row: (typeof cashRows)[number], result: DocUploadResult) {
     if (!result.url) return;
     if (!resolveWriteCompany(companyId, row.raw)) { toast(NEED_COMPANY, 'error'); return; }
+    const relatedRows = relatedExpenseEvidenceRows(cashRows, row);
+    const evidenceGroupId = relatedRows.length > 1
+      ? `${row.companyId}:${row.date.slice(0, 10)}:${row.recKey}`
+      : '';
     const ok = await safeRun(async () => {
-      await commitUpdate({
-        entity: row.entity,
+      const attachedAt = new Date().toISOString();
+      await commitAll(relatedRows.map((related) => ({
+        entity: related.entity,
         sessionCompanyId: companyId,
-        rec: row.raw,
-        key: row.recKey,
+        rec: related.raw,
+        key: related.recKey,
         patch: {
           evidenceUrl: result.url,
           evidenceFileName: result.file.name,
-          evidenceAttachedAt: new Date().toISOString(),
+          evidenceAttachedAt: attachedAt,
           evidenceAttachedBy: user.email,
+          evidenceGroupId,
+          evidenceGroupCount: relatedRows.length,
         },
-      });
+      })));
     });
     if (!ok) return;
     setEvidenceRowId('');
-    toast(`${row.party || '거래'} · 증빙 연결 완료`, 'success');
+    toast(`${row.party || '거래'} · ${relatedRows.length > 1 ? `${relatedRows.length}건 증빙 함께 연결` : '증빙 연결 완료'}`, 'success');
     reload();
   }
 
@@ -439,9 +575,11 @@ export default function PaymentsPage() {
                 <Metric label="입금" value={won(daily.inflow)} tone="ok" />
                 <Metric label="출금" value={won(daily.outflow)} tone="ink" />
                 <Metric label="미분류" value={`${daily.unclassifiedCount}건`} tone={daily.unclassifiedCount ? 'danger' : 'ok'} />
-                <Metric label="묶음 미완료" value={`${daily.bundleIncompleteCount}건`} tone={daily.bundleIncompleteCount ? 'warn' : 'ok'} />
+                <Metric label="분해 미완료" value={`${daily.bundleIncompleteCount}건`} tone={daily.bundleIncompleteCount ? 'warn' : 'ok'} />
                 <Metric label="증빙 누락" value={`${daily.missingEvidenceCount}건`} tone={daily.missingEvidenceCount ? 'warn' : 'ok'} />
                 <Metric label="계약 미연결" value={`${daily.unmatchedContractCount}건`} tone={daily.unmatchedContractCount ? 'warn' : 'ok'} />
+                <Metric label="과오납·미배분" value={daily.unappliedReceiptAmount ? won(daily.unappliedReceiptAmount) : '0건'} tone={daily.unappliedReceiptCount ? 'danger' : 'ok'} />
+                <Metric label="이체 짝 미확인" value={`${daily.unpairedTransferCount}건`} tone={daily.unpairedTransferCount ? 'danger' : 'ok'} />
                 <Metric label="안전후보" value={`${displayResults.length}건`} tone={displayResults.length ? 'ok' : 'ink'} />
                 <Metric label="수동검토" value={`${reviewProposalCount}건`} tone={reviewProposalCount ? 'warn' : 'ok'} />
                 <Metric label="후보없음" value={`${noProposalCount}건`} tone={noProposalCount ? 'warn' : 'ok'} />
@@ -457,23 +595,31 @@ export default function PaymentsPage() {
         }
         if (id === 'pay-review') {
           return (
-            <Sec key={id} id={id} title="미완료 처리" n={dailyWorkRows.length} desc="계정과목 확정 · 지출 증빙 확인 · 완료되지 않은 건은 일마감 차단" hideable={false} onReorder={reorder} right={<WorkPipe to="finance" />}>
-              {dailyWorkRows.length === 0 ? <EmptyState>미분류·증빙 누락 없음</EmptyState> : (
+            <Sec key={id} id={id} title="미완료 처리" n={dailyWorkRows.length} desc="계정과목 확정 · 증빙 확인 · 과오납 재검토 · 완료되지 않은 건은 일마감 차단" hideable={false} onReorder={reorder} right={<WorkPipe to="finance" />}>
+              {dailyWorkRows.length === 0 ? <EmptyState>미분류·분해 미완료·증빙 누락·과오납 미배분 없음</EmptyState> : (
                 <ListBox>
                   {dailyWorkRows.map((row) => {
-                    const bundleIncomplete = row.nest === 'bundle-parent' && String(row.raw.bundleReviewStatus || '') !== '대사완료';
+                    const bundleIncomplete = cashBundleReviewStatus(row) === '미완료';
+                    const loanSplitIncomplete = bundleIncomplete
+                      && (requiresLoanRepaymentSplit(row.category) || String(row.raw.bundleType || '') === '할부·리스상환');
                     const missingCategory = !bundleIncomplete && isUnclassified(row.category);
-                    const missingEvidence = row.outAmt > 0 && !row.raw.documentId && !row.raw.evidenceUrl;
+                    const missingEvidence = row.outAmt > 0 && requiresExpenseEvidence(row.category) && !row.raw.documentId && !row.raw.evidenceUrl;
+                    const unappliedReceipt = Math.max(0, Number(row.raw.matchedUnappliedAmount) || 0);
+                    const unpairedTransfer = unpairedTransferIds.has(row.id);
+                    const evidenceGroup = missingEvidence ? relatedExpenseEvidenceRows(cashRows, row) : [];
                     const evidenceOpen = evidenceRowId === row.id;
                     return (
                       <div key={row.id}>
                         <ListRow
-                          badge={bundleIncomplete ? '묶음미완료' : missingCategory ? '미분류' : '증빙누락'}
-                          badgeTone={missingCategory ? 'red' : 'amber'}
+                          badge={loanSplitIncomplete ? '원리금미분해' : bundleIncomplete ? '묶음미완료' : missingCategory ? '미분류' : unappliedReceipt ? '과오납미배분' : unpairedTransfer ? '이체짝없음' : '증빙누락'}
+                          badgeTone={missingCategory || unappliedReceipt || unpairedTransfer ? 'red' : 'amber'}
                           main={`${scopeAll ? companyLabel(row.companyId) + ' · ' : ''}${row.party || row.memo || '(상대 미상)'}`}
-                          sub={`${row.accountName || row.account || '계좌 미확인'} · ${row.inAmt > 0 ? `입금 ${won(row.inAmt)}` : `출금 ${won(row.outAmt)}`}${missingEvidence ? ' · 증빙 연결 필요' : ''}`}
+                          sub={`${row.accountName || row.account || '계좌 미확인'} · ${row.inAmt > 0 ? `입금 ${won(row.inAmt)}` : `출금 ${won(row.outAmt)}`}${unappliedReceipt ? ` · 과오납·미배분 ${won(unappliedReceipt)}` : ''}${unpairedTransfer ? ' · 반대편 입출금 확인 필요' : ''}${missingEvidence ? ' · 증빙 연결 필요' : ''}`}
                           right={<span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                            {bundleIncomplete ? <Badge tone="amber">자금관리에서 분해</Badge> : missingCategory ? (
+                            {bundleIncomplete ? <Btn size="sm" variant="solid" onClick={() => openFinance({
+                              transactionId: row.recKey,
+                              companyId: row.companyId,
+                            })}>{loanSplitIncomplete ? '원금·이자 분해' : '묶음 분해'}</Btn> : missingCategory ? (
                               <Select
                                 size="sm"
                                 aria-label={`${row.party || '거래'} 계정과목`}
@@ -487,14 +633,24 @@ export default function PaymentsPage() {
                                   .map((subject) => <option key={subject.code} value={subject.label}>{subject.label}</option>)}
                               </Select>
                             ) : null}
-                            {missingEvidence ? <Btn size="sm" variant={evidenceOpen ? 'solid' : 'ghost'} onClick={() => setEvidenceRowId(evidenceOpen ? '' : row.id)}>{evidenceOpen ? '닫기' : '증빙 연결'}</Btn> : null}
+                            {missingEvidence ? <Btn size="sm" variant={evidenceOpen ? 'solid' : 'ghost'} onClick={() => setEvidenceRowId(evidenceOpen ? '' : row.id)}>{evidenceOpen ? '닫기' : evidenceGroup.length > 1 ? `${evidenceGroup.length}건 증빙 연결` : '증빙 연결'}</Btn> : null}
+                            {unappliedReceipt ? <Btn size="sm" variant="solid" onClick={() => {
+                              setFacets(new Set(['매칭됨']));
+                              window.setTimeout(() => document.getElementById('pay-matched')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 30);
+                            }}>매칭 재검토</Btn> : null}
+                            {unpairedTransfer ? <Btn size="sm" variant="solid" onClick={() => openFinance({
+                              transactionId: row.recKey,
+                              companyId: row.companyId,
+                            })}>자금관리 확인</Btn> : null}
                           </span>}
                         />
                         {evidenceOpen ? (
                           <div style={{ padding: '10px 14px 14px 28px', borderBottom: `1px solid ${C.line}` }}>
                             <DocUpload
                               storeAt={{ company: row.companyId, entity: row.entity, key: row.recKey }}
-                              hint="영수증·세금계산서·거래명세서 · PDF/JPG/PNG"
+                              hint={evidenceGroup.length > 1
+                                ? `같은 날·계좌·상대방 ${evidenceGroup.length}건에 함께 연결 · PDF/JPG/PNG`
+                                : '영수증·세금계산서·거래명세서 · PDF/JPG/PNG'}
                               onDone={(result) => void attachDailyEvidence(row, result)}
                             />
                           </div>
@@ -569,12 +725,19 @@ export default function PaymentsPage() {
         if (id === 'pay-matched') {
           if (matched.length === 0) return null;
           return (
-            <Sec key={id} id={id} title="매칭된 입금" n={matched.length} desc="계약 회차에 붙은 입금 — 잘못 붙었으면 해제(미수 원복)" hideable={false} onReorder={reorder}>
+            <Sec key={id} id={id} title="계약 귀속 완료" n={matched.length} desc="대여료는 회차·미수에 반영 · 보증금은 수령액에만 반영 · 잘못 붙었으면 해제" hideable={false} onReorder={reorder}>
               <ListBox>
                 {matched.slice(0, 60).map((t) => {
                   const crec = contractRecordFor(String(t.companyCode || ''), String(t.matchedContractId));
                   const plate = crec ? String(crec.plate || '') : '';
                   const ck = crec ? customerKey(crec.contractorName, crec.contractorPhone) : '';
+                  const isDepositReceipt = isDepositReceiptCategory(txCategoryByKey.get(txScopeKey(t)));
+                  const allocationText = !isDepositReceipt && t.matchedScheduleAllocations?.length
+                    ? t.matchedScheduleAllocations.map((allocation) => `${allocation.seq}회차 ${won(allocation.amount)}`).join(' + ')
+                    : '';
+                  const unappliedText = !isDepositReceipt && Number(t.matchedUnappliedAmount) > 0
+                    ? `과오납·미배분 ${won(Number(t.matchedUnappliedAmount))}`
+                    : '';
                   return (
                     <ListRow
                       key={txScopeKey(t)}
@@ -585,12 +748,15 @@ export default function PaymentsPage() {
                           <TextLink disabled={!ck} onClick={() => { if (ck) openCustomer(ck); }}>{String(crec.contractorName || '')}</TextLink>
                           {' · '}
                           <TextLink mono disabled={!plate} onClick={() => { if (plate) openCar(plate, 'unpaid'); }}>{plate}</TextLink>
+                          {isDepositReceipt ? ' · 보증금(미수 차감 없음)' : ''}
+                          {allocationText ? ` · ${allocationText}` : ''}
+                          {unappliedText ? ` · ${unappliedText}` : ''}
                         </span>
                       ) : String(t.matchedContractId)}
                       right={<span style={{ display: 'inline-flex', alignItems: 'center', gap: SPACE_M }}>
                         <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 700 }}>{won(t.amount)}</span>
                         <Btn size="sm" variant="ghost"
-                          tip={`${t.txDate} ${t.counterparty || '적요 없음'} ${won(t.amount)} 매칭 해제`}
+                          tip={`${t.txDate} ${t.counterparty || '적요 없음'} ${won(t.amount)} ${isDepositReceipt ? '보증금 귀속' : '수납 매칭'} 해제`}
                           onClick={() => unmatch(t)}>해제</Btn>
                       </span>}
                     />
@@ -611,6 +777,7 @@ export default function PaymentsPage() {
                       const suggested = displayResults.some((r) => r.tx.id === t.id);
                       const proposal = proposalById.get(txScopeKey(t));
                       const open = manualTx ? txScopeKey(manualTx) === txScopeKey(t) : false;
+                      const isDepositReceipt = isDepositReceiptCategory(txCategoryByKey.get(txScopeKey(t)));
                       return (
                         <div key={txScopeKey(t)}>
                           <ListRow
@@ -619,8 +786,8 @@ export default function PaymentsPage() {
                             right={<span style={{ display: 'inline-flex', alignItems: 'center', gap: SPACE_M, opacity: suggested ? 0.55 : 1 }}>
                               <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 700 }}>{won(t.amount)}</span>
                               <Btn size="sm" variant={open ? 'solid' : 'ghost'}
-                                tip={`${t.txDate} ${t.counterparty || '적요 없음'} ${won(t.amount)} ${open ? '연결창 닫기' : '계약 연결'}`}
-                                onClick={() => { if (open) { setManualTx(null); setMq(''); } else { setManualTx(t); setMq(''); } }}>{open ? '닫기' : '연결'}</Btn>
+                                tip={`${t.txDate} ${t.counterparty || '적요 없음'} ${won(t.amount)} ${open ? '연결창 닫기' : isDepositReceipt ? '보증금 계약 귀속' : '계약 연결'}`}
+                                onClick={() => { if (open) { setManualTx(null); setMq(''); } else { setManualTx(t); setMq(''); } }}>{open ? '닫기' : isDepositReceipt ? '계약 귀속' : '연결'}</Btn>
                             </span>}
                           />
                           {open && (
@@ -632,13 +799,23 @@ export default function PaymentsPage() {
                                     <ListBox>
                                       {mCands.map((c) => {
                                         const v = computeContractView(c, TODAY);
+                                        const contractIdentity = [c.plate || '차량 미지정', c.contractNo || '계약번호 미지정', v.status || '상태 미지정'].join(' · ');
                                         return (
                                           <ListRow
                                             key={String(c._key)}
                                             main={String(c.contractorName || '—')}
-                                            sub={String(c.plate || '')}
-                                            right={v.net > 0 ? <span style={{ fontSize: 11.5, color: C.danger, fontWeight: 700 }}>미수 {won(v.net)}</span> : <span style={{ fontSize: 11, color: C.faint }}>미수없음</span>}
-                                            onClick={() => manualMatch(t, c)}
+                                            sub={contractIdentity}
+                                            right={<span style={{ display: 'inline-flex', alignItems: 'center', gap: SPACE_M }}>
+                                              {v.net > 0
+                                                ? <span style={{ fontSize: 11.5, color: C.danger, fontWeight: 700 }}>미수 {won(v.net)} · {v.count}회차</span>
+                                                : <span style={{ fontSize: 11, color: C.faint }}>미수없음</span>}
+                                              <Btn
+                                                size="sm"
+                                                variant="ghost"
+                                                tip={`${String(c.contractorName || '계약자 미지정')} ${String(c.plate || '')} ${isDepositReceipt ? '보증금 계약 귀속' : '입금 매칭'}`}
+                                                onClick={() => void manualMatch(t, c)}
+                                              >{isDepositReceipt ? '귀속' : '연결'}</Btn>
+                                            </span>}
                                           />
                                         );
                                       })}

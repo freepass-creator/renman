@@ -10,7 +10,7 @@ import { useBusyAction } from '@/lib/use-busy-action';
 import { safeUpdate } from '@/lib/safe-update';
 import { selectedInDim } from '@/lib/lens-filters';
 import { textMatch } from '@/lib/search-match';
-import { Badge, Btn, C, LedgerActiveFilterTags, LedgerFilterButton, LedgerFrame, LedgerRecordPanel, LedgerSelectionBar, Search, won, useConfirm, type LedgerColView } from '@/components/ui';
+import { Badge, Btn, C, Input, TextArea, LedgerActiveFilterTags, LedgerFilterButton, LedgerFrame, LedgerRecordPanel, LedgerSelectionBar, Search, won, useConfirm, type LedgerColView } from '@/components/ui';
 import { FacetRail } from '@/components/FacetRail';
 import { WorkbenchBar } from '@/components/WorkbenchBar';
 import { WorkHubBack } from '@/components/WorkHubTabs';
@@ -21,6 +21,7 @@ import { companyLabel } from '@/lib/companies';
 import { toast } from '@/lib/toast';
 import { TODAY } from '@/lib/dashboard-consts';
 import { useEntityLists } from '@/lib/use-entity-lists';
+import { hydrateContractsWithDepositReceipts } from '@/lib/payments/deposit-receipts';
 import { computeReturnSettlement } from '@/lib/contracts/settlement';
 import { commitUpdate } from '@/lib/commit';
 import { resolveWriteCompany, NEED_COMPANY } from '@/lib/scope';
@@ -38,6 +39,108 @@ import {
 import { useTableSelection } from '@/lib/use-table-selection';
 import { useCtrlASelectAll, useRowSelection } from '@/lib/use-row-selection';
 
+type CollectionTermsDraft = {
+  arrearsClause: string;
+  warningAfterDays: string;
+  engineLockAfterDays: string;
+  repossessionAfterDays: string;
+  legalNoticeAfterDays: string;
+  debtTransferAfterDays: string;
+};
+
+const collectionTermsDraft = (rec: EntityRecord): CollectionTermsDraft => ({
+  arrearsClause: String(rec.arrearsClause || ''),
+  warningAfterDays: rec.warningAfterDays == null ? '' : String(rec.warningAfterDays),
+  engineLockAfterDays: rec.engineLockAfterDays == null ? '' : String(rec.engineLockAfterDays),
+  repossessionAfterDays: rec.repossessionAfterDays == null ? '' : String(rec.repossessionAfterDays),
+  legalNoticeAfterDays: rec.legalNoticeAfterDays == null ? '' : String(rec.legalNoticeAfterDays),
+  debtTransferAfterDays: rec.debtTransferAfterDays == null ? '' : String(rec.debtTransferAfterDays),
+});
+
+const termDay = (value: string): number | null => {
+  if (!value.trim()) return null;
+  const n = Number(value);
+  return Number.isFinite(n) && n >= 0 ? Math.round(n) : null;
+};
+
+function CollectionTermsEditor({ row, actor, onSaved, onCancel }: {
+  row: ReceivableRow;
+  actor: string;
+  onSaved: () => void;
+  onCancel: () => void;
+}) {
+  const [form, setForm] = useState<CollectionTermsDraft>(() => collectionTermsDraft(row.rec));
+  const [saving, setSaving] = useState(false);
+  const setDay = (key: keyof CollectionTermsDraft, value: string) => {
+    setForm((current) => ({ ...current, [key]: value.replace(/[^\d]/g, '') }));
+  };
+  const save = async () => {
+    setSaving(true);
+    try {
+      await commitUpdate({
+        entity: 'contract',
+        sessionCompanyId: String(row.rec.companyId || ''),
+        rec: row.rec,
+        key: String(row.rec._key || ''),
+        patch: {
+          arrearsClause: form.arrearsClause.trim(),
+          warningAfterDays: termDay(form.warningAfterDays),
+          engineLockAfterDays: termDay(form.engineLockAfterDays),
+          repossessionAfterDays: termDay(form.repossessionAfterDays),
+          legalNoticeAfterDays: termDay(form.legalNoticeAfterDays),
+          debtTransferAfterDays: termDay(form.debtTransferAfterDays),
+          collectionTermsReviewedAt: TODAY,
+          collectionTermsReviewedBy: actor,
+        },
+      });
+      toast('계약별 연체조항 확인 결과를 저장했습니다.');
+      onSaved();
+    } catch (error) {
+      toast((error as Error).message || NEED_COMPANY, 'error');
+    } finally { setSaving(false); }
+  };
+  const days: Array<[keyof CollectionTermsDraft, string]> = [
+    ['warningAfterDays', '경고 D+'],
+    ['engineLockAfterDays', '시동제어 D+'],
+    ['repossessionAfterDays', '차량회수 D+'],
+    ['legalNoticeAfterDays', '내용증명 D+'],
+    ['debtTransferAfterDays', '채권전환 D+'],
+  ];
+  return (
+    <div style={{ borderTop: `1px solid ${C.line}`, paddingTop: 12, marginTop: 4 }}>
+      <div style={{ fontSize: 12.5, fontWeight: 800, color: C.ink }}>계약별 연체조항 확인</div>
+      <div style={{ fontSize: 11.5, color: C.mute, margin: '4px 0 10px', lineHeight: 1.6 }}>
+        계약서에 숫자로 명시된 조치만 입력합니다. 숫자 조건이 없어도 저장하면 확인완료로 기록됩니다.
+      </div>
+      <TextArea
+        size="sm"
+        value={form.arrearsClause}
+        onChange={(event) => setForm((current) => ({ ...current, arrearsClause: event.target.value }))}
+        placeholder="계약서 연체·회수 조항 원문 또는 확인 메모"
+        rows={3}
+        style={{ width: '100%', boxSizing: 'border-box', marginBottom: 8 }}
+      />
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(105px,1fr))', gap: 6 }}>
+        {days.map(([key, label]) => (
+          <label key={key} style={{ display: 'flex', flexDirection: 'column', gap: 3, fontSize: 11, color: C.mute }}>
+            {label}
+            <Input
+              inputMode="numeric"
+              value={form[key]}
+              onChange={(event) => setDay(key, event.target.value)}
+              placeholder="없으면 비움"
+            />
+          </label>
+        ))}
+      </div>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 6, marginTop: 10 }}>
+        <Btn size="sm" variant="ghost" onClick={onCancel} disabled={saving}>취소</Btn>
+        <Btn size="sm" onClick={() => void save()} disabled={saving}>{saving ? '저장 중…' : '확인 결과 저장'}</Btn>
+      </div>
+    </div>
+  );
+}
+
 const RECV_SECS = ['recv-status', 'recv-list'] as const;
 
 // 미수 워크벤치 = 회수 파트의 "딱 여기만" 메인. 미수율이 핵심축. 자금(수납)과 연동돼 자동 갱신.
@@ -47,7 +150,11 @@ const STONE: Record<string, 'gray' | 'amber' | 'orange' | 'red' | 'purple'> = { 
 export default function ReceivablesPage() {
   const { companyId, scopeAll, user } = useSession();
   const mobile = useIsMobile();
-  const { data: [cs = [], hs = []], loading, error: loadError, reload } = useEntityLists(['contract', 'history']);
+  const { data: [storedContracts = [], hs = [], bankTransactions = []], loading, error: loadError, reload } = useEntityLists(['contract', 'history', 'bank_tx']);
+  const cs = useMemo(
+    () => hydrateContractsWithDepositReceipts(storedContracts, bankTransactions),
+    [bankTransactions, storedContracts],
+  );
   const [facets, setFacets] = useState<Set<string>>(new Set());
   const [q, setQ] = useState('');
   const [logKey, setLogKey] = useState<string | null>(null);
@@ -55,6 +162,7 @@ export default function ReceivablesPage() {
   const [selected, setSelected] = useState<ReceivableRow | null>(null);
   const [filterOpen, setFilterOpen] = useState(false);
   const [colView, setColView] = useState<LedgerColView>('기본');
+  const [termsKey, setTermsKey] = useState<string | null>(null);
   const [, runBusy] = useBusyAction();
   const confirm = useConfirm();
   const toggleFacet = (label: string) => setFacets((s) => { const n = new Set(s); n.has(label) ? n.delete(label) : n.add(label); return n; });
@@ -102,6 +210,7 @@ export default function ReceivablesPage() {
     if (selected && !rowById.has(receivableRowKey(selected))) {
       setSelected(null);
       setLogKey(null);
+      setTermsKey(null);
     }
   }, [rowById, selected]);
   const noticeTodoFiltered = noticeTodoRows(filtered);
@@ -179,6 +288,7 @@ export default function ReceivablesPage() {
   const selectedImmob = !!selected?.rec.engineDisabled;
   const selectedNeedLock = !!selected && !selectedImmob && engineLockDue(selected);
   const selectedLogOpen = !!selectedKey && logKey === selectedKey;
+  const selectedTermsOpen = !!selectedKey && termsKey === selectedKey;
 
   return (
     <>
@@ -255,10 +365,12 @@ export default function ReceivablesPage() {
         onRowDoubleClick={(row) => {
           setSelected(row);
           setLogKey(null);
+          setTermsKey(null);
         }}
         onCloseDetail={() => {
           setSelected(null);
           setLogKey(null);
+          setTermsKey(null);
         }}
         sidePanel={selected ? (
           <LedgerRecordPanel
@@ -271,6 +383,7 @@ export default function ReceivablesPage() {
             onClose={() => {
               setSelected(null);
               setLogKey(null);
+              setTermsKey(null);
             }}
             actions={(
               <>
@@ -279,6 +392,13 @@ export default function ReceivablesPage() {
                 </Btn>
                 <Btn size="sm" variant={selectedLogOpen ? 'solid' : 'ghost'} onClick={() => setLogKey(selectedLogOpen ? null : selectedKey)}>
                   {selectedLogOpen ? '연락기록 닫기' : '문자·연락 기록'}
+                </Btn>
+                <Btn
+                  size="sm"
+                  variant={selectedTermsOpen || selected.st.stage === '계약조건 확인' ? 'solid' : 'ghost'}
+                  onClick={() => setTermsKey(selectedTermsOpen ? null : selectedKey)}
+                >
+                  {selectedTermsOpen ? '계약조건 닫기' : '계약조건 확인'}
                 </Btn>
                 {(selectedImmob || selectedNeedLock) ? (
                   <Btn size="sm" variant={selectedNeedLock ? 'danger' : 'ghost'} onClick={() => void toggleEngine(selected)}>
@@ -300,6 +420,15 @@ export default function ReceivablesPage() {
                 }}
                 onDone={() => setLogKey(null)}
                 onCancel={() => setLogKey(null)}
+              />
+            ) : null}
+            {selectedTermsOpen ? (
+              <CollectionTermsEditor
+                key={selectedKey || ''}
+                row={selected}
+                actor={user?.email || user?.name || ''}
+                onSaved={() => { setTermsKey(null); reload(); }}
+                onCancel={() => setTermsKey(null)}
               />
             ) : null}
           </LedgerRecordPanel>

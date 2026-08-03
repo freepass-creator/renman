@@ -304,6 +304,8 @@ export const ENTITIES: Record<string, Entity> = {
       { key: 'repossessionAfterDays', label: '차량회수 도래(D+)', type: 'number', ocrFrom: 'repossession_after_days', note: '계약서에 차량회수 조건이 명시된 경우만' },
       { key: 'legalNoticeAfterDays', label: '내용증명 도래(D+)', type: 'number', ocrFrom: 'legal_notice_after_days', note: '계약서에 통지 조건이 명시된 경우만' },
       { key: 'debtTransferAfterDays', label: '채권전환 도래(D+)', type: 'number', ocrFrom: 'debt_transfer_after_days', note: '계약서에 법적조치·채권전환 조건이 명시된 경우만' },
+      { key: 'collectionTermsReviewedAt', label: '연체조항 확인일', type: 'date', manual: true, note: '숫자 조건이 없는 계약도 확인 완료 상태를 남김' },
+      { key: 'collectionTermsReviewedBy', label: '연체조항 확인자', type: 'text', manual: true },
       { key: 'reservationFee', label: '예약금(원)', type: 'number', manual: true, note: '대여예정요금 10% 범위' },
       { key: 'lateFeeRate', label: '지연손해금율(%)', type: 'number', manual: true },
       /* 중도해지 위약금율 — ★계약서에는 «인도일로부터 경과기간»에 따라 두 값이 박혀 있다.
@@ -461,6 +463,36 @@ export const ENTITIES: Record<string, Entity> = {
 
 export type EntityRecord = Record<string, unknown>;
 
+/**
+ * OCR 스키마 이름과 이미 운영 중인 엔티티 원자 이름이 다른 경우의 명시적 연결.
+ * 새 원자를 임의 생성하지 않고 같은 의미가 확실한 기존 원자만 연결한다.
+ */
+const OCR_FIELD_ALIASES: Record<string, Record<string, string>> = {
+  contract: {
+    monthlyRent: 'monthly_amount',
+    deposit: 'deposit_total',
+    paymentDay: 'autopay_day',
+    mileageOut: 'initial_mileage_km',
+  },
+};
+
+/** 주민번호 원문은 저장하지 않고, 완전한 형식일 때 생년월일만 안전하게 파생한다. */
+function birthFromKoreanIdent(value: unknown): string {
+  const digits = String(value || '').replace(/\D/g, '');
+  if (digits.length !== 13) return '';
+  const centuryCode = Number(digits[6]);
+  const century = centuryCode === 9 || centuryCode === 0 ? 1800
+    : [1, 2, 5, 6].includes(centuryCode) ? 1900
+      : [3, 4, 7, 8].includes(centuryCode) ? 2000 : 0;
+  if (!century) return '';
+  const year = century + Number(digits.slice(0, 2));
+  const month = Number(digits.slice(2, 4));
+  const day = Number(digits.slice(4, 6));
+  const date = new Date(Date.UTC(year, month - 1, day));
+  if (date.getUTCFullYear() !== year || date.getUTCMonth() !== month - 1 || date.getUTCDate() !== day) return '';
+  return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+}
+
 /** OCR 추출 결과 → 표준 엔티티 레코드 매핑 */
 export function mapOcrToEntity(entityKey: string, ocr: Record<string, unknown>): EntityRecord {
   const e = ENTITIES[entityKey];
@@ -470,6 +502,13 @@ export function mapOcrToEntity(entityKey: string, ocr: Record<string, unknown>):
     if (f.ocrFrom && ocr[f.ocrFrom] != null && ocr[f.ocrFrom] !== '') {
       rec[f.key] = ocr[f.ocrFrom];
     }
+  }
+  for (const [target, source] of Object.entries(OCR_FIELD_ALIASES[entityKey] || {})) {
+    if (rec[target] == null && ocr[source] != null && ocr[source] !== '') rec[target] = ocr[source];
+  }
+  if (entityKey === 'contract' && !rec.contractorBirth) {
+    const birth = birthFromKoreanIdent(ocr.contractor_ident);
+    if (birth) rec.contractorBirth = birth;
   }
   // 회차 배열은 단일 입력 필드로 펼치지 않고 원문 구조를 보존한다.
   // 보험 분납 일정은 자금계획, 보증금 분납은 계약 정산의 근거가 된다.

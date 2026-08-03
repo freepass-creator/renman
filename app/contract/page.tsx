@@ -7,7 +7,7 @@ import { TODAY, dday } from '@/lib/dashboard-consts';
 import { contractMasterRow } from '@/lib/master-ledgers';
 import { CONTRACT_DETAIL_SECTIONS, CONTRACT_MASTER_BASIC_COLS, CONTRACT_MASTER_EXPANDED_COLS, SCHEDULE_LEDGER_ALL_COLS, SCHEDULE_LEDGER_COLS } from '@/lib/master-ledger-cols';
 import { latestDateOf, summarizeContractLedgerStats } from '@/lib/ledger-stats';
-import { useEntityList } from '@/lib/use-entity-lists';
+import { useEntityLists } from '@/lib/use-entity-lists';
 import { textMatch } from '@/lib/search-match';
 import {
   Badge, Btn, C, ContextMenu, type ContextMenuItem, LedgerActions, LedgerActiveFilters, LedgerCreatePanel, LedgerEditPanel, LedgerFilterButton, LedgerFilterFields, LedgerFilterPanel, LedgerFrame, LedgerRecordPanel, Message, PageLoading, PeriodBar, PillTabs, Search, Select, useSheetExport, won,
@@ -28,6 +28,7 @@ import {
 } from '@/lib/contract-ops';
 import { NotifyDialog } from '@/components/NotifyDialog';
 import { notifyRecipients } from '@/lib/notify/recipients';
+import { hydrateContractsWithDepositReceipts } from '@/lib/payments/deposit-receipts';
 
 type RentalChip = '전체' | (typeof RENTAL_TYPES)[number];
 /** 계약범위 — 전체·진행·만기임박·미납·종료 (riskLabel·net·dday 판정). */
@@ -61,7 +62,11 @@ function ContractLedgerInner() {
   const mobile = useIsMobile();
   const { isOperator } = useSession();
   const searchParams = useSearchParams();
-  const { rows: contracts, loading, error: loadError, reload } = useEntityList('contract');
+  const { data: [storedContracts = [], bankTransactions = []], loading, error: loadError, reload } = useEntityLists(['contract', 'bank_tx']);
+  const contracts = useMemo(
+    () => hydrateContractsWithDepositReceipts(storedContracts, bankTransactions),
+    [bankTransactions, storedContracts],
+  );
   const [q, setQ] = useState('');
   const [bucket, setBucket] = useState<ContractBucket>('진행');
   const [dateBasis, setDateBasis] = useState<'계약일' | '종료일'>('계약일');

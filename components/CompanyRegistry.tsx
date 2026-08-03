@@ -1,10 +1,55 @@
 'use client';
 // 법인 목록 관리 — 평소엔 고정 표시(읽기 전용). 헤더 '수정'을 눌러 편집 모드로 들어가야 바꿀 수 있음.
-import { useState } from 'react';
-import { Plus, Trash2, Pencil, Check } from 'lucide-react';
-import { companyDefs, addCompany, updateCompany, removeCompany, companyRegisteredName } from '@/lib/companies';
+import { useEffect, useState } from 'react';
+import { Plus, Trash2, Pencil, Check, FileScan } from 'lucide-react';
+import {
+  archiveManagedCompany,
+  companyDefs,
+  companyRegisteredName,
+  createManagedCompany,
+  ensureCompaniesHydrated,
+  updateManagedCompany,
+  type CompanyMasterInput,
+} from '@/lib/companies';
 import { useSession } from '@/lib/session';
 import { Panel, Btn, Input, C, useConfirm } from '@/components/ui';
+import FileDrop from '@/components/FileDrop';
+import { callOcrExtract } from '@/lib/ocr-client';
+import { docPath, uploadDoc } from '@/lib/storage';
+import { toast, toastError, toastInfo } from '@/lib/toast';
+
+type CompanyDraft = CompanyMasterInput & { label: string };
+const EMPTY_DRAFT: CompanyDraft = { label: '' };
+
+function text(raw: Record<string, unknown>, key: string): string {
+  return String(raw[key] || '').trim();
+}
+
+function list(raw: Record<string, unknown>, key: string): string[] | undefined {
+  const value = text(raw, key);
+  return value ? value.split(/[,\n]/).map((v) => v.trim()).filter(Boolean) : undefined;
+}
+
+function draftFromBusinessRegistration(raw: Record<string, unknown>): CompanyDraft {
+  const businessAddress = text(raw, 'address');
+  const headquartersAddress = text(raw, 'hq_address');
+  return {
+    label: text(raw, 'partner_name'),
+    bizNo: text(raw, 'biz_no'),
+    corpNo: text(raw, 'corp_no'),
+    ceo: text(raw, 'ceo'),
+    openDate: text(raw, 'open_date'),
+    address: headquartersAddress || businessAddress,
+    businessAddress,
+    headquartersAddress,
+    entityType: text(raw, 'entity_type'),
+    industry: list(raw, 'industry'),
+    category: list(raw, 'category'),
+    email: text(raw, 'email'),
+    taxOffice: text(raw, 'tax_office'),
+    businessRegistration: { issueDate: text(raw, 'issue_date') },
+  };
+}
 
 export function CompanyRegistry() {
   const { isOperator, companyId } = useSession();
@@ -12,13 +57,67 @@ export function CompanyRegistry() {
   const [, force] = useState(0);
   const rerender = () => force((n) => n + 1);
   const [edit, setEdit] = useState(false);
-  const [nw, setNw] = useState({ label: '' });
+  const [draft, setDraft] = useState<CompanyDraft>(EMPTY_DRAFT);
+  const [file, setFile] = useState<File | null>(null);
+  const [busy, setBusy] = useState<'ocr' | 'save' | 'row' | ''>('');
   const defs = companyDefs().filter((c) => isOperator || c.id === companyId);
 
+  useEffect(() => {
+    const changed = () => rerender();
+    window.addEventListener('jpk:companies-change', changed);
+    void ensureCompaniesHydrated().then(rerender);
+    return () => window.removeEventListener('jpk:companies-change', changed);
+  }, []);
+
   const del = async (id: string, label: string) => {
-    if (await confirm({ message: `법인 "${label}"을(를) 목록에서 제거합니다.\n(그 법인 데이터는 삭제되지 않지만 화면에서 사라집니다) 계속?`, danger: true })) { removeCompany(id); rerender(); }
+    if (!await confirm({ message: `법인 "${label}"을(를) 관리 목록에서 제외합니다.\n기존 업무·문서 데이터는 삭제되지 않습니다. 계속할까요?`, danger: true })) return;
+    setBusy('row');
+    try { await archiveManagedCompany(id); toast('관리회사 목록에서 제외했습니다.'); rerender(); }
+    catch (error) { toastError((error as Error).message); }
+    finally { setBusy(''); }
   };
-  const add = () => { if (addCompany(nw.label)) { setNw({ label: '' }); rerender(); } };
+
+  const pickBusinessRegistration = async (picked: File) => {
+    setFile(picked);
+    setBusy('ocr');
+    const result = await callOcrExtract(picked, 'business_reg');
+    if (!result.ok || !result.raw) {
+      setBusy('');
+      toastError(result.error || '사업자등록증을 읽지 못했습니다. 상호를 직접 입력할 수 있습니다.');
+      return;
+    }
+    const next = draftFromBusinessRegistration(result.raw);
+    setDraft(next);
+    setBusy('');
+    if (!next.label) toastInfo('상호를 읽지 못했습니다. 사업자등록증 상호를 직접 입력하세요.');
+    else toast('사업자등록증을 읽었습니다. 내용을 확인한 뒤 등록하세요.');
+  };
+
+  const add = async () => {
+    if (!draft.label.trim() || busy) return;
+    setBusy('save');
+    try {
+      const { label, ...master } = draft;
+      const id = await createManagedCompany(label, master);
+      if (!id) throw new Error('회사를 등록하지 못했습니다.');
+      if (file) {
+        const url = await uploadDoc(file, docPath(id, 'company', 'business-registration', file.name));
+        await updateManagedCompany(id, { label }, {
+          businessRegistration: {
+            ...master.businessRegistration,
+            fileName: file.name,
+            url: url || undefined,
+            uploadedAt: new Date().toISOString(),
+          },
+        });
+      }
+      setDraft(EMPTY_DRAFT);
+      setFile(null);
+      toast('관리회사와 회사 마스터를 등록했습니다.');
+      rerender();
+    } catch (error) { toastError((error as Error).message); }
+    finally { setBusy(''); }
+  };
 
   return (
     <Panel title="법인 목록" action={isOperator ? (
@@ -38,7 +137,14 @@ export function CompanyRegistry() {
         {defs.map((c) => edit && isOperator ? (
           // 편집 모드 — 입력
           <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 0', borderTop: `1px solid var(--border-soft)`, flexWrap: 'wrap' }}>
-            <Input defaultValue={c.label} onBlur={(e) => { updateCompany(c.id, { label: e.target.value }); rerender(); }} placeholder="사업자등록증 상호" style={{ flex: 1, minWidth: 180 }} />
+            <Input defaultValue={c.label} disabled={busy === 'row'} onBlur={async (e) => {
+              const label = e.target.value.trim();
+              if (!label || label === c.label) return;
+              setBusy('row');
+              try { await updateManagedCompany(c.id, { label }); toast('회사 상호를 수정했습니다.'); rerender(); }
+              catch (error) { e.target.value = c.label; toastError((error as Error).message); }
+              finally { setBusy(''); }
+            }} placeholder="사업자등록증 상호" style={{ flex: 1, minWidth: 180 }} />
             <span style={{ fontSize: 11, color: C.faint, fontFamily: 'var(--font-mono)', minWidth: 70 }}>{c.id}</span>
             <Btn size="sm" variant="danger" iconOnly tip="회사 제거" onClick={() => del(c.id, c.label)}><Trash2 size={14} /></Btn>
           </div>
@@ -52,9 +158,28 @@ export function CompanyRegistry() {
 
         {/* 법인 추가 — 편집 모드에서만 */}
         {edit && isOperator && (
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', borderTop: `1px solid ${C.line}`, marginTop: 6, paddingTop: 12 }}>
-            <Input value={nw.label} onChange={(e) => setNw({ label: e.target.value })} onKeyDown={(e) => { if (e.key === 'Enter') add(); }} placeholder="새 회사 · 사업자등록증 상호" style={{ flex: 1, minWidth: 180 }} />
-            <Btn size="sm" onClick={add} disabled={!nw.label.trim()}><Plus size={13} /> 추가</Btn>
+          <div style={{ borderTop: `1px solid ${C.line}`, marginTop: 6, paddingTop: 12 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8, fontSize: 12.5, fontWeight: 800, color: C.ink }}>
+              <FileScan size={14} /> 관리회사 등록
+            </div>
+            <FileDrop
+              file={file}
+              onFile={pickBusinessRegistration}
+              accept="image/*,.pdf"
+              hint="사업자등록증 PDF 또는 이미지 · OCR 후 확인 등록"
+              note={busy === 'ocr' ? '사업자등록증 분석 중…' : undefined}
+              style={{ minHeight: 92, padding: '14px 16px', marginBottom: 10 }}
+            />
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(180px,1fr))', gap: 8 }}>
+              <Input value={draft.label} onChange={(e) => setDraft((v) => ({ ...v, label: e.target.value }))} placeholder="사업자등록증 상호 (필수)" />
+              <Input value={draft.bizNo || ''} onChange={(e) => setDraft((v) => ({ ...v, bizNo: e.target.value }))} placeholder="사업자등록번호" />
+              <Input value={draft.ceo || ''} onChange={(e) => setDraft((v) => ({ ...v, ceo: e.target.value }))} placeholder="대표자" />
+              <Input value={draft.openDate || ''} onChange={(e) => setDraft((v) => ({ ...v, openDate: e.target.value }))} placeholder="개업일 YYYY-MM-DD" />
+              <Input value={draft.address || ''} onChange={(e) => setDraft((v) => ({ ...v, address: e.target.value }))} placeholder="본점 소재지" style={{ gridColumn: '1 / -1' }} />
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 10 }}>
+              <Btn size="sm" onClick={add} disabled={!draft.label.trim() || !!busy}><Plus size={13} /> {busy === 'save' ? '등록 중…' : '관리회사 등록'}</Btn>
+            </div>
           </div>
         )}
       </div>

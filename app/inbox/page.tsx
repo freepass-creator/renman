@@ -9,7 +9,7 @@ import { useSession } from '@/lib/session';
 import { type EntityRecord } from '@/lib/intake/entities';
 import { storageReady } from '@/lib/storage';
 import { uploadToInbox } from '@/lib/inbox-upload';
-import { openCar, openCustomer, openPayments } from '@/lib/ui-bus';
+import { openCar, openCustomer, openFinance } from '@/lib/ui-bus';
 import { toast } from '@/lib/toast';
 import { normPlate } from '@/lib/plate';
 import { pushDocVersion } from '@/lib/docs';
@@ -172,7 +172,11 @@ export default function InboxPage() {
       const ck = customerKey(targetRec.contractorName, targetRec.contractorPhone);
       if (target === 'contract' && ck) openCustomer(ck);
     } else if (target === 'bank_tx') {
-      openPayments();
+      openFinance({
+        unclassified: true,
+        transactionId: targetRec._key,
+        companyId: targetRec.companyId || companyId,
+      });
     }
   }
 
@@ -258,7 +262,11 @@ export default function InboxPage() {
                   main={`${String(r.kind || '')} · ${String(r.filename || '')}`}
                   right={<span style={{ fontSize: 11.5, color: ent === 'inbox' ? C.mute : C.accent, fontWeight: 700 }}>{ent === 'inbox' ? '중복확인' : ent === 'bank_tx' ? '수납매칭' : (plate || TARGET_LABEL[ent as Target] || '—')}</span>}
                   onClick={ent === 'inbox' ? undefined : () => {
-                    if (ent === 'bank_tx') openPayments();
+                    if (ent === 'bank_tx') openFinance({
+                      unclassified: true,
+                      transactionId: r.matchedKey,
+                      companyId: r.companyId || companyId,
+                    });
                     else if (plate) openCar(plate, 'doc');
                   }}
                 />

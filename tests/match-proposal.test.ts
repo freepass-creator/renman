@@ -65,7 +65,7 @@ describe('입금 계약 연결 후보', () => {
     expect(all.every((row) => row.proposal.state === '자동후보' && row.automatic)).toBe(true);
   });
 
-  it('미분류·개별 CMS 수납은 검토대기에 포함하고 합계 집금·비계약 계정은 제외한다', () => {
+  it('일반 미분류는 1차 분류로 돌리고 개별 CMS 수납만 과목 없이 검토한다', () => {
     const contracts = [
       { _key: 'C1', companyId: 'A', contractorName: '홍길동', monthlyRent: 500000, startDate: '2026-01-01', rentalMonths: 12 },
     ];
@@ -83,9 +83,15 @@ describe('입금 계약 연결 후보', () => {
       { ...base, _key: 'EXPENSE', category: '정비비' },
       { ...base, _key: 'DONE', category: '대여료', matchedContractId: 'C1' },
     ];
-    expect(buildMatchBacklog(records, contracts, '2026-08-02', 'all').map((row) => row.tx.id).sort()).toEqual([
-      'CMS_ITEM', 'CMS_RAW', 'KEEP', 'UNCLASSIFIED', 'UNCLASSIFIED_LABEL',
+    const backlog = buildMatchBacklog(records, contracts, '2026-08-02', 'all');
+    expect(backlog.map((row) => row.tx.id).sort()).toEqual([
+      'CMS_ITEM', 'CMS_RAW', 'DEPOSIT', 'KEEP',
     ]);
+    expect(backlog.find((row) => row.tx.id === 'DEPOSIT')).toMatchObject({
+      proposal: { state: '미매칭', reason: '계약 귀속 필요 · 대여료 미수 차감 없음' },
+      automatic: undefined,
+    });
+    expect(backlog.find((row) => row.tx.id === 'UNCLASSIFIED')).toBeUndefined();
   });
 
   it('동명이인 복수 계약은 전체 적체에서도 자동 승인 후보가 되지 않는다', () => {

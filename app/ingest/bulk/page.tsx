@@ -10,7 +10,7 @@ import { UploadCloud, Car, ShieldCheck } from 'lucide-react';
 import { useSession } from '@/lib/session';
 import { useEntityLists } from '@/lib/use-entity-lists';
 import { type EntityRecord } from '@/lib/intake/entities';
-import { ocrBatch, mapOcrToEntity } from '@/lib/ocr-client';
+import { ocrBatch, mapOcrToEntity, type OcrOriginal } from '@/lib/ocr-client';
 import { saveIntake } from '@/lib/intake';
 import { uploadDoc, docPath } from '@/lib/storage';
 import { pushDocVersion } from '@/lib/docs';
@@ -25,7 +25,7 @@ import { toast } from '@/lib/toast';
 import { getStore } from '@/lib/store';
 import { crossCheckDocuments, crossCheckSummary } from '@/lib/integrity/doc-crosscheck';
 import { TODAY } from '@/lib/dashboard-consts';
-import { buildAtomicEvent } from '@/lib/domain/atomic-event';
+import { commitUpdate } from '@/lib/commit';
 
 type DocKind = 'vehicle' | 'insurance';
 const KIND: Record<DocKind, { label: string; ocrType: string }> = {
@@ -36,6 +36,7 @@ const KIND: Record<DocKind, { label: string; ocrType: string }> = {
 type Row = {
   file: File;
   rec: EntityRecord;
+  ocrOriginal?: OcrOriginal;
   plate: string;
   match: EntityRecord | null;   // 매칭된 기존 차량
   status: '매칭' | '검토' | '신규' | '실패';
@@ -73,7 +74,7 @@ export default function BulkMatchPage() {
           : judged.decision === 'auto' ? '매칭'
           : match ? '검토'
           : '신규';
-        return { file: files[i], rec, plate: String(rec.plate || ''), match, status, matchScore: judged.score };
+        return { file: files[i], rec, ocrOriginal: r.ocrOriginal, plate: String(rec.plate || ''), match, status, matchScore: judged.score };
       }));
     } catch (e) {
       toast('OCR 실패: ' + (e as Error).message, 'error');
@@ -114,7 +115,6 @@ export default function BulkMatchPage() {
     setBusy(true);
     try {
       const recs: EntityRecord[] = [];
-      const updateEvents: EntityRecord[] = [];
       let updated = 0;
       let plateSkipped = 0;   // OCR 번호가 기존 차량과 다른데 갱신하지 않은 건수
       for (const r of okRows) {
@@ -125,8 +125,12 @@ export default function BulkMatchPage() {
           ? r.match
           : r.rec.policyNo ? await getStore().get('insurance', target, String(r.rec.policyNo)) : null;
         const merged = url
-          ? { ...r.rec, _docs: pushDocVersion(current || r.rec, { type: kind, url, reason: '대량 자동매칭', by: String(user?.name || '') }) }
-          : r.rec;
+          ? {
+              ...r.rec,
+              _docs: pushDocVersion(current || r.rec, { type: kind, url, ocr: r.ocrOriginal?.raw, reason: '대량 자동매칭', by: String(user?.name || '') }),
+              ...(r.ocrOriginal ? { _ocrOriginal: r.ocrOriginal } : {}),
+            }
+          : { ...r.rec, ...(r.ocrOriginal ? { _ocrOriginal: r.ocrOriginal } : {}) };
         if (current?._key) {
           /* ★차량번호(plate)는 자동 갱신 대상에서 제외한다.
              VIN·차명 등으로 같은 차로 매칭됐더라도 OCR 이 번호를 오독하면 그 값이 그대로 저장되고,
@@ -137,10 +141,10 @@ export default function BulkMatchPage() {
             ? (() => { const { plate: _ocrPlate, ...rest } = merged as Record<string, unknown>; return rest as EntityRecord; })()
             : merged;
           if (kind === 'vehicle' && r.plate && normPlate(r.plate) !== normPlate(current.plate)) plateSkipped++;
-          await getStore().update(kind, target, String(current._key), patch);
-          updateEvents.push(buildAtomicEvent({
-            entityType: kind, companyId: target, record: { ...current, ...merged }, source: 'ocr',
-          }));
+          await commitUpdate({
+            entity: kind, sessionCompanyId: target, rec: current,
+            key: String(current._key), patch, source: 'ocr',
+          });
           updated++;
         } else {
           recs.push(merged);
@@ -149,7 +153,6 @@ export default function BulkMatchPage() {
       const res = recs.length
         ? await saveIntake(kind, target, recs, { context: { source: 'ocr' } })
         : { save: { saved: 0, duplicates: 0, backend: getStore().backend } };
-      if (updateEvents.length) await getStore().save('atomic_event', target, updateEvents);
       toast(
         `${res.save.saved + updated}건 반영 (${KIND[kind].label} · ${companyLabel(target)})${updated ? ` · 기존 갱신 ${updated}` : ''}`
         + (plateSkipped ? ` · ★차량번호 불일치 ${plateSkipped}건은 번호를 바꾸지 않았습니다(차량 상세에서 확인)` : ''),

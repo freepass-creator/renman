@@ -48,7 +48,7 @@ export function LedgerFrame<R>({
   hint?: ReactNode;
   filters?: ReactNode;
   stats?: ReactNode;
-  /** 기본/전체 열보기. showColView=false 이거나 view 지정 시 생략 가능. */
+  /** 기본/전체 열보기. 별도 view 선택기와 독립적으로 노출하며 showColView=false일 때만 생략한다. */
   colView?: LedgerColView;
   onColView?: (v: LedgerColView) => void;
   /** false면 기본/전체 PillTabs 숨김(view로 대체하거나 보기 전환 없음). 기본 true. */
@@ -130,21 +130,24 @@ export function LedgerFrame<R>({
     }
     : onRow;
 
-  const viewControl = view != null
-    ? view
-    : (!mobile && showColView && colView != null && onColView != null)
-      ? (
-        <PillTabs
-          size="sm"
-          value={colView}
-          onChange={onColView}
-          tabs={[
-            { key: '기본', label: '기본' },
-            { key: '전체', label: '전체' },
-          ]}
-        />
-      )
-      : null;
+  const colViewControl = !mobile && showColView && colView != null && onColView != null
+    ? (
+      <PillTabs
+        size="sm"
+        value={colView}
+        onChange={onColView}
+        tabs={[
+          { key: '기본', label: '기본' },
+          { key: '전체', label: '전체' },
+        ]}
+      />
+    )
+    : null;
+  // 원장/탭 선택(view)과 열 밀도(기본/전체)는 서로 다른 축이다.
+  // 원장 선택이 있다고 기본/전체를 숨기면 페이지에 따라 전체열·엑셀 순서에 접근할 수 없다.
+  const viewControl = view != null && colViewControl != null
+    ? <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>{view}{colViewControl}</div>
+    : view ?? colViewControl;
 
   // 기본보기 pin 해제 배열을 렌더마다 새로 만들면 onView→setState 무한루프.
   const viewCols = React.useMemo(

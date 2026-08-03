@@ -6,7 +6,7 @@
  *   · 레거시 role '운영자'/'위탁사'는 로드 시 본사/법인으로 정규화(호환).
  */
 import { createContext, useContext, useEffect, useState, type FormEvent, type ReactNode } from 'react';
-import { COMPANIES, ALL_COMPANIES } from './companies';
+import { COMPANIES, ALL_COMPANIES, ensureCompaniesHydrated } from './companies';
 import { firebaseReady } from './firebase/client';
 import { watchAuth, loadProfile, signInEmail, signOutUser, resetPassword, signup, normalizeRole, type Role } from './firebase/auth';
 import { setAuditActor } from './audit';
@@ -123,6 +123,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => { setAuditActor({ uid: user.uid, name: user.name, email: user.email, role: user.role }); }, [user]);
+  useEffect(() => { if (phase === 'ready') void ensureCompaniesHydrated(); }, [phase, user.uid]);
   useEffect(() => startLiveSync(companyId), [companyId]);
 
   function login(uid: string) {

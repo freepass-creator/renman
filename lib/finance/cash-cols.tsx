@@ -12,16 +12,17 @@ import {
 import type { CashRow } from '@/lib/finance/cash-ledger';
 import { buildDetailSections, buildSheetViews, type DetailSectionDef, type SheetViewKeys } from '@/lib/ledger-ext';
 import { LEDGER_EMPTY } from '@/lib/ledger-empty';
-import { summarizeStoredCashBundle } from './cash-bundle';
+import { cashBundleReviewStatus, requiresLoanRepaymentSplit } from './cash-bundle';
 
 const coName = (r: CashRow) => companyDisplay(r.companyId);
 /** 내용 = 메모(거래 설명). 상대방은 party 열. */
 const content = (r: CashRow) => (r.memo || '').trim();
 const settlementKind = (r: CashRow): string => r.nest === 'cms-dep' ? 'CMS집금'
   : r.nest === 'card-dep' ? '카드정산'
-    : r.nest === 'bundle-parent' ? String(r.raw.bundleType || '일반묶음') : '';
+    : r.nest === 'bundle-parent' ? String(r.raw.bundleType || '일반묶음')
+      : requiresLoanRepaymentSplit(r.category) ? '할부·리스상환' : '';
 export const cashBundleStatus = (r: CashRow): '미완료' | '대사완료' =>
-  r.nest === 'bundle-parent' ? summarizeStoredCashBundle(r).status : '대사완료';
+  cashBundleReviewStatus(r) === '미완료' ? '미완료' : '대사완료';
 
 /* 자금상태 = «매칭됐는가». 판정은 lib/finance/money-status.ts 가 유일한 정의처다.
    ★이전 구현은 상태가 3개뿐이라 «계정과목이 없는 돈»과 «분류는 됐지만 계약에 안 붙은 돈»이
@@ -33,11 +34,8 @@ export const cashMoneyStatus = (r: CashRow): MoneyStatus => moneyStatusOf({
   matchedContractId: r.raw.matchedContractId,
   matchedScheduleSeq: r.raw.matchedScheduleSeq,
   isCmsItem: r.nest === 'cms-item' || r.nest === 'cms-pending',
-  // CMS·카드사 정산 모두 «묶음 원본 ↔ 구성건» 대사가 먼저다.
-  isCmsDeposit: r.nest === 'cms-dep' || r.nest === 'card-dep' || r.nest === 'bundle-parent',
-  cmsSettled: r.nest === 'bundle-parent'
-    ? cashBundleStatus(r) === '대사완료'
-    : String(r.raw.settlementRole || '') === 'deposit',
+  isCmsDeposit: r.nest === 'cms-dep' || r.nest === 'card-dep',
+  cmsSettled: String(r.raw.settlementRole || '') === 'deposit',
 });
 
 /* 자금분류 = «뭐로 입금됐는가». 계정과목(무슨 돈인가)과 다른 축 — 같은 칸에 담지 않는다. */
@@ -158,7 +156,8 @@ const CASH_COL_CATALOG: SheetCol<CashRow>[] = [
       const kind = settlementKind(r);
       if (!kind) return LEDGER_EMPTY.dash;
       const count = Number(r.raw.bundleItemCount ?? r.raw.settlementItemCount) || 0;
-      const complete = r.nest !== 'bundle-parent' || cashBundleStatus(r) === '대사완료';
+      const reviewStatus = cashBundleReviewStatus(r);
+      const complete = reviewStatus === '해당없음' || reviewStatus === '대사완료';
       return <Badge tone={complete ? 'blue' : 'amber'}>{kind}{count ? ` ${count}건` : ''}{complete ? '' : '·미완료'}</Badge>;
     },
     text: (r) => {

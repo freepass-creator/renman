@@ -1,11 +1,28 @@
 import { describe, expect, it } from 'vitest';
-import { summarizeCashBundle, type CashBundleItem } from '@/lib/finance/cash-bundle';
+import { cashBundleReviewStatus, createCashBundlePreset, requiresLoanRepaymentSplit, summarizeCashBundle, type CashBundleItem } from '@/lib/finance/cash-bundle';
 
 const item = (id: string, amount: number, category = '대여료수입'): CashBundleItem => ({
   id, amount, category, party: `거래처 ${id}`, memo: '', referenceId: `contract-${id}`,
 });
 
 describe('일반 묶음 입출금 대사', () => {
+  it('할부·리스 원출금은 분해 전부터 미완료이고 분해 자식 과목은 다시 대상이 아니다', () => {
+    expect(requiresLoanRepaymentSplit('할부금')).toBe(true);
+    expect(requiresLoanRepaymentSplit('할부금 상환')).toBe(true);
+    expect(requiresLoanRepaymentSplit('할부·리스료')).toBe(true);
+    expect(requiresLoanRepaymentSplit('할부원금상환')).toBe(false);
+    expect(requiresLoanRepaymentSplit('이자비용')).toBe(false);
+    expect(cashBundleReviewStatus({
+      category: '할부금', inAmt: 0, outAmt: 412_438, raw: {},
+    })).toBe('미완료');
+  });
+
+  it('할부·리스상환은 금액을 만들지 않고 원금·이자 입력 구조만 준비한다', () => {
+    expect(createCashBundlePreset('할부·리스상환', '메리츠', 'SP-2604-0086')).toEqual([
+      expect.objectContaining({ party: '메리츠', category: '할부원금상환', amount: 0, referenceId: 'SP-2604-0086' }),
+      expect.objectContaining({ party: '메리츠', category: '이자비용', amount: 0, referenceId: 'SP-2604-0086' }),
+    ]);
+  });
   it('입금은 구성합계에서 수수료를 뺀 금액과 실제 입금을 맞춘다', () => {
     expect(summarizeCashBundle({
       flow: '입금', actualAmount: 970_000, feeAmount: 30_000,

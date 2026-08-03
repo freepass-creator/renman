@@ -272,7 +272,7 @@ const C0 = {
   startDate: { key: 'startDate', label: '시작일', priority: 2, xf: 'date', render: (r) => date(r.startDate), text: (r) => r.startDate },
   endDate: { key: 'endDate', label: '종료일', priority: 2, xf: 'date', render: (r) => date(r.endDate), text: (r) => r.endDate },
   monthlyRent: { key: 'monthlyRent', label: '월대여료', align: 'r', priority: 1, xf: 'money', render: (r) => moneyCell(r.monthlyRent), text: (r) => r.monthlyRent },
-  deposit: { key: 'deposit', label: '보증금', align: 'r', priority: 2, xf: 'money', render: (r) => moneyCell(r.deposit), text: (r) => r.deposit },
+  deposit: { key: 'deposit', label: '계약보증금', align: 'r', priority: 2, xf: 'money', render: (r) => moneyCell(r.deposit), text: (r) => r.deposit },
   paymentDay: {
     key: 'paymentDay', label: '결제일', align: 'c', priority: 2,
     render: (r) => (r.paymentDay ? `${r.paymentDay}일` : LEDGER_EMPTY.dash),
@@ -315,6 +315,12 @@ const CONTRACT_COL_CATALOG: SheetCol<ContractMasterRow>[] = [
   cx('deliveredDate', '인도일', { date: true }), cx('returnScheduledDate', '반납예정일', { date: true }),
   cx('returnedDate', '반납/해지일', { date: true }), cx('pickupPlace', '인수장소'), cx('returnPlace', '반환장소'),
   cx('reservationFee', '예약금', { money: true, align: 'r' }),
+  {
+    key: 'depositReceived', label: '보증금 실수령', align: 'r', priority: 2, xf: 'money',
+    render: (r) => moneyOrNull(r.depositReceived),
+    text: (r) => r.depositReceived ?? '',
+  },
+  cx('depositReceivedDate', '보증금 수령일', { date: true }),
   {
     key: 'mileageOut', label: '출고주행', align: 'r', xf: 'int',
     render: (r) => numberOrNull(r.mileageOut, 'km'),
@@ -377,7 +383,7 @@ export const CONTRACT_SHEET_KEYS: SheetViewKeys = {
   all: [
     'company', 'contractNo', 'contractorName', 'rentalType', 'status',
     'plate', 'carName', 'contractorPhone', 'contractDate', 'startDate', 'endDate',
-    'monthlyRent', 'deposit', 'paymentDay', 'paymentTiming', 'paymentMethod', 'riskLabel', 'net', 'alert',
+    'monthlyRent', 'deposit', 'depositReceived', 'depositReceivedDate', 'paymentDay', 'paymentTiming', 'paymentMethod', 'riskLabel', 'net', 'alert',
     'contractorBirth', 'contractorLicenseNo', 'contractorLicenseExpiry', 'licenseType', 'contractorAddress',
     'rentalMonths', 'annualMileageLimit', 'mileageOut', 'returnMileage', 'overMileageRate',
     'drivenKm', 'allowedKm', 'excessKm', 'overMileageFee', 'overMileageBasis',
@@ -429,7 +435,7 @@ export const CONTRACT_DETAIL_DEFS: DetailSectionDef[] = [
   {
     title: '요금·납부',
     keys: [
-      'monthlyRent', 'deposit', 'reservationFee', 'paymentDay', 'paymentTiming', 'paymentMethod', 'net',
+      'monthlyRent', 'deposit', 'depositReceived', 'depositReceivedDate', 'reservationFee', 'paymentDay', 'paymentTiming', 'paymentMethod', 'net',
       'lateFeeRate', 'earlyTerminationRate',
     ],
   },
