@@ -69,7 +69,7 @@ const ACCOUNT_CREATE_SECTIONS: LedgerFormSection[] = [
 ];
 
 const CASH_TX_CREATE_SECTIONS: LedgerFormSection[] = [
-  { title: '거래 기본정보', open: true, fields: ['account', 'txDate', 'amount', 'withdraw'] },
+  { title: '거래 기본정보', open: true, fields: ['account', 'txDate', 'entryDirection', 'entryAmount'] },
   { title: '분류·내용', fields: ['counterparty', 'memo', 'method', 'balance'] },
 ];
 const CARD_TX_CREATE_SECTIONS: LedgerFormSection[] = [
@@ -1234,7 +1234,17 @@ export default function CashLedgerPage() {
           entityKey={singleKind === '법인카드' ? 'card_tx' : 'bank_tx'}
           title={`${singleKind} 단건 입력`}
           sections={singleKind === '법인카드' ? CARD_TX_CREATE_SECTIONS : CASH_TX_CREATE_SECTIONS}
-          initial={{ txDate: new Date().toISOString().slice(0, 10), method: singleKind === 'CMS' ? 'CMS' : '계좌' }}
+          initial={{ txDate: new Date().toISOString().slice(0, 10), entryDirection: '입금', method: singleKind === 'CMS' ? 'CMS' : '계좌' }}
+          prepareRecord={(record) => {
+            if (singleKind === '법인카드') return record;
+            const { entryDirection, entryAmount, ...stored } = record;
+            const value = Number(entryAmount) || 0;
+            return {
+              ...stored,
+              amount: entryDirection === '입금' ? value : 0,
+              withdraw: entryDirection === '출금' ? value : 0,
+            };
+          }}
           prefix={singleKindTabs}
           fileIngest={{ label: '통장 담기 (데이터센터)', onClick: () => openIngest('bank_tx') }}
           onClose={() => setCreating(null)}

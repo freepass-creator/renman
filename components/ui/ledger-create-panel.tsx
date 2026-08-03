@@ -101,6 +101,7 @@ export function LedgerCreatePanel({
   quick,
   continuable,
   prefix,
+  prepareRecord,
   onClose,
   onSaved,
 }: {
@@ -125,6 +126,8 @@ export function LedgerCreatePanel({
   /** 내용부터 먼저 저장하고 분류·대상·담당·기한은 같은 건에서 이어서 보완한다. */
   continuable?: boolean;
   prefix?: React.ReactNode;
+  /** 직접입력 전용 표시 필드를 실제 저장 스키마로 변환한다. */
+  prepareRecord?: (record: EntityRecord) => EntityRecord;
   onClose: () => void;
   onSaved?: (record: EntityRecord) => void;
 }) {
@@ -229,7 +232,7 @@ export function LedgerCreatePanel({
     setBusy(true);
     try {
       const continuableWork = continuable && entityKey === 'work_item';
-      const record = normalizedForm(selectedFields, {
+      const normalized = normalizedForm(selectedFields, {
         ...form,
         ...(continuableWork ? {
           category: String(form.category || '').trim() || '미분류',
@@ -247,6 +250,7 @@ export function LedgerCreatePanel({
         createdAt: new Date().toISOString(),
         inputSource: '원장 직접입력',
       });
+      const record = prepareRecord ? prepareRecord(normalized) : normalized;
       const result = await saveIntake(entityKey, targetCompany, [record], {
         context: { source: 'manual' },
       });
