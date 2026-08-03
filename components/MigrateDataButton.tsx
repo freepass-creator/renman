@@ -30,11 +30,22 @@ export function MigrateDataButton({
   const [busy, setBusy] = useState(false);
 
   if (!isOperator) return null;
-  // ★프로덕션에서는 버튼 자체를 렌더하지 않는다.
+  // ★프로덕션에서는 위치는 보여주되 실행은 잠근다.
   //   reflectCompany → wipeCompany 가 전 엔티티를 하드삭제하고, 프로덕션에선 live 소스가 403이라
   //   «가명(frozen) 시드»로 대체된다 = 실데이터 전멸. /dev/data는 가드했는데 이 버튼은 운영 원장
   //   3곳(계약·자금·자산)의 빈 상태에 노출돼 있었다(자금은 필터 결과가 비어도 뜸) — QA 적대검증 B2.
-  if (process.env.NODE_ENV === 'production' && process.env.NEXT_PUBLIC_ALLOW_HARD_WIPE !== '1') return null;
+  const productionLocked = process.env.NODE_ENV === 'production' && process.env.NEXT_PUBLIC_ALLOW_HARD_WIPE !== '1';
+  if (productionLocked) {
+    return (
+      <Btn
+        size={size}
+        disabled
+        tip="운영 데이터 보호 잠금 · 허용된 마이그레이션 배포에서만 실행할 수 있습니다"
+      >
+        <Database size={size === 'sm' ? 14 : 16} /> {label}
+      </Btn>
+    );
+  }
 
   async function run() {
     const store = getStore();

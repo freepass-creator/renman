@@ -157,7 +157,7 @@ export const ERP_MENU_TREE: ErpMenuNode[] = [
     icon: Building2,
     children: [
       { id: 'management', label: '경영관리', href: '/management', icon: Building2 },
-      { id: 'dev-tools', label: '개발도구', href: '/dev/data', icon: Database, hqOnly: true, devOnly: true },
+      { id: 'dev-tools', label: '개발도구', href: '/dev/data', icon: Database, hqOnly: true },
       { id: 'settings', label: '설정', href: '/settings', icon: Settings },
     ],
   },
@@ -182,7 +182,7 @@ export const NAV_GROUPS: NavGroup[] = [
   ] },
   { title: '하단', items: [
     { href: '/management', label: '경영관리', icon: Building2, tier: '라이트' },
-    { href: '/dev/data', label: '개발도구', icon: Database, tier: '라이트', hqOnly: true, devOnly: true },
+    { href: '/dev/data', label: '개발도구', icon: Database, tier: '라이트', hqOnly: true },
     { href: '/settings', label: '설정', icon: Settings, tier: '라이트' },
   ] },
 ];

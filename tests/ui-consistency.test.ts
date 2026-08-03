@@ -153,16 +153,19 @@ describe('UI 공용 원자 규격', () => {
     expect(violations).toEqual([]);
   });
 
-  it('개발 화면과 개발용 메뉴는 운영 배포에서 차단한다', () => {
+  it('개발도구는 본사 메뉴에 노출하되 운영 파괴 작업은 잠근다', () => {
     const devLayout = readFileSync(join(root, 'app/dev/layout.tsx'), 'utf8');
-    expect(devLayout).toContain("process.env.NODE_ENV === 'production'");
-    expect(devLayout).toContain('notFound()');
+    expect(devLayout).not.toContain('notFound()');
 
     const nav = readFileSync(join(root, 'lib/nav.ts'), 'utf8');
-    expect(nav).toMatch(/href: '\/dev\/data'[^\n]+devOnly: true/);
+    expect(nav).toMatch(/href: '\/dev\/data'[^\n]+hqOnly: true/);
 
-    const sessionBar = readFileSync(join(root, 'components/SessionBar.tsx'), 'utf8');
-    expect(sessionBar).toContain("!it.devOnly || process.env.NODE_ENV !== 'production'");
+    const migrateButton = readFileSync(join(root, 'components/MigrateDataButton.tsx'), 'utf8');
+    expect(migrateButton).toContain('productionLocked');
+    expect(migrateButton).toContain('disabled');
+
+    const devData = readFileSync(join(root, 'app/dev/data/page.tsx'), 'utf8');
+    expect(devData).toContain("NEXT_PUBLIC_ALLOW_HARD_WIPE !== '1'");
 
     const admin = readFileSync(join(root, 'app/admin/page.tsx'), 'utf8');
     expect(admin).toMatch(/process\.env\.NODE_ENV !== 'production'[\s\S]+계정 \(dev\)/);

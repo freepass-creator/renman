@@ -1,7 +1,7 @@
 'use client';
 
 import { Suspense, useEffect, useMemo, useState } from 'react';
-import { CircleDollarSign, Pencil, Plus, UploadCloud } from 'lucide-react';
+import { CircleDollarSign, Pencil, Plus, UploadCloud, X } from 'lucide-react';
 import { useSearchParams } from 'next/navigation';
 import { TODAY, dday } from '@/lib/dashboard-consts';
 import { contractMasterRow } from '@/lib/master-ledgers';
@@ -224,7 +224,7 @@ function ContractLedgerInner() {
             setEditing(false);
             setCreating((open) => !open);
           }}
-        ><Plus size={14} /> {creating ? '생성 취소' : '계약 생성'}</Btn>
+        >{creating ? <X size={14} /> : <Plus size={14} />} {creating ? '생성 취소' : '계약 생성'}</Btn>
       </LedgerActions>}
       filters={<>
         <Search
