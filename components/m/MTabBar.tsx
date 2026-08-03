@@ -1,18 +1,18 @@
 'use client';
-/** /m 하단 5탭 — 홈·운영·리스크·입력·설정 (고정). jpkerp5 모델. (설계서 §7) */
+/** /m 하단 5탭 — 조회 중심 모바일 업무 흐름. 리스크는 홈에서 들어가는 스택 화면이다. */
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Home, LayoutGrid, TriangleAlert, SquarePen, Settings } from 'lucide-react';
+import { Home, LayoutGrid, ListTodo, SquarePen, Settings } from 'lucide-react';
 import { C } from '@/components/ui';
 import { haptic } from '@/lib/haptics';
 
-export const TAB_ROOTS = ['/m', '/m/ops', '/m/risk', '/m/entry', '/m/me'];
+export const TAB_ROOTS = ['/m', '/m/ops', '/m/work', '/m/entry', '/m/me'];
 
 const TABS = [
   { href: '/m', label: '홈', icon: Home, color: C.ok },
   { href: '/m/ops', label: '운영', icon: LayoutGrid, color: C.brand },
-  { href: '/m/risk', label: '리스크', icon: TriangleAlert, color: C.danger },
-  { href: '/m/entry', label: '입력', icon: SquarePen, color: 'var(--indigo-text)' },
+  { href: '/m/work', label: '업무', icon: ListTodo, color: C.warn },
+  { href: '/m/entry', label: '단건입력', icon: SquarePen, color: 'var(--indigo-text)' },
   { href: '/m/me', label: '설정', icon: Settings, color: C.mute },
 ] as const;
 

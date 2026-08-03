@@ -1,24 +1,23 @@
 'use client';
-/** Mobile entry hub: route each field task directly to its focused workflow. */
-import { useRouter } from 'next/navigation';
-import { Camera, Upload, PenLine, ReceiptText } from 'lucide-react';
-import { ActionGrid, ActionTile, C } from '@/components/ui';
+/** 모바일 단건 입력 — 사진·메모 한 건만. 데이터센터·OCR·대량 투입은 웹 전용. */
+import { useState } from 'react';
+import { C, Message } from '@/components/ui';
 import { MHead } from '@/components/m/MHead';
+import { QuickInput } from '@/components/QuickInput';
 
 export default function MEntry() {
-  const router = useRouter();
+  const [formKey, setFormKey] = useState(0);
+  const reset = () => setFormKey((key) => key + 1);
   return (
     <>
-      <MHead title="입력" color="var(--indigo-text)" />
-      <div style={{ padding: 14 }}>
-        <ActionGrid>
-          <ActionTile icon={<Camera size={24} />} label="현장 수집" desc="사진·문서·서명을 먼저 등록" onClick={() => router.push('/inbox')} />
-          <ActionTile icon={<Upload size={24} />} label="차량 등록" desc="등록증 OCR 또는 직접 입력" onClick={() => router.push('/ingest?type=vehicle')} />
-          <ActionTile icon={<PenLine size={24} />} label="계약 등록" desc="계약서 OCR 또는 직접 입력" onClick={() => router.push('/ingest?type=contract')} />
-          <ActionTile icon={<ReceiptText size={24} />} label="과태료 등록" desc="고지서 촬영 및 책임자 매칭" onClick={() => router.push('/ingest?type=penalty')} />
-        </ActionGrid>
-        <div style={{ marginTop: 12, fontSize: 11.5, color: C.faint, lineHeight: 1.5 }}>
-          현장 업무별 입력 화면으로 바로 이동합니다. 인도·반납은 배차관리에서 차량과 계약을 확인한 뒤 처리하세요.
+      <MHead title="단건 입력" sub="현장 메모 · 사진 · 문서 한 건" color="var(--indigo-text)" />
+      <div style={{ padding: '12px 14px 24px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <QuickInput key={formKey} onDone={reset} onCancel={reset} />
+        <Message variant="info">
+          차량을 고르면 해당 차량 이력에, 고르지 않으면 미분류 대기함에 저장됩니다. 엑셀·여러 문서·OCR 등록은 웹 데이터센터에서 처리합니다.
+        </Message>
+        <div style={{ fontSize: 11.5, color: C.faint, lineHeight: 1.5 }}>
+          저장한 건은 웹에서 분류·대상 연결·담당 배정을 이어서 완료할 수 있습니다.
         </div>
       </div>
     </>

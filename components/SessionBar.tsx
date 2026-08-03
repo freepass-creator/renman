@@ -103,6 +103,7 @@ export default function TopBar() {
   const pathname = usePathname();
   const router = useRouter();
   const [menuOpen, setMenuOpen] = useState(false);
+  const customMobileShell = pathname === '/m' || pathname.startsWith('/m/') || pathname === '/dev/preview';
   // 모바일 크롬 SSOT — 허브=메뉴·탭 / 뎁스=상단 제목(ERP4 TopBar) · 하단 이전+액션(탭 숨김).
   const depth = !!slots.depth;
   const showBottom = !!(slots.back || slots.actions);
@@ -114,6 +115,17 @@ export default function TopBar() {
     ['/asset', '/contract', '/cash', '/work'].forEach((href) => router.prefetch(href));
   }, [router]);
   useEffect(() => {
+    if (customMobileShell) {
+      // /m은 자체 상·하단 셸을 가진다. 렌더가 null이어도 웹 TopBar 여백을 남기지 않는다.
+      document.body.style.paddingTop = '0px';
+      document.body.style.paddingBottom = '0px';
+      document.documentElement.style.setProperty('--fp-dock-h', '0px');
+      return () => {
+        document.body.style.paddingTop = '';
+        document.body.style.paddingBottom = '';
+        document.documentElement.style.setProperty('--fp-dock-h', '0px');
+      };
+    }
     // 상단바=fixed(웹·모바일) → body paddingTop으로 본문 시작 맞춤.
     // 웹 뎁스: 하단 이전/홈 바 높이 → --fp-dock-h (Page frame이 빼서 페이지 스크롤 방지).
     document.body.style.paddingTop = 'var(--fp-bar-h)';
@@ -129,7 +141,7 @@ export default function TopBar() {
       document.body.style.paddingBottom = '';
       document.documentElement.style.setProperty('--fp-dock-h', '0px');
     };
-  }, [showBottom, showActionBar, mobile, depth]);
+  }, [showBottom, showActionBar, mobile, depth, customMobileShell]);
   const [todayLabel, setTodayLabel] = useState('');
   useEffect(() => { const n = new Date(); setTodayLabel(`${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}-${String(n.getDate()).padStart(2, '0')} (${['일', '월', '화', '수', '목', '금', '토'][n.getDay()]})`); }, []);
   const goBack = () => { haptic.back(); if (slots.back) slots.back(); else router.back(); };
@@ -137,7 +149,7 @@ export default function TopBar() {
   const barBtn: CSSProperties = { display: 'inline-flex', alignItems: 'center', gap: 4, height: bh, boxSizing: 'border-box', padding: '0 12px', border: `1px solid ${line}`, borderRadius: 'var(--radius)', background: C.taupeBg, cursor: 'pointer', fontSize: 12.5, fontWeight: 600, color: ink, textDecoration: 'none' };
 
   // /m(모바일 전용 트리)·/dev/preview(모바일 미리보기)는 웹 크롬 없이 — 자체/프레임 셸만. 웹 상단바 숨김.
-  if (pathname === '/m' || pathname.startsWith('/m/') || pathname === '/dev/preview') return null;
+  if (customMobileShell) return null;
 
   if (mobile) {
     // ERP4: 메뉴 열림 → 상태창이「☰ 메뉴」로 바뀌고 우측 X · 패널은 bar 아래 펼침.

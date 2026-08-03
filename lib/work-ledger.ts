@@ -8,6 +8,7 @@ import type { WorkGroup } from '@/lib/work-form-sections';
 import { rentalTypeOf } from '@/lib/schema/contract';
 import { LEDGER_EMPTY } from '@/lib/ledger-empty';
 import { WORK_CATEGORIES } from '@/lib/work-taxonomy';
+import { companyDisplay } from '@/lib/companies';
 
 export type WorkGroupFilter = '전체' | WorkGroup;
 export type WorkSource = 'work_item' | 'history' | 'penalty' | 'inbox';
@@ -102,6 +103,57 @@ export function normalizeWorkStatus(raw: unknown, done?: boolean): WorkStatus {
   if (/진행/.test(s)) return '진행';
   if (/대기|접수|예정|todo|waiting/.test(s)) return '대기';
   return '대기';
+}
+
+/**
+ * work_item 원본을 웹·모바일이 함께 쓰는 업무 원장 행으로 변환한다.
+ * 화면별로 차량/계약 보강과 미배정 판정을 다시 구현하지 않는다.
+ */
+export function buildWorkItemLedgerRows(
+  workItems: EntityRecord[],
+  contracts: EntityRecord[],
+  vehicles: EntityRecord[],
+): WorkLedgerRow[] {
+  return workItems.map((record) => {
+    const createdAt = String(record.createdAt || record.date || record.dueDate || '');
+    const updatedAt = String(record.updatedAt || record.completedAt || createdAt);
+    const contractKey = String(record.contractKey || '');
+    const meta = contractMeta(contractKey, contracts);
+    const plate = String(record.plate || meta.plate || '');
+    const contractNo = String(record.contractNo || meta.contractNo || '');
+    const customerName = String(record.customerName || meta.customerName || '');
+    const carName = String(record.carName || '') || carNameOf(plate, vehicles);
+    const kind = String(record.workType || record.category || '').trim() || '미분류';
+    let status = normalizeWorkStatus(record.status, !!(record.status === 'completed' || record.done));
+    // 차량번호 없으면 대상 연결이 끝나지 않은 업무다. 완료·보류 상태는 보존한다.
+    if (!plate && status !== '완료' && status !== '보류') status = '미배정';
+    return {
+      id: `work:${String(record._key || record.id)}`,
+      company: companyDisplay(String(record.companyId || '')),
+      companyId: String(record.companyId || ''),
+      kind,
+      group: workGroup(kind),
+      target: [plate, carName, customerName, contractNo].filter(Boolean).join(' '),
+      title: String(record.title || record.description || record.memo || ''),
+      workAt: createdAt,
+      workDate: createdAt.slice(0, 10),
+      createdAt,
+      updatedAt,
+      dueDate: String(record.dueDate || record.date || '').slice(0, 10),
+      status,
+      assignee: String(record.assigneeName || record.assigneeId || ''),
+      amount: Number(record.amount || record.cost) || 0,
+      source: 'work_item' as const,
+      plate,
+      carName,
+      contractKey,
+      contractNo,
+      customerName,
+      rentalType: meta.rentalType,
+      priority: String(record.priority || ''),
+      raw: record,
+    };
+  });
 }
 
 /**
