@@ -101,6 +101,11 @@ function IngestInner() {
     const primaryKeys = new Set(primary.map((field) => field.key));
     return [primary, entity.fields.filter((field) => !primaryKeys.has(field.key))];
   }, [entity, entityKey]);
+  const manualMissingFields = useMemo(
+    () => entity.fields.filter((field) => field.required && !String(form[field.key] ?? '').trim()),
+    [entity.fields, form],
+  );
+  const manualReady = manualMissingFields.length === 0;
   useEffect(() => {
     if (tab === 'ocr' && !entity.ocrType) setTab('excel');
   }, [tab, entity.ocrType]);
@@ -279,6 +284,10 @@ function IngestInner() {
 
   function submitManual() {
     setError('');
+    if (!manualReady) {
+      setError(`필수값을 입력하세요: ${manualMissingFields.map((field) => field.label).join(', ')}`);
+      return;
+    }
     const filled = Object.fromEntries(Object.entries(form).filter(([, v]) => v !== '' && v != null));
     if (!Object.keys(filled).length) { setError('입력값이 없습니다'); return; }
     setOcrRaw(null);
@@ -577,7 +586,7 @@ function IngestInner() {
           </Btn>
         )}
         {tab === 'manual' && (
-          <Btn size="sm" variant="solid" onClick={submitManual}>입력 확정</Btn>
+          <Btn size="sm" variant="solid" onClick={submitManual} disabled={!manualReady}>입력 확정</Btn>
         )}
         {records.length > 0 && sheetView === '대기' && (
           <Btn size="sm" variant="ghost" onClick={resetQueue}>대기 비우기</Btn>

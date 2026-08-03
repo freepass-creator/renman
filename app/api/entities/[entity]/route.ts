@@ -52,11 +52,12 @@ async function closedMonthsOf(db: Firestore, companyId: string): Promise<Set<str
 export async function GET(req: Request, ctx: { params: Promise<{ entity: string }> }) {
   const actor = await requireAuth(req);
   if (actor instanceof NextResponse) return actor;
-  const limited = await enforceApiRateLimit('entity-read', actor.uid, { limit: 240, windowMs: 60_000 });
-  if (limited) return limited;
-
   const { entity } = await ctx.params;
   if (!Object.hasOwn(ENTITIES, entity)) return NextResponse.json({ error: 'unknown entity' }, { status: 404 });
+  // 한 화면이 차량·계약·업무를 병렬 조회한다. 모든 엔티티가 같은 카운터 문서를 갱신하면
+  // 정상적인 첫 진입도 Firestore 트랜잭션 경합으로 503이 된다 → 엔티티별 버킷으로 분리한다.
+  const limited = await enforceApiRateLimit(`entity-read-${entity}`, actor.uid, { limit: 240, windowMs: 60_000 });
+  if (limited) return limited;
 
   const url = new URL(req.url);
   const requestedCompany = url.searchParams.get('companyId') || '';
@@ -82,11 +83,10 @@ export async function GET(req: Request, ctx: { params: Promise<{ entity: string 
 export async function POST(req: Request, ctx: { params: Promise<{ entity: string }> }) {
   const actor = await requireAuth(req);
   if (actor instanceof NextResponse) return actor;
-  const limited = await enforceApiRateLimit('entity-write', actor.uid, { limit: 120, windowMs: 60_000 });
-  if (limited) return limited;
-
   const { entity } = await ctx.params;
   if (!Object.hasOwn(ENTITIES, entity)) return NextResponse.json({ error: 'unknown entity' }, { status: 404 });
+  const limited = await enforceApiRateLimit(`entity-write-${entity}`, actor.uid, { limit: 120, windowMs: 60_000 });
+  if (limited) return limited;
   const body = await req.json().catch(() => null) as {
     companyId?: string;
     docs?: Array<{ id?: string; data?: Record<string, unknown> }>;
