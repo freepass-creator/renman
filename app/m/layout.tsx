@@ -1,5 +1,5 @@
 'use client';
-/** /m 셸 — 탭루트=하단 5탭 / 스택(상세·폼·경영)=이전 바. SessionBar는 /m서 null이라 크롬 충돌 없음. */
+/** /m 셸 — 탭루트=하단 5탭 / 스택(검색·리스크·상세·폼)=이전 바. */
 import { usePathname } from 'next/navigation';
 import { C } from '@/components/ui';
 import { MTabBar, TAB_ROOTS } from '@/components/m/MTabBar';

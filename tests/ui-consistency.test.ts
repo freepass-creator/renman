@@ -84,6 +84,28 @@ describe('UI 공용 원자 규격', () => {
     expect(frame).toContain('view != null && colViewControl != null');
   });
 
+  it('모바일은 업무·단건입력을 전용 경로로 제공하고 웹 데이터센터로 보내지 않는다', () => {
+    const tabBar = readFileSync(join(root, 'components/m/MTabBar.tsx'), 'utf8');
+    const home = readFileSync(join(root, 'app/m/page.tsx'), 'utf8');
+    const entry = readFileSync(join(root, 'app/m/entry/page.tsx'), 'utf8');
+    const work = readFileSync(join(root, 'app/m/work/page.tsx'), 'utf8');
+
+    expect(tabBar).toContain("href: '/m/work'");
+    expect(tabBar).not.toContain("href: '/m/risk', label: '리스크'");
+    expect(home).toContain("router.push(t ? `/m/search?q=");
+    expect(home).toContain("new Set(['/risk', '/status', '/work'])");
+    expect(entry).toContain('<QuickInput');
+    expect(entry).not.toMatch(/router\.push\(['"]\/(?:ingest|inbox)/);
+    expect(work).toContain('buildWorkItemLedgerRows');
+  });
+
+  it('모바일 전용 셸에는 숨겨진 웹 상단바 여백이 남지 않는다', () => {
+    const sessionBar = readFileSync(join(root, 'components/SessionBar.tsx'), 'utf8');
+    expect(sessionBar).toContain('if (customMobileShell)');
+    expect(sessionBar).toContain("document.body.style.paddingTop = '0px'");
+    expect(sessionBar).toContain("document.body.style.paddingBottom = '0px'");
+  });
+
   it('일반 실행 버튼을 페이지에서 새로 손조립하지 않는다', () => {
     const violations = operationalFiles.flatMap((file) => {
       const source = readFileSync(file, 'utf8');

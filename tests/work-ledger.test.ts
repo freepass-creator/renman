@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { inboxWorkStatus, summarizeWorkLedgerRows, workAttentionRank, workDueSignal, workGroup, type WorkLedgerRow } from '@/lib/work-ledger';
+import { buildWorkItemLedgerRows, inboxWorkStatus, summarizeWorkLedgerRows, workAttentionRank, workDueSignal, workGroup, type WorkLedgerRow } from '@/lib/work-ledger';
 import { workDetailSectionsFor } from '@/lib/work-cols';
 import { WORK_CATEGORIES } from '@/lib/work-taxonomy';
 import { WORK_SECTIONS_BY_KIND } from '@/lib/work-form-sections';
@@ -53,6 +53,20 @@ describe('수집함 → 업무 원장 상태', () => {
     expect(workAttentionRank({ dueDate: '2026-08-01', status: '진행' }, '2026-08-03')).toBe(0);
     expect(workAttentionRank({ dueDate: '', status: '미배정' }, '2026-08-03')).toBe(1);
     expect(workAttentionRank({ dueDate: '2026-08-10', status: '진행' }, '2026-08-03')).toBe(3);
+  });
+
+  it('웹·모바일 업무 목록이 같은 계약·차량 보강과 미배정 판정을 쓴다', () => {
+    const [row] = buildWorkItemLedgerRows(
+      [{ _key: 'w1', companyId: 'c1', contractKey: 'k1', title: '반납 확인', category: '일정', status: '대기' }],
+      [{ _key: 'k1', companyId: 'c1', plate: '12가3456', contractNo: 'C-1', contractorName: '홍길동' }],
+      [{ companyId: 'c1', plate: '12가3456', carName: '아반떼' }],
+    );
+    expect(row).toMatchObject({ plate: '12가3456', carName: '아반떼', contractNo: 'C-1', customerName: '홍길동', status: '대기' });
+
+    const [unassigned] = buildWorkItemLedgerRows(
+      [{ _key: 'w2', companyId: 'c1', title: '분류 전 메모', status: '대기' }], [], [],
+    );
+    expect(unassigned.status).toBe('미배정');
   });
 
   it('수납이슈 상세값을 상담이 아닌 수납이슈 섹션에 표시한다', () => {

@@ -9,18 +9,22 @@ import { MHead } from '@/components/m/MHead';
 function mHref(href: string): string {
   if (href === '/risk') return '/m/risk';
   if (href === '/status') return '/m/ops';
-  if (href === '/ingest') return '/m/entry';
+  if (href === '/work') return '/m/work';
   return href;
 }
 
 export default function MHome() {
   const router = useRouter();
   const [q, setQ] = useState('');
-  const shortcuts = useMemo(() => homeLedgerShortcuts(), []);
+  // 전용 모바일 화면이 있는 조회만 노출한다. 웹 원장을 좁혀 보여주는 우회 링크는 만들지 않는다.
+  const shortcuts = useMemo(() => {
+    const mobileReady = new Set(['/risk', '/status', '/work']);
+    return homeLedgerShortcuts().filter((item) => mobileReady.has(item.href));
+  }, []);
 
   const goSearch = () => {
     const t = q.trim();
-    router.push(t ? `/search?q=${encodeURIComponent(t)}` : '/search');
+    router.push(t ? `/m/search?q=${encodeURIComponent(t)}` : '/m/search');
   };
 
   return (

@@ -34,7 +34,7 @@ import { WORK_SECTIONS_BY_KIND, workSectionsFor } from '@/lib/work-form-sections
 import { PenaltyBucketPanel } from '@/components/work/PenaltyBucketPanel';
 import {
   WORK_GROUPS, WORK_SOURCE_LABEL,
-  carNameOf, contractMeta, inboxWorkStatus, normalizeWorkStatus, parseWorkGroup, summarizeWorkLedgerRows, workGroup,
+  buildWorkItemLedgerRows, carNameOf, contractMeta, inboxWorkStatus, normalizeWorkStatus, parseWorkGroup, summarizeWorkLedgerRows, workGroup,
   workAttentionRank, workDueSignal,
   type WorkGroupFilter, type WorkLedgerRow, type WorkSource, type WorkStatus,
 } from '@/lib/work-ledger';
@@ -126,42 +126,7 @@ function WorkLedgerInner() {
   );
 
   const otherRows = useMemo<WorkLedgerRow[]>(() => {
-    const scheduled = workItems.map((r): WorkLedgerRow => {
-      const createdAt = String(r.createdAt || r.date || r.dueDate || '');
-      const updatedAt = String(r.updatedAt || r.completedAt || createdAt);
-      const contractKey = String(r.contractKey || '');
-      const meta = contractMeta(contractKey, contracts);
-      const plate = String(r.plate || meta.plate || '');
-      const contractNo = String(r.contractNo || meta.contractNo || '');
-      const customerName = String(r.customerName || meta.customerName || '');
-      const carName = String(r.carName || '') || carNameOf(plate, vehicles);
-      const kind = String(r.workType || r.category || '').trim() || '미분류';
-      let status = normalizeWorkStatus(r.status, !!(r.status === 'completed' || r.done));
-      // 차량번호 없으면 미배정 (계약자만으로는 신원 미완)
-      if (!plate && status !== '완료' && status !== '보류') status = '미배정';
-      return {
-        id: `work:${String(r._key || r.id)}`,
-        company: companyDisplay(String(r.companyId || '')),
-        companyId: String(r.companyId || ''),
-        kind,
-        group: workGroup(kind),
-        target: [plate, carName, customerName, contractNo].filter(Boolean).join(' '),
-        title: String(r.title || r.description || r.memo || ''),
-        workAt: createdAt,
-        workDate: createdAt.slice(0, 10),
-        createdAt,
-        updatedAt,
-        dueDate: String(r.dueDate || r.date || '').slice(0, 10),
-        status,
-        assignee: String(r.assigneeName || r.assigneeId || ''),
-        amount: Number(r.amount || r.cost) || 0,
-        source: 'work_item',
-        plate, carName, contractKey, contractNo, customerName,
-        rentalType: meta.rentalType,
-        priority: String(r.priority || ''),
-        raw: r,
-      };
-    });
+    const scheduled = buildWorkItemLedgerRows(workItems, contracts, vehicles);
     const activities = history.map((r): WorkLedgerRow => {
       const createdAt = String(r.createdAt || r.occurredAt || r.date || '');
       const updatedAt = String(r.updatedAt || r.occurredAt || createdAt);
