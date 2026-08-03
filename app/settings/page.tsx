@@ -35,7 +35,7 @@ const HUB: HubLink[] = [
   { href: '/integrity', label: '리스크·정합성', desc: '데이터 이상·만기 점검', icon: ShieldAlert },
   { href: '/audit', label: '감사 로그', desc: '변경 이력', icon: History },
   { href: '/manage', label: '경영·손익', desc: '가동률·미수 aging·재무 요약', icon: BarChart3, hqOnly: true },
-  { href: '/dev/data', label: '개발도구', desc: '시드·백엔드·회사별 데이터', icon: Wrench, hqOnly: true, devOnly: true },
+  { href: '/dev/data', label: '개발도구', desc: '시드·백엔드·회사별 데이터', icon: Wrench, hqOnly: true },
 ];
 
 function Chevron({ open }: { open?: boolean }) {

@@ -344,11 +344,6 @@ export function LedgerCreatePanel({
                 }}
               />
             </label>
-            {continuable ? (
-              <div style={{ marginTop: 6, fontSize: 11.5, color: C.mute }}>
-                내용만 입력해도 미분류·미배정 업무로 먼저 저장됩니다. 분류·대상·담당자는 같은 업무에서 이어서 보완할 수 있습니다.
-              </div>
-            ) : null}
           </div>
         )}
 

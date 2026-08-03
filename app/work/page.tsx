@@ -1,7 +1,7 @@
 'use client';
 
 import { Suspense, useEffect, useMemo, useState } from 'react';
-import { Plus, FileText, Pencil, Trash2 } from 'lucide-react';
+import { Plus, FileText, Pencil, Trash2, X } from 'lucide-react';
 import { useEntityLists } from '@/lib/use-entity-lists';
 import { textMatch } from '@/lib/search-match';
 import { companyDisplay } from '@/lib/companies';
@@ -337,7 +337,7 @@ function WorkLedgerInner() {
             setEditing(false);
             setCreating((open) => !open);
           }}
-        ><Plus size={14} /> {creating ? '취소' : '업무 생성'}</Btn>
+        >{creating ? <X size={14} /> : <Plus size={14} />} {creating ? '취소' : '업무 생성'}</Btn>
       </LedgerActions>}
       filters={<>
         <Search

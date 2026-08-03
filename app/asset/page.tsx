@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { Pencil, Plus, UploadCloud } from 'lucide-react';
+import { Pencil, Plus, UploadCloud, X } from 'lucide-react';
 import { assetMasterRow, type AssetMasterRow } from '@/lib/master-ledgers';
 import {
   ASSET_DETAIL_SECTIONS, ASSET_MASTER_BASIC_COLS, ASSET_MASTER_EXPANDED_COLS,
@@ -182,7 +182,7 @@ export default function AssetLedgerPage() {
             setEditing(false);
             setCreating((open) => !open);
           }}
-        ><Plus size={14} /> {creating ? '생성 취소' : '자산 생성'}</Btn>
+        >{creating ? <X size={14} /> : <Plus size={14} />} {creating ? '생성 취소' : '자산 생성'}</Btn>
       </LedgerActions>}
       filters={<>
         <Search
