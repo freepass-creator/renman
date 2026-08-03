@@ -47,8 +47,13 @@ try {
   }
 
   if (production) {
-    const unauthorized = await fetch(`${base}/api/entities/vehicle`);
-    if (unauthorized.status !== 401) failures.push(`/api/entities/vehicle: expected 401, got ${unauthorized.status}`);
+    const protectedGetRoutes = ['/api/entities/vehicle', '/api/staff/list', '/api/migrate-source'];
+    for (const route of protectedGetRoutes) {
+      const unauthorized = await fetch(base + route);
+      if (unauthorized.status !== 401 && unauthorized.status !== 403) {
+        failures.push(`${route}: expected auth denial, got ${unauthorized.status}`);
+      }
+    }
   }
 
   const page = await fetch(base);
