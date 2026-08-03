@@ -136,7 +136,12 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     localStorage.setItem(LS_CO, co);
     setPhase('ready');
   }
-  function logout() { if (firebaseReady()) void signOutUser(); }
+  function logout() {
+    if (!firebaseReady()) return;
+    void signOutUser()
+      .then(() => setPhase('signed-out'))
+      .catch((error) => console.error('로그아웃 실패', error));
+  }
   function setCompanyId(id: string) {
     if (user.role !== '본사') return; // 법인 소속 직원은 배정 법인 고정
     setCompanyState(id);
