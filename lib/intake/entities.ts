@@ -372,6 +372,8 @@ export const ENTITIES: Record<string, Entity> = {
     fields: [
       { key: 'account', label: '계좌번호', type: 'text', required: true, note: '어느 법인의 어느 계좌' },
       { key: 'txDate', label: '거래일', type: 'date', required: true },
+      { key: 'entryDirection', label: '거래구분', type: 'select', required: true, options: ['입금', '출금'], manual: true },
+      { key: 'entryAmount', label: '금액', type: 'number', required: true, manual: true },
       { key: 'amount', label: '입금', type: 'number' },
       { key: 'withdraw', label: '출금', type: 'number' },
       { key: 'balance', label: '잔액', type: 'number' },
@@ -392,7 +394,7 @@ export const ENTITIES: Record<string, Entity> = {
     key: 'card_tx', label: '법인카드', layer: ENTITY_LAYER.card_tx, source: '법인카드 내역(엑셀/CSV)', idFrom: 'txKey', keyFields: ['txDate', 'amount', 'approvalNo'],
     fields: [
       { key: 'txDate', label: '거래일', type: 'date', required: true },
-      { key: 'amount', label: '금액', type: 'number' },
+      { key: 'amount', label: '금액', type: 'number', required: true },
       { key: 'merchant', label: '가맹점', type: 'text' },
       { key: 'approvalNo', label: '승인번호', type: 'text' },
       { key: 'cardLast4', label: '카드끝4', type: 'text' },
