@@ -36,12 +36,22 @@ export default function PenaltyUploadPage() {
   const [saving, setSaving] = useState(false);
   const [contracts, setContracts] = useState<EntityRecord[]>([]);
   const [existing, setExisting] = useState<EntityRecord[]>([]);
+  const [contractsLoading, setContractsLoading] = useState(false);
 
   useEffect(() => {
-    if (!co) { setContracts([]); setExisting([]); return; }
+    if (!co) { setContracts([]); setExisting([]); setContractsLoading(false); return; }
+    let active = true;
+    setContractsLoading(true);
     const store = getStore();
     Promise.all([store.list('contract', co), store.list('penalty', co)])
-      .then(([cs, ps]) => { setContracts(cs); setExisting(ps); }).catch(() => {});
+      .then(([cs, ps]) => {
+        if (!active) return;
+        setContracts(cs);
+        setExisting(ps);
+      })
+      .catch(() => {})
+      .finally(() => { if (active) setContractsLoading(false); });
+    return () => { active = false; };
   }, [co]);
 
   const derive = useCallback(
@@ -113,7 +123,8 @@ export default function PenaltyUploadPage() {
             {COMPANIES.map((c) => <option key={c} value={c}>{companyLabel(c)}</option>)}
           </Select>
           {!co && companyId === ALL_COMPANIES ? <span style={{ fontSize: 11.5, color: C.warn }}>저장 전 회사를 선택하세요</span> : null}
-          {co && contracts.length === 0 && <span style={{ fontSize: 11.5, color: C.warn }}>이 회사 계약이 없어 매칭이 안 됩니다 — 운영현황에서 계약 먼저 등록</span>}
+          {co && contractsLoading && <span style={{ fontSize: 11.5, color: C.faint }}>계약 불러오는 중…</span>}
+          {co && !contractsLoading && contracts.length === 0 && <span style={{ fontSize: 11.5, color: C.warn }}>이 회사 계약이 없어 매칭이 안 됩니다 — 운영현황에서 계약 먼저 등록</span>}
         </div>
 
         <FileDrop
