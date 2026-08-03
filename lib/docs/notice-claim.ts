@@ -4,6 +4,8 @@
  */
 import { type EntityRecord } from '@/lib/intake/entities';
 import { computeContractView } from '@/lib/contract-ops';
+import { hasDepositOffsetPayment } from '@/lib/contracts/deposit-offset';
+import { hasChargeKind, CHARGE_KIND_EARLY_TERM } from '@/lib/contracts/charges';
 import { earlyTerminationFee, type EarlyTerm } from '@/lib/domain/early-termination';
 import { TODAY } from '@/lib/dashboard-consts';
 import { fmtKMoneyHangul } from '@/lib/won-korean';
@@ -40,8 +42,14 @@ export function buildNoticeClaim(c: EntityRecord, asOf: string = TODAY, dueInDay
   const v = computeContractView(c, asOf);
   const early = earlyTerminationFee(c, asOf);
   const unpaidGross = Number(v.gross) || 0;
-  const deposit = Number(c.deposit) || 0;
-  const claim = Math.max(0, unpaidGross + early.fee - deposit);
+  // ★보증금 이중차감 방지 — 충당이 이미 수납으로 기록된 계약은 gross가 그만큼 줄어 있다.
+  //   거기서 보증금을 또 빼면 청구액이 0원이 되어 잔여 채권이 최고에서 탈락한다(적대검증 R1).
+  const offsetRecorded = hasDepositOffsetPayment(c);
+  const deposit = offsetRecorded ? 0 : (Number(c.deposit) || 0);
+  // ★위약금 이중계상 방지 — _charges에 위약금이 기록된 계약은 gross(=openCharges 포함)에 이미 들어있다.
+  //   settlement.ts의 etInNet과 같은 규율. 기록 전(정산 미확정) 계약만 여기서 가산한다.
+  const earlyAdd = hasChargeKind(c, CHARGE_KIND_EARLY_TERM) ? 0 : early.fee;
+  const claim = Math.max(0, unpaidGross + earlyAdd - deposit);
   return {
     asOf,
     dueDate: addDays(asOf, dueInDays),

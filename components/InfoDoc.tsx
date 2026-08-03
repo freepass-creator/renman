@@ -4,10 +4,10 @@ import { ENTITIES, type EntityRecord } from '@/lib/intake/entities';
 import { callOcrExtract, mapOcrToEntity, type OcrResult, type OcrOriginal } from '@/lib/ocr-client';
 import { uploadDoc, docPath, storageReady } from '@/lib/storage';
 import type { DocVersion } from '@/lib/docs';
-import { KV, Btn, Badge, OcrCrosscheck, Select, Input, C, ctrlH, type KVRow } from '@/components/ui';
+import { KV, Btn, TextLink, Badge, OcrCrosscheck, Select, Input, C, ctrlH, type KVRow } from '@/components/ui';
 import { type CrosscheckResult } from '@/lib/ocr-crosscheck';
 import { useIsMobile } from '@/lib/use-mobile';
-import { ChevronDown, FileText } from 'lucide-react';
+import { ChevronDown, Check, FileText } from 'lucide-react';
 import FileDrop from '@/components/FileDrop';
 
 /**
@@ -51,7 +51,6 @@ type InfoDocProps = {
 const REASONS = ['재발급', '변경', '오류정정'];
 const fLab: React.CSSProperties = { display: 'flex', flexDirection: 'column', gap: 3, minWidth: 0 };
 const fLl: React.CSSProperties = { fontSize: 11, color: C.mute };
-const link: React.CSSProperties = { display: 'inline-flex', alignItems: 'center', gap: 5, border: 'none', background: 'none', cursor: 'pointer', padding: 0, fontSize: 11.5, color: C.mute, fontWeight: 600 };
 
 export function InfoDoc({
   id, order, title, desc, fields, editing, form, onChange, onEditToggle, onSave,
@@ -60,7 +59,7 @@ export function InfoDoc({
   const mobile = useIsMobile();
   const [mode, setMode] = useState<'view' | 'replace'>('view');
   const [busy, setBusy] = useState(false);
-  const [pending, setPending] = useState<{ url: string; ocr?: Record<string, unknown>; ocrOriginal?: OcrOriginal; crosscheck?: CrosscheckResult; fileName: string } | null>(null);
+  const [pending, setPending] = useState<{ url: string; ocr?: Record<string, unknown>; ocrOriginal?: OcrOriginal; mapped?: EntityRecord; crosscheck?: CrosscheckResult; fileName: string } | null>(null);
   const [confirm, setConfirm] = useState<EntityRecord>({});
   const [reason, setReason] = useState(REASONS[0]);
   const [saving, setSaving] = useState(false);
@@ -91,7 +90,7 @@ export function InfoDoc({
     const seed: EntityRecord = {};
     for (const [, key] of editKeys) if (mapped[key] != null && mapped[key] !== '') seed[key] = mapped[key];
     setConfirm(seed);
-    setPending({ url: url || '', ocr: ocrRes.ok ? ocrRes.raw : undefined, ocrOriginal: ocrRes.ocrOriginal, crosscheck: ocrRes.crosscheck, fileName: file.name });
+    setPending({ url: url || '', ocr: ocrRes.ok ? ocrRes.raw : undefined, ocrOriginal: ocrRes.ocrOriginal, mapped, crosscheck: ocrRes.crosscheck, fileName: file.name });
     setBusy(false);
   }
 
@@ -101,6 +100,9 @@ export function InfoDoc({
     try {
       const merged: EntityRecord = {};
       for (const [k, val] of Object.entries(confirm)) if (val != null && String(val).trim() !== '') merged[k] = val;
+      // 분납표처럼 폼 한 칸으로 편집할 수 없는 반복 원자도 OCR 결과 그대로 보존한다.
+      // 스칼라 숨은 필드는 사용자 확인 없이 덮지 않고, 배열 구조만 이 경로에서 추가한다.
+      for (const [k, val] of Object.entries(pending.mapped || {})) if (Array.isArray(val)) merged[k] = val;
       await onReplaceDoc({ url: pending.url, ocr: pending.ocr, ocrOriginal: pending.ocrOriginal, fields: merged, reason });
       resetReplace();
     } finally { setSaving(false); }
@@ -110,11 +112,16 @@ export function InfoDoc({
     <div id={id} style={{ marginTop: 22, scrollMarginTop: 62, order }}>
       {/* 헤더: 접기토글(제목) + 첨부상태 배지 + 우측 액션(수정 / 서류 교체·재발급). 접히면 본문 숨김. */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 9, flexWrap: mobile ? 'wrap' : 'nowrap', minHeight: ctrlH(mobile) }}>
-        <button type="button" onClick={toggleCollapse} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, border: 'none', background: 'none', cursor: 'pointer', padding: 0, WebkitTapHighlightColor: 'transparent' }}>
+        <button
+          type="button"
+          onClick={toggleCollapse}
+          aria-expanded={!collapsed}
+          style={{ display: 'inline-flex', alignItems: 'center', gap: 7, minHeight: mobile ? 44 : undefined, border: 'none', background: 'none', cursor: 'pointer', padding: 0, WebkitTapHighlightColor: 'transparent' }}
+        >
           <ChevronDown size={15} color={C.sub} style={{ flexShrink: 0, transform: collapsed ? 'rotate(-90deg)' : 'none', transition: 'transform .15s' }} />
           <span style={{ fontSize: 13.5, fontWeight: 800, letterSpacing: '-0.01em', color: C.ink }}>{title}</span>
         </button>
-        <Badge tone={attached ? 'green' : hasOcr ? 'amber' : 'gray'}>{attached ? '첨부됨 ✓' : hasOcr ? 'OCR만 · 미첨부' : '미첨부'}</Badge>
+        <Badge tone={attached ? 'green' : hasOcr ? 'amber' : 'gray'}>{attached ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>첨부됨 <Check size={12} strokeWidth={2.6} aria-hidden /></span> : hasOcr ? 'OCR만 · 미첨부' : '미첨부'}</Badge>
         {!collapsed && (desc ? <span style={{ fontSize: 11.5, color: C.faint, flex: 1, minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{desc}</span> : <span style={{ flex: 1 }} />)}
         {collapsed && <span style={{ flex: 1 }} />}
         {!collapsed && (editing
@@ -166,7 +173,7 @@ export function InfoDoc({
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, flexWrap: 'wrap', fontSize: 11.5 }}>
                 <span style={{ color: C.mute, maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={pending.fileName}>{pending.fileName}</span>
-                <Badge tone={pending.url ? 'green' : 'amber'}>{pending.url ? '첨부됨 ✓' : '파일 미첨부'}</Badge>
+                <Badge tone={pending.url ? 'green' : 'amber'}>{pending.url ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>첨부됨 <Check size={12} strokeWidth={2.6} aria-hidden /></span> : '파일 미첨부'}</Badge>
                 <Badge tone={pending.ocr ? 'blue' : 'gray'}>{pending.ocr ? 'OCR 완료' : 'OCR 없음 · 수기'}</Badge>
                 <span style={{ flex: 1 }} />
                 <Btn size="sm" variant="ghost" onClick={() => { setPending(null); setConfirm({}); }}>다시 선택</Btn>
@@ -194,9 +201,9 @@ export function InfoDoc({
       {/* 서류 이력 (접힘) — 최신 먼저 */}
       {docs.length > 1 && (
         <div style={{ marginTop: 6 }}>
-          <button onClick={() => setHistOpen((o) => !o)} style={link}>
+          <TextLink onClick={() => setHistOpen((o) => !o)} tone="ink" style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11.5, color: C.mute, fontWeight: 600 }}>
             <ChevronDown size={13} color={C.sub} style={{ transform: histOpen ? 'none' : 'rotate(-90deg)', transition: 'transform .15s' }} /> 서류 이력 {docs.length}
-          </button>
+          </TextLink>
           {histOpen && (
             <div style={{ marginTop: 6, border: `1px solid ${C.line}`, borderRadius: 'var(--radius)', overflow: 'hidden', background: C.card }}>
               {docs.map((d, i) => (

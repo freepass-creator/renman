@@ -1,6 +1,10 @@
 import { apiAuthHeaders } from './api-headers';
-import { ENTITIES, type EntityRecord } from './intake/entities';
 import { crosscheckOcr, type CrosscheckResult } from './ocr-crosscheck';
+
+// OCR raw → 엔티티 매핑은 intake/entities 한 곳만 정본으로 둔다.
+// 일반 투입·대량 투입·상세 문서교체가 서로 다른 매퍼를 쓰면 반복 원자(분납표 등)가
+// 입력 경로에 따라 유실되므로 이 모듈에서는 재구현하지 않고 그대로 재수출한다.
+export { mapOcrToEntity } from './intake/entities';
 
 export type OcrOriginal = { raw: Record<string, unknown>; at: string; source: string };
 export type OcrResult = { ok: boolean; raw?: Record<string, unknown>; error?: string; ocrOriginal?: OcrOriginal; crosscheck?: CrosscheckResult };
@@ -10,7 +14,7 @@ export async function callOcrExtract(file: File, ocrType: string): Promise<OcrRe
   fd.append('file', file);
   fd.append('type', ocrType);
   try {
-    const res = await fetch('/api/ocr/extract', { method: 'POST', body: fd, headers: apiAuthHeaders() });
+    const res = await fetch('/api/ocr/extract', { method: 'POST', body: fd, headers: await apiAuthHeaders() });
     let json: Record<string, unknown> = {};
     try { json = await res.json(); } catch { /* non-json */ }
     if (!res.ok || !json.ok) return { ok: false, error: String(json.error || `OCR 실패 (${res.status})`) };
@@ -20,18 +24,6 @@ export async function callOcrExtract(file: File, ocrType: string): Promise<OcrRe
   } catch (e) {
     return { ok: false, error: (e as Error).message };
   }
-}
-
-// OCR raw(JSON) → 엔티티 레코드. 각 필드의 ocrFrom 선언을 그대로 따름(SSOT).
-export function mapOcrToEntity(entityKey: string, raw: Record<string, unknown>): EntityRecord {
-  const ent = ENTITIES[entityKey];
-  const rec: EntityRecord = {};
-  if (!ent) return rec;
-  for (const f of ent.fields) {
-    const src = f.ocrFrom;
-    if (src && raw[src] != null && raw[src] !== '') rec[f.key] = raw[src] as EntityRecord[string];
-  }
-  return rec;
 }
 
 // 여러 파일 동시 OCR(동시성 제한). 순서 보존.

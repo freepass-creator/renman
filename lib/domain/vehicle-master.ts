@@ -145,6 +145,18 @@ function preNormName(s: string): string {
 const KOR_MAKER_RANK = ['현대', '기아', '제네시스', 'KGM', '쌍용', '쉐보레', '한국GM', 'GM대우', '르노', '르노삼성', '대우'];
 const FOREIGN_MAKER_RANK = ['BMW', '벤츠', '아우디', '테슬라', '렉서스', '미니', '볼보', '폭스바겐', '포르쉐', '랜드로버', '재규어', '포드', '지프', '도요타', '토요타', '닛산', '혼다', '인피니티', '캐딜락', '링컨', '크라이슬러', '마세라티', '페라리', '람보르기니', '벤틀리', '롤스로이스', '맥라렌', '애스턴마틴', '부가티'];
 
+/**
+ * 제조사 → 수입차 여부. 초과주행 단가(계약서에 국산·수입 2종 표기)를 고르는 데 쓴다.
+ * 국산 목록에 있으면 false, 수입 목록에 있으면 true, 둘 다 아니면 null(판단 불가 → 청구 보류).
+ */
+export function isForeignMaker(maker: unknown): boolean | null {
+  const mk = canonMk(maker);
+  if (!mk) return null;
+  if (KOR_MAKER_RANK.includes(mk)) return false;
+  if (FOREIGN_MAKER_RANK.includes(mk)) return true;
+  return null;
+}
+
 export function getCatalogMakers(): string[] {
   if (!_index) return [];
   const set = new Set<string>();

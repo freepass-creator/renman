@@ -11,7 +11,7 @@ import {
   WORK_CATEGORIES, WORK_STATUSES, workStatusPatch, canApplyWorkStatus, workSummary,
   workCategoryTone, type WorkCategory,
 } from '@/lib/work-ops';
-import { Btn, Badge, Input, Select, C, fieldStyle, toggleStyle, ctrlH, ctrlFs } from '@/components/ui';
+import { Btn, Badge, Input, TextArea, Select, PillTabs, ToggleChips, C, ctrlH, ctrlFs } from '@/components/ui';
 import { todayKST } from '@/lib/contracts/dates'; // KST 기준 오늘
 import { useIsMobile } from '@/lib/use-mobile';
 import { UploadCloud } from 'lucide-react';
@@ -183,13 +183,6 @@ export function WorkForm({ plate, companyId, vehicle, idle, onDone, onCancel, st
     } finally { setSaving(false); }
   }
 
-  // 칩 = toggleStyle(CTRL) · 작업구분만 카테고리 톤으로 활성색 오버라이드
-  const chip = (on: boolean, size: 'sm' | 'md' = 'md', tone?: string): React.CSSProperties => {
-    const base = toggleStyle(on, size, mobile);
-    if (on && tone) return { ...base, border: `1px solid ${tone}`, background: tone };
-    return base;
-  };
-  const catToneVar: Record<WorkCategory, string> = { '정비': 'var(--amber-text)', '사고수리': 'var(--red-text)', '상품화': 'var(--text-link)', '세차': 'var(--teal-text, #0e7490)' /* CSS var 폴백 — 매핑표 외 */ };
   const filePickH = ctrlH(mobile);
 
   return (
@@ -200,13 +193,13 @@ export function WorkForm({ plate, companyId, vehicle, idle, onDone, onCancel, st
       </div>
 
       {/* 작업구분 — 큰 칩 */}
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: mobile ? 8 : 6, marginBottom: 8 }}>
-        {WORK_CATEGORIES.map((c) => <button key={c} type="button" data-ui="toggle" onClick={() => pickCategory(c)} aria-pressed={category === c} style={chip(category === c, 'md', catToneVar[c])}>{c}</button>)}
+      <div style={{ marginBottom: 8 }}>
+        <PillTabs value={category} onChange={pickCategory} tabs={WORK_CATEGORIES.map((key) => ({ key, label: key }))} />
       </div>
       {/* 작업상태 — 칩 */}
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: mobile ? 8 : 6, marginBottom: 11, alignItems: 'center' }}>
         <span style={{ fontSize: 11, color: C.mute, marginRight: 2 }}>작업상태</span>
-        {WORK_STATUSES.map((w) => <button key={w} type="button" data-ui="toggle" onClick={() => setWorkStatus(w)} aria-pressed={workStatus === w} style={chip(workStatus === w, 'sm')}>{w}</button>)}
+        <PillTabs size="sm" value={workStatus} onChange={setWorkStatus} tabs={WORK_STATUSES.map((key) => ({ key, label: key }))} />
         <span style={{ flex: 1 }} />
         {willTransition
           ? <span style={{ fontSize: 11, color: C.mute }}>저장 시 차량상태 → <Badge tone={workCategoryTone(category)}>{targetStatus}</Badge></span>
@@ -224,7 +217,7 @@ export function WorkForm({ plate, companyId, vehicle, idle, onDone, onCancel, st
                   {(f.options || []).map((o) => <option key={o} value={o}>{o}</option>)}
                 </Select>
               : f.wide
-                ? <textarea value={vals[f.key] ?? ''} onChange={(e) => chg(f.key, e.target.value)} rows={2} style={{ ...fieldStyle(false, mobile), width: '100%', height: 'auto', padding: '8px 9px', resize: 'vertical', lineHeight: 1.5 }} />
+                ? <TextArea value={vals[f.key] ?? ''} onChange={(e) => chg(f.key, e.target.value)} rows={2} />
                 : <Input type={f.type === 'number' ? 'number' : f.type === 'date' ? 'date' : 'text'} value={vals[f.key] ?? ''} onChange={(e) => chg(f.key, e.target.value)} style={{ width: '100%' }} />}
           </label>
         ))}
@@ -233,11 +226,12 @@ export function WorkForm({ plate, companyId, vehicle, idle, onDone, onCancel, st
       {category === '사고수리' ? (
         <div style={{ border: `1px solid ${C.line}`, borderRadius: 'var(--radius)', background: C.card, padding: '11px 12px', marginBottom: 11 }}>
           <div style={{ fontSize: 11, color: C.mute, marginBottom: 6 }}>보험 처리 유형 <span style={{ color: C.faint }}>· 복수선택</span></div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: mobile ? 8 : 6, marginBottom: 12 }}>
-            {ACC_INS_TOGGLES.map((t) => {
-              const on = vals[t.key] === 'Y';
-              return <button key={t.key} type="button" data-ui="toggle" onClick={() => chg(t.key, on ? '' : 'Y')} aria-pressed={on} style={chip(on, 'sm', 'var(--red-text)')}>{t.label}</button>;
-            })}
+          <div style={{ marginBottom: 12 }}>
+            <ToggleChips
+              selected={new Set(ACC_INS_TOGGLES.filter((item) => vals[item.key] === 'Y').map((item) => item.key))}
+              onToggle={(key) => chg(key, vals[key] === 'Y' ? '' : 'Y')}
+              options={ACC_INS_TOGGLES.map((item) => ({ key: item.key, label: item.label }))}
+            />
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 }}>
             <div>

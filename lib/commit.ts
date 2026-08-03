@@ -9,32 +9,37 @@ import { resolveWriteCompany, NEED_COMPANY } from './scope';
 import { canSetStatus } from './domain/status';
 import { syncVehicleToFreepass } from './freepass/product-sync';
 import type { EntityRecord } from './intake/entities';
+import { normalizeRecord, runIntakePostWrite, saveIntake } from './intake';
+import type { AtomicEventSource } from './domain/atomic-event';
 
 export type CommitUpdateArgs = {
   entity: string;
   sessionCompanyId: string;
   /** companyId 해소용(레코드에 있으면 우선) */
-  rec?: { companyId?: unknown } | null;
+  rec?: EntityRecord | null;
   key: string;
   patch: EntityRecord;
+  /** 원자 사건 출처. 문서교체·대량 OCR은 'ocr', 기본은 'manual'. */
+  source?: AtomicEventSource;
 };
 
 export type CommitSaveArgs = {
   entity: string;
   sessionCompanyId: string;
-  rec?: { companyId?: unknown } | null;
+  rec?: EntityRecord | null;
   records: EntityRecord[];
+  source?: AtomicEventSource;
 };
 
 export type CommitRemoveArgs = {
   entity: string;
   sessionCompanyId: string;
-  rec?: { companyId?: unknown } | null;
+  rec?: EntityRecord | null;
   key: string;
   reason?: string;
 };
 
-function resolveOrThrow(sessionCompanyId: string, rec?: { companyId?: unknown } | null): string {
+function resolveOrThrow(sessionCompanyId: string, rec?: EntityRecord | null): string {
   const companyId = resolveWriteCompany(sessionCompanyId, rec);
   if (!companyId) throw new Error(NEED_COMPANY);
   return companyId;
@@ -61,17 +66,24 @@ async function assertLegalContractStatus(args: CommitUpdateArgs, companyId: stri
 
 export async function commitUpdate(args: CommitUpdateArgs): Promise<{ companyId: string }> {
   const companyId = resolveOrThrow(args.sessionCompanyId, args.rec);
-  await assertLegalContractStatus(args, companyId);
-  await getStore().update(args.entity, companyId, args.key, args.patch);
+  const patch = normalizeRecord(args.patch);
+  await assertLegalContractStatus({ ...args, patch }, companyId);
+  await getStore().update(args.entity, companyId, args.key, patch);
+  const merged = normalizeRecord({ ...(args.rec as EntityRecord | null || {}), ...patch, _key: args.key, companyId });
+  await runIntakePostWrite(args.entity, companyId, [merged], {
+    context: { source: args.source || 'manual' }, writeKind: 'update',
+  });
   // 차량 상태가 상품대기/상품화면 프리패스 매물로 자동 등록(fire-and-forget·env 게이트).
-  if (args.entity === 'vehicle') syncVehicleToFreepass({ ...(args.rec as EntityRecord | null || {}), ...args.patch });
+  if (args.entity === 'vehicle') syncVehicleToFreepass(merged);
   return { companyId };
 }
 
 export async function commitSave(args: CommitSaveArgs): Promise<{ companyId: string }> {
   const companyId = resolveOrThrow(args.sessionCompanyId, args.rec ?? args.records[0]);
-  await getStore().save(args.entity, companyId, args.records);
-  if (args.entity === 'vehicle') for (const r of args.records) syncVehicleToFreepass(r);
+  const result = await saveIntake(args.entity, companyId, args.records, {
+    context: { source: args.source || 'manual' }, notify: false,
+  });
+  if (args.entity === 'vehicle') for (const r of result.records) syncVehicleToFreepass(r);
   return { companyId };
 }
 

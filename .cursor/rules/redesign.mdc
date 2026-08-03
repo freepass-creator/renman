@@ -1,0 +1,123 @@
+---
+description: renman 리디자인 현재 아키텍처 — 웹=LedgerFrame(원장) · 모바일=/m 전문트리 · 데이터 1 SSOT
+alwaysApply: true
+---
+
+# renman 리디자인 — 현재 아키텍처 지도 (2026-07)
+
+«1 정의(데이터 SSOT) · 2 렌더러(웹·모바일)». 두 렌더러는 **같은 도메인 데이터**를 본다 — 데이터·집계를 두 벌 계산하면 그게 버그.
+
+## 웹 = LedgerFrame (원장)
+- 메뉴 IA (**사장님 확정 — 메뉴·그룹 추가는 사장님 승인 필요**):
+  - (상단) 대시보드 `/` · 운영현황 `/status`
+  - (처리) 리스크 `/risk` · 업무 `/work` · 자금일보 `/payments` · 데이터관리 `/ingest`
+  - (원장) 자산 `/asset` · 계약 `/contract` · 자금 `/cash`
+  - (하단) 경영관리 `/management` · 개발도구 `/dev/data`(hqOnly) · 설정 `/settings`
+  - 미수 `/receivables` = **메뉴 비노출** · 페이지 존치(리스크 미납 우클릭/선택바 «회수 큐 열기»)
+  - IA=`lib/nav.ts` PAGE_IA/ERP_MENU_TREE/NAV_GROUPS 동기.
+- 원장 = **마스터 표 + 더블클릭 우측 상세패널**. 틀 SSOT = `components/ui/ledger-frame.tsx`(+`ledger-filter/create/edit/record-panel`·`ledger-actions`·`ledger-selection-bar`). 데이터=`lib/master-ledgers`·`master-ledger-cols`·`ledger-ext`.
+- **헤더에 ⋯도구 없음.** 액션 자리: 이동=좌측메뉴 · 투입=[+생성]패널 · 대량=선택 액션바 · 개별=상세패널·우클릭.
+- 레거시 redirect: `/sheet`→`/asset` · `/finance`→`/cash` · `/ops`→`/` · `/desk`→`/risk`. (page.tsx는 redirect 1줄만 — 살리지 말 것)
+
+## 모바일 = `/m` 전문 트리 (웹 축소본 아님 ★)
+- **/m은 반응형 웹 축소가 아니라 «폰 전용 전문 페이지»다.** 데스크톱 표+더블클릭패널을 폰에 욱여넣지 말 것.
+- 하단 **5탭 고정**(홈·운영·리스크·입력·설정). 햄버거 없음. 셸=`components/m/{MTabBar,MHead,MBackBar}`. 상단=MHead(제목+3px 탭색).
+- 목록 = `ObjRow`+`Rows`(`components/ui/obj-row.tsx`): 행마다 박스 금지(테두리는 Rows), **상태 신호=배지 색만**(행 배경·좌측점·세로선 금지), 행 안 버튼 금지(선택 체크박스만). 섹션 접기 가능.
+- 드릴인 = `/m/vehicle/[plate]`(Vehicle360 재사용). 탭루트=MTabBar / 스택=MBackBar(`app/m/layout.tsx`).
+- **데이터는 웹과 동일 도메인 SSOT**(`linkFleet`/`buildFleetRows`, 이후 master-ledgers) — /m 전용 데이터 로직 신설 금지.
+- SessionBar는 `/m`·`/dev/preview`에서 `null`(웹 크롬 숨김) — 유지.
+
+## 공유 원자 SSOT
+- 상태색 = **분류/상태 `Badge` 톤만**. 행 배경 틴트·좌측 레일·점 금지. (`RailTone`은 모바일 ObjRow 잔여 prop — 원장 표에는 쓰지 않음.)
+- `statusRank`·`fleetRail` = `lib/sheet-rows.ts`(함대 정렬·모바일 리스트용). 웹 원장 행 스타일에 재사용 금지.
+- 데이터형태→원자 1:1: 집계=Metric · 라벨값=KV · 훑는목록=ObjRow(모바일)/ExcelSheet(웹 표) · 태그=Badge · 구획=Sec.
+
+## 원장 행 문법 (즉흥 컬럼 금지 — 고정 골격)
+
+`회사(다회사만) · 신원 · [분류] · 내용 · 상태배지 · 수치/기한`
+
+| 슬롯 | 역할 |
+|---|---|
+| 회사 | 다회사 뷰만(단일 회사면 ExcelSheet가 `company` 열 숨김 — 페이지 손롤 금지) |
+| 신원 | 대상·관통·검색의 열쇠. **역할은 공용, 이름·강조는 페이지별** — 계약=계약자 · 자산=차량 · 자금=거래처 · 업무=차량번호+계약자. 없으면 `미배정`. |
+| 내용 | 의도 한 줄(제목·위반내용·메모) |
+| 상태배지 | 공용 `Badge` 1종 — **상태 신호는 여기만**(행 배경·레일·점 금지) |
+| 수치/기한 | 금액·D-day·예정일 |
+
+원칙: (a) 신원 없는 행 없음 → 못 물면 상태 `미배정` (b) Badge만 상태색 (c) 신원=검색·딥링크 열쇠(`/work?open=` 등).
+
+### 엑셀기본(`*_SHEET_KEYS.basic`) 열 순서
+행문법과 같은 축. **분류(kind/group/rentalType)는 내용 앞·상태 앞**에 둘 수 있음.
+
+`회사 → 신원(+) → [분류] → 내용 → 상태 → 수치/기한 → (보조…)`
+
+- 상태·분류를 신원보다 앞에 두지 말 것 (업무·자산에서 깨졌던 패턴).
+- 빈값 카피 SSOT = `lib/ledger-empty.ts` (`—` · `미배정` · `없음` · `미매칭`).
+- 열 추가/삭제 요청 규격 = `lib/ledger-ext.ts`.
+
+## 엑셀뷰 공통 그릇 (100% 공통 · 이탈 금지)
+
+| 항목 | 규격 |
+|---|---|
+| 셀 여백 | `EXCEL_PAD_Y/X` = 5 / 8 |
+| 행높이 | `--ledger-row-h`(44) · `EXCEL_ROW_H` 단일토큰. 페이지 예외 금지 |
+| 헤더 높이 | `--ledger-head-h`(36) |
+| 숫자 | 우측 + tabular + `NUM` 폰트 |
+| 텍스트·날짜·배지 | 좌측(배지·상태만 center 허용) |
+| 헤더 정렬 | 데이터 열과 동일 |
+| 금액 표기 | **표 셀** = `money()`(₩ 없음) · **합계·지표·패널 요약** = `won()`(₩) |
+| 빈값 | `LEDGER_EMPTY` · 신원없음 `'미배정'` |
+| 배지 라운드 | `--radius-badge` |
+| 2줄 셀 | **`TwoLineCell`만** (`CELL_SUB_FS` sub) |
+| 들여쓰기 | `INDENT_UNIT`(14) · 매직넘버 금지 |
+| 선택행 | `--bg-selected` / `C.selected` 만 |
+
+### 금지 (컬럼 `render` 안 «그릇 변형»)
+`padding` / `margin` / `height` / `fontSize` / `lineHeight` / `display:flex` / `gap` 등 레이아웃·타이포 인라인 style 금지.
+**허용:** 상태색(`color` / `background`) · `fontWeight` · `fontFamily: NUM`(모노 신원).
+
+### 공통 vs 페이지별
+- **공통** = 틀(`LedgerFrame`) · 원자(`Badge`/`TwoLineCell`/`money`) · 토큰 · 셀규격 · 정렬규칙
+- **페이지별** = 컬럼 배열(`*_SHEET_KEYS`) · 필터축 · 스코프
+- 공통을 페이지 내용에 강제 주입 금지(예: 운영현황에 대여형태)
+
+## 분류→상태 SSOT (잠정 — 추후 수정 가능)
+각 원장 행 = **분류 1 + 상태 1**.
+
+| 원장 | 분류 | 상태 |
+|---|---|---|
+| **업무** | 정비 · 사고 · 상담 · 일정 · 문서 · 과태료 · 기타 | 정비[접수·입고·작업중·출고·완료·보류] · 사고[접수·수리중·보험청구·정산·완료·보류] · 상담[대기·진행·완료·재연락] · 일정[예정·임박·완료·지연] · 문서[작성·발송·완료] · 과태료[미매칭·진행·종결] · 기타[대기·진행·완료·보류] · **공통예외 `미배정`** |
+| **계약** | 대여형태(셀프·보험·월렌트·장기·업무용·기타) | 예약·진행·만기임박·만기경과·종료·해지·연장 |
+| **자산** | 구매예정 · 보유중 · 처분예정 · 처분완료 | 구매예정[발주·입고대기·등록대기] · 보유중[운행·정비·사고·휴차] · 처분예정[매물·상담·매각계약] · 처분완료[매각·폐차·반납·전손] |
+| **운영현황** | 대여형태 | 운행·정비·사고·휴차·회수단계 (=자산 보유중 SSOT 재사용) |
+| **자금** | 입금/출금(+과목) | 매칭완료·미매칭·해당없음 |
+| **리스크** | 미완료 · 미납 · 만기 · 휴차 | 미완료[진행·지연] · 미납[임박·경과·독촉·내용증명] · 만기[임박·경과] · 휴차[단기·장기] |
+
+## 지금 지켜야 (검수 2026-07 지적)
+- **페이지 손롤 집계 금지** — 원장 배지/합계는 `lib/ledger-stats` SSOT. 자산·계약 이행됨 · 자금·운영도 동일. 페이지 `.filter/.reduce`로 통계 직접 계산 금지.
+- **/m PageDef**: `MobilePage`·`FLEET_DEF`·`lib/pagedef/{types,rank,defs}` 유지. ~~`WebPage`~~ 폐기(웹 소비처 0 · 삭제됨).
+
+## 헤더 컨트롤 존 규격 (전 페이지 동일 — 누더기 금지)
+좌→우 순서 고정: `[회사][검색][☰필터][기간] ····· 지표 [기본/전체] [+생성]`
+- **회사 스코프**: `CompanyFilter` 원자 하나 · **프레임이 그림**(페이지에서 손롤·손 `<select>` 금지) · LedgerFrame=필터줄 첫칸 `size="sm"`(표준) · 회사무관 페이지만 숨김 · **meta에 스코프 텍스트 중복 표기 금지**.
+- **주액션(쓰기)**: 필터줄 맨 오른쪽 `[+생성]` · **라벨 solid 최대 1개** · 보조는 ghost `iconOnly`.
+- **버튼 size**: 헤더 컨트롤 전부 `size="sm"`.
+- **⋯도구 메뉴 없음** (`LedgerToolsMenu` 폐기). 액션은 «대상이 정해진 순간»에만:
+  - 페이지 이동 → **좌측 메뉴** (헤더 금지)
+  - 데이터 투입 → **[+생성] 패널** (`fileIngest` · 과태료 gateway 패턴)
+  - 여러 행 대량 실행 → 행 선택 시 **`LedgerSelectionBar`** (0건이면 미렌더)
+  - 개별 행 실행 → **상세패널 액션 · 우클릭 ContextMenu**
+- **표 선택 = 체크박스 없음.** 클릭=단일 · Shift=범위 · Ctrl/Cmd=토글 · 선택행 `--bg-selected` · 더블클릭=상세. 훅=`useTableSelection`+`useRowSelection`(jpkerp5). 우클릭=미선택이면 선택 후 `ContextMenu`.
+- **범위·구분 선택**: `Select` 하나로 통일(PillTabs 혼용 지양).
+- 헤더 드롭다운은 3종만: 회사 스코프 · 기간(`PeriodBar` sm) · 보기(기본/전체).
+
+## 아이콘 규격 (전 앱 통일)
+- **전 아이콘 = `lucide-react` 하나로 통일.** 이모지·유니코드 기호(✓·⌂·↻ 등)·커스텀 SVG·다른 아이콘셋을 아이콘 자리에 쓰지 말 것 (인쇄면/문서면 예외).
+- **페이지 타이틀·탭·바로가기 아이콘 = 그 화면의 nav 아이콘 재사용** — `lib/nav.ts`(NAV_GROUPS/ERP_MENU_TREE)의 `icon`이 SSOT. 메뉴와 타이틀이 항상 같은 아이콘.
+- 새 아이콘이 필요하면 nav 항목/공용 맵에 먼저 정의 → 거기서 가져다 씀. 페이지에서 임의 손픽 금지.
+
+## 하지 말 것
+- ❌ /m을 반응형 웹 축소로 만들기 (전문 페이지로 간다).
+- ❌ 같은 개념(가동상태·미수·잔액)을 웹·모바일이 각자 계산 (데이터 2벌).
+- ❌ redirect된 레거시 페이지(`/sheet`·`/finance`·`/ops`·`/desk`) 되살리기.
+- ❌ 홈(`/`)에 엑셀 예외 큐·Facet 복원. 홈(/) = **«대시보드»** — 시각 SSOT=`/dev/erp-design` HomeView(KPI4 + 오늘업무 + 교차검증). 셸=`LedgerFrame`. 예외·일정 기한=/risk(`risk-ledger`←`buildAgenda` 어김·임박). 데이터=`computeKPI`/`computeDashboard`/`riskAgendaFocus`/`selectPendingWork`. Sec 접기 금지(`collapsible={false}`).

@@ -3,9 +3,8 @@ import React, { useState } from 'react';
 import { useSession } from '@/lib/session';
 import { saveIntake } from '@/lib/intake';
 import { resolveWriteCompany, NEED_COMPANY } from '@/lib/scope';
-import { Btn, Input, C, fieldStyle, toggleStyle } from '@/components/ui';
+import { Btn, Checkbox, Input, TextArea, PillTabs, C } from '@/components/ui';
 import { todayKST } from '@/lib/contracts/dates'; // KST 기준 오늘
-import { useIsMobile } from '@/lib/use-mobile';
 
 export type QuickLogCtx = { plate?: string; customer?: string; contractNo?: string; companyId?: string };
 
@@ -28,7 +27,6 @@ const today = todayKST;
  *  저장·취소 모두 onDone/onCancel 콜백으로 상위(펼침 상태)를 접는다. 저장 로직은 전역 QuickLog와 동일. */
 export function QuickLogForm({ ctx, onDone, onCancel, autoFocus = true, style }: { ctx: QuickLogCtx; onDone: () => void; onCancel: () => void; autoFocus?: boolean; style?: React.CSSProperties }) {
   const { user, companyId } = useSession();
-  const mobile = useIsMobile();
   const [kind, setKind] = useState<string>('메모');
   const [text, setText] = useState('');
   const [follow, setFollow] = useState(false);
@@ -59,16 +57,14 @@ export function QuickLogForm({ ctx, onDone, onCancel, autoFocus = true, style }:
         <span style={{ fontSize: 12.5, fontWeight: 800, color: C.ink }}>빠른 기록</span>
         {anchor ? <span style={{ fontSize: 11.5, color: C.faint }}>{anchor}에 남깁니다</span> : null}
       </div>
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: mobile ? 8 : 6, marginBottom: 8 }}>
-        {KINDS.map((k) => (
-          <button key={k} type="button" data-ui="toggle" onClick={() => setKind(k)} aria-pressed={kind === k} style={toggleStyle(kind === k, 'sm', mobile)}>{k}</button>
-        ))}
+      <div style={{ marginBottom: 8 }}>
+        <PillTabs size="sm" value={kind} onChange={setKind} tabs={KINDS.map((key) => ({ key, label: key }))} />
       </div>
-      <textarea autoFocus={autoFocus} value={text} onChange={(e) => setText(e.target.value)} placeholder={hint}
-        style={{ ...fieldStyle(false, mobile), width: '100%', height: 'auto', minHeight: 80, marginTop: 8, padding: '10px 12px', lineHeight: 1.5, resize: 'vertical' }} />
-      <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10, fontSize: 13, color: C.mute, cursor: 'pointer' }}>
-        <input type="checkbox" checked={follow} onChange={(e) => setFollow(e.target.checked)} /> 다음 할 일 있음 — 일정에 뜨게
-      </label>
+      <TextArea autoFocus={autoFocus} value={text} onChange={(e) => setText(e.target.value)} placeholder={hint}
+        style={{ minHeight: 80, marginTop: 8 }} />
+      <div style={{ marginTop: 6, color: C.mute }}>
+        <Checkbox checked={follow} onChange={setFollow} label="다음 할 일 있음 — 일정에 뜨게" stop={false} />
+      </div>
       {follow && <Input type="date" value={nextDate} onChange={(e) => setNextDate(e.target.value)} style={{ display: 'block', marginTop: 8 }} />}
       <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 12, flexWrap: 'wrap' }}>
         <Btn onClick={save} disabled={saving || !text.trim()}>{saving ? '저장 중…' : '저장'}</Btn>

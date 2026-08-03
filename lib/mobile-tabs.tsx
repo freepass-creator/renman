@@ -7,8 +7,8 @@
  */
 import { useEffect, useMemo, useState } from 'react';
 import {
-  Home, LayoutDashboard, Search, Upload, Settings, LayoutGrid, Car,
-  ReceiptText, Wallet, FileText, Inbox, TrendingUp, ShieldAlert,
+  LayoutDashboard, Upload, CarFront, ListTodo,
+  Wallet, FileText, TriangleAlert,
   type LucideIcon,
 } from 'lucide-react';
 import { useSession } from '@/lib/session';
@@ -19,7 +19,8 @@ import { tierIncludes, type Tier } from '@/lib/tier';
 import { Btn, C, SPACE_M, toggleStyle } from '@/components/ui';
 
 export type MobileTabId =
-  | 'home' | 'mydesk' | 'search' | 'upload' | 'settings'
+  | 'operations' | 'money' | 'work'
+  | 'home' | 'status' | 'risk' | 'desk' | 'mydesk' | 'search' | 'upload' | 'settings'
   | 'dispatch' | 'asset' | 'receivables' | 'finance' | 'contract'
   | 'inbox' | 'penalty' | 'payments' | 'pnl' | 'integrity';
 
@@ -34,34 +35,24 @@ export type MobileTabDef = {
 };
 
 export const MOBILE_TAB_DEFS: MobileTabDef[] = [
-  { id: 'home', label: '홈', href: '/', icon: Home, match: (p) => p === '/', group: '기본', tier: pageTier('/') },
-  { id: 'mydesk', label: '마이', href: '/ops', icon: LayoutDashboard, match: (p) => p.startsWith('/ops'), group: '기본', tier: pageTier('/ops') },
-  { id: 'search', label: '검색', href: '/search', icon: Search, match: (p) => p.startsWith('/search'), group: '기본', tier: pageTier('/search') },
-  { id: 'upload', label: '데이터센터', href: '/ingest', icon: Upload, match: (p) => p.startsWith('/ingest'), group: '기본', tier: pageTier('/ingest') },
-  { id: 'settings', label: '설정', href: '/settings', icon: Settings, match: (p) => p.startsWith('/settings'), group: '기본', tier: pageTier('/settings') },
-  { id: 'dispatch', label: '업무', href: '/work', icon: LayoutGrid, match: (p) =>
-      p === '/work' || p.startsWith('/work/') || p.startsWith('/dispatch') || p.startsWith('/receivables') || p.startsWith('/repair')
-      || p.startsWith('/penalty') || p.startsWith('/payments') || p.startsWith('/ingest') || p.startsWith('/inbox')
-      || p.startsWith('/field') || p === '/m', group: '업무', tier: pageTier('/work') },
-  { id: 'asset', label: '자산', href: '/asset', icon: Car, match: (p) => p.startsWith('/asset'), group: '현황', tier: pageTier('/asset') },
-  { id: 'contract', label: '계약', href: '/contract', icon: FileText, match: (p) => p.startsWith('/contract'), group: '현황', tier: pageTier('/contract') },
-  { id: 'finance', label: '재무', href: '/finance', icon: Wallet, match: (p) => p.startsWith('/finance'), group: '현황', tier: pageTier('/finance') },
-  { id: 'receivables', label: '미수관리', href: '/receivables', icon: ReceiptText, match: (p) => p.startsWith('/receivables'), group: '업무', tier: pageTier('/receivables') },
-  { id: 'penalty', label: '과태료관리', href: '/penalty', icon: ReceiptText, match: (p) => p.startsWith('/penalty'), group: '업무', tier: pageTier('/penalty') },
-  { id: 'inbox', label: '증빙수집', href: '/inbox', icon: Inbox, match: (p) => p.startsWith('/inbox'), group: '업무', tier: pageTier('/inbox') },
-  { id: 'payments', label: '자금일보', href: '/payments', icon: Wallet, match: (p) => p.startsWith('/payments'), group: '업무', tier: pageTier('/payments') },
-  { id: 'pnl', label: '손익', href: '/pnl', icon: TrendingUp, match: (p) => p.startsWith('/pnl'), group: '경영', tier: pageTier('/pnl') },
-  { id: 'integrity', label: '정합성', href: '/integrity', icon: ShieldAlert, match: (p) => p.startsWith('/integrity'), group: '시스템', tier: pageTier('/integrity') },
+  { id: 'home', label: '대시보드', href: '/', icon: LayoutDashboard, match: (p) => p === '/', group: '허브', tier: pageTier('/') },
+  { id: 'status', label: '운영', href: '/status', icon: LayoutDashboard, match: (p) => p.startsWith('/status'), group: '허브', tier: pageTier('/status') },
+  { id: 'risk', label: '리스크', href: '/risk', icon: TriangleAlert, match: (p) => p.startsWith('/risk') || p.startsWith('/desk'), group: '허브', tier: pageTier('/risk') },
+  { id: 'upload', label: '업로드', href: '/ingest', icon: Upload, match: (p) => p.startsWith('/ingest'), group: '허브', tier: pageTier('/ingest') },
+  { id: 'asset', label: '자산', href: '/asset', icon: CarFront, match: (p) => p.startsWith('/asset'), group: '원장', tier: pageTier('/asset') },
+  { id: 'contract', label: '계약', href: '/contract', icon: FileText, match: (p) => p.startsWith('/contract'), group: '원장', tier: pageTier('/contract') },
+  { id: 'money', label: '자금', href: '/cash', icon: Wallet, match: (p) => p.startsWith('/cash'), group: '원장', tier: pageTier('/cash') },
+  { id: 'work', label: '업무', href: '/work', icon: ListTodo, match: (p) => p.startsWith('/work'), group: '원장', tier: pageTier('/work') },
 ];
 
 export const MOBILE_TAB_MAP: Record<string, MobileTabDef> = Object.fromEntries(MOBILE_TAB_DEFS.map((t) => [t.id, t]));
 
-/** 라이트 코어 — 홈·마이·현황·설정. 스탠다드+=업무 허브·미수를 기본에 포함(막힘 없이 진입). */
-const PREFERRED_LIGHT: MobileTabId[] = ['home', 'mydesk', 'asset', 'contract', 'settings'];
-const PREFERRED_STANDARD: MobileTabId[] = ['home', 'mydesk', 'dispatch', 'receivables', 'settings'];
+/** 라이트 코어 — 홈·리스크·원장. */
+const PREFERRED_LIGHT: MobileTabId[] = ['home', 'risk', 'asset', 'contract', 'work'];
+const PREFERRED_STANDARD: MobileTabId[] = PREFERRED_LIGHT;
 
 export const MAX_MOBILE_TABS = 5;
-export const MOBILE_TAB_GROUPS = ['기본', '현황', '업무', '경영', '시스템'] as const;
+export const MOBILE_TAB_GROUPS = ['허브', '원장'] as const;
 
 function allowedTab(id: string): id is MobileTabId {
   const t = MOBILE_TAB_MAP[id];
@@ -80,7 +71,11 @@ const STORE_PREFIX = 'jpk:mobile-tabs:';
 
 function normalizeIds(raw: unknown): MobileTabId[] {
   if (!Array.isArray(raw)) return defaultMobileTabs();
-  const mapped = (raw as string[]).map((id) => (id === 'field' ? 'dispatch' : id));
+  const mapped = (raw as string[]).map((id) => (
+    id === 'field' ? 'dispatch'
+      : id === 'desk' || id === 'mydesk' ? 'risk'
+        : id
+  ));
   const ids = mapped.filter(allowedTab);
   const uniq = [...new Set(ids)];
   return uniq.length ? uniq.slice(0, MAX_MOBILE_TABS) : defaultMobileTabs();

@@ -7,10 +7,9 @@ import { useCashHubNav } from '@/components/CashHubTabs';
 import { companyLabel } from '@/lib/companies';
 import { computeContractView } from '@/lib/contract-ops';
 import { selectReceivables } from '@/lib/snapshot/selectors';
-import { computeAssetLedgerEntry } from '@/lib/payments/asset-ledger';
+import { computeAssetLedgerEntry, summarizeLedger, vehicleRecordToAsset } from '@/lib/payments/asset-ledger';
 import { loanSchedule } from '@/lib/finance/loan-schedule';
 import { isCashPurchase } from '@/lib/domain/vehicle-finance';
-import type { Vehicle } from '@/lib/payments/types';
 import { TODAY } from '@/lib/dashboard-consts';
 import { useEntityLists } from '@/lib/use-entity-lists';
 
@@ -36,12 +35,8 @@ export default function FinancialsPage() {
   const { data: [vs = [], cs = [], bank = []], loading } = useEntityLists(['vehicle', 'contract', 'bank_tx']);
 
   const F = useMemo(() => {
-    // 자산
-    let carBook = 0, acquisition = 0;
-    for (const v of vs) {
-      const acq = Number(v.acquisitionPrice) || 0; acquisition += acq;
-      if (acq) carBook += computeAssetLedgerEntry({ id: String(v.plate), plate: String(v.plate), model: String(v.carName || ''), status: '운행', purchasePrice: acq, firstRegisteredDate: String(v.firstReg || v.acquisitionDate || '') } as unknown as Vehicle, TODAY).bookValue;
-    }
+    const entries = vs.map((v) => computeAssetLedgerEntry(vehicleRecordToAsset(v), TODAY));
+    const S = summarizeLedger(entries);
     const recv = selectReceivables(cs, TODAY);
     let receivable = recv.misuActive, deposit = 0;
     for (const c of cs) { const view = computeContractView(c, TODAY); if (!view.ended) deposit += Number(c.deposit) || 0; }
@@ -60,10 +55,20 @@ export default function FinancialsPage() {
     // 부채
     let loanRemain = 0;
     for (const v of vs) { const cur = loanSchedule(v).filter((r) => r.ym <= TYM).pop(); loanRemain += cur ? cur.balance : (isCashPurchase(v.loanCashOnly) ? 0 : Number(v.loanPrincipal) || 0); }
-    const assets = carBook + receivable + cash;
+    const assets = S.totalBookValue + receivable + cash;
     const liabilities = loanRemain + deposit;
     const equity = assets - liabilities;
-    return { carBook, acquisition, depreciation: acquisition - carBook, receivable, cash, cashIsReal, loanRemain, deposit, assets, liabilities, equity };
+    return {
+      carBook: S.totalBookValue,
+      acquisition: S.totalAcquisition,
+      depreciation: S.totalAccumulatedDep,
+      receivable, cash, cashIsReal, loanRemain, deposit, assets, liabilities, equity,
+      totalSalePrice: S.totalSalePrice,
+      totalDisposalGainLoss: S.totalDisposalGainLoss,
+      disposedCount: S.disposedCount,
+      salePriceMissingCount: S.salePriceMissingCount,
+      incompleteCount: S.incompleteCount,
+    };
   }, [vs, cs, bank]);
 
   return (
@@ -81,6 +86,23 @@ export default function FinancialsPage() {
           <Row label="미수금" value={F.receivable} hint="운행중 계약 순미수" />
           <Row label="현금" value={F.cash} hint={F.cashIsReal ? '계좌 최신 잔액(실제)' : '자금원장 순증감(기초잔액 미반영)'} tone={F.cash < 0 ? C.danger : undefined} />
           <Row label="자산 총계" value={F.assets} strong />
+          {F.incompleteCount > 0 ? (
+            <div style={{ marginTop: 6, fontSize: 11.5, color: C.faint }}>취득가·취득일 미입력 {F.incompleteCount}대 제외</div>
+          ) : null}
+        </Sec>
+        <Sec id="f-disposal" title="처분손익" desc="매각한 차 — 매각가 − 장부가">
+          <Row label="매각대금" value={F.totalSalePrice} />
+          <Row
+            label="처분손익"
+            value={F.totalDisposalGainLoss}
+            strong
+            tone={F.totalDisposalGainLoss >= 0 ? 'var(--green-text)' : C.danger}
+            /* ★매각가 미입력 건은 손익에 반영되지 못한다 — 합계가 불완전함을 그 자리에서 알려야
+               «이게 전부»라고 오해하지 않는다(말소·폐차는 장부가 전액 손실로 이미 반영된다). */
+            hint={F.salePriceMissingCount
+              ? `처분 ${F.disposedCount}대 · ★매각가 미입력 ${F.salePriceMissingCount}대는 미반영`
+              : `처분 ${F.disposedCount}대`}
+          />
         </Sec>
         <Sec id="f-liability" title="부채" desc="갚아야 할 것">
           <Row label="할부·리스 잔여원금" value={F.loanRemain} hint="상환스케줄 계산값" />

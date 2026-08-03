@@ -13,7 +13,7 @@ import { ensureCatalog, classifyVehicle, type ClassifyResult } from '@/lib/domai
 import { commitUpdate } from '@/lib/commit';
 import { NEED_COMPANY } from '@/lib/scope';
 import { companyLabel } from '@/lib/companies';
-import { Page, Panel, Btn, Badge, EmptyState, DataTable, IconSeg, C, SPACE_M, type Col, PageLoading } from '@/components/ui';
+import { Page, Panel, Btn, Badge, Checkbox, EmptyState, DataTable, IconSeg, C, SPACE_M, type Col, PageLoading } from '@/components/ui';
 import { WorkbenchBar } from '@/components/WorkbenchBar';
 import { toast } from '@/lib/toast';
 
@@ -104,7 +104,7 @@ export default function ClassifyPage() {
   const cols: Col<Row>[] = [
     {
       key: '_ck', label: '', render: (r) => r.sug.confidence !== 'none' && r.sug.subModel
-        ? <input type="checkbox" checked={checked.has(r.key)} onChange={() => toggle(r.key)} onClick={(e) => e.stopPropagation()} style={{ width: 16, height: 16, cursor: 'pointer' }} />
+        ? <Checkbox checked={checked.has(r.key)} onChange={() => toggle(r.key)} ariaLabel={`${r.plate || r.carName || '차량'} 차종 분류 선택`} />
         : <span style={{ color: C.faint }}>—</span>,
     },
     ...(scopeAll ? [{ key: '_co', label: '회사', render: (r: Row) => <span style={{ color: C.mute }}>{companyLabel(r.veh.companyId)}</span> }] : []),

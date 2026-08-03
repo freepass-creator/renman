@@ -1,6 +1,7 @@
 /**
- * 리스크 엔진 — 베이스 정합성 경고. 대여(계약) 레코드의 사실에서 파생, 저장 안 함.
- * 베이스 3종: ① 미수(돈 안 냄) ② 보험 불일치(운전자<보험허용) ③ 반납 지남.
+ * 리스크 엔진 — 계약 불이행(약정대로 안 되는 상태). 저장 안 함 · 사실에서 파생.
+ * 「미수」는 리스크의 한 종류(돈). 그 외 보험·반납 등 이행 위반을 같이 잡는다.
+ * 베이스 3종: ① 미수 ② 보험 불일치(운전자<보험허용) ③ 반납 지남.
  * 차량 마스터 없이 대여 행만으로 동작 — 엑셀 마이그레이션 직후 바로 경고가 뜬다.
  */
 import type { EntityRecord } from './intake/entities';
@@ -12,6 +13,11 @@ export type Severity = 'high' | 'mid';
 export type RiskFlag = { kind: RiskKind; sev: Severity; detail: string };
 
 function ymd(d: unknown): string { const s = String(d || ''); return /^\d{4}-\d{2}-\d{2}/.test(s) ? s.slice(0, 10) : ''; }
+
+/** 계약에 리스크(불이행) 플래그가 하나라도 있으면 true. */
+export function hasContractRisk(rec: EntityRecord, today: string, view?: ContractView): boolean {
+  return contractRisks(rec, today, view).length > 0;
+}
 
 /** 대여 1건의 경고 목록(0~3개). view를 넘기면 computeContractView 재계산 없음. */
 export function contractRisks(rec: EntityRecord, today: string, view?: ContractView): RiskFlag[] {

@@ -47,10 +47,13 @@ export const ENTITY_LAYER: Record<string, DataLayer> = {
   vehicle: 'ledger',   // 현물
   contract: 'ledger',  // 계약(무형) — 성립=자산 생성, 이벤트 아님
   insurance: 'ledger', // 보험 권리·증권 = 계약성 자산
+  bank_account: 'ledger', // 계좌 자체 = 자금자산 원장
+  lease: 'ledger',        // 임대차(사업장) 계약 = 무형 원장
   bank_tx: 'ledger',   // 자금 원장 줄
   card_tx: 'ledger',
   customer: 'ledger',  // 계약에 묶인 거래상대(얇은 원장)
   // ③ 이벤트
+  work_item: 'event',
   history: 'event',
   penalty: 'event',
   inbox: 'event',
@@ -64,6 +67,8 @@ export const ENTITY_ASSET_KIND: Partial<Record<string, AssetKind>> = {
   vehicle: 'physical',
   contract: 'contract',
   insurance: 'contract',
+  bank_account: 'cash',
+  lease: 'contract',
   bank_tx: 'cash',
   card_tx: 'cash',
   customer: 'party',
@@ -87,9 +92,9 @@ export const EVENT_FLOWS = [
   { key: 'receivables', label: '미수관리', writes: 'history·contract 상태', href: '/receivables' },
   { key: 'cash-journal', label: '자금일보', writes: 'bank_tx↔contract 연결 → 재무현황', href: '/payments' },
   { key: 'repair', label: '차량수선', writes: 'history', href: '/repair' },
-  { key: 'penalty', label: '과태료관리', writes: 'penalty', href: '/penalty' },
+  { key: 'penalty', label: '과태료관리', writes: 'penalty', href: '/work?group=과태료' },
   { key: 'ingest', label: '데이터센터', writes: '원장+이벤트 엔티티', href: '/ingest' },
-  { key: 'inbox', label: '증빙수집', writes: 'inbox→매칭', href: '/inbox' },
+  { key: 'inbox', label: '원본 처리함', writes: 'inbox→매칭', href: '/inbox' },
   { key: 'quicklog', label: 'QuickLog', writes: 'history', href: null },
 ] as const;
 

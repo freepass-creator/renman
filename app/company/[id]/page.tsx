@@ -1,14 +1,15 @@
 'use client';
 // 법인 워크스페이스 — 법인 하나의 전용 페이지. 모듈(기본정보·차고지·등록대수·증차신청·공문…)을
 // 접기/펼치기 + 카탈로그에서 추가/제거. 자산·자금이 이 법인에 귀속되는 뿌리 설정.
-import { useEffect, useState, type CSSProperties } from 'react';
+import { useEffect, useState, type CSSProperties, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { Plus, X, Trash2, Building2 } from 'lucide-react';
+import { Plus, X, Trash2, Building2, AlertTriangle } from 'lucide-react';
 import { useSession } from '@/lib/session';
 import { getStore } from '@/lib/store';
-import { COMPANIES, companyLabel, companyShort } from '@/lib/companies';
-import { loadMaster, saveMaster, genId, MODULE_CATALOG, type CompanyMaster, type Garage, type RegApplication, type OfficialDoc } from '@/lib/company-master';
-import { Page, Panel, Sec, Btn, Input, Select, C } from '@/components/ui';
+import { COMPANIES, companyLabel } from '@/lib/companies';
+import { loadMaster, saveMaster, masterStampOf, ensureCompanyMasterHydrated, genId, MODULE_CATALOG, type CompanyMaster, type Garage, type RegApplication, type OfficialDoc } from '@/lib/company-master';
+import { toast } from '@/lib/toast';
+import { Page, Panel, Sec, Btn, Input, Select, C, useConfirm } from '@/components/ui';
 import { WorkbenchBar } from '@/components/WorkbenchBar';
 
 const lab: CSSProperties = { fontSize: 11.5, color: 'var(--text-sub)', display: 'block', marginBottom: 3 };
@@ -19,42 +20,94 @@ export default function CompanyWorkspace() {
   const { companyId: scope, isOperator } = useSession();
   const params = useParams();
   const router = useRouter();
+  const confirm = useConfirm();
   const id = String(params.id || '');
   // 법인 소속 직원은 자기 법인만. 본사는 전 법인.
   const allowed = isOperator || scope === id;
   const [m, setM] = useState<CompanyMaster>({});
   const [dirty, setDirty] = useState(false);
   const [owned, setOwned] = useState(0); // 이 법인 보유 차량 수(정합용)
+  /* 저장 준비 상태 — 원격을 읽기 «전»에 저장하면 하이드레이트 전 로컬 스냅샷이 원격 최신값을
+     통째로 덮어써 차고지·증차신청·공문대장이 사라진다(전체 교체 저장이므로 되돌릴 수 없음).
+     그래서 하이드레이트가 끝날 때까지 저장 버튼을 열지 않고, 그때의 원격 스탬프를 CAS 기준값으로 잡는다. */
+  const [ready, setReady] = useState(false);
+  const [base, setBase] = useState('');
+  const [saving, setSaving] = useState(false);
 
-  useEffect(() => { setM(loadMaster(id)); setDirty(false); }, [id]);
+  useEffect(() => {
+    let cancelled = false;
+    setM(loadMaster(id)); setDirty(false); setReady(false);
+    void ensureCompanyMasterHydrated(id).then(() => {
+      if (cancelled) return;
+      // 하이드레이트가 캐시를 갈아끼웠을 수 있다 → 다시 읽는다(사용자가 이미 고치던 중이면 보존).
+      setM((prev) => (Object.keys(prev).length && dirtyRef.current ? prev : loadMaster(id)));
+      setBase(masterStampOf(id));
+      setReady(true);
+    });
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id]);
+
+  // dirty를 effect 안에서 최신값으로 읽기 위한 ref(구독 콜백이 낡은 값을 보지 않게).
+  const dirtyRef = useRef(false);
+  useEffect(() => { dirtyRef.current = dirty; }, [dirty]);
+
+  // 다른 탭·다른 화면에서 이 법인 마스터가 바뀌면 화면을 맞춘다(내가 고치던 중이면 보류).
+  useEffect(() => {
+    const on = () => { if (!dirtyRef.current) { setM(loadMaster(id)); setBase(masterStampOf(id)); } };
+    window.addEventListener('jpk:master-change', on);
+    return () => window.removeEventListener('jpk:master-change', on);
+  }, [id]);
   useEffect(() => { getStore().list('vehicle', id).then((v) => setOwned(v.filter((x) => String(x.status || '') !== '매각' && String(x.status || '') !== '말소').length)).catch(() => {}); }, [id]);
 
   const modules = m.modules || [];
   const set = (patch: Partial<CompanyMaster>) => { setM((p) => ({ ...p, ...patch })); setDirty(true); };
-  const save = () => { saveMaster(id, m); setDirty(false); };
+  const save = async () => {
+    if (saving) return;
+    setSaving(true);
+    const r = await saveMaster(id, m, { baseUpdatedAt: base });
+    setSaving(false);
+    if (r.ok) {
+      setBase(masterStampOf(id));
+      setDirty(false);
+      toast('법인 정보 저장', 'success');
+      return;
+    }
+    // ★실패했는데 dirty를 지우면 «저장됐다»는 거짓 신호가 남는다 — 그대로 둔다.
+    toast(r.message || '저장 실패', 'error');
+  };
   const addModule = (k: string) => set({ modules: [...modules, k] });
-  const removeModule = (k: string) => set({ modules: modules.filter((x) => x !== k) });
+  const removeModule = async (k: string, label: string) => {
+    if (!(await confirm({
+      title: '회사 모듈 제거',
+      message: `${label} 모듈을 이 회사 워크스페이스에서 제거합니까?\n저장해야 최종 반영됩니다.`,
+      confirmLabel: '모듈 제거',
+      danger: true,
+    }))) return;
+    set({ modules: modules.filter((x) => x !== k) });
+  };
   const available = MODULE_CATALOG.filter((c) => !modules.includes(c.key));
 
-  if (!allowed) return <Page title="법인관리"><div style={{ padding: 20, color: C.mute }}>이 법인에 접근 권한이 없습니다.</div></Page>;
-  if (!COMPANIES.includes(id)) return <Page title="법인관리"><div style={{ padding: 20, color: C.mute }}>존재하지 않는 법인입니다.</div></Page>;
+  if (!allowed) return <Page title="회사관리"><div style={{ padding: 20, color: C.mute }}>이 회사에 접근 권한이 없습니다.</div></Page>;
+  if (!COMPANIES.includes(id)) return <Page title="회사관리"><div style={{ padding: 20, color: C.mute }}>관리 목록에 없는 회사입니다.</div></Page>;
 
   return (
-    <Page title={companyLabel(id)} meta={`법인 워크스페이스 · ${companyShort(id)}`}
+    <Page title={companyLabel(id)} meta="회사별 전용 워크스페이스"
       tools={<WorkbenchBar actions={
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           {dirty && <span style={{ fontSize: 12, color: C.warn, fontWeight: 700 }}>저장 안 됨</span>}
-          <Btn onClick={save} disabled={!dirty}>저장</Btn>
+          {!ready && <span style={{ fontSize: 12, color: C.mute }}>서버 확인 중…</span>}
+          <Btn onClick={save} disabled={!dirty || !ready || saving}>{saving ? '저장 중…' : '저장'}</Btn>
         </div>
       } />}>
 
       {/* 법인 스위처 — 본사만 */}
       {isOperator && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', margin: '4px 0 18px' }}>
-          <span style={{ fontSize: 11.5, fontWeight: 700, color: C.faint, marginRight: 2 }}>법인 전환</span>
+          <span style={{ fontSize: 11.5, fontWeight: 700, color: C.faint, marginRight: 2 }}>회사 전환</span>
           {COMPANIES.map((c) => (
             <Btn key={c} size="sm" variant={c === id ? 'solid' : 'ghost'} onClick={() => router.push(`/company/${c}`)}>
-              <Building2 size={13} /> {companyShort(c)}
+              <Building2 size={13} /> {companyLabel(c)}
             </Btn>
           ))}
         </div>
@@ -65,7 +118,7 @@ export default function CompanyWorkspace() {
         if (!cat) return null;
         return (
           <Sec key={key} id={`co-${key}`} title={cat.label} desc={cat.desc}
-            right={!cat.core ? <Btn size="sm" variant="ghost" onClick={() => removeModule(key)}><X size={15} /></Btn> : undefined}>
+            right={!cat.core ? <Btn size="sm" variant="ghost" iconOnly tip={`${cat.label} 모듈 제거`} onClick={() => { void removeModule(key, cat.label); }}><X size={15} /></Btn> : undefined}>
             {renderModule(key, m, set, owned)}
           </Sec>
         );
@@ -102,11 +155,22 @@ type MP = { m: CompanyMaster; set: (p: Partial<CompanyMaster>) => void };
 function BasicModule({ m, set }: MP) {
   return (
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(210px,1fr))', gap: 10 }}>
+      <div style={{ gridColumn: '1 / -1' }}><label style={lab}>사업자등록증 상호 원문</label><Input value={m.registeredNameRaw || ''} onChange={(e) => set({ registeredNameRaw: e.target.value })} placeholder="예: 주식회사 ○○" style={{ width: '100%' }} /></div>
       <div><label style={lab}>대표</label><Input value={m.ceo || ''} onChange={(e) => set({ ceo: e.target.value })} style={{ width: '100%' }} /></div>
       <div><label style={lab}>사업자등록번호</label><Input value={m.bizNo || ''} onChange={(e) => set({ bizNo: e.target.value })} style={{ width: '100%' }} /></div>
       <div><label style={lab}>법인등록번호</label><Input value={m.corpNo || ''} onChange={(e) => set({ corpNo: e.target.value })} style={{ width: '100%' }} /></div>
+      <div><label style={lab}>개업일</label><Input type="date" value={m.openDate || ''} onChange={(e) => set({ openDate: e.target.value })} style={{ width: '100%' }} /></div>
       <div><label style={lab}>대표 전화</label><Input value={m.phone || ''} onChange={(e) => set({ phone: e.target.value })} style={{ width: '100%' }} /></div>
       <div style={{ gridColumn: '1 / -1' }}><label style={lab}>본점(사무실) 소재지</label><Input value={m.address || ''} onChange={(e) => set({ address: e.target.value })} placeholder="예: 김포시 …" style={{ width: '100%' }} /></div>
+      <div><label style={lab}>업태</label><Input value={(m.industry || []).join(', ')} onChange={(e) => set({ industry: e.target.value.split(',').map((v) => v.trim()).filter(Boolean) })} placeholder="예: 서비스, 부동산업" style={{ width: '100%' }} /></div>
+      <div><label style={lab}>종목</label><Input value={(m.category || []).join(', ')} onChange={(e) => set({ category: e.target.value.split(',').map((v) => v.trim()).filter(Boolean) })} placeholder="예: 렌터카, 매매업" style={{ width: '100%' }} /></div>
+      {m.businessRegistration?.url && (
+        <div style={{ gridColumn: '1 / -1', fontSize: 12.5 }}>
+          <a href={m.businessRegistration.url} target="_blank" rel="noopener noreferrer" style={{ color: C.accent, fontWeight: 700 }}>
+            사업자등록증 원본 열기{m.businessRegistration.fileName ? ` · ${m.businessRegistration.fileName}` : ''}
+          </a>
+        </div>
+      )}
     </div>
   );
 }
@@ -123,7 +187,7 @@ function GarageModule({ m, set }: MP) {
           <Input value={g.name || ''} onChange={(e) => upd(i, { name: e.target.value })} placeholder="차고지명" style={{ width: 130 }} />
           <Input value={g.address || ''} onChange={(e) => upd(i, { address: e.target.value })} placeholder="주소" style={{ flex: 1, minWidth: 200 }} />
           <Input type="number" value={g.capacity ?? ''} onChange={(e) => upd(i, { capacity: e.target.value === '' ? undefined : Number(e.target.value) })} placeholder="수용대수" style={{ width: 96 }} />
-          <Btn size="sm" variant="ghost" onClick={() => set({ garages: list.filter((_, j) => j !== i) })}><Trash2 size={15} /></Btn>
+          <Btn size="sm" variant="ghost" iconOnly tip={`${g.name || `${i + 1}번`} 차고지 삭제`} onClick={() => set({ garages: list.filter((_, j) => j !== i) })}><Trash2 size={15} /></Btn>
         </div>
       ))}
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 4 }}>
@@ -149,8 +213,8 @@ function VehicleRegModule({ m, set, owned }: MP & { owned: number }) {
       </div>
       {(mism || overCap) && (
         <div style={{ fontSize: 12, color: C.danger, fontWeight: 600, display: 'flex', flexDirection: 'column', gap: 2 }}>
-          {mism && <span>⚠ 등록 대수({reg})와 보유 차량({owned})이 다릅니다 — 증차·감차 신고 확인.</span>}
-          {overCap && <span>⚠ 등록 대수({reg})가 차고지 수용({cap})을 초과합니다.</span>}
+          {mism && <span style={{ display: 'inline-flex', alignItems: 'flex-start', gap: 4 }}><AlertTriangle size={13} strokeWidth={2.2} aria-hidden style={{ flexShrink: 0, marginTop: 1 }} />등록 대수({reg})와 보유 차량({owned})이 다릅니다 — 증차·감차 신고 확인.</span>}
+          {overCap && <span style={{ display: 'inline-flex', alignItems: 'flex-start', gap: 4 }}><AlertTriangle size={13} strokeWidth={2.2} aria-hidden style={{ flexShrink: 0, marginTop: 1 }} />등록 대수({reg})가 차고지 수용({cap})을 초과합니다.</span>}
         </div>
       )}
       <div>
@@ -166,7 +230,7 @@ function VehicleRegModule({ m, set, owned }: MP & { owned: number }) {
               <Select value={a.status} onChange={(e) => upd(i, { status: e.target.value as RegApplication['status'] })} style={{ width: 92, color: statusTone(a.status), fontWeight: 700 }}>
                 {APP_STATUS.map((s) => <option key={s} value={s} style={{ color: C.ink }}>{s}</option>)}
               </Select>
-              <Btn size="sm" variant="ghost" onClick={() => set({ regApplications: apps.filter((_, j) => j !== i) })}><Trash2 size={15} /></Btn>
+              <Btn size="sm" variant="ghost" iconOnly tip={`${a.date || `${i + 1}번`} ${a.kind} 신청 삭제`} onClick={() => set({ regApplications: apps.filter((_, j) => j !== i) })}><Trash2 size={15} /></Btn>
             </div>
           ))}
           <div><Btn size="sm" variant="ghost" onClick={() => set({ regApplications: [...apps, { id: genId('ap'), kind: '증차', status: '준비' }] })}><Plus size={13} /> 신청 추가</Btn></div>
@@ -188,7 +252,7 @@ function OfficialDocModule({ m, set }: MP) {
           <Select value={d.direction} onChange={(e) => upd(i, { direction: e.target.value as OfficialDoc['direction'] })} style={{ width: 84 }}><option value="발신">발신</option><option value="수신">수신</option></Select>
           <Input value={d.title || ''} onChange={(e) => upd(i, { title: e.target.value })} placeholder="제목" style={{ flex: 1, minWidth: 180 }} />
           <Input value={d.counterpart || ''} onChange={(e) => upd(i, { counterpart: e.target.value })} placeholder="상대(수신처/발신처)" style={{ width: 150 }} />
-          <Btn size="sm" variant="ghost" onClick={() => set({ officialDocs: list.filter((_, j) => j !== i) })}><Trash2 size={15} /></Btn>
+          <Btn size="sm" variant="ghost" iconOnly tip={`${d.title || `${i + 1}번`} 공문 삭제`} onClick={() => set({ officialDocs: list.filter((_, j) => j !== i) })}><Trash2 size={15} /></Btn>
         </div>
       ))}
       <div><Btn size="sm" variant="ghost" onClick={() => set({ officialDocs: [...list, { id: genId('doc'), direction: '발신' }] })}><Plus size={13} /> 공문 추가</Btn></div>
@@ -205,7 +269,7 @@ function CardModule({ m, set }: MP) {
         <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
           <Input value={c.no || ''} onChange={(e) => upd(i, { no: e.target.value })} placeholder="카드번호(끝4자리)" style={{ width: 150 }} />
           <Input value={c.alias || ''} onChange={(e) => upd(i, { alias: e.target.value })} placeholder="별명 (예: 영업용)" style={{ flex: 1, minWidth: 150 }} />
-          <Btn size="sm" variant="ghost" onClick={() => set({ cards: list.filter((_, j) => j !== i) })}><Trash2 size={15} /></Btn>
+          <Btn size="sm" variant="ghost" iconOnly tip={`${c.alias || c.no || `${i + 1}번`} 법인카드 삭제`} onClick={() => set({ cards: list.filter((_, j) => j !== i) })}><Trash2 size={15} /></Btn>
         </div>
       ))}
       <div><Btn size="sm" variant="ghost" onClick={() => set({ cards: [...list, { no: '' }] })}><Plus size={13} /> 카드 추가</Btn></div>

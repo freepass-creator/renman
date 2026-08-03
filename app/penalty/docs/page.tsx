@@ -28,12 +28,12 @@ export default function PenaltyDocsPage() {
     <Page
       title="변경부과 공문"
       meta={`${scopeAll ? '전체 회사' : companyLabel(companyId)} · 매칭 ${matched.length}건`}
-      tools={<WorkbenchBar mid={<WorkHubBack />} actions={<Btn variant="ghost" href="/penalty">← 과태료</Btn>} />}
+      tools={<WorkbenchBar mid={<WorkHubBack />}           actions={<Btn variant="ghost" href="/work?group=%EA%B3%BC%ED%83%9C%EB%A3%8C">← 과태료</Btn>} />}
     >
       {loading ? <PageLoading />
         : matched.length === 0 ? (
           <EmptyState>
-            매칭된 과태료가 없습니다 — <Btn variant="ghost" href="/penalty">과태료관리</Btn>에서 임차인을 확인하세요
+            매칭된 과태료가 없습니다 — <Btn variant="ghost" href="/work?group=%EA%B3%BC%ED%83%9C%EB%A3%8C">업무관리·과태료</Btn>에서 임차인을 확인하세요
           </EmptyState>
         ) : (
           <PenaltyDocs

@@ -1,9 +1,8 @@
 'use client';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useSession } from '@/lib/session';
 import { type EntityRecord } from '@/lib/intake/entities';
-import { computeContractView, patchEngineLock } from '@/lib/contract-ops';
-import { collectionStage } from '@/lib/collection';
+import { patchEngineLock } from '@/lib/contract-ops';
 import { openCar, openCustomer } from '@/lib/ui-bus';
 import { customerKey } from '@/lib/customers';
 import { sendNoticeCert, sendNoticeCertBulk } from '@/lib/docs/send-notice';
@@ -11,80 +10,173 @@ import { useBusyAction } from '@/lib/use-busy-action';
 import { safeUpdate } from '@/lib/safe-update';
 import { selectedInDim } from '@/lib/lens-filters';
 import { textMatch } from '@/lib/search-match';
-import { FacetPage, Sec, Cards, Metric, ObjCard, Btn, EmptyState, won, C, SPACE_M, TOUCH, PageLoading, useConfirm } from '@/components/ui';
+import { Badge, Btn, C, Input, TextArea, LedgerActiveFilterTags, LedgerFilterButton, LedgerFrame, LedgerRecordPanel, LedgerSelectionBar, Search, won, useConfirm, type LedgerColView } from '@/components/ui';
 import { FacetRail } from '@/components/FacetRail';
 import { WorkbenchBar } from '@/components/WorkbenchBar';
 import { WorkHubBack } from '@/components/WorkHubTabs';
 import { QuickLogForm } from '@/components/QuickLogForm';
 import { NotifyDialog, type NotifyRecipient } from '@/components/NotifyDialog';
+import { depositReceivedOf, notifyRecipient } from '@/lib/notify/recipients';
 import { companyLabel } from '@/lib/companies';
 import { toast } from '@/lib/toast';
 import { TODAY } from '@/lib/dashboard-consts';
-import { selectReceivables } from '@/lib/snapshot/selectors';
 import { useEntityLists } from '@/lib/use-entity-lists';
+import { hydrateContractsWithDepositReceipts } from '@/lib/payments/deposit-receipts';
+import { computeReturnSettlement } from '@/lib/contracts/settlement';
 import { commitUpdate } from '@/lib/commit';
 import { resolveWriteCompany, NEED_COMPANY } from '@/lib/scope';
 import { useSecOrder } from '@/lib/use-sec-order';
+import {
+  buildReceivablesWorkbench, countReceivableFacets, engineLockDue, noticeTodoRows,
+  type ReceivableRow,
+} from '@/lib/receivables-ledger';
+import { Check } from 'lucide-react';
+import { useIsMobile } from '@/lib/use-mobile';
+import {
+  RECEIVABLE_BASIC_COLS, RECEIVABLE_DETAIL_SECTIONS, RECEIVABLE_EXPANDED_COLS,
+  receivableContractState, receivableNextAction, receivableRowKey,
+} from '@/lib/receivables-cols';
+import { useTableSelection } from '@/lib/use-table-selection';
+import { useCtrlASelectAll, useRowSelection } from '@/lib/use-row-selection';
+
+type CollectionTermsDraft = {
+  arrearsClause: string;
+  warningAfterDays: string;
+  engineLockAfterDays: string;
+  repossessionAfterDays: string;
+  legalNoticeAfterDays: string;
+  debtTransferAfterDays: string;
+};
+
+const collectionTermsDraft = (rec: EntityRecord): CollectionTermsDraft => ({
+  arrearsClause: String(rec.arrearsClause || ''),
+  warningAfterDays: rec.warningAfterDays == null ? '' : String(rec.warningAfterDays),
+  engineLockAfterDays: rec.engineLockAfterDays == null ? '' : String(rec.engineLockAfterDays),
+  repossessionAfterDays: rec.repossessionAfterDays == null ? '' : String(rec.repossessionAfterDays),
+  legalNoticeAfterDays: rec.legalNoticeAfterDays == null ? '' : String(rec.legalNoticeAfterDays),
+  debtTransferAfterDays: rec.debtTransferAfterDays == null ? '' : String(rec.debtTransferAfterDays),
+});
+
+const termDay = (value: string): number | null => {
+  if (!value.trim()) return null;
+  const n = Number(value);
+  return Number.isFinite(n) && n >= 0 ? Math.round(n) : null;
+};
+
+function CollectionTermsEditor({ row, actor, onSaved, onCancel }: {
+  row: ReceivableRow;
+  actor: string;
+  onSaved: () => void;
+  onCancel: () => void;
+}) {
+  const [form, setForm] = useState<CollectionTermsDraft>(() => collectionTermsDraft(row.rec));
+  const [saving, setSaving] = useState(false);
+  const setDay = (key: keyof CollectionTermsDraft, value: string) => {
+    setForm((current) => ({ ...current, [key]: value.replace(/[^\d]/g, '') }));
+  };
+  const save = async () => {
+    setSaving(true);
+    try {
+      await commitUpdate({
+        entity: 'contract',
+        sessionCompanyId: String(row.rec.companyId || ''),
+        rec: row.rec,
+        key: String(row.rec._key || ''),
+        patch: {
+          arrearsClause: form.arrearsClause.trim(),
+          warningAfterDays: termDay(form.warningAfterDays),
+          engineLockAfterDays: termDay(form.engineLockAfterDays),
+          repossessionAfterDays: termDay(form.repossessionAfterDays),
+          legalNoticeAfterDays: termDay(form.legalNoticeAfterDays),
+          debtTransferAfterDays: termDay(form.debtTransferAfterDays),
+          collectionTermsReviewedAt: TODAY,
+          collectionTermsReviewedBy: actor,
+        },
+      });
+      toast('계약별 연체조항 확인 결과를 저장했습니다.');
+      onSaved();
+    } catch (error) {
+      toast((error as Error).message || NEED_COMPANY, 'error');
+    } finally { setSaving(false); }
+  };
+  const days: Array<[keyof CollectionTermsDraft, string]> = [
+    ['warningAfterDays', '경고 D+'],
+    ['engineLockAfterDays', '시동제어 D+'],
+    ['repossessionAfterDays', '차량회수 D+'],
+    ['legalNoticeAfterDays', '내용증명 D+'],
+    ['debtTransferAfterDays', '채권전환 D+'],
+  ];
+  return (
+    <div style={{ borderTop: `1px solid ${C.line}`, paddingTop: 12, marginTop: 4 }}>
+      <div style={{ fontSize: 12.5, fontWeight: 800, color: C.ink }}>계약별 연체조항 확인</div>
+      <div style={{ fontSize: 11.5, color: C.mute, margin: '4px 0 10px', lineHeight: 1.6 }}>
+        계약서에 숫자로 명시된 조치만 입력합니다. 숫자 조건이 없어도 저장하면 확인완료로 기록됩니다.
+      </div>
+      <TextArea
+        size="sm"
+        value={form.arrearsClause}
+        onChange={(event) => setForm((current) => ({ ...current, arrearsClause: event.target.value }))}
+        placeholder="계약서 연체·회수 조항 원문 또는 확인 메모"
+        rows={3}
+        style={{ width: '100%', boxSizing: 'border-box', marginBottom: 8 }}
+      />
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(105px,1fr))', gap: 6 }}>
+        {days.map(([key, label]) => (
+          <label key={key} style={{ display: 'flex', flexDirection: 'column', gap: 3, fontSize: 11, color: C.mute }}>
+            {label}
+            <Input
+              inputMode="numeric"
+              value={form[key]}
+              onChange={(event) => setDay(key, event.target.value)}
+              placeholder="없으면 비움"
+            />
+          </label>
+        ))}
+      </div>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 6, marginTop: 10 }}>
+        <Btn size="sm" variant="ghost" onClick={onCancel} disabled={saving}>취소</Btn>
+        <Btn size="sm" onClick={() => void save()} disabled={saving}>{saving ? '저장 중…' : '확인 결과 저장'}</Btn>
+      </div>
+    </div>
+  );
+}
 
 const RECV_SECS = ['recv-status', 'recv-list'] as const;
 
 // 미수 워크벤치 = 회수 파트의 "딱 여기만" 메인. 미수율이 핵심축. 자금(수납)과 연동돼 자동 갱신.
 // 담당자가 어떻게 관리했는지(내용증명 발송·시동제어 여부·최근 연락)가 보이고, 그 자리에서 조치.
-const STONE: Record<string, 'gray' | 'amber' | 'orange' | 'red' | 'purple'> = { 정상: 'gray', 경고: 'amber', 시동제어: 'orange', 내용증명: 'red', 채권화: 'purple' };
-const CONTACT_KINDS = ['통화', '문자', '방문', '독촉'];
+const STONE: Record<string, 'gray' | 'amber' | 'orange' | 'red' | 'purple'> = { '계약조건 확인': 'amber', 회수대기: 'gray', 경고: 'amber', 시동제어: 'orange', 차량회수: 'red', 내용증명: 'red', 채권화: 'purple' };
 
 export default function ReceivablesPage() {
   const { companyId, scopeAll, user } = useSession();
-  const { data: [cs = [], hs = []], loading, reload } = useEntityLists(['contract', 'history']);
+  const mobile = useIsMobile();
+  const { data: [storedContracts = [], hs = [], bankTransactions = []], loading, error: loadError, reload } = useEntityLists(['contract', 'history', 'bank_tx']);
+  const cs = useMemo(
+    () => hydrateContractsWithDepositReceipts(storedContracts, bankTransactions),
+    [bankTransactions, storedContracts],
+  );
   const [facets, setFacets] = useState<Set<string>>(new Set());
   const [q, setQ] = useState('');
-  const [logKey, setLogKey] = useState<string | null>(null); // 연락 기록 펼친 행. 그 자리에서 인라인(팝업 X)
-  const [notify, setNotify] = useState(false); // 문자 발송 다이얼로그
-  const [noticeSel, setNoticeSel] = useState<Set<string>>(new Set());
+  const [logKey, setLogKey] = useState<string | null>(null);
+  const [notify, setNotify] = useState(false);
+  const [selected, setSelected] = useState<ReceivableRow | null>(null);
+  const [filterOpen, setFilterOpen] = useState(false);
+  const [colView, setColView] = useState<LedgerColView>('기본');
+  const [termsKey, setTermsKey] = useState<string | null>(null);
   const [, runBusy] = useBusyAction();
   const confirm = useConfirm();
-  const [order, reorder] = useSecOrder('jpk:order:receivables', [...RECV_SECS]);
   const toggleFacet = (label: string) => setFacets((s) => { const n = new Set(s); n.has(label) ? n.delete(label) : n.add(label); return n; });
   const resetFacets = () => setFacets(new Set());
 
-  const D = useMemo(() => {
-    const lastContact = new Map<string, EntityRecord>();
-    for (const h of hs) { if (!CONTACT_KINDS.includes(String(h.category))) continue; const p = String(h.plate || ''); const cur = lastContact.get(p); if (!cur || String(h.date || '') > String(cur.date || '')) lastContact.set(p, h); }
-    const rows = cs.map((c) => { const v = computeContractView(c, TODAY); return { rec: c, v, st: collectionStage(v.overdueDays), contact: lastContact.get(String(c.plate || '')) || null }; })
-      .filter((r) => r.v.net > 0)
-      .sort((a, b) => b.v.net - a.v.net);
-    const recv = selectReceivables(cs, TODAY);
-    return {
-      rows, totalUnpaid: recv.total, count: recv.unpaidCount,
-      misuActive: recv.misuActive, misuActiveCount: recv.misuActiveCount,
-      misuReturned: recv.misuReturned, misuReturnedCount: recv.misuReturnedCount,
-      rate: recv.rate,
-      over30: recv.over30,
-      over90: recv.over90,
-      noticeTodo: rows.filter((r) => (r.st.stage === '내용증명' || r.st.stage === '채권화') && !r.rec.noticeSentDate).length,
-      immob: rows.filter((r) => r.rec.engineDisabled).length,
-      lockTodo: rows.filter((r) => !r.v.ended && !r.rec.engineDisabled && (r.st.stage === '시동제어' || r.st.stage === '내용증명' || r.st.stage === '채권화')).length,
-    };
-  }, [cs, hs]);
+  const D = useMemo(() => buildReceivablesWorkbench(cs, hs, TODAY), [cs, hs]);
+  const counts = useMemo(() => countReceivableFacets(D.rows), [D.rows]);
 
   const stageSel = selectedInDim('미수', '연체단계', facets);
+  const contractSel = selectedInDim('미수', '계약상태', facets);
   const overdueSel = selectedInDim('미수', '연체기간', facets);
   const actionSel = selectedInDim('미수', '조치', facets);
-  // 칩별 매칭 건수(erp3식 '라벨(N)') — 전체 미수 정적 집계. 필터 술어와 동일 기준.
-  const counts = useMemo(() => {
-    const c: Record<string, number> = { 정상: 0, 경고: 0, 시동제어: 0, 내용증명: 0, 채권화: 0, '1~29일': 0, '30~89일': 0, '90일+': 0, 미조치: 0, 내용증명발송: 0, 시동제어중: 0 };
-    for (const r of D.rows) {
-      if (c[r.st.stage] != null) c[r.st.stage]++;
-      const d = r.v.overdueDays;
-      if (d >= 1 && d <= 29) c['1~29일']++; else if (d >= 30 && d <= 89) c['30~89일']++; else if (d >= 90) c['90일+']++;
-      const notice = !!r.rec.noticeSentDate, immob = !!r.rec.engineDisabled;
-      if (!notice && !immob) c['미조치']++;
-      if (notice) c['내용증명발송']++;
-      if (immob) c['시동제어중']++;
-    }
-    return c;
-  }, [D.rows]);
   const filtered = D.rows.filter((r) => {
+    if (contractSel.length && !contractSel.includes(r.v.ended ? '계약종료' : '계약유지')) return false;
     if (stageSel.length && !stageSel.includes(r.st.stage)) return false;
     if (overdueSel.length) {
       const d = r.v.overdueDays;
@@ -103,16 +195,38 @@ export default function ReceivablesPage() {
     }
     return textMatch(q, r.rec.contractorName, r.rec.plate, r.rec.contractNo, r.rec.contractorPhone, r.st.stage);
   });
-  // 좌측 FacetRail — LENS_FILTERS['미수'] SSOT (연체단계 × 연체기간 × 조치)
-
-  // 문자 발송 대상 — 현재 필터된 미수 계약(연락처 보유)
-  const recipients: NotifyRecipient[] = filtered.map((r) => ({
-    contractKey: String(r.rec._key || ''), companyId: String(r.rec.companyId || ''),
-    name: String(r.rec.contractorName || ''), plate: String(r.rec.plate || ''),
-    phone: String(r.rec.contractorPhone || ''), contractNo: String(r.rec.contractNo || ''),
-    unpaidAmount: r.v.net, unpaidSeqCount: r.v.count, currentSeq: r.v.count, monthlyRent: r.v.monthlyRent,
-    depositDue: Number(r.rec.deposit || 0), depositReceived: 0, depositUnreceived: 0, depositRefund: r.v.refund,
-  }));
+  const sel = useTableSelection();
+  const { clear: clearSel } = sel;
+  const rowIds = useMemo(() => filtered.map(receivableRowKey), [filtered]);
+  const rowSel = useRowSelection({ ids: rowIds, selection: sel });
+  useCtrlASelectAll(rowSel, sel);
+  const rowById = useMemo(() => new Map(filtered.map((row) => [receivableRowKey(row), row])), [filtered]);
+  const selectedRows = useMemo(
+    () => [...sel.selectedIds].map((id) => rowById.get(id)).filter(Boolean) as ReceivableRow[],
+    [sel.selectedIds, rowById],
+  );
+  useEffect(() => { clearSel(); }, [q, facets, companyId, scopeAll, clearSel]);
+  useEffect(() => {
+    if (selected && !rowById.has(receivableRowKey(selected))) {
+      setSelected(null);
+      setLogKey(null);
+      setTermsKey(null);
+    }
+  }, [rowById, selected]);
+  const noticeTodoFiltered = noticeTodoRows(filtered);
+  const recipients: NotifyRecipient[] = filtered.map((r) => {
+    const dr = depositReceivedOf(r.rec);
+    const refund = dr == null
+      ? 0
+      : computeReturnSettlement(dr, r.v, { contract: r.rec, asOf: TODAY }).refund;
+    return notifyRecipient(r.rec, {
+      net: r.v.net,
+      unpaidCount: r.v.count,
+      currentSeq: r.v.count,
+      monthlyRent: r.v.monthlyRent,
+      refund,
+    });
+  });
   const smsCount = recipients.filter((r) => r.phone).length;
 
   async function patch(rec: EntityRecord, p: Record<string, unknown>) {
@@ -133,27 +247,29 @@ export default function ReceivablesPage() {
       reload();
     });
   };
-  const toggleNoticeSel = (key: string) => setNoticeSel((s) => { const n = new Set(s); n.has(key) ? n.delete(key) : n.add(key); return n; });
-  const noticeTargets = filtered.filter((r) => noticeSel.has(String(r.rec._key || '')));
-  const noticeTodoFiltered = filtered.filter((r) => (r.st.stage === '내용증명' || r.st.stage === '채권화') && !r.rec.noticeSentDate);
+  const noticeTargets = noticeTodoRows(selectedRows);
   const sendNoticeBulk = async (recs: EntityRecord[]) => {
     if (recs.length === 0) return;
+    const companies = new Set(recs.map((rec) => String(rec.companyId || companyId)).filter(Boolean));
+    if (companies.size > 1) {
+      toast('내용증명 일괄 처리는 한 법인씩 선택해 주세요', 'error');
+      return;
+    }
     if (!(await confirm({ message: `내용증명 ${recs.length}건을 일괄 발송(인쇄)·기록합니까?` }))) return;
     void runBusy(async () => {
       const r = await safeUpdate(() => sendNoticeCertBulk({
         recs,
-        companyId,
+        companyId: [...companies][0] || companyId,
         actor: user?.email || user?.name || '',
       }));
       if (r) {
         toast(`내용증명 일괄 ${r.count}건 · 청구합 ${won(r.totalClaim)}`, 'success');
-        setNoticeSel(new Set());
+        clearSel();
       }
       reload();
     });
   };
-  // 시동제어 전환 — "물어보고"(확인) 걸고, engineDisabled 원자(patchEngineLock SSOT)에 사유·시각·담당 기록.
-  const toggleEngine = async (r: { rec: EntityRecord; v: { net: number; overdueDays: number } }) => {
+  const toggleEngine = async (r: ReceivableRow) => {
     const rec = r.rec;
     const who = String(rec.contractorName || '—'), plate = String(rec.plate || '');
     const actor = user?.email || user?.name || '';
@@ -168,81 +284,157 @@ export default function ReceivablesPage() {
     }
   };
 
+  const selectedKey = selected ? receivableRowKey(selected) : null;
+  const selectedImmob = !!selected?.rec.engineDisabled;
+  const selectedNeedLock = !!selected && !selectedImmob && engineLockDue(selected);
+  const selectedLogOpen = !!selectedKey && logKey === selectedKey;
+  const selectedTermsOpen = !!selectedKey && termsKey === selectedKey;
+
   return (
-    <FacetPage
-      title="미수관리"
-      meta={`${scopeAll ? '전체 회사' : companyLabel(companyId)} · 미수 ${D.count}건`}
-      tools={<WorkbenchBar mid={<WorkHubBack />} search={{ value: q, onChange: setQ, placeholder: '손님·차량·계약' }} stat={<span style={{ fontSize: 13, fontWeight: 800, color: D.totalUnpaid > 0 ? C.danger : C.ok, whiteSpace: 'nowrap' }}>미수 {won(D.totalUnpaid)}</span>} />}
-      rail={!loading ? <FacetRail lensKey="미수" facets={facets} onToggle={toggleFacet} onReset={resetFacets} counts={counts} /> : null}
-    >
-      {order.map((id) => {
-        if (id === 'recv-status') {
-          return (
-            <Sec key={id} id={id} title="현황" desc="미수율 · 연체 분포 · 회수 조치 대상" onReorder={reorder}>
-              <Cards min={128} fit>
-                <Metric label="현재 미수" value={won(D.misuActive)} hint="운행중 · 정상 회수" tone={D.misuActive ? 'danger' : 'ink'} />
-                <Metric label="계약종료 미수" value={won(D.misuReturned)} hint="반납·해지 추심" tone={D.misuReturned ? 'warn' : 'ink'} />
-                <Metric label="미수 계약" value={`${D.misuActiveCount}건`} tone={D.misuActiveCount ? 'warn' : 'ink'} />
-                <Metric label="미수율(계약)" value={`${D.rate}%`} tone={D.rate >= 20 ? 'danger' : D.rate >= 10 ? 'warn' : 'ok'} />
-                <Metric label="30일+ 연체" value={`${D.over30}건`} tone={D.over30 ? 'warn' : 'ink'} />
-                <Metric label="90일+ 연체" value={`${D.over90}건`} tone={D.over90 ? 'danger' : 'ink'} />
-                <Metric label="내용증명 대상" value={`${D.noticeTodo}건`} tone={D.noticeTodo ? 'danger' : 'ink'} />
-                <Metric label="시동제어 필요" value={`${D.lockTodo}대`} tone={D.lockTodo ? 'danger' : 'ink'} hint="미납 심화·미제어" />
-                <Metric label="시동제어 중" value={`${D.immob}대`} tone={D.immob ? 'warn' : 'ink'} />
-              </Cards>
-            </Sec>
-          );
-        }
-        return (
-          <Sec key={id} id={id} title="미수 목록" n={filtered.length} desc="금액 큰 순 · 체크 후 내용증명 일괄 · 자리에서 단건·시동제어·연락" onReorder={reorder}
-            right={<span style={{ display: 'inline-flex', gap: SPACE_M, flexWrap: 'wrap' }}>
-              <Btn variant="ghost" onClick={() => setNoticeSel(new Set(noticeTodoFiltered.map((r) => String(r.rec._key || ''))))} disabled={noticeTodoFiltered.length === 0}>대상 선택 ({noticeTodoFiltered.length})</Btn>
-              <Btn variant="danger" onClick={() => sendNoticeBulk(noticeTargets.map((r) => r.rec))} disabled={noticeTargets.length === 0}>내용증명 일괄{noticeTargets.length ? ` (${noticeTargets.length})` : ''}</Btn>
-              <Btn onClick={() => setNotify(true)} disabled={smsCount === 0}>문자 발송{smsCount ? ` (${smsCount})` : ''}</Btn>
-            </span>}>
-            {loading ? <PageLoading /> : filtered.length === 0 ? <EmptyState variant="sec">해당 미수 없음</EmptyState> :
-              <div style={{ display: 'flex', flexDirection: 'column', gap: SPACE_M }}>
-                {filtered.map((r, i) => { const rec = r.rec; const immob = !!rec.engineDisabled; const needLock = !r.v.ended && !immob && (r.st.stage === '시동제어' || r.st.stage === '내용증명' || r.st.stage === '채권화'); const rowId = String(rec._key ?? `row-${i}`); const logOn = logKey === rowId; const checked = noticeSel.has(rowId); return (
-                  <div key={i} style={{ display: 'flex', flexDirection: 'column', gap: SPACE_M }}>
-                    <div style={{ display: 'flex', gap: SPACE_M, alignItems: 'flex-start' }}>
-                      <label style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: TOUCH, height: TOUCH, flexShrink: 0, marginTop: 4, cursor: 'pointer' }}>
-                        <input type="checkbox" checked={checked} onChange={() => toggleNoticeSel(rowId)}
-                          style={{ width: 16, height: 16, cursor: 'pointer' }}
-                          aria-label="내용증명 일괄 선택" />
-                      </label>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                    <ObjCard
-                      badge={r.st.stage}
-                      badgeTone={STONE[r.st.stage] || 'gray'}
-                      co={scopeAll ? String(rec.companyId || '') : undefined}
-                      name={String(rec.contractorName || '—')}
-                      carType={String(rec.plate || '')}
-                      fields={[
-                        ['내용증명', rec.noticeSentDate ? `✓ ${String(rec.noticeSentDate)}` : '미발송'],
-                        ['시동제어', immob ? `적용중 (${String(rec.engineDisabledAt || '').slice(0, 10)})` : needLock ? '전환 필요' : '—'],
-                        ['최근 연락', r.contact ? `${String(r.contact.category)} · ${String(r.contact.date)}` : '없음'],
-                        ...(r.st.nextAction ? [['다음', r.st.nextAction] as [string, string]] : []),
-                      ]}
-                      right={<span style={{ color: C.danger }}>{won(r.v.net)} · {r.v.overdueDays}일</span>}
-                      onClick={() => openCar(String(rec.plate || ''), 'unpaid')}
-                    />
-                      </div>
-                    </div>
-                    <div style={{ display: 'flex', gap: SPACE_M, flexWrap: 'wrap', paddingLeft: 28 }}>
-                      <Btn variant="danger" onClick={() => sendNotice(rec)}>내용증명 발송</Btn>
-                      <Btn variant={logOn ? 'solid' : 'ghost'} onClick={() => setLogKey((k) => k === rowId ? null : rowId)}>{logOn ? '닫기' : '문자·연락 기록'}</Btn>
-                      <Btn variant={needLock ? 'danger' : 'ghost'} onClick={() => toggleEngine(r)}>{immob ? '시동제어 해제' : needLock ? '시동제어 전환' : '시동제어'}</Btn>
-                      <Btn variant="ghost" onClick={() => openCustomer(customerKey(rec.contractorName, rec.contractorPhone))}>손님</Btn>
-                      <Btn variant="ghost" onClick={() => openCar(String(rec.plate || ''), 'unpaid')}>360 · 수납</Btn>
-                    </div>
-                    {logOn ? <div style={{ paddingLeft: 28 }}><QuickLogForm ctx={{ plate: String(rec.plate || ''), customer: String(rec.contractorName || ''), contractNo: String(rec.contractNo || ''), companyId: String(rec.companyId || '') }} onDone={() => setLogKey(null)} onCancel={() => setLogKey(null)} /></div> : null}
-                  </div>
-                ); })}
-              </div>}
-          </Sec>
-        );
-      })}
+    <>
+      <LedgerFrame
+        title="미수관리"
+        meta={`${scopeAll ? '전체 회사' : companyLabel(companyId)} · 미수 대상 ${D.count}건 · 총 ${won(D.totalUnpaid)}`}
+        filters={(
+          <>
+            <Search
+              size="sm"
+              placeholder="고객·차량·계약·계약조건 이행"
+              value={q}
+              onChange={(event) => setQ(event.target.value)}
+              style={{ width: mobile ? 180 : 280, flexShrink: 0 }}
+            />
+            <LedgerFilterButton open={filterOpen} count={facets.size} onClick={() => setFilterOpen((open) => !open)} />
+            {!filterOpen && <LedgerActiveFilterTags values={[...facets]} onClear={toggleFacet} onClearAll={resetFacets} />}
+          </>
+        )}
+        filterPanel={filterOpen && !loading ? (
+          <FacetRail lensKey="미수" facets={facets} onToggle={toggleFacet} onReset={resetFacets} counts={counts} />
+        ) : null}
+        stats={(
+          <span style={{ fontSize: 12.5, color: C.mute, whiteSpace: 'nowrap' }}>
+            계약유지 <b style={{ color: D.misuActive ? C.danger : C.ink }}>{D.misuActiveCount}건 · {won(D.misuActive)}</b>
+            {' · '}계약종료 <b style={{ color: D.misuReturned ? C.warn : C.ink }}>{D.misuReturnedCount}건 · {won(D.misuReturned)}</b>
+            {' · '}유지 30일+ <b>{D.over30}</b>
+            {' · '}내용증명 <b>{D.noticeTodo}</b>
+            {D.endedLockReview ? <>{' · '}종료 후 잠금점검 <b style={{ color: C.danger }}>{D.endedLockReview}</b></> : null}
+          </span>
+        )}
+        right={<Btn size="sm" onClick={() => setNotify(true)} disabled={smsCount === 0}>문자 발송{smsCount ? ` (${smsCount})` : ''}</Btn>}
+        colView={colView}
+        onColView={setColView}
+        loading={loading}
+        error={loadError}
+        onRetry={reload}
+        empty="해당 조건의 미수가 없습니다"
+        cols={colView === '기본' ? RECEIVABLE_BASIC_COLS : RECEIVABLE_EXPANDED_COLS}
+        rows={filtered}
+        rowKey={receivableRowKey}
+        selectedRowKey={selectedKey}
+        selectedKeys={sel.selectedIds}
+        onRowMouseDown={(event) => rowSel.onRowMouseDown(event)}
+        onRowClickEvent={(event, row, index) => rowSel.onRowClick(event, receivableRowKey(row), index)}
+        mobileCard={(row) => ({
+          co: scopeAll ? String(row.rec.companyId || '') : undefined,
+          badge: row.st.stage,
+          badgeTone: STONE[row.st.stage] || 'gray',
+          name: String(row.rec.contractorName || '—'),
+          carType: String(row.rec.plate || ''),
+          fields: [
+            ['미수분류', receivableContractState(row)],
+            ['다음조치', receivableNextAction(row)],
+          ],
+          right: won(row.v.net),
+        })}
+        selectionBar={sel.size > 0 ? (
+            <LedgerSelectionBar
+              count={sel.size}
+              onSelectAll={() => sel.selectAll(noticeTodoFiltered.map(receivableRowKey))}
+              onClear={clearSel}
+            >
+              <Btn
+                size="sm"
+                variant="danger"
+                disabled={noticeTargets.length === 0 || scopeAll}
+                onClick={() => void sendNoticeBulk(noticeTargets.map((row) => row.rec))}
+              >
+                {scopeAll ? '법인 선택 후 내용증명' : `내용증명 일괄${noticeTargets.length ? ` (${noticeTargets.length})` : ''}`}
+              </Btn>
+            </LedgerSelectionBar>
+        ) : null}
+        onRowDoubleClick={(row) => {
+          setSelected(row);
+          setLogKey(null);
+          setTermsKey(null);
+        }}
+        onCloseDetail={() => {
+          setSelected(null);
+          setLogKey(null);
+          setTermsKey(null);
+        }}
+        sidePanel={selected ? (
+          <LedgerRecordPanel
+            title={selected.v.ended ? '종료계약 잔존채권' : '계약유지 미수'}
+            identity={`${String(selected.rec.contractorName || '—')} · ${String(selected.rec.plate || '—')}`}
+            statusBadge={<Badge tone={STONE[selected.st.stage] || 'gray'}>{selected.st.stage}</Badge>}
+            row={selected}
+            cols={RECEIVABLE_EXPANDED_COLS}
+            sections={RECEIVABLE_DETAIL_SECTIONS}
+            onClose={() => {
+              setSelected(null);
+              setLogKey(null);
+              setTermsKey(null);
+            }}
+            actions={(
+              <>
+                <Btn size="sm" variant="danger" onClick={() => sendNotice(selected.rec)}>
+                  {selected.rec.noticeSentDate ? '내용증명 재발송' : '내용증명 발송'}
+                </Btn>
+                <Btn size="sm" variant={selectedLogOpen ? 'solid' : 'ghost'} onClick={() => setLogKey(selectedLogOpen ? null : selectedKey)}>
+                  {selectedLogOpen ? '연락기록 닫기' : '문자·연락 기록'}
+                </Btn>
+                <Btn
+                  size="sm"
+                  variant={selectedTermsOpen || selected.st.stage === '계약조건 확인' ? 'solid' : 'ghost'}
+                  onClick={() => setTermsKey(selectedTermsOpen ? null : selectedKey)}
+                >
+                  {selectedTermsOpen ? '계약조건 닫기' : '계약조건 확인'}
+                </Btn>
+                {(selectedImmob || selectedNeedLock) ? (
+                  <Btn size="sm" variant={selectedNeedLock ? 'danger' : 'ghost'} onClick={() => void toggleEngine(selected)}>
+                    {selectedImmob ? '시동제어 해제' : '시동제어 전환'}
+                  </Btn>
+                ) : null}
+                <Btn size="sm" variant="ghost" onClick={() => openCustomer(customerKey(selected.rec.contractorName, selected.rec.contractorPhone))}>고객</Btn>
+                <Btn size="sm" variant="ghost" onClick={() => openCar(String(selected.rec.plate || ''), 'unpaid', selected.rec.companyId)}>수납·정산</Btn>
+              </>
+            )}
+          >
+            {selectedLogOpen ? (
+              <QuickLogForm
+                ctx={{
+                  plate: String(selected.rec.plate || ''),
+                  customer: String(selected.rec.contractorName || ''),
+                  contractNo: String(selected.rec.contractNo || ''),
+                  companyId: String(selected.rec.companyId || ''),
+                }}
+                onDone={() => setLogKey(null)}
+                onCancel={() => setLogKey(null)}
+              />
+            ) : null}
+            {selectedTermsOpen ? (
+              <CollectionTermsEditor
+                key={selectedKey || ''}
+                row={selected}
+                actor={user?.email || user?.name || ''}
+                onSaved={() => { setTermsKey(null); reload(); }}
+                onCancel={() => setTermsKey(null)}
+              />
+            ) : null}
+          </LedgerRecordPanel>
+        ) : null}
+      />
       {notify && <NotifyDialog recipients={recipients} onClose={() => setNotify(false)} onSent={reload} />}
-    </FacetPage>
+    </>
   );
 }

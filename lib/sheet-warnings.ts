@@ -1,5 +1,5 @@
 /**
- * 운영시트 인라인 경고 — 기존 SSOT(compliance·collectionStage) «재호출·합성»만. 새 판정식 신설 금지.
+ * 운영시트 인라인 경고 — 기존 SSOT(compliance·계약별 collectionInfo) «재호출·합성»만. 새 판정식 신설 금지.
  *   행 1개가 안고 있는 문제를 위험(high)/경고(med) 2톤으로. 시트 ⚠ 열·'경고있음' 필터가 이걸 씀.
  *
  *   보험은 renman이 별도 엔티티를 plate로 조인(FleetRow.insEnd)한다 → checkCompliance 의 veh 기반 보험판정은
@@ -7,7 +7,7 @@
  */
 import type { EntityRecord } from './intake/entities';
 import { checkCompliance } from './compliance';
-import { collectionStage } from './domain/status';
+import type { CollectionInfo } from './collection';
 
 export type WarnSev = 'high' | 'med';
 export interface SheetWarning { code: string; label: string; sev: WarnSev; }
@@ -29,6 +29,7 @@ export interface RowWarnCtx {
   dday: number | null;               // 활성 계약 만기 D-day.
   rent: number;
   overdueDays: number;               // 이 차의 최장 연체일(반납·잔존채권 포함).
+  collectionInfo: CollectionInfo | null; // 미수 계약 중 가장 강한 계약별 조치 단계.
   insEnd: string;                    // 조인된 보험 만기(정본).
   inspectionTo: string;              // 검사 만기(veh).
   today: string;
@@ -57,10 +58,14 @@ export function rowWarnings(ctx: RowWarnCtx): SheetWarning[] {
     else if (inspD <= 30) out.push({ code: 'inspection_soon', label: '검사 임박', sev: 'med' });
   }
 
-  // 3) 미수 회수단계 — overdueDays 있으면 단계 경고. 경고=med, 시동제어·내용증명·채권화=high.
-  if (ctx.overdueDays > 0) {
-    const cs = collectionStage(ctx.overdueDays);
-    if (cs.stage !== '정상') out.push({ code: 'collection', label: `미수·${cs.stage}`, sev: cs.stage === '경고' ? 'med' : 'high' });
+  // 3) 미수 계약조건 이행 — 고정 D+정책을 재계산하지 않고 원장에서 확정한 단계만 표시한다.
+  if (ctx.collectionInfo && ctx.collectionInfo.stage !== '회수대기') {
+    const stage = ctx.collectionInfo.stage;
+    out.push({
+      code: 'collection',
+      label: `미수·${stage}`,
+      sev: stage === '경고' || stage === '계약조건 확인' ? 'med' : 'high',
+    });
   }
 
   // 4) 계약 기반(운행 계약 있을 때만) — 반납지남·대여료0·면허·연령.

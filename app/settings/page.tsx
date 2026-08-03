@@ -12,22 +12,21 @@ import { getStore } from '@/lib/store';
 import { ENTITIES } from '@/lib/intake/entities';
 import { downloadCsv } from '@/lib/export-csv';
 import { todayKST } from '@/lib/contracts/dates'; // KST 기준 오늘(내보내기 파일명)
-import { Page, Panel, ListBox, ListRow, Btn, C, SPACE_M, usePrompt } from '@/components/ui';
+import { Page, Panel, ListBox, ListRow, Btn, C, SPACE_M, useConfirm, usePrompt } from '@/components/ui';
 import { NAV_GROUPS } from '@/lib/nav';
 import { WorkbenchBar } from '@/components/WorkbenchBar';
 import { closePeriod, reopenPeriod, useClosedPeriods } from '@/lib/finance/period-lock';
 import { MobileTabsSettings, useMobileTabs } from '@/lib/mobile-tabs';
-import { MyDeskSettings, useMyDeskPicked } from '@/lib/my-desk';
 import { toast } from '@/lib/toast';
 
-type OpenKey = 'landing' | 'mydesk' | 'tabs' | 'export' | 'closing' | null;
+type OpenKey = 'landing' | 'tabs' | 'export' | 'closing' | null;
 
 const EXPORTS: { key: string; label: string }[] = [
   { key: 'vehicle', label: '차량' }, { key: 'contract', label: '계약' }, { key: 'penalty', label: '과태료' },
   { key: 'insurance', label: '보험' }, { key: 'bank_tx', label: '계좌 거래' }, { key: 'customer', label: '손님' }, { key: 'history', label: '이력' },
 ];
 
-type HubLink = { href: string; label: string; desc: string; icon: typeof Building2; hqOnly?: boolean };
+type HubLink = { href: string; label: string; desc: string; icon: typeof Building2; hqOnly?: boolean; devOnly?: boolean };
 
 const HUB: HubLink[] = [
   { href: '/company', label: '법인관리', desc: '소재지·차고지·등록대수·공문', icon: Building2 },
@@ -36,7 +35,7 @@ const HUB: HubLink[] = [
   { href: '/integrity', label: '리스크·정합성', desc: '데이터 이상·만기 점검', icon: ShieldAlert },
   { href: '/audit', label: '감사 로그', desc: '변경 이력', icon: History },
   { href: '/manage', label: '경영·손익', desc: '가동률·미수 aging·재무 요약', icon: BarChart3, hqOnly: true },
-  { href: '/dev/data', label: '개발도구', desc: '시드·백엔드·회사별 데이터', icon: Wrench, hqOnly: true },
+  { href: '/dev/data', label: '개발도구', desc: '시드·백엔드·회사별 데이터', icon: Wrench, hqOnly: true, devOnly: true },
 ];
 
 function Chevron({ open }: { open?: boolean }) {
@@ -62,16 +61,19 @@ function ClosingBody({ companyId, actor }: { companyId: string; actor: string })
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
   });
 
+  /* ★원격(period_locks) 반영에 성공했을 때만 «마감/해제»를 말한다.
+     이전에는 로컬 저장만 하고 무조건 성공 토스트를 띄웠다 → 서버가 마감을 모르는데
+     사용자는 마감됐다고 믿는 상태(결산 무결성 통제가 작동하지 않으면서 작동하는 척). */
   const toggle = async (ym: string) => {
     try {
       if (closed.includes(ym)) {
         const reason = await prompt({ message: `${ym} 마감 해제 사유 (필수)`, initial: '', required: true });
         if (!reason?.trim()) { toast('해제 사유를 입력해야 합니다', 'error'); return; }
-        reopenPeriod(companyId, ym, actor, reason);
-        toast(`${ym} 마감 해제`, 'info');
+        const r = await reopenPeriod(companyId, ym, actor, reason);
+        toast(r.ok ? `${ym} 마감 해제` : `마감 해제 실패 — 서버에 반영되지 않았습니다${r.message ? ` (${r.message})` : ''}`, r.ok ? 'info' : 'error');
       } else {
-        closePeriod(companyId, ym, actor);
-        toast(`${ym} 마감`, 'success');
+        const r = await closePeriod(companyId, ym, actor);
+        toast(r.ok ? `${ym} 마감` : `마감 실패 — 서버에 반영되지 않았습니다${r.message ? ` (${r.message})` : ''}`, r.ok ? 'success' : 'error');
       }
       reload();
     } catch (e) {
@@ -100,8 +102,8 @@ function ClosingBody({ companyId, actor }: { companyId: string; actor: string })
 
 export default function SettingsPage() {
   const { user, companyId, scopeAll, isOperator } = useSession();
-  const { picked } = useMyDeskPicked();
   const { ids: tabIds } = useMobileTabs();
+  const confirm = useConfirm();
   const [msg, setMsg] = useState('');
   const [sending, setSending] = useState(false);
   const [exporting, setExporting] = useState('');
@@ -110,8 +112,9 @@ export default function SettingsPage() {
   useEffect(() => {
     try {
       const v = localStorage.getItem('jpk:landing') || '';
-      if (v === 'mydesk') setLanding('/ops');            // 레거시 키 → href
+      if (v === 'mydesk') setLanding('/risk');            // 레거시 → 리스크관리
       else if (v === 'field') setLanding('/dispatch');
+      else if (v === '/desk') setLanding('/risk');
       else if (!v || v === 'home') setLanding('/');
       else setLanding(v);
     } catch { /* 무시 */ }
@@ -121,6 +124,11 @@ export default function SettingsPage() {
 
   async function sendReset() {
     if (!user.email) return;
+    if (!(await confirm({
+      title: '비밀번호 재설정',
+      message: `${user.email}로 비밀번호 재설정 링크를 발송합니까?`,
+      confirmLabel: '메일 발송',
+    }))) return;
     setSending(true); setMsg('');
     try {
       await resetPassword(user.email);
@@ -144,10 +152,10 @@ export default function SettingsPage() {
     } finally { setExporting(''); }
   }
 
-  const hub = HUB.filter((h) => !h.hqOnly || isOperator);
+  const hub = HUB.filter((h) => (!h.hqOnly || isOperator) && (!h.devOnly || process.env.NODE_ENV !== 'production'));
   // 초기화면 후보 = 햄버거 메뉴 전 항목(권한 필터). 홈 포함.
-  const landingItems = NAV_GROUPS.flatMap((g) => g.items).filter((it) => !it.hqOnly || isOperator);
-  const landingLabel = landingItems.find((it) => it.href === landing)?.label || '홈';
+  const landingItems = NAV_GROUPS.flatMap((g) => g.items).filter((it) => (!it.hqOnly || isOperator) && (!it.devOnly || process.env.NODE_ENV !== 'production'));
+  const landingLabel = landingItems.find((it) => it.href === landing)?.label || '대시보드';
 
   return (
     <Page title="설정" meta={`${user.name} · ${roleLabel(user.role)}`} tools={<WorkbenchBar />} noCompany>
@@ -185,13 +193,6 @@ export default function SettingsPage() {
             </ExpandPad>
           )}
           <ListRow
-            main={<CollMain open={open === 'mydesk'}>마이페이지 섹션</CollMain>}
-            sub="내 업무에 담을 섹션"
-            right={<span style={{ fontSize: 12.5, color: C.mute }}>{picked.length}개</span>}
-            onClick={() => toggle('mydesk')}
-          />
-          {open === 'mydesk' && <ExpandPad><MyDeskSettings /></ExpandPad>}
-          <ListRow
             main={<CollMain open={open === 'tabs'}>모바일 하단 메뉴</CollMain>}
             sub="하단 탭 구성"
             right={<span style={{ fontSize: 12.5, color: C.mute }}>{tabIds.length}개</span>}
@@ -215,7 +216,9 @@ export default function SettingsPage() {
         </ListBox>
       </Panel>
 
-      {!scopeAll && (
+      {/* 회계 마감은 firestore.rules 상 본사(hq)만 쓸 수 있다 → 법인 사용자에게 노출하면
+          «눌렀는데 서버는 모르는» 상태가 된다. 본사 + 특정 법인 스코프일 때만 표시. */}
+      {isOperator && !scopeAll && (
         <Panel title="회계">
           <ListBox>
             <ListRow
@@ -241,8 +244,8 @@ export default function SettingsPage() {
             onClick={() => { if (!sending && user.email) void sendReset(); }}
           />
           <ListRow
-            main={<CollMain open={open === 'export'}>엑셀 내보내기</CollMain>}
-            sub={`${scopeAll ? '전체 법인' : companyLabel(companyId)} CSV`}
+            main={<CollMain open={open === 'export'}>CSV 내보내기</CollMain>}
+            sub={`${scopeAll ? '전체 법인' : companyLabel(companyId)} · 엑셀에서 열 수 있는 CSV`}
             right={<Download size={15} color={C.faint} />}
             onClick={() => toggle('export')}
           />

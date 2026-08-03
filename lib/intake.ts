@@ -14,6 +14,8 @@ import { notifySaved } from './ui-bus';
 import type { EntityRecord } from './intake/entities';
 import { workStatusPatch, canApplyWorkStatus } from './work-ops';
 import { normPlate, findVehicleByPlate, vehicleMatchesPlate, deriveVehicleStatusFromContract } from './plate';
+import { autoSettleAfterIntake } from './payments/auto-settle';
+import { buildAtomicEvent, type AtomicEventSource } from './domain/atomic-event';
 
 // ── 앵커키 정규화 ──────────────────────────────────────────────────────────
 /** 차량번호 정규화 — plate SSOT(normPlate) 위임. 공백·OCR O/0·I/1 통일. */
@@ -54,11 +56,13 @@ export function resolveAnchor(vehicles: EntityRecord[], query: string): EntityRe
 export type IntakeContext = {
   vehicle?: EntityRecord | null; // 앵커 차량(수선→상태전이용). _key·status 보유.
   idle?: boolean;                // 앵커 차량이 유휴(활성계약 없음)인가 → 상태전이 가드.
+  source?: AtomicEventSource;    // 직접입력·OCR·업로드 등 사건의 생성 경로.
   // 확장 여지: contracts?(과태료→계약 매칭), schedule 등.
 };
 
 type SideEffectArgs = { entityKey: string; companyId: string; records: EntityRecord[]; context: IntakeContext };
 type SideEffectFn = (args: SideEffectArgs) => Promise<string[]>; // 적용한 효과 라벨들 반환
+export type IntakeWriteKind = 'create' | 'update';
 
 /**
  * 수선(_kind:'work') → 차량 자산상태 파생 전이. WorkForm이 오늘 하던 로직을 그대로 이관.
@@ -114,6 +118,8 @@ const insuranceDenormSideEffect: SideEffectFn = async ({ companyId, records }) =
  * 엔티티별 부수효과. 새 후속처리는 여기에만 꽂으면 전 입력지점에 자동 적용된다.
  *   history   : 수선→차량상태 전이 (배선 완료)
  *   insurance : 보험→차량 만기 denorm 동기화(최신 증권) — 만기 오탐 제거
+ *   contract  : 계약→차량 자동생성
+ *   bank_tx · card_tx : CMS/카드집금 자동 정산(auto-settle)
  *   penalty   : 과태료→계약(임차인) 매칭 — 지금은 PenaltyUpload가 저장 전에 자체 수행(현행 유지: 리스크 회피).
  */
 /**
@@ -140,10 +146,22 @@ const contractVehicleSyncSideEffect: SideEffectFn = async ({ companyId, records 
   return applied;
 };
 
-const SIDE_EFFECTS: Record<string, SideEffectFn[]> = {
-  history: [workStatusSideEffect],
-  insurance: [insuranceDenormSideEffect],
-  contract: [contractVehicleSyncSideEffect],
+/**
+ * 계좌·카드 담기 → CMS집금/카드자동집금 자동 묶음 정산.
+ *   계좌만 넣어도·CMS만 넣어도·카드만 넣어도, 상대편이 이미 있으면 high·medium 자동 붙음.
+ */
+const cashAutoSettleSideEffect: SideEffectFn = async ({ companyId }) => {
+  return autoSettleAfterIntake(companyId);
+};
+
+type SideEffectRule = { on: IntakeWriteKind[]; run: SideEffectFn };
+const SIDE_EFFECTS: Record<string, SideEffectRule[]> = {
+  // 사건성 입력과 자동대사는 신규 원자 생성 때만, 정본 동기화는 수정 때도 실행한다.
+  history: [{ on: ['create'], run: workStatusSideEffect }],
+  insurance: [{ on: ['create', 'update'], run: insuranceDenormSideEffect }],
+  contract: [{ on: ['create', 'update'], run: contractVehicleSyncSideEffect }],
+  bank_tx: [{ on: ['create'], run: cashAutoSettleSideEffect }],
+  card_tx: [{ on: ['create'], run: cashAutoSettleSideEffect }],
 };
 
 // ── 단일 통로 ──────────────────────────────────────────────────────────────
@@ -156,6 +174,48 @@ export type IntakeResult = {
   records: EntityRecord[];  // 정규화되어 저장에 넘어간 레코드
   sideEffects: string[];    // 적용된 부수효과 라벨
 };
+
+export type IntakePostWriteOptions = {
+  context?: IntakeContext;
+  writeKind?: IntakeWriteKind;
+  recordEvent?: boolean;
+};
+
+/**
+ * 저장 종류와 무관한 공용 후처리. 신규(saveIntake)와 수정(commitUpdate)이 같은 규칙을 탄다.
+ * 후처리 실패는 이미 성공한 원장 쓰기를 거짓 실패로 만들지 않고 경고·결과 라벨로 남긴다.
+ */
+export async function runIntakePostWrite(
+  entityKey: string,
+  companyId: string,
+  records: EntityRecord[],
+  opts: IntakePostWriteOptions = {},
+): Promise<string[]> {
+  const context = opts.context || {};
+  const writeKind = opts.writeKind || 'create';
+  const sideEffects: string[] = [];
+  if (opts.recordEvent !== false && entityKey !== 'atomic_event') {
+    try {
+      const events = records.map((record) => buildAtomicEvent({
+        entityType: entityKey, companyId, record, source: context.source || 'system',
+      }));
+      const eventSave = await getStore().save('atomic_event', companyId, events);
+      sideEffects.push(`atomic-events:${eventSave.saved}`);
+    } catch (e) {
+      console.warn(`원자 사건 기록(${entityKey}) 실패:`, (e as Error).message);
+    }
+  }
+  for (const rule of SIDE_EFFECTS[entityKey] || []) {
+    if (!rule.on.includes(writeKind)) continue;
+    try {
+      const applied = await rule.run({ entityKey, companyId, records, context });
+      sideEffects.push(...applied);
+    } catch (e) {
+      console.warn(`intake 부수효과(${entityKey}) 실패:`, (e as Error).message);
+    }
+  }
+  return sideEffects;
+}
 
 /**
  * 모든 입력이 지나는 단일 통로.
@@ -172,16 +232,11 @@ export async function saveIntake(
   const normalized = records.map(normalizeRecord);
   const save = await getStore().save(entityKey, companyId, normalized);
 
-  const sideEffects: string[] = [];
-  for (const fn of SIDE_EFFECTS[entityKey] || []) {
-    try {
-      const applied = await fn({ entityKey, companyId, records: normalized, context: opts.context || {} });
-      sideEffects.push(...applied);
-    } catch (e) {
-      // 부수효과 실패가 저장을 되돌리진 않는다(저장은 이미 성공). 로그만.
-      console.warn(`intake 부수효과(${entityKey}) 실패:`, (e as Error).message);
-    }
-  }
+  const sideEffects = save.saved > 0
+    ? await runIntakePostWrite(entityKey, companyId, normalized, {
+        context: opts.context, writeKind: 'create',
+      })
+    : [];
 
   if (opts.notify !== false) notifySaved();
   return { save, records: normalized, sideEffects };

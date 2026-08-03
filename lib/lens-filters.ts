@@ -3,7 +3,8 @@
 //   · 기한(due):  언제까지 처리냐 → 카드의 마감 D-day로 거르기(overdue=지남, [a,b]=D-a~D-b)
 //   같은 그룹 안 다중선택=OR, 그룹 간=AND. 아무것도 안 고르면 전체.
 //   회사·기간·검색·탭은 WorkbenchBar 소유 — 레일에 중복 금지.
-import { AGENDA_KINDS } from './agenda';
+//
+// 삭제된 facet 렌즈(섹션 레지스트리 슬림 후 orphan): 콕핏·리스크·자산·손님·운영·일정·마이·자산현황·계약현황·손님현황·재무현황·과태료·돈
 
 export type FacetChip = {
   label: string;
@@ -16,7 +17,7 @@ export type FacetChip = {
 };
 export type FacetGroup = { dim: string; chips: FacetChip[] };
 
-/** 공유 D-day 칩 — 콕핏·과태료·계약 만기 등에서 재사용 */
+/** 공유 D-day 칩 — 기한 필터가 필요한 렌즈에서 재사용 */
 export const DUE_CHIPS: FacetChip[] = [
   { label: '지남', due: 'overdue' },
   { label: '오늘', due: [0, 0] },
@@ -26,27 +27,13 @@ export const DUE_CHIPS: FacetChip[] = [
 ];
 
 export const LENS_FILTERS: Record<string, FacetGroup[]> = {
-  일정: [   // 종류 필터 → ScheduleLens가 facets 라벨(=AgendaKind)로 어젠다 거름
-    { dim: '종류', chips: AGENDA_KINDS.map((k) => ({ label: k })) },
-  ],
-  마이: [   // 영역 필터 → MyWorkLens가 섹션 group으로 거름
-    { dim: '영역', chips: [{ label: '미결' }, { label: '리스크' }, { label: '자산' }, { label: '자금' }, { label: '고객' }] },
-  ],
   배차: [   // 차 기준 배치상태 — 페이지가 facets.has(상태)로 직접 매칭(dueMatcher 불필요)
     { dim: '상태', chips: [
       { label: '대여가능' }, { label: '운행중' }, { label: '반납임박' }, { label: '반납지남' }, { label: '정비' },
     ] },
   ],
-  // 현황 = FacetRail 상시 + 생애 Sec (탭 금지).
-  자산현황: [
-    { dim: '가동', chips: [{ label: '운행' }, { label: '휴차' }, { label: '정비' }] },
-    { dim: '만기', chips: [
-      { label: '검사지남' }, { label: '검사30일' }, { label: '보험지남' }, { label: '보험30일' },
-    ] },
-    { dim: '부채·보험', chips: [{ label: '할부있음' }, { label: '보험없음' }] },
-  ],
-  운영시트: [  // 차량 1대=1행 통합 마스터 사이드필터. 기본 '보유' 선택(매각/처분은 명시 선택 시 노출).
-    { dim: '보유', chips: [{ label: '보유' }, { label: '전체' }, { label: '매각' }] },   // 보유=기본값(필터 아님·카운트 제외). 전체=전부·매각=처분완료만.
+  운영시트: [  // 차량 1대=1행 통합 마스터 사이드필터. 기본 '보유'=isVehicleHeld(매각·처분예정·구매예정 제외).
+    { dim: '보유', chips: [{ label: '보유' }, { label: '전체' }, { label: '매각' }] },
     { dim: '가동', chips: [{ label: '운행' }, { label: '휴차' }, { label: '정비' }] },
     { dim: '계약', chips: [{ label: '만기임박' }, { label: '반납지남' }, { label: '계약없음' }] },
     { dim: '경고', chips: [{ label: '경고있음' }, { label: '위험만' }] },
@@ -54,26 +41,12 @@ export const LENS_FILTERS: Record<string, FacetGroup[]> = {
     { dim: '만기', chips: [{ label: '검사임박' }, { label: '보험임박' }] },
     { dim: '부채·보험', chips: [{ label: '할부있음' }, { label: '보험없음' }] },
   ],
-  계약현황: [
-    { dim: '채권', chips: [{ label: '채권잔존' }, { label: '청산' }] },
-    { dim: '만기', chips: [
-      { label: '만기경과', due: 'overdue' },
-      { label: '30일이내', due: [0, 30] },
-      { label: '60일이내', due: [0, 60] },
-    ] },
-    { dim: '손님', chips: [{ label: '운행중' }, { label: '미수있음' }] },
-  ],
-  손님현황: [
-    { dim: '상태', chips: [{ label: '운행중' }, { label: '미수있음' }] },
-  ],
-  재무현황: [
-    { dim: '분류', chips: [{ label: '미분류' }, { label: '분류됨' }] },
-    { dim: '입출금', chips: [{ label: '입금', txFlow: '입금' }, { label: '출금', txFlow: '출금' }] },
-    { dim: '소스', chips: [{ label: '계좌', txSource: '계좌' }, { label: 'CMS', txSource: 'CMS' }, { label: '카드', txSource: '카드' }] },
-  ],
   미수: [
+    { dim: '계약상태', chips: [
+      { label: '계약유지' }, { label: '계약종료' },
+    ] },
     { dim: '연체단계', chips: [
-      { label: '정상' }, { label: '경고' }, { label: '시동제어' }, { label: '내용증명' }, { label: '채권화' },
+      { label: '계약조건 확인' }, { label: '회수대기' }, { label: '경고' }, { label: '시동제어' }, { label: '차량회수' }, { label: '내용증명' }, { label: '채권화' },
     ] },
     { dim: '연체기간', chips: [
       { label: '1~29일' }, { label: '30~89일' }, { label: '90일+' },
@@ -81,13 +54,6 @@ export const LENS_FILTERS: Record<string, FacetGroup[]> = {
     { dim: '조치', chips: [
       { label: '미조치' }, { label: '내용증명발송' }, { label: '시동제어중' },
     ] },
-  ],
-  과태료: [
-    { dim: '실운전자', chips: [{ label: '매칭' }, { label: '미매칭' }] },
-    { dim: '처리', chips: [
-      { label: '접수' }, { label: '임차인확인' }, { label: '변경부과신청' }, { label: '변경부과완료' }, { label: '종결' },
-    ] },
-    { dim: '기한', chips: DUE_CHIPS },
   ],
   // 업무 — FacetRail = 데이터 좁히기(secs show/hide 금지 · UIUX-SPEC).
   차량수선: [
@@ -98,6 +64,7 @@ export const LENS_FILTERS: Record<string, FacetGroup[]> = {
   ],
   자금일보: [
     { dim: '구간', chips: [
+      { label: '미완료' },
       { label: 'CMS' },
       { label: '매칭제안' },
       { label: '매칭됨' },
@@ -115,62 +82,9 @@ export const LENS_FILTERS: Record<string, FacetGroup[]> = {
     { dim: '심각도', chips: [{ label: '위험' }, { label: '주의' }] },
     { dim: '종류', chips: [
       { label: '필수누락' }, { label: '만기' }, { label: '고아' }, { label: '날짜역전' }, { label: '미납' }, { label: '보험불일치' }, { label: '반납지남' },
+      { label: '번호오기입' }, { label: '정체불명' }, { label: '무보험' }, { label: '서류미비' },
+      { label: '차종불일치' }, { label: '대여료불일치' }, { label: '연령구간상승' },
     ] },
-  ],
-  운영: [   // 홈 운영현황 — 「보유자산이 어떻게 굴러가나」. 요약 + 실체 목록.
-    { dim: '보기', chips: [
-      { label: '요약', secs: ['ops-summary'] },
-      { label: '인도 대기', secs: ['ops-deliver'] },
-      { label: '반납 지남', secs: ['ops-overdue'] },
-      { label: '만기 임박', secs: ['ops-return'] },
-      { label: '쉬는 차', secs: ['a-idle'] },
-      { label: '운행중', secs: ['a-running'] },
-      { label: '멈춘 차', secs: ['a-other'] },
-    ] },
-  ],
-  콕핏: [
-    { dim: '처리 기한', chips: DUE_CHIPS },
-    { dim: '종류', chips: [
-      // 미수 칩 없음 — 미수는 리스크관리(r-unpaid) 소관. 정비·사고(s-repair)는 자산 그룹으로 옮김.
-      { label: '반납', secs: ['s-return-over', 's-return'] },
-      { label: '과태료', secs: ['s-penalty'] },
-      { label: '서류', secs: ['s-docwait'] },
-      { label: '검사·보험', secs: ['s-expire'] },
-      { label: '자금', secs: ['s-money'] },
-      { label: '할일·충돌', secs: ['s-todo', 's-overlap'] },
-    ] },
-  ],
-  리스크: [
-    { dim: '처리 기한', chips: DUE_CHIPS },
-    { dim: '종류', chips: [
-      { label: '미수', secs: ['r-unpaid'] },
-      { label: '컴플라이언스', secs: ['r-compliance'] },
-      { label: '보증금', secs: ['r-deposit'] },
-      { label: '정합성', secs: ['r-integrity'] },
-    ] },
-  ],
-  자산: [
-    { dim: '상태', chips: [
-      { label: '미처리', secs: ['a-unreg'] },
-      { label: '휴차', secs: ['a-idle'] },
-      { label: '운행중', secs: ['a-running'] },
-      { label: '관리·정비', secs: ['a-manage', 'a-other'] },
-      { label: '매각', secs: ['a-out'] },
-      { label: '이벤트', secs: ['a-events'] },
-    ] },
-  ],
-  손님: [
-    { dim: '유형', chips: [
-      { label: '미수 고객', secs: ['c-unpaid'] },
-      { label: '진행중', secs: ['c-active'] },
-      { label: '재계약 대상', secs: ['c-past'] },
-    ] },
-  ],
-  // 옛 키 — 재무현황과 동일
-  돈: [
-    { dim: '분류', chips: [{ label: '미분류' }, { label: '분류됨' }] },
-    { dim: '입출금', chips: [{ label: '입금', txFlow: '입금' }, { label: '출금', txFlow: '출금' }] },
-    { dim: '소스', chips: [{ label: '계좌', txSource: '계좌' }, { label: 'CMS', txSource: 'CMS' }, { label: '카드', txSource: '카드' }] },
   ],
 };
 
@@ -181,16 +95,16 @@ export function visibleSecs(lensKey: string, selected: Set<string> | undefined):
   if (!selected || selected.size === 0) return null;
   const secChips = allChips(lensKey).filter((c) => c.secs);
   const picked = secChips.filter((c) => selected.has(c.label));
-  if (picked.length === 0) return null; // 종류는 안 고르고 기한만 골랐을 때 = 섹션 전체 유지
+  if (picked.length === 0) return null;
   const out = new Set<string>();
   picked.forEach((c) => c.secs!.forEach((s) => out.add(s)));
   return out;
 }
 
-// 자금 tx 필터 — 입출금·소스·미분류·계정성격. Finance 페이지·렌즈 공용.
+// 자금 tx 필터 — 입출금·소스·미분류·계정성격. (재무현황/돈 렌즈 제거됨 — 칩 없으면 null)
 export function txFacetMatch(selected: Set<string> | undefined): ((tx: Record<string, unknown>) => boolean) | null {
   if (!selected || selected.size === 0) return null;
-  const chips = (LENS_FILTERS['재무현황'] || LENS_FILTERS['돈'] || []).flatMap((g) => g.chips).filter((c) => selected.has(c.label));
+  const chips = allChips('자금일보').filter((c) => selected.has(c.label) && (c.txFlow || c.txSource || c.txState || c.ledgerKind || c.label === '미분류'));
   const flows = chips.map((c) => c.txFlow).filter(Boolean) as ('입금' | '출금')[];
   const sources = chips.map((c) => c.txSource).filter(Boolean) as ('계좌' | 'CMS' | '카드')[];
   const kinds = chips.map((c) => c.ledgerKind).filter(Boolean) as ('수입' | '지출' | '이체')[];
@@ -222,7 +136,7 @@ export function dueMatcher(lensKey: string, selected: Set<string> | undefined): 
   const dueChips = allChips(lensKey).filter((c) => c.due && selected.has(c.label));
   if (dueChips.length === 0) return null;
   return (dday) => {
-    if (dday == null) return false; // 마감 없는 건은 기한 필터 시 제외
+    if (dday == null) return false;
     return dueChips.some((c) => (c.due === 'overdue' ? dday < 0 : dday >= (c.due as [number, number])[0] && dday <= (c.due as [number, number])[1]));
   };
 }
@@ -246,6 +160,13 @@ export function riskKindMatch(selected: Set<string>, kind: string): boolean {
     미납: ['미수'],
     보험불일치: ['보험불일치'],
     반납지남: ['반납지남'],
+    번호오기입: ['번호오기입'],
+    정체불명: ['정체불명'],
+    무보험: ['무보험'],
+    서류미비: ['서류미비'],
+    차종불일치: ['차종불일치'],
+    대여료불일치: ['대여료불일치'],
+    연령구간상승: ['연령구간상승'],
   };
   return kinds.some((lab) => (map[lab] || [lab]).includes(kind));
 }

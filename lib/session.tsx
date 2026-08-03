@@ -6,7 +6,7 @@
  *   · 레거시 role '운영자'/'위탁사'는 로드 시 본사/법인으로 정규화(호환).
  */
 import { createContext, useContext, useEffect, useState, type FormEvent, type ReactNode } from 'react';
-import { COMPANIES, ALL_COMPANIES } from './companies';
+import { COMPANIES, ALL_COMPANIES, ensureCompaniesHydrated } from './companies';
 import { firebaseReady } from './firebase/client';
 import { watchAuth, loadProfile, signInEmail, signOutUser, resetPassword, signup, normalizeRole, type Role } from './firebase/auth';
 import { setAuditActor } from './audit';
@@ -65,17 +65,31 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     if (firebaseReady()) {
       let alive = true;
       // Auth 콜백이 안 오면 boot 스피너 영구 → 로그인 화면으로.
+      // ※ 죽은(StrictMode cleanup) 콜백이 clearTimeout 하면 안 됨 — 새 mount의 boot 탈출을 가로챔.
       const bootTo = setTimeout(() => {
-        if (alive) { console.error('Auth 부트 시간초과'); setPhase('signed-out'); }
-      }, 10_000);
+        if (alive) { console.error('Auth 부트 시간초과'); setPhase((p) => (p === 'boot' ? 'signed-out' : p)); }
+      }, 6_000);
       const unsub = watchAuth(async (fb) => {
-        clearTimeout(bootTo);
         if (!alive) return;
+        clearTimeout(bootTo);
         if (!fb) { setPhase('signed-out'); return; }
         try {
           const prof = await withTimeout(loadProfile(fb.uid, fb.email), 8_000, '프로필 로드');
           if (!alive) return;
-          if (!prof) { setPhase('no-profile'); return; }
+          if (!prof) {
+            // 로컬: Auth는 됐는데 claims 미배정이면 DEV_USERS 이메일 매칭으로 화면 확인 가능.
+            // (프로덕션은 no-profile 유지 — 본사 배정 필수)
+            if (process.env.NODE_ENV === 'development') {
+              const dev = DEV_USERS.find((u) => u.email === fb.email) || DEV_USERS[0];
+              console.warn('[DEV] claims 없음 → DEV_USERS 폴백', fb.email, '→', dev.uid);
+              setUser(dev);
+              setCompanyState(resolveCompany(dev, localStorage.getItem(LS_CO)));
+              setPhase('ready');
+              return;
+            }
+            setPhase('no-profile');
+            return;
+          }
           if (isStaffSuspended(prof.email)) {
             await signOutUser();
             setPhase('suspended');
@@ -109,6 +123,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => { setAuditActor({ uid: user.uid, name: user.name, email: user.email, role: user.role }); }, [user]);
+  useEffect(() => { if (phase === 'ready') void ensureCompaniesHydrated(); }, [phase, user.uid]);
   useEffect(() => startLiveSync(companyId), [companyId]);
 
   function login(uid: string) {
@@ -122,7 +137,12 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     localStorage.setItem(LS_CO, co);
     setPhase('ready');
   }
-  function logout() { if (firebaseReady()) void signOutUser(); }
+  function logout() {
+    if (!firebaseReady()) return;
+    void signOutUser()
+      .then(() => setPhase('signed-out'))
+      .catch((error) => console.error('로그아웃 실패', error));
+  }
   function setCompanyId(id: string) {
     if (user.role !== '본사') return; // 법인 소속 직원은 배정 법인 고정
     setCompanyState(id);
@@ -137,7 +157,14 @@ export function SessionProvider({ children }: { children: ReactNode }) {
           : phase === 'signed-out' ? <LoginScreen />
             : phase === 'suspended' ? <Gate title="이용이 정지된 계정입니다" desc="직원 명단에서 정지 처리되었습니다. 본사에 문의하세요." onLogout={logout} />
             : phase === 'no-profile' ? <Gate title="계정이 등록되지 않았습니다" desc="본사에서 계정에 법인·권한을 배정해야 이용할 수 있습니다." onLogout={logout} />
-              : <Gate title="불러오는 중…" loading />}
+              : (
+                <Gate
+                  title="불러오는 중…"
+                  loading
+                  // Auth hang 시 signOut 대기하지 말고 즉시 로그인 화면 — reload도 불필요
+                  onEscape={() => { setPhase('signed-out'); void signOutUser(); }}
+                />
+              )}
     </SessionContext.Provider>
   );
 }
@@ -158,13 +185,15 @@ function LoginScreen() {
 }
 
 function LoginForm({ onSignup, onReset }: { onSignup: () => void; onReset: () => void }) {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);
   async function submit(e: FormEvent) {
-    e.preventDefault(); setErr(''); setBusy(true);
-    try { await signInEmail(email, password); }
+    e.preventDefault();
+    const form = new FormData(e.currentTarget as HTMLFormElement);
+    const submittedEmail = String(form.get('email') || '');
+    const submittedPassword = String(form.get('password') || '');
+    setErr(''); setBusy(true);
+    try { await signInEmail(submittedEmail, submittedPassword); }
     catch (ex) {
       const m = String((ex as Error)?.message || '');
       setErr(m.includes('too-many') ? '시도가 너무 많습니다. 잠시 후 다시 시도하세요'
@@ -182,13 +211,13 @@ function LoginForm({ onSignup, onReset }: { onSignup: () => void; onReset: () =>
       <div className="login-form">
         <div className="login-field">
           <label htmlFor="login-email">이메일</label>
-          <input id="login-email" type="email" autoComplete="username" placeholder="name@company.com" required
-            value={email} onChange={(e) => setEmail(e.target.value)} />
+          <input id="login-email" name="email" type="email" autoComplete="username" placeholder="name@company.com" required
+          />
         </div>
         <div className="login-field">
           <label htmlFor="login-password">비밀번호</label>
-          <input id="login-password" type="password" autoComplete="current-password" placeholder="비밀번호 입력" required
-            value={password} onChange={(e) => setPassword(e.target.value)} />
+          <input id="login-password" name="password" type="password" autoComplete="current-password" placeholder="비밀번호 입력" required
+          />
         </div>
         <button type="submit" className="login-submit" disabled={busy}>로그인</button>
       </div>
@@ -202,13 +231,29 @@ function LoginForm({ onSignup, onReset }: { onSignup: () => void; onReset: () =>
   );
 }
 
+function formatPhone(value: string): string {
+  const digits = value.replace(/\D/g, '').slice(0, 11);
+  if (digits.length <= 3) return digits;
+  if (digits.length <= 7) return `${digits.slice(0, 3)}-${digits.slice(3)}`;
+  return `${digits.slice(0, 3)}-${digits.slice(3, digits.length - 4)}-${digits.slice(-4)}`;
+}
+
+function formatBusinessNo(value: string): string {
+  const digits = value.replace(/\D/g, '').slice(0, 10);
+  if (digits.length <= 3) return digits;
+  if (digits.length <= 5) return `${digits.slice(0, 3)}-${digits.slice(3)}`;
+  return `${digits.slice(0, 3)}-${digits.slice(3, 5)}-${digits.slice(5)}`;
+}
+
 function SignupForm({ onBack }: { onBack: () => void }) {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
-  const [department, setDepartment] = useState('');
+  const [companyName, setCompanyName] = useState('');
+  const [businessNo, setBusinessNo] = useState('');
   const [password, setPassword] = useState('');
   const [password2, setPassword2] = useState('');
+  const [policyAccepted, setPolicyAccepted] = useState(false);
   const [err, setErr] = useState('');
   const [info, setInfo] = useState('');
   const [busy, setBusy] = useState(false);
@@ -217,6 +262,7 @@ function SignupForm({ onBack }: { onBack: () => void }) {
     if (!email.trim()) return '이메일을 입력하세요';
     if (password.length < 6) return '비밀번호는 6자 이상이어야 합니다';
     if (password !== password2) return '비밀번호가 일치하지 않습니다';
+    if (!policyAccepted) return '서비스 이용약관과 개인정보 처리방침에 동의해야 합니다';
     return null;
   }
   async function submit(e: FormEvent) {
@@ -224,9 +270,15 @@ function SignupForm({ onBack }: { onBack: () => void }) {
     const v = validate(); if (v) { setErr(v); return; }
     setBusy(true);
     try {
-      const displayName = [name.trim(), department.trim() ? `(${department.trim()})` : ''].filter(Boolean).join(' ');
-      await signup({ email, password, name: displayName, phone, department });
-      setInfo('가입 완료 — 본사에서 법인·권한을 배정하면 이용할 수 있습니다.');
+      await signup({
+        email,
+        password,
+        name: name.trim(),
+        phone,
+        companyName: companyName.trim(),
+        businessNo: businessNo.replace(/\D/g, ''),
+      });
+      setInfo('가입 신청 완료 — 관리자가 소속 회사와 권한을 승인하면 이용할 수 있습니다.');
     } catch (ex) {
       const m = String((ex as Error)?.message || '');
       setErr(m.includes('email-already-in-use') ? '이미 가입된 이메일입니다'
@@ -239,24 +291,12 @@ function SignupForm({ onBack }: { onBack: () => void }) {
     <form className={`login-card${busy ? ' is-loading' : ''}`} onSubmit={submit} noValidate aria-label="계정 만들기">
       <header className="login-head">
         <h2 className="login-title">계정 만들기</h2>
-        <p className="login-sub">직원 계정을 만듭니다. 가입 후 본사가 소속 법인을 배정해야 데이터가 보입니다.</p>
+        <p className="login-sub">사업자번호로 소속을 확인한 뒤 관리자 승인으로 이용합니다.</p>
       </header>
       <div className="login-form">
         <div className="login-field">
-          <label htmlFor="su-name">이름</label>
-          <input id="su-name" type="text" autoComplete="name" placeholder="홍길동" required value={name} onChange={(e) => setName(e.target.value)} />
-        </div>
-        <div className="login-field">
-          <label htmlFor="su-email">이메일</label>
+          <label htmlFor="su-email">이메일 (필수)</label>
           <input id="su-email" type="email" autoComplete="email" placeholder="name@company.com" required value={email} onChange={(e) => setEmail(e.target.value)} />
-        </div>
-        <div className="login-field">
-          <label htmlFor="su-phone">휴대폰 (선택)</label>
-          <input id="su-phone" type="tel" autoComplete="tel" placeholder="010-0000-0000" value={phone} onChange={(e) => setPhone(e.target.value)} />
-        </div>
-        <div className="login-field">
-          <label htmlFor="su-dept">부서 (선택)</label>
-          <input id="su-dept" type="text" placeholder="운영팀" value={department} onChange={(e) => setDepartment(e.target.value)} />
         </div>
         <div className="login-field">
           <label htmlFor="su-pw">비밀번호</label>
@@ -265,8 +305,35 @@ function SignupForm({ onBack }: { onBack: () => void }) {
         <div className="login-field">
           <label htmlFor="su-pw2">비밀번호 확인</label>
           <input id="su-pw2" type="password" autoComplete="new-password" placeholder="비밀번호 다시 입력" required value={password2} onChange={(e) => setPassword2(e.target.value)} />
+          {password2 && password !== password2 && <p className="biz-no-match is-miss">비밀번호가 일치하지 않습니다.</p>}
         </div>
-        <button type="submit" className="login-submit" disabled={busy || !!info}>가입하기</button>
+        <div className="login-field">
+          <label htmlFor="su-name">이름</label>
+          <input id="su-name" type="text" autoComplete="name" placeholder="홍길동" required value={name} onChange={(e) => setName(e.target.value)} />
+        </div>
+        <div className="login-field">
+          <label htmlFor="su-phone">연락처</label>
+          <input id="su-phone" type="tel" autoComplete="tel" inputMode="tel" placeholder="010-0000-0000"
+            value={phone} onChange={(e) => setPhone(formatPhone(e.target.value))} />
+        </div>
+        <div className="login-field">
+          <label htmlFor="su-company">소속 회사명 (참고)</label>
+          <input id="su-company" type="text" placeholder="회사명" value={companyName} onChange={(e) => setCompanyName(e.target.value)} />
+        </div>
+        <div className="login-field">
+          <label htmlFor="su-biz-no">소속 사업자번호</label>
+          <input id="su-biz-no" inputMode="numeric" autoComplete="off" placeholder="000-00-00000"
+            value={businessNo} onChange={(e) => setBusinessNo(formatBusinessNo(e.target.value))} />
+        </div>
+        <p className="login-msg signup-guide">가입 신청 후 관리자 승인이 필요합니다. 승인되면 사업자번호에 맞는 회사와 권한이 배정됩니다.</p>
+        <label className="login-consent" htmlFor="su-policy">
+          <input id="su-policy" type="checkbox" checked={policyAccepted} onChange={(e) => setPolicyAccepted(e.target.checked)} required />
+          <span>
+            <a href="/terms" target="_blank" rel="noopener noreferrer">서비스 이용약관</a>과{' '}
+            <a href="/privacy" target="_blank" rel="noopener noreferrer">개인정보 처리방침</a>을 확인했으며 이에 동의합니다. (필수)
+          </span>
+        </label>
+        <button type="submit" className="login-submit" disabled={busy || !!info}>계정 만들기</button>
       </div>
       <div className="login-links"><AuthLink onClick={onBack}>로그인으로 돌아가기</AuthLink></div>
       {err && <p className="login-msg is-err" role="alert" aria-live="polite">{err}</p>}
@@ -313,14 +380,38 @@ function AuthLink({ onClick, children }: { onClick: () => void; children: ReactN
   return <button type="button" className="login-link" onClick={onClick}>{children}</button>;
 }
 
-function Gate({ title, desc, loading, onLogout }: { title: string; desc?: string; loading?: boolean; onLogout?: () => void }) {
-  // 부트 로딩 = 깔끔한 스피너만(브랜드 박스·카드 없음). PageLoading과 동일 룩(로딩 표준 SSOT).
+function Gate({ title, desc, loading, onLogout, onEscape }: {
+  title: string; desc?: string; loading?: boolean; onLogout?: () => void; onEscape?: () => void;
+}) {
+  // 세션 부트만 풀스크린(셸 없음). 데이터 로딩은 페이지 안 — 여기로 끌어올리지 말 것.
+  const [stuck, setStuck] = useState(false);
+  useEffect(() => {
+    if (!loading) { setStuck(false); return; }
+    const t = setTimeout(() => setStuck(true), 4_000);
+    return () => clearTimeout(t);
+  }, [loading]);
+
   if (loading) {
+    // inset 쓰지 말 것 — SSR이 top/right/bottom/left로 풀어 hydration mismatch(Next overlay) 남김
     return (
       <div role="status" aria-busy="true" aria-live="polite"
-        style={{ position: 'fixed', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12, background: '#fff' }}>
-        <Spinner size={28} stroke={2.5} color="#1B2A4A" />
-        <div style={{ fontSize: 12.5, color: '#5f6368' }}>{title}</div>
+        style={{
+          position: 'fixed', top: 0, right: 0, bottom: 0, left: 0,
+          display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+          gap: 12, background: 'var(--bg-page)', padding: 24,
+        }}>
+        <Spinner size={28} stroke={2.5} color="var(--brand)" />
+        <div style={{ fontSize: 12.5, color: 'var(--text-sub)' }}>{title}</div>
+        {stuck && (
+          <>
+            <div style={{ fontSize: 12, color: 'var(--text-weak)', textAlign: 'center', maxWidth: 280 }}>
+              인증이 오래 걸립니다. 네트워크·Firebase를 확인하거나 로그인 화면으로 나가세요.
+            </div>
+            <button type="button" className="login-submit" style={{ maxWidth: 220 }} onClick={() => onEscape?.()}>
+              로그인 화면으로
+            </button>
+          </>
+        )}
       </div>
     );
   }

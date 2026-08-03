@@ -2,24 +2,21 @@
 import { useParams, useRouter } from 'next/navigation';
 import { useSession } from '@/lib/session';
 import { ENTITIES, type EntityRecord } from '@/lib/intake/entities';
-import { computeAssetLedgerEntry } from '@/lib/payments/asset-ledger';
-import type { Vehicle } from '@/lib/payments/types';
+import { computeAssetLedgerEntry, vehicleRecordToAsset } from '@/lib/payments/asset-ledger';
+import { UploadCloud } from 'lucide-react';
 import { openIngest } from '@/lib/ui-bus';
-import { Page, Sec, Cards, Metric, DataTable, Btn, Badge, EmptyState, TextLink, won, C, Panel, type Col, PageLoading } from '@/components/ui';
+import { Page, Sec, Cards, Metric, DataTable, Btn, EmptyState, TextLink, won, C, Panel, LedgerActions, type Col, PageLoading } from '@/components/ui';
 import { WorkbenchBar } from '@/components/WorkbenchBar';
 import { companyLabel } from '@/lib/companies';
 import { TODAY } from '@/lib/dashboard-consts';
 import { useEntityList } from '@/lib/use-entity-lists';
 
-// v6 차량 레코드 → 감가엔진(장부가). 증명서 OCR 데이터로 v5 Vehicle 타입 매핑.
+// v6 차량 레코드 → 감가엔진(장부가).
 function bookValue(rec: EntityRecord): number | null {
   const price = Number(rec.acquisitionPrice);
   if (!price) return null;
-  const v = {
-    id: String(rec._key || ''), plate: String(rec.plate || ''), model: String(rec.carName || ''),
-    status: '운행', purchasePrice: price, firstRegisteredDate: String(rec.firstReg || ''),
-  } as unknown as Vehicle;
-  return computeAssetLedgerEntry(v, TODAY).bookValue;
+  const entry = computeAssetLedgerEntry(vehicleRecordToAsset(rec), TODAY);
+  return entry.incomplete ? null : entry.bookValue;
 }
 
 export default function ListPage() {
@@ -56,7 +53,13 @@ export default function ListPage() {
   return (
     <Page title={entity.label} meta={`${companyLabel(companyId)} · ${records.length}건 · ${user.role}`}
       tools={<WorkbenchBar />}
-      right={<Btn variant="solid" onClick={() => openIngest(entityKey)}>+ {entity.label} 담기</Btn>}>
+      right={(
+        <LedgerActions aria-label="투입">
+          <Btn size="sm" variant="ghost" iconOnly tip={`${entity.label} 담기 — 데이터관리`} onClick={() => openIngest(entityKey)}>
+            <UploadCloud size={14} />
+          </Btn>
+        </LedgerActions>
+      )}>
       <Sec title="현황" desc="엔티티 요약">
         <Cards min={128} fit>
           <Metric label="데이터 건수" value={loading ? '…' : records.length} tone="ink" />

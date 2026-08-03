@@ -5,6 +5,8 @@ import { useIsMobile } from '@/lib/use-mobile';
 import { C, R, SH, ctrlH, ctrlInputFs } from './tokens';
 import { Badge } from './misc';
 import { Input, Select } from './controls';
+import { VehicleFieldPicker, ContractFieldPicker } from './entity-picker';
+import { ChevronDown } from 'lucide-react';
 
 /* 상세 라벨/값 표 · 인라인 편집 폼 · 링크형 리스트 — 상세(360) 원자. */
 
@@ -44,6 +46,45 @@ export function DetailEmpty({ children }: { children: React.ReactNode }) {
   return <div style={{ padding: 14, fontSize: 12.5, color: C.lineStrong }}>{children}</div>;
 }
 
+/* 섹션 소제목(테두리 없음) — freepass ERP4 동기. 상세 그룹 헤더. Section(박스)·Sec(접기)와 별개. */
+export function SectionLabel({ children, mt = 14, mb = 6 }: { children: React.ReactNode; mt?: number; mb?: number }) {
+  return <div style={{ fontSize: 13, fontWeight: 800, color: C.ink, letterSpacing: '-0.01em', margin: `${mt}px 0 ${mb}px` }}>{children}</div>;
+}
+
+/* 접이식 — 제목 줄만 보이고 눌러 펼침(할부스케줄·FAQ). Sec(페이지 섹션)과 별개. */
+export function Disclosure({ title, defaultOpen = false, open: openProp, onOpenChange, children }: {
+  title: React.ReactNode; defaultOpen?: boolean; open?: boolean; onOpenChange?: (o: boolean) => void; children: React.ReactNode;
+}) {
+  const mobile = useIsMobile();
+  const [inner, setInner] = React.useState(defaultOpen);
+  const controlled = openProp !== undefined;
+  const open = controlled ? !!openProp : inner;
+  const setOpen = (next: boolean) => { onOpenChange?.(next); if (!controlled) setInner(next); };
+  return (
+    <div style={{ borderTop: `1px solid ${C.line}` }}>
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        aria-expanded={open}
+        style={{
+          display: 'flex', alignItems: 'center', gap: 8, width: '100%',
+          minHeight: ctrlH(mobile), padding: mobile ? '10px 2px' : '8px 2px',
+          border: 'none', background: 'none', cursor: 'pointer', textAlign: 'left',
+          WebkitTapHighlightColor: 'transparent',
+        }}
+      >
+        <ChevronDown
+          size={mobile ? 16 : 14}
+          color={open ? C.ink : C.faint}
+          style={{ flex: '0 0 auto', transform: open ? 'none' : 'rotate(-90deg)', transition: 'transform .15s' }}
+        />
+        <span style={{ flex: 1, minWidth: 0, fontSize: mobile ? 14 : 12.5, fontWeight: 700, color: C.ink, lineHeight: 1.4 }}>{title}</span>
+      </button>
+      {open && <div style={{ padding: '0 0 10px 0' }}>{children}</div>}
+    </div>
+  );
+}
+
 /* 라벨|값 표(인라인 편집) — 세부(360)·InfoDoc 공용 SSOT.
  * editing이면 값 칸만 그 자리에서 입력칸으로(화면 그대로, 폼 스왑 X). key=null이면 읽기전용.
  * 편집 모드는 테두리·배경(accent)으로 시각 구분. */
@@ -74,28 +115,82 @@ export function KV({ rows, editing, form, onChange }: { rows: KVRow[]; editing?:
   );
 }
 
-/* 공용 입력 폼 — 직접입력·상세수정 공용. */
-export function FormGrid({ fields, form, onChange, cols = 2 }: { fields: Field[]; form: EntityRecord; onChange: (key: string, val: string) => void; cols?: number }) {
+/* 공용 입력 폼 — 직접입력·상세수정 공용. vehicle/contract-picker = 목록에서만 선택(순수 텍스트 금지).
+ * 사이드패널 cols=1 · 넓은 ingest/표 편집은 cols=2.
+ * note 기본 표시(ingest·상세 안내). 사이드패널만 showNotes={false}.
+ * Select background 통째 override 금지(캐럿 깨짐) → backgroundColor만.
+ */
+export function FormGrid({
+  fields, form, onChange, onPatch, cols = 2, showNotes = true,
+}: {
+  fields: Field[];
+  form: EntityRecord;
+  onChange: (key: string, val: string) => void;
+  /** 피커 선택 시 plate+contractKey 등 동반 세팅 */
+  onPatch?: (patch: Record<string, string>) => void;
+  cols?: number;
+  /** false면 field.note 숨김(ledger create/edit 패널). 기본 true. */
+  showNotes?: boolean;
+}) {
   const mobile = useIsMobile();
-  const c = mobile ? 1 : cols; // 모바일=1열(칸 눌림 방지)
+  const c = mobile ? 1 : cols;
+
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: `repeat(${c},1fr)`, gap: 9 }}>
+    <div style={{ display: 'grid', gridTemplateColumns: `repeat(${c},1fr)`, gap: 14 }}>
       {fields.map((f) => {
+        if (f.type === 'vehicle-picker') {
+          return (
+            <label key={f.key} style={{ fontSize: 12, color: C.mute, gridColumn: c > 1 && !mobile ? '1 / -1' : undefined }}>
+              {f.label}{f.required && <span style={{ color: C.danger }}> *</span>}
+              <div style={{ marginTop: 6 }}>
+                <VehicleFieldPicker
+                  value={String(form.plate || '')}
+                  onChange={(plate) => onChange('plate', plate)}
+                  onPatch={onPatch}
+                />
+              </div>
+              {showNotes && f.note ? <small style={{ display: 'block', marginTop: 6, color: C.faint }}>{f.note}</small> : null}
+            </label>
+          );
+        }
+        if (f.type === 'contract-picker') {
+          return (
+            <label key={f.key} style={{ fontSize: 12, color: C.mute, gridColumn: c > 1 && !mobile ? '1 / -1' : undefined }}>
+              {f.label}{f.required && <span style={{ color: C.danger }}> *</span>}
+              <div style={{ marginTop: 6 }}>
+                <ContractFieldPicker
+                  value={String(form.contractKey || '')}
+                  onChange={(key) => onChange('contractKey', key)}
+                  onPatch={onPatch}
+                />
+              </div>
+              {showNotes && f.note ? <small style={{ display: 'block', marginTop: 6, color: C.faint }}>{f.note}</small> : null}
+              {(form.contractNo || form.customerName || form.plate) && String(form.contractKey || '') ? (
+                <small style={{ display: 'block', marginTop: 6, color: C.mute }}>
+                  {[form.customerName, form.contractNo, form.plate].filter(Boolean).map(String).join(' · ')}
+                </small>
+              ) : null}
+            </label>
+          );
+        }
+
         const val = (form[f.key] as string) ?? '';
         const empty = val === '' || val == null;
-        const bg = f.manual && empty ? 'var(--orange-bg)' : C.card;
+        // 직접입력 빈칸 강조 — background 통째 덮지 않음(Select 캐럿·appearance 유지)
+        const emptyHint = f.manual && empty ? { backgroundColor: 'var(--orange-bg)' } as const : undefined;
         return (
-          <label key={f.key} style={{ fontSize: 11.5, color: C.mute }}>
-            {f.label}{f.required && <span style={{ color: C.danger }}> *</span>}{f.manual && <span style={{ color: 'var(--orange-text)' }}> ·직접</span>}
+          <label key={f.key} style={{ fontSize: 12, color: C.mute }}>
+            {f.label}{f.required && <span style={{ color: C.danger }}> *</span>}
             {f.type === 'select' ? (
-              <Select value={val} onChange={(e) => onChange(f.key, e.target.value)} style={{ width: '100%', marginTop: 3, background: bg }}>
+              <Select value={val} onChange={(e) => onChange(f.key, e.target.value)} style={{ width: '100%', marginTop: 6, ...emptyHint }}>
                 <option value="">—</option>
                 {(f.options || []).map((o) => <option key={o} value={o}>{o}</option>)}
               </Select>
             ) : (
               <Input type={f.type === 'number' ? 'number' : f.type === 'date' ? 'date' : 'text'} value={val}
-                onChange={(e) => onChange(f.key, e.target.value)} style={{ width: '100%', marginTop: 3, background: bg }} />
+                onChange={(e) => onChange(f.key, e.target.value)} style={{ width: '100%', marginTop: 6, ...emptyHint }} />
             )}
+            {showNotes && f.note ? <small style={{ display: 'block', marginTop: 6, color: C.faint }}>{f.note}</small> : null}
           </label>
         );
       })}

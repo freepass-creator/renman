@@ -6,8 +6,9 @@ import { WorkbenchBar } from '@/components/WorkbenchBar';
 import { useCashHubNav } from '@/components/CashHubTabs';
 import { companyLabel } from '@/lib/companies';
 import { buildCashLedger, aggregateBySubject, type SubjectAgg } from '@/lib/finance/cash-ledger';
-import { vatOfLabel } from '@/lib/payments/ledger-subjects';
+import { summarizeVatSubjects } from '@/lib/finance/subject-summary';
 import { useCashLedgerLists } from '@/lib/use-cash-ledger-lists';
+import { latestDateOf } from '@/lib/ledger-stats';
 
 // 부가세 산출(경영·비즈니스 티어) — 매출세액 − 매입세액 = 납부/환급세액. 현금기준 추정(세금계산서 대사 전).
 //   부가세 = 공급대가 × 10/110 (입출금액에 부가세 내포 가정). 면세(보험·급여·세금)·거래외(보증금·이체) 제외.
@@ -19,18 +20,12 @@ export default function VatPage() {
   const [range, setRange] = useState<{ from: string; to: string }>({ from: '', to: '' });
 
   const rows = useMemo(() => buildCashLedger(bank, card), [bank, card]);
-  const latest = useMemo(() => rows.reduce((mx, r) => (r.date > mx ? r.date : mx), ''), [rows]);
+  const latest = useMemo(() => latestDateOf(rows, (r) => r.date, ''), [rows]);
   const inRange = useMemo(() => rows.filter((r) => (!range.from || r.date >= range.from) && (!range.to || r.date <= range.to)), [rows, range]);
   const subjects = useMemo(() => aggregateBySubject(inRange), [inRange]);
-
-  const taxableIn = subjects.filter((s) => s.kind === '수입' && vatOfLabel(s.label) === '과세');
-  const taxableOut = subjects.filter((s) => s.kind === '지출' && vatOfLabel(s.label) === '과세');
-  const salesGross = taxableIn.reduce((s, x) => s + x.inAmt, 0);
-  const purchaseGross = taxableOut.reduce((s, x) => s + x.outAmt, 0);
-  const salesVat = Math.round(salesGross / 11);
-  const purchaseVat = Math.round(purchaseGross / 11);
-  const payable = salesVat - purchaseVat;
-  const supplyValue = salesGross - salesVat;
+  const {
+    taxableIn, taxableOut, salesGross, purchaseGross, salesVat, purchaseVat, payable, supplyValue,
+  } = useMemo(() => summarizeVatSubjects(subjects), [subjects]);
 
   const cols = (kind: '수입' | '지출'): Col<SubjectAgg>[] => [
     { key: 'label', label: '계정과목', render: (s) => <b>{s.label}</b> },

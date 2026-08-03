@@ -17,6 +17,8 @@ import { GoogleGenAI } from '@google/genai';
 import { requireAuth } from '@/lib/api-auth';
 import { TYPE_SPECS } from './type-specs';
 import { inferMediaTypeFromName } from './media';
+import { validateDocument } from '@/lib/file-security';
+import { enforceApiRateLimit } from '@/lib/api-rate-limit';
 
 export const runtime = 'nodejs';
 export const maxDuration = 120;
@@ -25,8 +27,10 @@ const MODEL = 'gemini-2.5-flash';
 
 export async function POST(req: NextRequest) {
   // 인증 — Authorization: Bearer <Firebase ID token> (직원만)
-  const actor = await requireAuth();
+  const actor = await requireAuth(req);
   if (actor instanceof NextResponse) return actor;
+  const limited = await enforceApiRateLimit('ocr', actor.uid, { limit: 10, windowMs: 10 * 60_000 });
+  if (limited) return limited;
 
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
@@ -54,13 +58,14 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: `지원하지 않는 type: ${docType}` }, { status: 400 });
   }
 
-  if (file.size > 20 * 1024 * 1024) {
-    return NextResponse.json({ ok: false, error: '파일 크기는 20MB 이하만 가능' }, { status: 413 });
-  }
-
   const arrayBuf = await file.arrayBuffer();
+  const validated = validateDocument(file.name, file.type, new Uint8Array(arrayBuf));
+  if (!validated.ok) {
+    const status = validated.error.includes('20MB') ? 413 : 415;
+    return NextResponse.json({ ok: false, error: validated.error }, { status });
+  }
   const base64 = Buffer.from(arrayBuf).toString('base64');
-  const mediaType = file.type || inferMediaTypeFromName(file.name);
+  const mediaType = validated.mime || inferMediaTypeFromName(file.name);
 
   const ai = new GoogleGenAI({ apiKey });
 

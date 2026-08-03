@@ -1,9 +1,9 @@
 /**
  * CMS 집금 ↔ 자동이체 묶음 자동 매칭 (v5 cms-matching 이식).
  *
- *  · CMS 사업자는 N건 자동이체를 1건 통장 입금으로 묶음 (수수료 차감).
+ *  · CMS 성공(결제일) → 통장 집금은 보통 **3~5일 후** (창: 입금이 성공일 이후 1~7일).
+ *  · 창 안 **전량**이 아니라 deposit 금액에 맞는 **부분합**을 고른다 (수수료 0~3.5%).
  *  · 매칭 후 bank_tx 에 settlementId / role / gross·fee 메타 기록.
- *  · UI는 `/payments` 에서 high만 일괄 적용 · medium/low 는 검토 후 적용.
  */
 import type { BankTransaction } from './types';
 
@@ -19,28 +19,73 @@ export type CmsMatchCandidate = {
   confidence: 'high' | 'medium' | 'low';
 };
 
-const DATE_TOLERANCE_DAYS = 7;
+const LAG_MIN_DAYS = 1;
+const LAG_MAX_DAYS = 7;
+const LAG_TYPICAL_LO = 3;
+const LAG_TYPICAL_HI = 5;
 const MAX_FEE_RATE = 0.035;
-const TYPICAL_FEE_LO = 0.005;
-const TYPICAL_FEE_HI = 0.035;
 
 function ymd(date: string): string { return (date ?? '').slice(0, 10); }
 
-function dayDiff(a: string, b: string): number {
-  const ta = new Date(ymd(a)).getTime();
-  const tb = new Date(ymd(b)).getTime();
+/** later − earlier (일). later가 이전이면 Infinity. */
+function daysAfter(earlier: string, later: string): number {
+  const ta = new Date(ymd(earlier)).getTime();
+  const tb = new Date(ymd(later)).getTime();
   if (!Number.isFinite(ta) || !Number.isFinite(tb)) return Infinity;
-  return Math.abs(ta - tb) / 86400_000;
+  const d = (tb - ta) / 86400_000;
+  return d < 0 ? Infinity : d;
 }
 
-/** 회사 키 — v6 EntityRecord.companyId 를 companyCode 로 넘긴 경우 포함. */
 function coKey(t: BankTransaction): string {
-  return String(t.companyCode || '').trim();
+  return String(t.companyCode || (t as { companyId?: string }).companyId || '').trim();
+}
+
+export function isCmsDepositLabel(t: BankTransaction): boolean {
+  const blob = `${t.counterparty ?? ''} ${t.memo ?? ''}`;
+  const cat = String((t as { category?: string }).category || '');
+  return /CMS집금|카드자동집금/i.test(blob)
+    || /CMS집금|카드자동집금/i.test(cat)
+    || String(t.source || '') === 'CMS집금';
+}
+
+/**
+ * deposit 금액에 맞는 item 부분합.
+ *   목표: deposit ≤ sum ≤ deposit/(1−MAX_FEE)  (수수료 0~3.5%)
+ *   우선: 지연 3~5일 · 큰 금액부터 담기.
+ */
+function pickItemsForDeposit(
+  pool: BankTransaction[],
+  depositAmount: number,
+  depositDate: string,
+): BankTransaction[] {
+  if (depositAmount <= 0 || !pool.length) return [];
+  const maxSum = depositAmount / (1 - MAX_FEE_RATE);
+  const scored = pool.map((it) => {
+    const lag = daysAfter(it.txDate, depositDate);
+    const typical = lag >= LAG_TYPICAL_LO && lag <= LAG_TYPICAL_HI ? 0 : 1;
+    return { it, lag, typical, amt: it.amount ?? 0 };
+  }).filter((x) => x.lag >= LAG_MIN_DAYS && x.lag <= LAG_MAX_DAYS && x.amt > 0);
+
+  scored.sort((a, b) => a.typical - b.typical || b.amt - a.amt || a.lag - b.lag);
+
+  const selected: BankTransaction[] = [];
+  let sum = 0;
+  for (const { it, amt } of scored) {
+    if (sum + amt > maxSum) continue;
+    selected.push(it);
+    sum += amt;
+    if (sum >= depositAmount) break;
+  }
+  if (sum < depositAmount) return [];
+  const fee = sum - depositAmount;
+  const feeRate = sum > 0 ? fee / sum : 1;
+  if (feeRate > MAX_FEE_RATE) return [];
+  return selected;
 }
 
 /**
  * 미정산 bank_tx 에서 CMS 묶음 후보 찾기.
- * deposit = 통장 입금(라벨·계좌·CMS집금) · item = method/source CMS|자동이체.
+ * deposit = 통장 CMS집금 라벨 · item = method/source CMS|자동이체 (결제일=성공일).
  */
 export function findCmsMatchCandidates(bankTx: BankTransaction[]): CmsMatchCandidate[] {
   const depositCandidates: BankTransaction[] = [];
@@ -48,46 +93,46 @@ export function findCmsMatchCandidates(bankTx: BankTransaction[]): CmsMatchCandi
 
   for (const t of bankTx) {
     if (t.settlementId) continue;
-    const labeled = /CMS|집금|cms/i.test(`${t.counterparty ?? ''} ${t.memo ?? ''}`);
     const src = String(t.source || '');
     const method = String(t.method || '');
-    // 개별 CMS — 명시 채널만 (계좌 매칭입금을 item 오인 → 수익 과대 방지)
     const isCmsItem = src === '자동이체' || src === 'CMS' || method === 'CMS' || method === '자동이체';
     if (isCmsItem) {
       const co = coKey(t);
       const arr = itemsByCompany.get(co);
       if (arr) arr.push(t);
       else itemsByCompany.set(co, [t]);
-      continue; // item ↔ deposit 상호배타
+      continue;
     }
-    if ((t.amount ?? 0) > 0 && !t.matchedContractId && (labeled || src === '계좌' || src === 'CMS집금' || method === '계좌')) {
+    if ((t.amount ?? 0) > 0 && !t.matchedContractId && isCmsDepositLabel(t)) {
       depositCandidates.push(t);
     }
   }
+
+  depositCandidates.sort((a, b) => ymd(a.txDate).localeCompare(ymd(b.txDate)) || a.id.localeCompare(b.id));
 
   const out: CmsMatchCandidate[] = [];
   const claimedItems = new Set<string>();
 
   for (const dep of depositCandidates) {
     const co = coKey(dep);
-    const pool = itemsByCompany.get(co);
-    if (!pool?.length) continue;
-    const sameWindow = pool.filter((it) => !claimedItems.has(it.id) && dayDiff(it.txDate, dep.txDate) <= DATE_TOLERANCE_DAYS);
-    if (sameWindow.length === 0) continue;
+    const pool = (itemsByCompany.get(co) || []).filter((it) => !claimedItems.has(it.id));
+    if (!pool.length) continue;
 
-    const itemsSum = sameWindow.reduce((s, x) => s + (x.amount ?? 0), 0);
+    const picked = pickItemsForDeposit(pool, dep.amount ?? 0, dep.txDate);
+    if (!picked.length) continue;
+
+    const itemsSum = picked.reduce((s, x) => s + (x.amount ?? 0), 0);
     const fee = itemsSum - (dep.amount ?? 0);
-    if (fee < 0) continue;
     const feeRate = itemsSum > 0 ? fee / itemsSum : 1;
-    if (feeRate > MAX_FEE_RATE) continue;
 
-    for (const it of sameWindow) claimedItems.add(it.id);
+    for (const it of picked) claimedItems.add(it.id);
 
-    const depLabeled = /CMS|집금|cms/i.test(`${dep.counterparty ?? ''} ${dep.memo ?? ''}`);
-    const strongCmsSignal = depLabeled || dep.source === 'CMS집금';
+    const lags = picked.map((it) => daysAfter(it.txDate, dep.txDate));
+    const avgLag = lags.reduce((s, n) => s + n, 0) / lags.length;
+    const typicalLag = avgLag >= LAG_TYPICAL_LO && avgLag <= LAG_TYPICAL_HI;
     const confidence: CmsMatchCandidate['confidence'] =
-      (strongCmsSignal && feeRate >= TYPICAL_FEE_LO && feeRate <= TYPICAL_FEE_HI && sameWindow.length >= 3) ? 'high'
-      : (sameWindow.length >= 2 || feeRate >= TYPICAL_FEE_LO) ? 'medium'
+      (typicalLag && feeRate <= MAX_FEE_RATE && picked.length >= 2) ? 'high'
+      : (picked.length >= 2 || feeRate <= MAX_FEE_RATE) ? 'medium'
       : 'low';
 
     out.push({
@@ -95,7 +140,7 @@ export function findCmsMatchCandidates(bankTx: BankTransaction[]): CmsMatchCandi
       depositDate: ymd(dep.txDate),
       depositAmount: dep.amount ?? 0,
       companyCode: co,
-      items: sameWindow,
+      items: picked,
       itemsSum,
       estimatedFee: fee,
       feeRate,
@@ -108,8 +153,8 @@ export function findCmsMatchCandidates(bankTx: BankTransaction[]): CmsMatchCandi
 }
 
 /**
- * 매칭 확정 패치 — deposit=지급수수료(이중수익 방지) · items=settlement 링크만.
- * category/subject 는 v6 ledger-subjects SSOT.
+ * 매칭 확정 패치 — deposit 수입과목 유지 · 수수료는 settlementFeeAmount 메타만.
+ * (category를 지급수수료로 덮으면 inAmt가 영업수입·과세매출에서 누락되고 영업손익과 어긋남)
  */
 export function buildSettlementPatches(
   candidate: CmsMatchCandidate,
@@ -126,8 +171,6 @@ export function buildSettlementPatches(
       settlementGrossAmount: candidate.itemsSum,
       settlementFeeAmount: candidate.estimatedFee,
       settlementItemCount: candidate.items.length,
-      subject: '지급수수료',
-      category: '지급수수료',
       memo: `CMS집금 정산${feeLabel}`,
     },
   }];

@@ -1,0 +1,253 @@
+'use client';
+/**
+ * LedgerFrame — 원장 페이지 공용 틀 (재무·운영·데이터센터 동일 규격).
+ *   Page(frame) + 필터 1행 + ExcelSheet(또는 body) + (옵션) 우측 고정 상세패널.
+ *   패널은 오버레이·슬라이드가 아니라 표와 나란히 공간을 나눠 쓴다.
+ *
+ *   클릭 = 행 선택 · 더블클릭 = 상세패널 열기 · 같은 행/패널 재더블클릭 = 닫기.
+ *
+ *   버튼 자리 (왼쪽→오른쪽):
+ *     필터줄 = 회사(또는 companySlot) · 검색 · ☰필터 · 기간 ····· 지표 · 보기 · [+생성]
+ *     ※ ⋯도구 메뉴 없음. 대량액션=선택 액션바 · 투입=[+생성]패널 · 이동=좌측메뉴 · 개별=상세패널.
+ *     내보내기 = 우클릭 컨텍스트 메뉴(`useSheetExport` + ContextMenu).
+ *     필드 적은 원장 = `LedgerFilterSelects`로 상단 흡수(3분할 회피). 다수 필드는 좌측 `filterPanel`.
+ *     Page.right / 필터줄 right = 쓰기(생성·입력) — zone당 solid 1 · Btn sm
+ */
+import React, { type ReactNode } from 'react';
+import type { LucideIcon } from 'lucide-react';
+import { Page } from './layout';
+import { ExcelSheet, type SheetCol } from './excel-sheet';
+import { CompanyFilter, PillTabs } from './controls';
+import { EmptyState, ErrorState, Message, PageLoading, type ObjCardProps } from './misc';
+import { C } from './tokens';
+import { useIsMobile } from '@/lib/use-mobile';
+
+export type LedgerColView = '기본' | '전체';
+
+export function LedgerFrame<R>({
+  title, meta, right, tools, hint,
+  filters, stats,
+  colView, onColView, showColView = true,
+  view, companySlot, body,
+  loading, empty, error, onRetry,
+  cols, rows, exportRows, rowKey, onRow, onRowDoubleClick, onCloseDetail, selectedRowKey,
+  rowClickable,
+  selectedKeys,
+  onRowMouseDown, onRowClickEvent, onRowContextMenu,
+  onView, mobileCard,
+  selectionBar,
+  detail, sidePanel, filterPanel,
+  icon,
+}: {
+  title: string;
+  meta?: ReactNode;
+  /** 페이지 쓰기 CTA — 생성/입력만. solid 1개 원칙. 필터줄 맨 오른쪽. */
+  right?: ReactNode;
+  /** @deprecated ⋯도구 메뉴 폐기. 새 코드에서 쓰지 말 것. */
+  tools?: ReactNode;
+  hint?: ReactNode;
+  filters?: ReactNode;
+  stats?: ReactNode;
+  /** 기본/전체 열보기. 별도 view 선택기와 독립적으로 노출하며 showColView=false일 때만 생략한다. */
+  colView?: LedgerColView;
+  onColView?: (v: LedgerColView) => void;
+  /** false면 기본/전체 PillTabs 숨김(view로 대체하거나 보기 전환 없음). 기본 true. */
+  showColView?: boolean;
+  /** 기본/전체 대신 쓸 보기 전환(예: 대기/저장본). */
+  view?: ReactNode;
+  /** CompanyFilter 대신(합본 저장대상 Select 등). */
+  companySlot?: ReactNode;
+  /** 시트 자리 커스텀(데이터센터 등). 있으면 ExcelSheet 경로 생략. */
+  body?: ReactNode;
+  loading?: boolean;
+  empty?: ReactNode;
+  /** 조회 실패 메시지 — 있으면 표 자리에 오류 상태(«0건»으로 위장 금지). */
+  error?: string | null;
+  onRetry?: () => void;
+  cols?: SheetCol<R>[];
+  rows?: R[];
+  /** 화면 표시 제한과 무관하게 엑셀·헤더필터에 사용할 전체 행. */
+  exportRows?: R[];
+  rowKey?: (r: R) => string;
+  onRow?: (r: R) => void;
+  /** 더블클릭 — 같은 행이면 닫고, 다른 행/미열림이면 연다(페이지에서 토글). */
+  onRowDoubleClick?: (r: R) => void;
+  onCloseDetail?: () => void;
+  selectedRowKey?: string | null;
+  rowClickable?: (r: R) => boolean;
+  /** 다중 선택 하이라이트(체크박스 없음). */
+  selectedKeys?: ReadonlySet<string>;
+  onRowMouseDown?: (e: React.MouseEvent, row: R, index: number) => void;
+  onRowClickEvent?: (e: React.MouseEvent, row: R, index: number) => void;
+  onRowContextMenu?: (e: React.MouseEvent, row: R, index: number) => void;
+  /** ExcelSheet 가 보이는 rows·cols 를 밖으로 — 엑셀 내보내기 SSOT. 로직 금지(통과만). */
+  onView?: (v: { rows: R[]; cols: SheetCol<R>[] }) => void;
+  /** Mobile task card mapping, kept separate from desktop column order. */
+  mobileCard?: (row: R) => Omit<ObjCardProps, 'onClick' | 'style'>;
+  /** 표 위 선택 액션바(`LedgerSelectionBar`). 0건이면 페이지가 null. */
+  selectionBar?: ReactNode;
+  detail?: ReactNode;
+  sidePanel?: ReactNode;
+  filterPanel?: ReactNode;
+  /** 타이틀 nav 아이콘. 생략=경로 자동(lib/nav). false=숨김. */
+  icon?: LucideIcon | false;
+}) {
+  const mobile = useIsMobile();
+  const [pickedKey, setPickedKey] = React.useState<string | null>(null);
+  const sheetRows = rows ?? [];
+  const sheetCols = cols ?? [];
+
+  React.useEffect(() => {
+    if (selectedRowKey != null) setPickedKey(selectedRowKey);
+    else if (sidePanel == null) {
+      setPickedKey(null);
+    }
+  }, [selectedRowKey, sidePanel]);
+
+  // 모바일은 열 밀도 선택이 없는 전용 카드 뷰어다. 데스크톱의 전체열 상태를 가져오지 않는다.
+  React.useEffect(() => {
+    if (mobile && view == null && colView === '전체' && onColView) onColView('기본');
+  }, [mobile, view, colView, onColView]);
+
+  const openDetail = onRowDoubleClick && rowKey
+    ? (row: R) => {
+      const key = rowKey(row);
+      if (pickedKey === key && sidePanel != null && onCloseDetail) {
+        setPickedKey(null);
+        onCloseDetail();
+        return;
+      }
+      setPickedKey(key);
+      onRowDoubleClick(row);
+    }
+    : undefined;
+
+  // 클릭은 선택만, 더블클릭은 모든 원장에서 동일하게 상세를 연다.
+  const selectRow = onRowDoubleClick && rowKey
+    ? (row: R) => {
+      setPickedKey(rowKey(row));
+      onRow?.(row);
+    }
+    : onRow;
+
+  const colViewControl = !mobile && showColView && colView != null && onColView != null
+    ? (
+      <PillTabs
+        size="sm"
+        value={colView}
+        onChange={onColView}
+        tabs={[
+          { key: '기본', label: '기본' },
+          { key: '전체', label: '전체' },
+        ]}
+      />
+    )
+    : null;
+  // 원장/탭 선택(view)과 열 밀도(기본/전체)는 서로 다른 축이다.
+  // 원장 선택이 있다고 기본/전체를 숨기면 페이지에 따라 전체열·엑셀 순서에 접근할 수 없다.
+  const viewControl = view != null && colViewControl != null
+    ? <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>{view}{colViewControl}</div>
+    : view ?? colViewControl;
+
+  // 기본보기 pin 해제 배열을 렌더마다 새로 만들면 onView→setState 무한루프.
+  const viewCols = React.useMemo(
+    () => (colView === '기본' ? sheetCols.map((col) => ({ ...col, pin: false })) : sheetCols),
+    [colView, sheetCols],
+  );
+
+  // ERP: 제목·필터줄·패널 유지 · 표 자리만 PageLoading.
+  return (
+    <Page frame title={title} meta={meta} noCompany icon={icon}>
+      {hint != null && (
+        typeof hint === 'string' || typeof hint === 'number'
+          ? <Message variant="info">{hint}</Message>
+          : hint
+      )}
+
+      <div className="ledger-toolbar">
+        <div className="ledger-toolbar__filters">
+          {companySlot ?? <CompanyFilter size="sm" />}
+          {filters}
+        </div>
+        {stats != null && <div className="ledger-toolbar__stats">{stats}</div>}
+        <div className="ledger-toolbar__actions">
+          {viewControl}
+          {tools}
+          {right}{/* 주액션(생성/등록) — 필터줄 맨 오른쪽. ⋯도구 없음. */}
+        </div>
+      </div>
+
+      <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+        <div
+          className="ledger-workspace"
+          data-panel={sidePanel != null ? 'open' : 'closed'}
+          data-filter={filterPanel != null ? 'open' : 'closed'}
+        >
+          {filterPanel != null && (
+            <aside className="ledger-workspace__filter">
+              {filterPanel}
+            </aside>
+          )}
+          <div className="ledger-workspace__sheet">
+            {selectedKeys != null ? (
+              <div
+                className="ledger-selection-slot"
+                aria-hidden={selectionBar == null ? true : undefined}
+              >
+                {selectionBar}
+              </div>
+            ) : selectionBar}
+            {loading ? (
+              <PageLoading />
+            ) : error ? (
+              // ★실패를 «항목 없음»으로 보여주지 않는다 — 거짓 안심 방지(QA 중요).
+              <ErrorState message={error} onRetry={onRetry} />
+            ) : body != null ? (
+              body
+            ) : !sheetRows.length ? (
+              <EmptyState variant="sheet">{empty ?? '표시할 항목이 없습니다'}</EmptyState>
+            ) : (
+              <ExcelSheet
+                cols={viewCols}
+                rows={sheetRows}
+                exportRows={exportRows}
+                rowKey={rowKey!}
+                onRow={selectRow}
+                onRowDoubleClick={openDetail}
+                selectedRowKey={onRowDoubleClick ? (pickedKey ?? selectedRowKey) : selectedRowKey}
+                fit={colView === '기본'}
+                rowClickable={rowClickable}
+                selectedKeys={selectedKeys}
+                onRowMouseDown={onRowMouseDown}
+                onRowClickEvent={onRowClickEvent ? (e, row, idx) => {
+                  if (rowKey) setPickedKey(rowKey(row));
+                  onRowClickEvent(e, row, idx);
+                } : undefined}
+                onRowContextMenu={onRowContextMenu}
+                onView={onView}
+                mobileCard={mobileCard}
+              />
+            )}
+          </div>
+          {sidePanel != null && (
+            // 상세패널 안 더블클릭은 닫힘과 무관 — 닫기는 X버튼·행 재더블클릭·바깥으로만.
+            <aside className="ledger-workspace__panel">
+              {sidePanel}
+            </aside>
+          )}
+        </div>
+        {detail != null && sheetRows.length > 0 && (
+          <div style={{
+            flexShrink: 0,
+            borderTop: `1px solid ${C.line}`,
+            background: C.card,
+            maxHeight: '42vh',
+            overflow: 'auto',
+          }}>
+            {detail}
+          </div>
+        )}
+      </div>
+    </Page>
+  );
+}

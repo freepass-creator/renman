@@ -2,7 +2,7 @@
 import { useState, useEffect, type CSSProperties } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { ChevronLeft, Menu, X, Home } from 'lucide-react';
+import { ChevronLeft, Menu, X, LayoutDashboard } from 'lucide-react';
 import { useSession, roleLabel } from '@/lib/session';
 import { useAppBarSlots } from '@/lib/appbar';
 import { useIsMobile } from '@/lib/use-mobile';
@@ -20,9 +20,9 @@ const OPERATOR_BRAND = 'teamjpk';
 const APP_VERSION = '6.0.0';
 
 // 메뉴 = lib/nav NAV_GROUPS SSOT (현황=보기 · 업무=손대기 · 경영=지표).
-//   hqOnly 항목(개발도구 등)은 본사(마스터)에게만 노출 — 직원 계정엔 숨김.
+//   hqOnly 항목은 본사(마스터)에게만, devOnly 항목은 개발 빌드에서만 노출.
 const navGroups = (isOperator: boolean, mobile = false) => NAV_GROUPS
-  .map((g) => ({ ...g, items: g.items.filter((it) => tierIncludes(it.tier ?? '라이트') && (!it.hqOnly || isOperator) && !(mobile && it.webOnly)) }))
+  .map((g) => ({ ...g, items: g.items.filter((it) => tierIncludes(it.tier ?? '라이트') && (!it.hqOnly || isOperator) && (!it.devOnly || process.env.NODE_ENV !== 'production') && !(mobile && it.webOnly)) }))
   .filter((g) => g.items.length > 0);
 
 function NavMenu() {
@@ -109,14 +109,26 @@ export default function TopBar() {
   const showActionBar = !!(slots.back || slots.actions || slots.depth);   // 모바일 하단 액션바(이전+주액션)
   useEffect(() => { setMenuOpen(false); }, [pathname]);
   useEffect(() => {
-    // 모바일: 상단 TopBar 항상(ERP4) · 하단 도크=탭/액션.
-    document.body.style.paddingTop = mobile ? 'var(--fp-bar-h)' : '';
+    // Menu links mount only after the popover opens, so their default prefetch starts too late.
+    // Warm the four primary ledgers up front to prevent the previous page lingering on navigation.
+    ['/asset', '/contract', '/cash', '/work'].forEach((href) => router.prefetch(href));
+  }, [router]);
+  useEffect(() => {
+    // 상단바=fixed(웹·모바일) → body paddingTop으로 본문 시작 맞춤.
+    // 웹 뎁스: 하단 이전/홈 바 높이 → --fp-dock-h (Page frame이 빼서 페이지 스크롤 방지).
+    document.body.style.paddingTop = 'var(--fp-bar-h)';
+    const dock = showBottom ? 'calc(var(--fp-bar-h) + 8px)' : '0px';
+    document.documentElement.style.setProperty('--fp-dock-h', mobile ? '0px' : dock);
     document.body.style.paddingBottom = mobile
       ? (depth
           ? (showActionBar ? 'calc(var(--fp-bar-h) + env(safe-area-inset-bottom))' : 'env(safe-area-inset-bottom)')
           : (showActionBar ? 'calc(2 * var(--fp-bar-h) + env(safe-area-inset-bottom))' : 'calc(var(--fp-bar-h) + env(safe-area-inset-bottom))'))
-      : (showBottom ? 'calc(var(--fp-bar-h) + 8px)' : '');
-    return () => { document.body.style.paddingTop = ''; document.body.style.paddingBottom = ''; };
+      : (showBottom ? dock : '');
+    return () => {
+      document.body.style.paddingTop = '';
+      document.body.style.paddingBottom = '';
+      document.documentElement.style.setProperty('--fp-dock-h', '0px');
+    };
   }, [showBottom, showActionBar, mobile, depth]);
   const [todayLabel, setTodayLabel] = useState('');
   useEffect(() => { const n = new Date(); setTodayLabel(`${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}-${String(n.getDate()).padStart(2, '0')} (${['일', '월', '화', '수', '목', '금', '토'][n.getDay()]})`); }, []);
@@ -124,8 +136,8 @@ export default function TopBar() {
   const bh = ctrlH(false);
   const barBtn: CSSProperties = { display: 'inline-flex', alignItems: 'center', gap: 4, height: bh, boxSizing: 'border-box', padding: '0 12px', border: `1px solid ${line}`, borderRadius: 'var(--radius)', background: C.taupeBg, cursor: 'pointer', fontSize: 12.5, fontWeight: 600, color: ink, textDecoration: 'none' };
 
-  // /m(모바일 미리보기)는 웹 크롬 없이 — 프리뷰 프레임만. 웹 상단바 숨김.
-  if (pathname === '/m' || pathname.startsWith('/m/')) return null;
+  // /m(모바일 전용 트리)·/dev/preview(모바일 미리보기)는 웹 크롬 없이 — 자체/프레임 셸만. 웹 상단바 숨김.
+  if (pathname === '/m' || pathname.startsWith('/m/') || pathname === '/dev/preview') return null;
 
   if (mobile) {
     // ERP4: 메뉴 열림 → 상태창이「☰ 메뉴」로 바뀌고 우측 X · 패널은 bar 아래 펼침.
@@ -169,7 +181,12 @@ export default function TopBar() {
 
   return (
     <>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 16px', background: C.taupeBg, borderBottom: `1px solid ${line}`, position: 'sticky', top: 0, zIndex: 30, minHeight: 48, boxSizing: 'border-box', flexWrap: 'wrap' }}>
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 10,
+        padding: '0 16px', background: C.taupeBg, borderBottom: `1px solid ${line}`,
+        position: 'fixed', top: 0, left: 0, right: 0, zIndex: 80,
+        height: 'var(--fp-bar-h)', boxSizing: 'border-box',
+      }}>
         <NavMenu />
         <Link href="/" style={{ fontSize: 15, fontWeight: 800, letterSpacing: '-0.03em', color: ink, textDecoration: 'none' }}>{OPERATOR_BRAND}</Link>{/* SPA 이동 — 구 <a>는 전체 앱 재부팅(캐시 소실) */}
         {/* 가운데 = 전역 검색(검색 전용 인라인 타입어헤드 — 창 안 뜨고 밑에 결과 바로). */}
@@ -184,7 +201,7 @@ export default function TopBar() {
         <div style={{ position: 'fixed', left: 0, right: 0, bottom: 0, zIndex: 55, background: C.taupeBg, borderTop: `1px solid ${line}`, boxShadow: 'var(--shadow-sm)' }}>
           <div style={{ maxWidth: slots.contentMax ?? 1480, margin: '0 auto', padding: `8px ${slots.contentPad ?? 20}px`, display: 'flex', alignItems: 'center', gap: 8, boxSizing: 'border-box' }}>
             <button onClick={goBack} title="이전" style={barBtn}><ChevronLeft size={15} /> 이전</button>
-            <Link href="/" title="홈" style={barBtn}><Home size={15} /> 홈</Link>
+            <Link href="/" title="대시보드" style={barBtn}><LayoutDashboard size={15} /> 대시보드</Link>
             <span style={{ flex: 1 }} />
             {slots.actions}
           </div>

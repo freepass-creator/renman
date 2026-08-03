@@ -1,31 +1,48 @@
 rules_version = '2';
 // jpkerp6 법인 격리 — companyId 기반. 진짜 보안 경계는 여기(서버).
-// users/{uid} = { role: '본사'|'법인'(|레거시 운영자|위탁사), companyId: string|null }
-// 본사(companyId=null) = 전 법인. 법인 소속 직원 = 배정 companyId 문서만.
-// MASTER 이메일은 NEXT_PUBLIC_MASTER_EMAIL 과 동일하게 유지할 것(기본 pyh@teamjpk.com).
+// 권한 SSOT = Firebase Custom Claims:
+//   { systemRole: 'hq' } 또는 { systemRole: 'tenant', companyId: string }
 service cloud.firestore {
   match /databases/{database}/documents {
-    function userDoc() {
-      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
-    }
-    function hasUserDoc() {
-      return exists(/databases/$(database)/documents/users/$(request.auth.uid));
-    }
     function isSignedIn() { return request.auth != null; }
-    function isMaster() {
-      return isSignedIn() && request.auth.token.email != null
-        && request.auth.token.email.lower() == 'pyh@teamjpk.com';
-    }
-    // 본사 = 전 법인. 레거시 '운영자' 호환.
     function isHQ() {
-      return isMaster() || (isSignedIn() && hasUserDoc()
-        && (userDoc().role == '본사' || userDoc().role == '운영자'));
+      return isSignedIn() && request.auth.token.systemRole == 'hq';
     }
-    function myCompany() { return hasUserDoc() ? userDoc().companyId : null; }
+    function myCompany() {
+      return isSignedIn() && request.auth.token.systemRole == 'tenant'
+        ? request.auth.token.companyId
+        : null;
+    }
     function tenantOK(companyId) { return isHQ() || (isSignedIn() && myCompany() == companyId); }
     // ★ 민감 컬렉션 — 범용 규칙에서 반드시 제외. 각자의 명시 match만 지배(범용 OR 우회로 권한승격 차단).
-    //   users: role 자기승격 방지 · period_locks: 마감 우회 방지 · audit_logs: 위변조 방지.
-    function businessColl(coll) { return coll != 'users' && coll != 'period_locks' && coll != 'audit_logs'; }
+    //   users: role 자기승격 방지 · period_locks: 마감 우회 방지 · audit_logs: 위변조 방지
+    //   · company_master: 대외문서에 인쇄되는 법인 신원 위조 방지
+    //   · company_registry: 서버 API에서만 관리하는 관리회사 범위.
+    // 문서ID 소유권 — `{companyId}__…` 접두어. companyId 자체에 '__'가 없어야 유효(회사 id는 영숫자 slug).
+    function docIdOwnedBy(docId, companyId) {
+      return companyId is string
+             && !companyId.matches('.*__.*')
+             && docId.size() > companyId.size() + 2
+             && docId[0:(companyId.size() + 2)] == companyId + '__';
+    }
+    function businessColl(coll) {
+      return coll != 'users'
+        && coll != 'company_master'
+        && coll != 'company_registry'
+        && coll != 'period_locks'
+        && coll != 'audit_logs'
+        && coll != '_api_rate_limits';
+    }
+
+    // 서버 Admin 전용. 클라이언트는 조회·변조할 수 없다.
+    match /_api_rate_limits/{id} {
+      allow read, write: if false;
+    }
+
+    // 목록의 생성·이름변경·보관은 HQ 검증 API만 수행한다(Admin SDK).
+    match /company_registry/{companyId} {
+      allow read, write: if false;
+    }
 
     match /users/{uid} {
       allow read: if isSignedIn() && (request.auth.uid == uid || isHQ());
@@ -46,24 +63,63 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
+    // 법인 마스터 — 대외문서(내용증명·과태료 공문·거래사실확인서)에 인쇄되는 법인 신원.
+    //   ★쓰기 = 본사 또는 «자기 법인». 화면 권한(app/company/[id] allowed = isOperator || scope === id)과
+    //     일치시킨다. 규칙만 본사로 좁히면 법인 사용자의 저장이 조용히 거부돼
+    //     «저장됐다고 믿는데 로컬에만 남는» 상태가 된다(내가 고치려던 문제가 형태만 바꿔 재발).
+    //   다른 회사 문서는 여전히 불가. companyId 필드도 문서 경로와 일치해야 한다.
+    match /company_master/{companyId} {
+      allow read: if isSignedIn() && tenantOK(companyId);
+      allow write: if isSignedIn() && tenantOK(companyId)
+                   && request.resource.data.companyId == companyId;
+    }
+
     // 회계기간 마감 — 본사 쓰기, 소속 법인 읽기.
     match /period_locks/{companyId} {
       allow read: if isSignedIn() && tenantOK(companyId);
       allow write: if isHQ();
     }
 
+    // ── 회계기간 마감(period_locks) 서버 강제 ─────────────────────────────
+    // 왜 여기인가: 클라이언트 가드(lib/finance/period-lock.ts)는 localStorage를 보므로
+    //   «설정 페이지를 한 번도 안 연 기기·새 브라우저»에서는 마감이 아예 없는 것으로 보인다.
+    //   마감은 결산 무결성 장치라 «기기에 따라 달라지는 가드»는 가드가 아니다 → 경계에서 강제한다.
+    // 본사도 막는다 — 마감월을 고치려면 «마감 해제» 또는 신규 분개(전기오류수정)를 타야 한다.
+    function isMoneyColl(coll) { return coll == 'bank_tx' || coll == 'card_tx'; }
+    function closedMap(companyId) {
+      return exists(/databases/$(database)/documents/period_locks/$(companyId))
+        ? get(/databases/$(database)/documents/period_locks/$(companyId)).data.get('map', {})
+        : {};
+    }
+    function ymOf(data) {
+      return data.get('txDate', '').size() >= 7 ? data.get('txDate', '')[0:7] : '';
+    }
+    function ymOpen(companyId, ym) { return ym == '' || !(ym in closedMap(companyId)); }
+    // 수정: 원래 월도, 옮겨갈 월도 열려 있어야 한다(마감월 밖으로 빼내는 것도 차단).
+    function moneyUpdatable(coll, companyId) {
+      return !isMoneyColl(coll)
+        || (ymOpen(companyId, ymOf(resource.data)) && ymOpen(companyId, ymOf(request.resource.data)));
+    }
+    function moneyDeletable(coll, companyId) {
+      return !isMoneyColl(coll) || ymOpen(companyId, ymOf(resource.data));
+    }
+
     // 업무 데이터(vehicle·contract·payment·bank_tx…) — 법인 격리. businessColl()로 민감 컬렉션(users·period_locks·audit_logs)은 절대 여기 안 걸림 → 범용 OR 우회 차단.
     match /{coll}/{docId} {
       allow read: if isSignedIn() && businessColl(coll) && tenantOK(resource.data.companyId);
+      // ★생성 시 문서ID 소유권도 강제 — docId = `{companyId}__{자연키}`(lib/store.ts firestoreDocId).
+      //   없으면 남의 회사 문서ID를 «선점»해 그 회사의 정상 저장을 영구 차단할 수 있다(dedup read 거부→저장 실패).
       allow create: if isSignedIn() && businessColl(coll)
                     && tenantOK(request.resource.data.companyId)
-                    && request.resource.data.companyId is string;
+                    && request.resource.data.companyId is string
+                    && docIdOwnedBy(docId, request.resource.data.companyId);
       // 수정: 소유 법인이거나 본사. companyId(테넌트)는 불변 — 법인 사용자가 자기 문서를 남의 회사로 이동 금지(본사만 재배정 가능).
       allow update: if isSignedIn() && businessColl(coll)
                     && tenantOK(resource.data.companyId)
-                    && (isHQ() || request.resource.data.companyId == resource.data.companyId);
+                    && (isHQ() || request.resource.data.companyId == resource.data.companyId)
+                    && moneyUpdatable(coll, resource.data.companyId);
       // 하드삭제=본사만. 일반 삭제는 soft-delete(deletedAt=update)로 → 휴지통·감사 보존.
-      allow delete: if businessColl(coll) && isHQ();
+      allow delete: if businessColl(coll) && isHQ() && moneyDeletable(coll, resource.data.companyId);
     }
   }
 }

@@ -4,9 +4,10 @@ import { useSession } from '@/lib/session';
 import { getStore } from '@/lib/store';
 import { useReloadOnSaved } from '@/lib/use-reload-on-saved';
 import { ENTITY_LIST, ENTITIES, type EntityRecord } from '@/lib/intake/entities';
-import { companyLabel } from '@/lib/companies';
+import { companyLabel, companyShort } from '@/lib/companies';
 import { Page, Sec, EmptyState, ListBox, ListRow, Btn, C, PageLoading, useConfirm } from '@/components/ui';
 import { WorkbenchBar } from '@/components/WorkbenchBar';
+import { toast } from '@/lib/toast';
 
 type Item = { entity: string; rec: EntityRecord };
 
@@ -20,16 +21,33 @@ export default function TrashPage() {
     if (!silent) setLoading(true);
     const store = getStore();
     Promise.all(ENTITY_LIST.map((e) => store.listDeleted(e.key, companyId).then((rs) => rs.map((rec) => ({ entity: e.key, rec })))))
-      .then((arrs) => { setItems(arrs.flat()); setLoading(false); }).catch(() => setLoading(false));
+      .then((arrs) => {
+        setItems(arrs.flat().sort((a, b) => String(b.rec.deletedAt || '').localeCompare(String(a.rec.deletedAt || ''))));
+        setLoading(false);
+      }).catch(() => setLoading(false));
   }, [companyId]);
 
   useEffect(() => { load(); }, [load]);
   useReloadOnSaved(useCallback(() => load(true), [load]));
 
   async function restore(it: Item) {
-    if (!(await confirm({ message: '이 항목을 복원할까요?' }))) return;
-    await getStore().restore(it.entity, companyId, String(it.rec._key || ''));
-    load();
+    const e = ENTITIES[it.entity];
+    const name = String(it.rec[e.fields[0].key] || it.rec._key || '');
+    const owner = String(it.rec.companyId || companyId);
+    if (!(await confirm({
+      title: '삭제 항목 복구',
+      message: `${companyShort(owner)} · ${e.label} · ${name}\n원래 원장으로 복구합니까?`,
+      confirmLabel: '복구',
+    }))) return;
+    try {
+      // 전체 회사 모드에서 key로 법인을 재탐색하지 않는다.
+      // 법인 간 동일 key가 있어도 삭제 레코드의 소유 법인으로만 복구한다.
+      await getStore().restore(it.entity, owner, String(it.rec._key || ''));
+      toast(`${e.label} 복구 완료 · ${name}`, 'success');
+      load();
+    } catch (error) {
+      toast(`복구 실패 — ${(error as Error).message || '잠시 후 다시 시도해 주세요'}`, 'error');
+    }
   }
 
   return (
@@ -42,10 +60,10 @@ export default function TrashPage() {
               {items.map((it, i) => {
                 const e = ENTITIES[it.entity];
                 const name = String(it.rec[e.fields[0].key] || it.rec._key || '');
-                const sub = `${String(it.rec.deletedAt || '').slice(0, 16).replace('T', ' ')}${it.rec.deletedReason ? ' · ' + it.rec.deletedReason : ''}${scopeAll ? ' · ' + companyLabel(it.rec.companyId) : ''}`;
+                const sub = `${String(it.rec.deletedAt || '').slice(0, 16).replace('T', ' ')}${it.rec.deletedReason ? ' · ' + it.rec.deletedReason : ''}${scopeAll ? ' · ' + companyShort(it.rec.companyId) : ''}`;
                 return (
-                  <ListRow key={i} badge={e.label} main={name} sub={sub}
-                    right={<Btn variant="ghost" onClick={() => restore(it)}><span style={{ color: C.ok }}>복구</span></Btn>} />
+                  <ListRow key={`${it.entity}:${String(it.rec.companyId || '')}:${String(it.rec._key || i)}`} badge={e.label} main={name} sub={sub}
+                    right={<Btn size="sm" variant="ghost" onClick={() => restore(it)}><span style={{ color: C.ok }}>복구</span></Btn>} />
                 );
               })}
             </ListBox>

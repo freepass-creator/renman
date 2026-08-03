@@ -16,7 +16,7 @@ import { TODAY } from '@/lib/dashboard-consts';
 import { linkFleet, recommendNextRent, buildRentRecoCtx, type VehicleNode } from '@/lib/domain/model';
 import { textMatch } from '@/lib/search-match';
 import { effectiveEndDate } from '@/lib/contract-ops';
-import { buildFieldQueues, filterFieldRows, fieldTodayCount } from '@/lib/field-queue';
+import { buildFieldQueues, filterFieldRows } from '@/lib/field-queue';
 import { DeliveryWizard } from '@/components/DeliveryWizard';
 import { ReturnWizard } from '@/components/ReturnWizard';
 import { useEntityLists } from '@/lib/use-entity-lists';
@@ -39,6 +39,7 @@ function dispatchOf(n: VehicleNode): { key: DState; label: string; tone: 'red' |
 }
 
 const nkey = (p: unknown) => String(p || '').replace(/\s/g, '');
+const vehicleKey = (companyId: unknown, plate: unknown) => `${String(companyId || '')}::${nkey(plate)}`;
 const ddayOf = (d: string) => (d ? Math.round((new Date(d + 'T12:00:00').getTime() - new Date(TODAY + 'T12:00:00').getTime()) / 86400000) : null);
 const goSec = (id: string) => { if (typeof document !== 'undefined') document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' }); };
 
@@ -64,7 +65,7 @@ function IoCards({ rows, byPlate, openIo }: {
   return (
     <Cards min={260} fit>
       {rows.map(({ kind, contract: c }, i) => {
-        const v = byPlate.get(nkey(c.plate)) || null;
+        const v = byPlate.get(vehicleKey(c.companyId, c.plate)) || null;
         const carType = String(v?.carName || c.carName || '');
         if (kind === '인도') {
           const sched = c.deliveryScheduledDate
@@ -73,7 +74,7 @@ function IoCards({ rows, byPlate, openIo }: {
           const today = (String(c.deliveryScheduledDate || c.startDate || '').slice(0, 10) === TODAY);
           return (
             <ObjCard
-              key={`d-${i}`}
+              key={`d-${String(c.companyId || '')}-${String(c._key || c.plate || i)}`}
               plate={String(c.plate || '')}
               name={String(c.contractorName || '—')}
               carType={carType}
@@ -90,7 +91,7 @@ function IoCards({ rows, byPlate, openIo }: {
         const tone = dd != null && dd < 0 ? 'red' : dd != null && dd <= 7 ? 'amber' : 'blue';
         return (
           <ObjCard
-            key={`r-${i}`}
+            key={`r-${String(c.companyId || '')}-${String(c._key || c.plate || i)}`}
             plate={String(c.plate || '')}
             name={String(c.contractorName || '—')}
             carType={carType}
@@ -139,21 +140,42 @@ export default function DispatchPage() {
 
   const byPlate = useMemo(() => {
     const m = new Map<string, EntityRecord>();
-    for (const v of vs) m.set(nkey(v.plate), v);
+    for (const v of vs) m.set(vehicleKey(v.companyId, v.plate), v);
     return m;
   }, [vs]);
   const queues = useMemo(() => buildFieldQueues(cs, TODAY), [cs]);
-  const todayN = fieldTodayCount(queues);
+  const fleetReturnQueue = useMemo(() => nodes
+    .map(({ n }) => n.activeContract)
+    .filter((active): active is NonNullable<typeof active> => !!active && active.view.dday != null && active.view.dday <= 30)
+    .map((active) => active.view.rec), [nodes]);
+  const returnQueueAll = useMemo(() => {
+    const map = new Map<string, EntityRecord>();
+    for (const c of [...queues.returnQueue, ...fleetReturnQueue]) {
+      map.set(`${String(c.companyId || '')}::${String(c._key || c.contractNo || c.plate || '')}`, c);
+    }
+    return [...map.values()].sort((a, b) => String(effectiveEndDate(a) || '').localeCompare(String(effectiveEndDate(b) || '')));
+  }, [queues.returnQueue, fleetReturnQueue]);
+  const overdueAll = useMemo(() => returnQueueAll.filter((c) => {
+    const view = fleet.vehicles.flatMap((n) => n.contracts).find((x) => x.view.rec === c)?.view;
+    return view?.dday != null && view.dday < 0;
+  }), [returnQueueAll, fleet]);
+  const todayN = useMemo(() => {
+    const ids = new Set<string>();
+    for (const c of [...overdueAll, ...queues.returnToday, ...queues.deliverToday]) {
+      ids.add(`${String(c.companyId || '')}::${String(c._key || c.contractNo || c.plate || '')}`);
+    }
+    return ids.size;
+  }, [overdueAll, queues.returnToday, queues.deliverToday]);
   const todayRows = useMemo(() => filterFieldRows([
-    ...queues.returnOverdue.map((c) => ({ kind: '반납' as const, contract: c })),
+    ...overdueAll.map((c) => ({ kind: '반납' as const, contract: c })),
     ...queues.returnToday.map((c) => ({ kind: '반납' as const, contract: c })),
     ...queues.deliverToday.map((c) => ({ kind: '인도' as const, contract: c })),
-  ].filter((row, i, arr) => arr.findIndex((x) => String(x.contract._key || x.contract.plate) === String(row.contract._key || row.contract.plate)) === i), q), [queues, q]);
+  ].filter((row, i, arr) => arr.findIndex((x) => vehicleKey(x.contract.companyId, x.contract._key || x.contract.contractNo || x.contract.plate) === vehicleKey(row.contract.companyId, row.contract._key || row.contract.contractNo || row.contract.plate)) === i), q), [queues, overdueAll, q]);
   const outRows = useMemo(() => filterFieldRows(queues.deliverAll.map((c) => ({ kind: '인도' as const, contract: c })), q), [queues, q]);
-  const inRows = useMemo(() => filterFieldRows(queues.returnAll.map((c) => ({ kind: '반납' as const, contract: c })), q), [queues, q]);
+  const inRows = useMemo(() => filterFieldRows(returnQueueAll.map((c) => ({ kind: '반납' as const, contract: c })), q), [returnQueueAll, q]);
 
   const openIo = (kind: '인도' | '반납', c: EntityRecord) => {
-    setWiz({ kind, contract: c, vehicle: byPlate.get(nkey(c.plate)) || null });
+    setWiz({ kind, contract: c, vehicle: byPlate.get(vehicleKey(c.companyId, c.plate)) || null });
     if (typeof document !== 'undefined') {
       window.setTimeout(() => document.getElementById('dispatch-wiz')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
     }
@@ -171,7 +193,7 @@ export default function DispatchPage() {
             <span style={{ fontSize: 12, color: C.mute, whiteSpace: 'nowrap' }}>
               오늘 <b style={{ color: todayN ? C.warn : C.ink }}>{todayN}</b>
               {' · '}출고 {queues.deliverAll.length}
-              {' · '}반납 {queues.returnAll.length}
+              {' · '}반납 30일내 {returnQueueAll.length}
             </span>
           }
         />
@@ -194,7 +216,7 @@ export default function DispatchPage() {
                   <Cards min={128} fit>
                     <Metric label="오늘 큐" value={`${todayN}건`} tone={todayN ? 'warn' : 'ink'} onClick={() => goSec('dispatch-today')} />
                     <Metric label="출고 대기" value={`${queues.deliverAll.length}건`} tone={queues.deliverAll.length ? 'warn' : 'ink'} onClick={() => goSec('dispatch-out')} />
-                    <Metric label="반납 대상" value={`${queues.returnAll.length}건`} tone={queues.returnOverdue.length ? 'danger' : queues.returnAll.length ? 'warn' : 'ink'} onClick={() => goSec('dispatch-in')} />
+                    <Metric label="반납 대상(30일)" value={`${returnQueueAll.length}건`} tone={overdueAll.length ? 'danger' : returnQueueAll.length ? 'warn' : 'ink'} onClick={() => goSec('dispatch-in')} />
                     <Metric label="대여가능" value={`${cnt('대여가능')}대`} tone={cnt('대여가능') ? 'ok' : 'ink'} onClick={() => { setF(['대여가능']); goSec('dispatch-stock'); }} />
                     <Metric label="운행중" value={`${running}대`} tone="ink" onClick={() => { setF(['운행중', '반납임박', '반납지남']); goSec('dispatch-stock'); }} />
                     <Metric label="반납지남" value={`${cnt('반납지남')}대`} tone={cnt('반납지남') ? 'danger' : 'ink'} onClick={() => { setF(['반납지남']); goSec('dispatch-stock'); }} />
@@ -229,13 +251,13 @@ export default function DispatchPage() {
             }
             if (id === 'dispatch-in') {
               return (
-                <Sec key={id} id={id} title="반납 대상" n={inRows.length} desc="반납 — 계기판·연료·정산 · 임박순" onReorder={reorder}>
+                <Sec key={id} id={id} title="반납 대상" n={inRows.length} desc="지남·30일 이내 도래 · 계기판·연료·정산 · 임박순" onReorder={reorder}>
                   <IoCards rows={inRows} byPlate={byPlate} openIo={openIo} />
                 </Sec>
               );
             }
             return (
-              <Sec key={id} id={id} title="재고" n={shown.length} desc="보낼 수 있나 · 언제 돌아오나 · 좌측 필터" onReorder={reorder}>
+              <Sec key={id} id={id} title="재고" n={shown.length} desc="보낼 수 있나 · 언제 돌아오나 · 필터로 조회" onReorder={reorder}>
                 {shown.length === 0 ? <EmptyState variant="sec">해당 차량 없음</EmptyState>
                   : <div style={{ display: 'flex', flexDirection: 'column', gap: SPACE_M }}>{shown.map(({ n, d }) => {
                     const av = n.activeContract;
@@ -266,12 +288,12 @@ export default function DispatchPage() {
                           carType={av && n.veh.carName ? String(n.veh.carName) : undefined}
                           fields={fields}
                           right={av && av.net > 0 ? <span style={{ color: C.danger }}>미수 {won(av.net)}</span> : undefined}
-                          onClick={() => openCar(n.plate)}
+                          onClick={() => openCar(n.plate, undefined, n.veh.companyId)}
                         />
                         {(needReturn || d.key === '대여가능') && (
                           <div style={{ display: 'flex', gap: SPACE_M, flexWrap: 'wrap' }}>
                             {needReturn && av ? <Btn size="sm" onClick={() => openIo('반납', av.view.rec)}>반납</Btn> : null}
-                            {d.key === '대여가능' ? <Btn size="sm" variant="ghost" onClick={() => openCar(n.plate)}>360</Btn> : null}
+                            {d.key === '대여가능' ? <Btn size="sm" variant="ghost" onClick={() => openCar(n.plate, undefined, n.veh.companyId)}>360</Btn> : null}
                           </div>
                         )}
                       </div>

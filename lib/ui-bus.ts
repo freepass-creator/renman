@@ -1,20 +1,54 @@
 // 전역 UI 이벤트 버스 — 어디서든 차 열기/담기/팔레트/새로고침. 사이드바 없는 단일화면의 접착제.
 // focus = 온 이유(task): unpaid(수납)·return(반납)·inspect(검사)·deploy(투입)·doc(서류)·loan|insurance → 360이 해당 액션을 띄움
 // 세계관: 차번·기간·계약자 축이 끊기지 않게 열기 — openCar / openCustomer / openPayments.
-export const openCar = (plate: unknown, focus?: string) => window.dispatchEvent(new CustomEvent('jpk:open-car', { detail: { plate: String(plate || ''), focus: focus || '' } }));
-/** 홈 렌즈 전환 — 운영|일정|콕핏|리스크. 자금은 openFinance. */
-export const openLens = (lens: string) => window.dispatchEvent(new CustomEvent('jpk:lens', { detail: lens }));
-export const openCustomer = (key: unknown) => window.dispatchEvent(new CustomEvent('jpk:open-customer', { detail: { key: String(key || '') } }));
-/** 수납매칭 — 입금→계약 파이프 입구. SPA push(CarDrawer jpk:navigate). 풀리로드 금지. */
-export const openPayments = () => {
+export const openCar = (plate: unknown, focus?: string, companyId?: unknown) => window.dispatchEvent(new CustomEvent('jpk:open-car', {
+  detail: { plate: String(plate || ''), focus: focus || '', companyId: String(companyId || '') },
+}));
+/** 홈 렌즈 전환 — 전용 페이지로. */
+export const openLens = (lens: string) => {
   if (typeof window === 'undefined') return;
-  window.dispatchEvent(new CustomEvent('jpk:navigate', { detail: { href: '/payments' } }));
-};
-/** 재무현황 — 출금·미분류 등. facet=미분류면 미분류 탭·칩. */
-export const openFinance = (opts?: { unclassified?: boolean }) => {
-  if (typeof window === 'undefined') return;
-  const href = opts?.unclassified ? '/finance?facet=미분류' : '/finance';
+  const map: Record<string, string> = {
+    운영: '/status',
+    일정: '/risk',
+    콕핏: '/',
+    미결: '/receivables',
+    리스크: '/risk',
+    휴차: '/status',
+    요약: '/',
+    돈: '/cash',
+    자금: '/cash',
+  };
+  const href = map[lens] || '/';
   window.dispatchEvent(new CustomEvent('jpk:navigate', { detail: { href } }));
+};
+export const openCustomer = (key: unknown) => window.dispatchEvent(new CustomEvent('jpk:open-customer', { detail: { key: String(key || '') } }));
+/** 수납매칭 — 입금→계약 파이프. 선택 거래가 있으면 화면 이동 뒤에도 이어서 처리한다. */
+export const paymentsHref = (opts?: { transactionId?: unknown; companyId?: unknown }) => {
+  const qs = new URLSearchParams();
+  if (opts?.transactionId) qs.set('tx', String(opts.transactionId));
+  if (opts?.companyId) qs.set('company', String(opts.companyId));
+  return '/payments' + (qs.toString() ? `?${qs.toString()}` : '');
+};
+export const openPayments = (opts?: { transactionId?: unknown; companyId?: unknown }) => {
+  if (typeof window === 'undefined') return;
+  window.dispatchEvent(new CustomEvent('jpk:navigate', { detail: { href: paymentsHref(opts) } }));
+};
+/** 미수관리 — 회수 큐. */
+export const openReceivables = () => {
+  if (typeof window === 'undefined') return;
+  window.dispatchEvent(new CustomEvent('jpk:navigate', { detail: { href: '/receivables' } }));
+};
+/** 재무/자금 — /cash (구 /finance 흡수). 선택 거래가 있으면 1차 분류 패널까지 이어서 연다. */
+export const financeHref = (opts?: { unclassified?: boolean; transactionId?: unknown; companyId?: unknown }) => {
+  const qs = new URLSearchParams();
+  if (opts?.unclassified) qs.set('facet', '미분류');
+  if (opts?.transactionId) qs.set('tx', String(opts.transactionId));
+  if (opts?.companyId) qs.set('company', String(opts.companyId));
+  return '/cash' + (qs.toString() ? `?${qs.toString()}` : '');
+};
+export const openFinance = (opts?: { unclassified?: boolean; transactionId?: unknown; companyId?: unknown }) => {
+  if (typeof window === 'undefined') return;
+  window.dispatchEvent(new CustomEvent('jpk:navigate', { detail: { href: financeHref(opts) } }));
 };
 // 문서 인쇄 오버레이(내용증명 등) — 라우트 없이 전역 PrintHost로
 // contractKeys = 내용증명 일괄(N건 한 오버레이·페이지브레이크)

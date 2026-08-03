@@ -1,0 +1,32 @@
+name: Production smoke
+
+on:
+  workflow_dispatch:
+  schedule:
+    # 매일 09:10 KST. GitHub 스케줄 지연을 고려해 정각을 피한다.
+    - cron: '10 0 * * *'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-smoke
+  cancel-in-progress: true
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Verify production routes, release identity, security headers and auth boundary
+        run: npm run test:production

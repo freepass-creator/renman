@@ -2,6 +2,9 @@
   "name": "jpkerp6",
   "version": "6.0.0-alpha",
   "private": true,
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "dev": "next dev --turbo -p 6006",
     "build": "next build",
@@ -9,7 +12,24 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:rules": "firebase emulators:exec --only firestore --project renman-rules-test \"vitest run --config vitest.rules.config.ts\""
+    "test:smoke": "node --experimental-strip-types scripts/smoke.mts",
+    "test:production": "node --experimental-strip-types scripts/smoke.mts --production",
+    "open:gate": "node --experimental-strip-types scripts/open-gate.mts",
+    "open:scan": "node --experimental-strip-types scripts/scan-money-hazards.mts",
+    "open:snapshot": "npx tsx tools/snapshot-receivables.ts",
+    "open:check": "npm run open:scan && npm run open:gate",
+    "test:rules": "firebase emulators:exec --only firestore --project renman-rules-test \"vitest run --config vitest.rules.config.ts\"",
+    "admin:set-claims": "node --experimental-strip-types scripts/set-user-claims.mts",
+    "security:secrets": "node --experimental-strip-types scripts/check-secrets.mts",
+    "security:audit": "node --experimental-strip-types scripts/audit-severity-gate.mts",
+    "backup:preflight": "node --experimental-strip-types scripts/firestore-managed-backup.mts --check-api",
+    "backup:run": "node --experimental-strip-types scripts/firestore-managed-backup.mts --execute --wait",
+    "firestore:delete-protection:check": "node --experimental-strip-types scripts/firestore-delete-protection.mts",
+    "restore:preflight": "node --experimental-strip-types scripts/firestore-managed-restore.mts",
+    "restore:run": "node --experimental-strip-types scripts/firestore-managed-restore.mts --execute",
+    "deploy:preflight": "npm run security:secrets && npm run security:audit && npm run open:scan && node --experimental-strip-types scripts/deploy-preflight.mts",
+    "release:preflight": "npm run deploy:preflight && npm run backup:preflight && npm run open:check",
+    "deploy:rules": "npm run deploy:preflight && firebase deploy --only firestore:rules,storage --project renman-dd0a2"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",
@@ -17,13 +37,14 @@
     "@radix-ui/react-tabs": "^1.1.17",
     "clsx": "^2.1.1",
     "firebase": "^12.12.1",
+    "firebase-admin": "^13.4.0",
     "googleapis": "^173.0.0",
     "lucide-react": "^1.21.0",
     "next": "^15.1.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "tailwind-merge": "^2.6.1",
-    "xlsx": "^0.18.5",
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz",
     "zod": "^4.4.3"
   },
   "devDependencies": {
@@ -37,5 +58,11 @@
     "tailwindcss": "^3.4.14",
     "typescript": "^5.6.3",
     "vitest": "^4.1.10"
+  },
+  "overrides": {
+    "next": {
+      "postcss": "8.5.25",
+      "sharp": "0.35.3"
+    }
   }
 }

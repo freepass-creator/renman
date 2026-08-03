@@ -4,23 +4,14 @@
  *   · Sec right={<WorkPipe to="payments" />}
  */
 'use client';
-import { C } from '@/components/ui';
+import { TextLink } from '@/components/ui';
 import { PIPE, openPipe, type PipeId } from '@/lib/work-hub';
 
 export function WorkPipe({ to, label, query }: { to: PipeId; label?: string; query?: string }) {
   const p = PIPE[to];
   return (
-    <button
-      type="button"
-      data-ui="action"
-      onClick={() => openPipe(to, query)}
-      style={{
-        border: 'none', background: 'none', padding: 0, margin: 0,
-        fontSize: 12, color: C.accent, fontWeight: 700, cursor: 'pointer',
-        fontFamily: 'inherit', whiteSpace: 'nowrap',
-      }}
-    >
+    <TextLink onClick={() => openPipe(to, query)} style={{ fontSize: 12, whiteSpace: 'nowrap' }}>
       {label || `${p.label} →`}
-    </button>
+    </TextLink>
   );
 }

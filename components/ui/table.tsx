@@ -51,3 +51,9 @@ export function DataTable<T>({ cols, rows, onRow }: { cols: Col<T>[]; rows: T[];
 }
 
 export function won(n: unknown): string { const x = Number(n); return isNaN(x) ? '—' : '₩' + x.toLocaleString(); }
+/** 표 셀 금액 — ₩ 없이 콤마 숫자만(tabular). 합계·지표·패널은 won(). */
+export function money(n: unknown): string {
+  const x = Number(n);
+  if (isNaN(x)) return '—';
+  return x.toLocaleString('ko-KR');
+}

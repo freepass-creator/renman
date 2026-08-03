@@ -9,17 +9,18 @@ import { useRouter } from 'next/navigation';
 import { useSession } from '@/lib/session';
 import { COMPANIES, ALL_COMPANIES, companyLabel } from '@/lib/companies';
 import { loadMaster } from '@/lib/company-master';
-import { Page, Btn, C, Input, Select, toggleStyle, fieldStyle } from '@/components/ui';
+import { Page, Btn, C, Input, TextArea, Select, PillTabs } from '@/components/ui';
 import { WorkbenchBar } from '@/components/WorkbenchBar';
 import { useIsMobile } from '@/lib/use-mobile';
 import { useEntityList } from '@/lib/use-entity-lists';
 import { commitSave } from '@/lib/commit';
 import { toast } from '@/lib/toast';
 import {
-  listTemplates, getTemplate, renderBody, buildDocNo, computeNextSeq, fmtKDate, fmtKMoney,
+  listTemplates, getTemplate, renderBody, buildCompanyDocNo, computeNextCompanySeq, fmtKDate, fmtKMoney,
   DOC_CATEGORIES, DOC_PRINT_CSS, type DocCategory,
 } from '@/lib/doc-templates';
 import { todayKST } from '@/lib/contracts/dates';
+import { sanitizeDocHtml } from '@/lib/docs/sanitize-html';
 
 const today = todayKST;
 
@@ -63,8 +64,10 @@ export default function DocIssuePage() {
         ? { name: fieldData._targetName || '', bizRegNo: fieldData._targetBizRegNo || '', ceo: fieldData._targetCeo || '', mainPhone: fieldData._targetPhone || '', address: fieldData._targetAddress || '' }
         : undefined;
 
-  const nextSeq = template ? computeNextSeq(issued as { docNo?: string }[], template.prefix) : 1;
-  const docNo = template ? buildDocNo(template.prefix, nextSeq) : '';
+  const nextSeq = template && issuerId
+    ? computeNextCompanySeq(issued as { docNo?: string; companyId?: unknown }[], issuerId, template.prefix)
+    : 1;
+  const docNo = template && issuerId ? buildCompanyDocNo(issuerId, template.prefix, nextSeq) : '';
 
   const previewBody = useMemo(() => {
     if (!template) return '';
@@ -102,7 +105,8 @@ export default function DocIssuePage() {
           docNo, templateId: template.id, templateTitle: template.title, category: template.category,
           targetType: template.target, targetName: targetScope?.name || '',
           data: fieldData, issuerCompanyName: companyLabel(issuerId),
-          bodyHtml: previewBody,
+          // ★저장물 자체를 새니타이즈 — 재인쇄·외부 소비 어디서든 실행 가능한 코드가 남지 않게.
+          bodyHtml: sanitizeDocHtml(previewBody),
           issuedAt: new Date().toISOString(), issuedBy: user.name,
         }],
       });
@@ -112,7 +116,6 @@ export default function DocIssuePage() {
   }
 
   const lbl: React.CSSProperties = { fontSize: 11, color: C.mute, marginBottom: 4, fontWeight: 600 };
-  const fld = { ...fieldStyle(false, mobile), width: '100%' } as React.CSSProperties;
 
   return (
     <Page
@@ -120,11 +123,11 @@ export default function DocIssuePage() {
       meta={template?.title || '재직·거래사실·입금확인·위임장'}
       tools={
         <WorkbenchBar
-          mid={<span style={{ fontSize: 11.5, color: C.faint, whiteSpace: 'nowrap' }}>문서번호 <b style={{ fontFamily: 'var(--font-mono)' }}>{docNo}</b> · {fmtKDate(today())}</span>}
+          mid={<span style={{ fontSize: 11.5, color: C.faint, whiteSpace: 'nowrap' }}>문서번호 <b style={{ fontFamily: 'var(--font-mono)' }}>{docNo || '회사 선택 후 채번'}</b> · {fmtKDate(today())}</span>}
           actions={<>
             <Btn variant="ghost" href="/docs">← 발급 이력</Btn>
-            <Btn variant="ghost" onClick={print} disabled={!template}>인쇄 / PDF</Btn>
-            <Btn onClick={issue} disabled={saving || !template}>{saving ? '발급 중…' : '발급 (기록 저장)'}</Btn>
+            <Btn variant="ghost" onClick={print} disabled={!template || !issuerId}>인쇄 / PDF</Btn>
+            <Btn onClick={issue} disabled={saving || !template || !issuerId}>{saving ? '발급 중…' : '발급 (기록 저장)'}</Btn>
           </>}
         />
       }
@@ -135,11 +138,12 @@ export default function DocIssuePage() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           <div>
             <div style={lbl}>분류</div>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: mobile ? 8 : 6 }}>
-              {DOC_CATEGORIES.filter((c) => listTemplates({ category: c }).length > 0).map((c) => (
-                <button key={c} type="button" data-ui="toggle" style={toggleStyle(category === c, 'sm', mobile)} onClick={() => setCategory(c)} aria-pressed={category === c}>{c}</button>
-              ))}
-            </div>
+            <PillTabs
+              size="sm"
+              value={category}
+              onChange={setCategory}
+              tabs={DOC_CATEGORIES.filter((key) => listTemplates({ category: key }).length > 0).map((key) => ({ key, label: key }))}
+            />
           </div>
           <div>
             <div style={lbl}>양식</div>
@@ -179,7 +183,7 @@ export default function DocIssuePage() {
             <div key={f.key}>
               <div style={lbl}>{f.label}{f.required && <span style={{ color: C.danger, marginLeft: 2 }}>*</span>}</div>
               {f.type === 'textarea'
-                ? <textarea rows={3} value={fieldData[f.key] || ''} onChange={(e) => setF(f.key, e.target.value)} placeholder={f.placeholder} style={{ ...fld, height: 'auto', padding: '8px 9px', resize: 'vertical' }} />
+                ? <TextArea rows={3} value={fieldData[f.key] || ''} onChange={(e) => setF(f.key, e.target.value)} placeholder={f.placeholder} />
                 : f.type === 'select'
                   ? <Select value={fieldData[f.key] || ''} onChange={(e) => setF(f.key, e.target.value)} style={{ width: '100%' }}>{(f.options || []).map((o) => <option key={o} value={o}>{o}</option>)}</Select>
                   : <Input type={f.type === 'date' ? 'date' : f.type === 'number' ? 'number' : 'text'} value={fieldData[f.key] || ''} onChange={(e) => setF(f.key, e.target.value)} placeholder={f.placeholder} style={{ width: '100%' }} />}

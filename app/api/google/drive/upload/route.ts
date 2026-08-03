@@ -11,6 +11,8 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { getDriveClient, workspaceConfigured } from '@/lib/google/client';
 import { requireAuth } from '@/lib/api-auth';
 import { Readable } from 'stream';
+import { safeDrivePath, validateDocument } from '@/lib/file-security';
+import { enforceApiRateLimit } from '@/lib/api-rate-limit';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -45,11 +47,13 @@ async function ensureFolderPath(drive: ReturnType<typeof getDriveClient>, segmen
 }
 
 export async function POST(req: NextRequest) {
+  const actor = await requireAuth(req);
+  if (actor instanceof NextResponse) return actor;
+  const limited = await enforceApiRateLimit('drive-upload', actor.uid, { limit: 30, windowMs: 10 * 60_000 });
+  if (limited) return limited;
+
   const cfg = workspaceConfigured();
   if (!cfg.ok) return NextResponse.json({ ok: false, error: `Workspace 미설정: ${cfg.missing.join(', ')}` }, { status: 500 });
-
-  const actor = await requireAuth();
-  if (actor instanceof NextResponse) return actor;
 
   try {
     const form = await req.formData();
@@ -60,14 +64,25 @@ export async function POST(req: NextRequest) {
     if (!pathRaw) return NextResponse.json({ ok: false, error: 'path 필수' }, { status: 400 });
     if (!fileName) return NextResponse.json({ ok: false, error: 'fileName 필수' }, { status: 400 });
 
-    const segments = pathRaw.split('/').map((s) => s.trim()).filter(Boolean);
+    const segments = safeDrivePath(pathRaw);
+    if (!segments) return NextResponse.json({ ok: false, error: 'invalid path' }, { status: 400 });
+    if (actor.systemRole === 'tenant' && segments[0] !== actor.companyId) {
+      return NextResponse.json({ ok: false, error: 'forbidden path' }, { status: 403 });
+    }
+
+    const arrayBuffer = await file.arrayBuffer();
+    const validated = validateDocument(fileName, file.type, new Uint8Array(arrayBuffer));
+    if (!validated.ok) {
+      const status = validated.error.includes('20MB') ? 413 : 415;
+      return NextResponse.json({ ok: false, error: validated.error }, { status });
+    }
     const drive = getDriveClient();
     const folderId = await ensureFolderPath(drive, segments);
 
-    const buffer = Buffer.from(await file.arrayBuffer());
+    const buffer = Buffer.from(arrayBuffer);
     const created = await drive.files.create({
-      requestBody: { name: fileName, parents: [folderId] },
-      media: { mimeType: file.type || 'application/octet-stream', body: Readable.from(buffer) },
+      requestBody: { name: validated.name, parents: [folderId] },
+      media: { mimeType: validated.mime, body: Readable.from(buffer) },
       fields: 'id,webViewLink,webContentLink',
       supportsAllDrives: true,
     });

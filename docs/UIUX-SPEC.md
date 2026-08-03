@@ -2,6 +2,20 @@
 
 > 전수검사(2026-07-23 · 24개 페이지) 근거. 페이지 **유형**별로 보기·필터·정렬·섹션·팝업·모바일을 하나로 고정한다.
 > 페이지는 이 표에서 «따다 쓰기»만 — 손롤 금지. 원자: `WorkbenchBar`(툴바) · `FacetRail`(좌측필터) · `ExcelSheet`(표) · `IconSeg`(뷰토글) · `Sec`+`useSecOrder`(섹션) · `DetailShell`(상세).
+> 원장 셸 추가: `LedgerFrame`(+`LedgerActions`) · 회사=`CompanyFilter`.
+
+## 헤더 컨트롤 존 규격 (전 페이지 동일)
+
+좌→우 순서 고정: `[회사 스코프] · 제목 · (검색·범위·칩) ····· [기간] [보기] [도구] │ [주액션]`
+
+| 자리 | 규격 |
+|---|---|
+| **회사 스코프** | `CompanyFilter` 원자 하나 · **프레임이 그림**(페이지 손 `<select>`·`companySlot` 금지) · LedgerFrame=필터줄 첫칸 `size="sm"` · **meta에 스코프 텍스트 중복 금지** |
+| **주액션(쓰기)** | 헤더 `right` / WorkbenchBar `actions` 에만 · **라벨 solid 최대 1개**(생성·저장) · 보조는 ghost `iconOnly` · Sec 본문·다른 곳 금지 |
+| **버튼 size** | 헤더 컨트롤 전부 `size="sm"` |
+| **도구(tools)** | ghost `iconOnly`+`tip` |
+| **범위·구분** | `Select` 하나로 통일(PillTabs 혼용 지양) |
+| **드롭다운 3종** | 회사 스코프 · 기간(`PeriodBar` sm) · 보기(기본/전체) |
 
 ## 왜 (검사에서 드러난 불일치)
 - **보기**: 같은 조회인데 카드↔엑셀 토글은 /asset·/contract 2곳뿐, 나머지는 DataTable·카드·혼합 6갈래.
@@ -10,6 +24,7 @@
 - **섹션**: `Sec`에 `id`/`onReorder` 안 넘긴 페이지(/integrity·/manage·/pnl·/financials 등)는 접기·숨김·재정렬 전부 죽음.
 - **팝업**: 담기·Wizard·수동연결·문서발급 풀스크린 모달 남발 + `window.confirm/prompt` 혼재.
 - **모바일**: 셸/원자 위임 표준 (`WorkbenchBar`·`FacetPage`·`Sec`). 뎁스=상단 제목·하단 이전(=ERP4).
+- **헤더**: 회사 스코프 3갈래(CompanyFilter·손 select·meta 텍스트) · 주액션 ghost iconOnly/Sec 본문 혼재 · size md/sm 혼재.
 
 ## 유형별 규격
 
@@ -29,6 +44,7 @@
 4. **`FacetRail` = 데이터 좁히기 의미로 통일** — 섹션 show/hide 전용으로 쓰지 말 것.
 5. **모바일 = 셸/원자 위임 표준** — 페이지가 `useIsMobile`을 직접 안 써도 `WorkbenchBar`·`FacetPage`·`Sec` 위임으로 반응형 보장.
 6. **팝업 최소화** — 담기·매칭·정산은 인라인 패널/전용 페이지 우선(풀스크린 모달 지양).
+7. **헤더 컨트롤 존** — 위 표 준수. 회사=`CompanyFilter` · 주액션=solid 라벨 1개 · size=sm.
 
 ## 위반 체크리스트 (수정 대상)
 - [x] **/contract-history** (a): 카드↔엑셀 · FacetRail(지난계약) · Sec
@@ -46,9 +62,13 @@
 - [x] **/list/[id]** (d): usePrompt (기반영)
 - [x] **/settings**: usePrompt (기반영)
 - [x] **/manage · /pnl · /financials** (f): Sec id · Page 셸 · pnl ExcelSheet
+- [x] **헤더 회사 스코프**: ingest 손 select→CompanyFilter · 홈 meta 중복 제거
+- [x] **헤더 주액션**: asset/contract/work=solid 라벨 sm · receivables actions→WorkbenchBar · penalty size sm
+- [x] **헤더 범위**: work PillTabs→Select
 
 ## 이미 규격 부합
 `/`(홈)·`/ops`·`/asset`·`/contract`(뷰/필터/섹션 축)·`/sheet`(운영시트=b형 신규) 은 대체로 부합. 홈·/ops 는 모바일 페이지레벨 분기까지 완비(모범).
 
 ## 잔여(후속)
-- (없음 — UIUX-SPEC 위반 체크리스트 이행 완료)
+- FacetPage 계열(`/receivables`·`/penalty`) 회사 위치=title-row — C 이후 검토
+- 업무 셸 이원화(`/work`=LedgerFrame vs `/receivables`·`/penalty`=FacetPage+FacetRail) — 별도

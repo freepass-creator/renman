@@ -5,7 +5,7 @@
  *   1. DocTemplate — 양식 정의 (id, 분류, 필드, body HTML)
  *   2. registerTemplate() / getTemplate() / listTemplates()
  *   3. renderBody() — 입력값 + 양식 → 최종 HTML ({{key}} 치환, XSS 이스케이프)
- *   4. buildDocNo() / computeNextSeq() — JPK-{prefix}-{YYMM}-{seq} 채번
+ *   4. buildCompanyDocNo() / computeNextCompanySeq() — {companyId}-{prefix}-{YYMM}-{seq} 회사별 채번
  *   5. DOC_PRINT_CSS — A4 미리보기·인쇄 공통 스타일
  *
  * 양식 추가 = 이 파일에 registerTemplate() 1개. 별도 페이지 불필요.
@@ -36,7 +36,7 @@ export type DocTemplate = {
   title: string;            // 한글 제목
   category: DocCategory;
   target: DocTargetType;
-  prefix: string;           // 문서번호 prefix — JPK-{prefix}-{YYMM}-{seq}
+  prefix: string;           // 양식 prefix — {companyId}-{prefix}-{YYMM}-{seq}
   description?: string;
   fields: DocFieldDef[];
   body: string;             // {{key}} / {{company.name}} / {{target.name}} 치환
@@ -89,6 +89,36 @@ export function buildDocNo(prefix: string, seq: number, when: Date = new Date())
   const yy = String(when.getFullYear()).slice(-2);
   const mm = String(when.getMonth() + 1).padStart(2, '0');
   return `JPK-${prefix}-${yy}${mm}-${String(seq).padStart(3, '0')}`;
+}
+
+/** 동적 관리회사용 문서번호. 회사 ID는 레지스트리에서 고정되므로 상호 변경 후에도 번호가 안정적이다. */
+export function companyDocCode(companyId: unknown): string {
+  const id = String(companyId || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+  return (id || 'COMPANY').slice(0, 12);
+}
+
+export function buildCompanyDocNo(companyId: unknown, prefix: string, seq: number, when: Date = new Date()): string {
+  const yy = String(when.getFullYear()).slice(-2);
+  const mm = String(when.getMonth() + 1).padStart(2, '0');
+  return `${companyDocCode(companyId)}-${prefix}-${yy}${mm}-${String(seq).padStart(3, '0')}`;
+}
+
+/** 회사별·양식별·월별 다음 번호. */
+export function computeNextCompanySeq(
+  items: { docNo?: string; companyId?: unknown }[],
+  companyId: unknown,
+  prefix: string,
+  when: Date = new Date(),
+): number {
+  const yy = String(when.getFullYear()).slice(-2);
+  const mm = String(when.getMonth() + 1).padStart(2, '0');
+  const owner = String(companyId || '');
+  const monthPrefix = `${companyDocCode(companyId)}-${prefix}-${yy}${mm}-`;
+  const seqs = items
+    .filter((d) => String(d.companyId || '') === owner && String(d.docNo || '').startsWith(monthPrefix))
+    .map((d) => Number(String(d.docNo || '').slice(monthPrefix.length)))
+    .filter((n) => Number.isFinite(n));
+  return seqs.length ? Math.max(...seqs) + 1 : 1;
 }
 /** 같은 prefix의 이번 달 발급 건수 + 1 = 다음 일련번호. */
 export function computeNextSeq(items: { docNo?: string }[], prefix: string, when: Date = new Date()): number {

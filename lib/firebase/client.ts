@@ -16,7 +16,10 @@ const cfg = {
 /** 실데이터 루트. v4는 root 직접(prefix 없음). v5 네임스페이스는 'v5'. 현재 실데이터=v4 root. */
 export const DATA_ROOT = '';
 
-export function firebaseReady(): boolean { return !!cfg.apiKey; }
+/** Explicit local UI-QA mode. The NODE_ENV guard prevents this bypass in production builds. */
+const localQaSession = process.env.NODE_ENV === 'development' && process.env.NEXT_PUBLIC_QA_LOCAL_SESSION === '1';
+
+export function firebaseReady(): boolean { return !!cfg.apiKey && !localQaSession; }
 
 export function getFirebaseApp(): FirebaseApp | null {
   if (!firebaseReady()) return null;

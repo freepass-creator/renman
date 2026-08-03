@@ -1,22 +1,42 @@
 'use client';
 import React from 'react';
-import { Check } from 'lucide-react';
+import { Check, AlertTriangle, type LucideIcon } from 'lucide-react';
 import { companyTone, companyShort } from '@/lib/companies';
 import { type CrosscheckResult } from '@/lib/ocr-crosscheck';
 import { useIsMobile } from '@/lib/use-mobile';
-import { C, R, NUM, SH, METRIC_FS, GAP_M, SPACE_M, TOUCH } from './tokens';
+import { C, R, NUM, SH, METRIC_FS, GAP_M, SPACE_M, TOUCH, CELL_SUB_FS, INDENT_UNIT } from './tokens';
 import { Spinner } from '../Spinner';
 
 /* 카드·지표·상태/이슈 어휘 등 — UI 키트의 "나머지" 원자 모음. */
 
-// 페이지 로딩 — 본문 중앙 스피너. 빈 화면이 아니라 "자리 차지한 로딩"으로 보이게.
+/** ERP 작업영역 로딩 — 남은 본문 칸을 채우고 그 안 정중앙.
+ *  풀스크린/페이지 바깥 덮기 금지(세션 Gate·LoadingOverlay). */
 export function PageLoading({ label = '불러오는 중…' }: { label?: string }) {
-  // 로딩 표준 SSOT — 박스·부제 없이 스피너 + 옅은 라벨만(깔끔). Gate 부트 로딩도 동일 룩.
   return (
-    <div role="status" aria-busy="true" aria-live="polite"
-      style={{ minHeight: 'min(52vh, 420px)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12, padding: '48px 20px' }}>
-      <Spinner size={28} stroke={2.5} color={C.brand} />
-      <div style={{ fontSize: 12.5, color: C.mute }}>{label}</div>
+    <div
+      style={{
+        flex: 1,
+        alignSelf: 'stretch',
+        width: '100%',
+        minHeight: 'min(50vh, 360px)',
+        position: 'relative',
+      }}
+    >
+      <div role="status" aria-busy="true" aria-live="polite"
+        style={{
+          position: 'absolute',
+          inset: 0,
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: 12,
+          padding: 20,
+          boxSizing: 'border-box',
+        }}>
+        <Spinner size={28} stroke={2.5} color={C.brand} />
+        <div style={{ fontSize: 12.5, color: C.mute }}>{label}</div>
+      </div>
     </div>
   );
 }
@@ -35,7 +55,7 @@ export function Stepper({ steps }: { steps: Step[] }) {
               background: s.state === 'done' ? 'var(--green-text)' : s.state === 'current' ? C.brand : C.card,
               color: s.state === 'todo' ? C.lineStrong : C.inverse, border: `2px solid ${dotColor(s.state)}`,
               boxShadow: s.state === 'current' ? `0 0 0 3px color-mix(in srgb, ${C.brand} 18%, transparent)` : 'none' }}>
-              {s.state === 'done' ? '✓' : i + 1}
+              {s.state === 'done' ? <Check size={12} strokeWidth={2.6} aria-hidden /> : i + 1}
             </div>
             <div style={{ marginTop: 6, fontSize: mobile ? 10.5 : 12, fontWeight: s.state === 'current' ? 800 : 600, color: s.state === 'todo' ? C.faint : C.ink, textAlign: 'center', lineHeight: 1.25, whiteSpace: mobile ? 'normal' : 'nowrap' }}>{s.label}</div>
             {!mobile && <div style={{ fontSize: 10.5, color: C.faint, fontFamily: NUM, fontVariantNumeric: 'tabular-nums', minHeight: 13 }}>{s.date || ''}</div>}
@@ -81,7 +101,18 @@ export function Metric({ label, value, hint, tone, onClick }: { label: React.Rea
   const color = tone === 'danger' ? C.danger : tone === 'ok' ? C.ok : tone === 'warn' ? C.warn : C.ink;
   const { h, on } = useHover();
   return (
-    <div onClick={onClick} {...on} style={{
+    <div
+      onClick={onClick}
+      role={onClick ? 'button' : undefined}
+      tabIndex={onClick ? 0 : undefined}
+      onKeyDown={onClick ? (event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          onClick();
+        }
+      } : undefined}
+      {...on}
+      style={{
       ...cardStyle(h, !!onClick),
       padding: mobile ? '10px 12px' : '9px 13px',
       flex: mobile ? undefined : '0 0 auto',
@@ -98,23 +129,90 @@ export function Metric({ label, value, hint, tone, onClick }: { label: React.Rea
 }
 // 객체 카드 = 목록의 단일 원자(2행 신원카드). 웹·모바일 높이 56(= freepass ERP4 ObjCard).
 //  1행 신원: [회사][상태배지][차량번호(모노·무잘림) 또는 이름][차종(축소가능)] …[우측 핵심수치]
-//  2행 원자: fields(라벨-값, 우선순위 상위 3 + ＋n) 또는 sub(자유문). 좌측 2px 레일=위험 신호.
+//  2행 원자: fields(라벨-값, 우선순위 상위 3 + ＋n) 또는 sub(자유문). 상태색=배지만. 행배경·좌측점·세로선 금지.
 //  호출부는 "필요한 원자만" 넘긴다. 차번=plate, 비차량 주체(자금 상대방·고객)=name, 부가식별=carType.
-export type RailTone = 'none' | 'danger' | 'warn' | 'ok' | 'mute';
-const RAIL: Record<RailTone, { c: string; o: number }> = {
-  none: { c: C.faint, o: 0.28 }, mute: { c: C.faint, o: 0.5 },
-  danger: { c: C.danger, o: 1 }, warn: { c: C.warn, o: 1 }, ok: { c: C.ok, o: 1 },
-};
+// RailTone — 모바일 ObjRow 잔여. 원장 ExcelSheet 행 틴트에는 쓰지 않음.
+export type RailTone = 'none' | 'brand' | 'danger' | 'warn' | 'violet' | 'ok' | 'mute';
+export function railToneColor(tone: Exclude<RailTone, 'none'>): string {
+  return tone === 'brand' ? C.brand
+    : tone === 'danger' ? C.danger
+    : tone === 'warn' ? C.warn
+    : tone === 'violet' ? C.violet
+    : tone === 'ok' ? C.ok
+    : C.faint;
+}
+
+/**
+ * 엑셀 2줄 셀 SSOT — main(12)·sub(`CELL_SUB_FS`). ellipsis 내장.
+ * 컬럼 render에서 fontSize/lineHeight/flex 손롤 금지 → 이것만.
+ */
+export function TwoLineCell({
+  main, sub, mono,
+}: {
+  main: React.ReactNode;
+  sub?: React.ReactNode;
+  /** 차번 등 모노 강조 */
+  mono?: boolean;
+}) {
+  if (main == null || main === '') {
+    return <span style={{ color: C.mute }}>{sub ?? '—'}</span>;
+  }
+  return (
+    <div style={{ minWidth: 0, lineHeight: 1.25 }}>
+      <div style={{
+        fontFamily: mono ? NUM : undefined,
+        fontWeight: mono ? 700 : 600,
+        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+      }}>{main}</div>
+      {sub != null && sub !== '' && (
+        <div style={{
+          fontSize: CELL_SUB_FS, color: C.mute,
+          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+        }}>{sub}</div>
+      )}
+    </div>
+  );
+}
+
+/** 트리/CMS 하위행 들여쓰기 — `INDENT_UNIT`만. */
+export function TreeIndent({ children, depth = 1 }: { children: React.ReactNode; depth?: number }) {
+  return <span style={{ color: C.mute, paddingLeft: INDENT_UNIT * depth }}>{children}</span>;
+}
+
+/** 아이콘+건수(경고 열 등). 컬럼에서 flex/gap 손롤 금지 → 이것만. */
+export function IconCount({
+  icon: Icon, count, tone = 'warn', title,
+}: {
+  icon: LucideIcon;
+  count: number;
+  tone?: 'danger' | 'warn' | 'mute';
+  title?: string;
+}) {
+  const color = tone === 'danger' ? C.danger : tone === 'warn' ? C.warn : C.faint;
+  return (
+    <span
+      title={title}
+      style={{
+        display: 'inline-flex', alignItems: 'center', gap: 3,
+        color, fontWeight: 800, whiteSpace: 'nowrap', cursor: title ? 'help' : undefined,
+      }}
+    >
+      <Icon size={13} aria-hidden />{count}
+    </span>
+  );
+}
 const ATOM_CAP = 3; // 2행 원자 표시 상한 — 넘으면 ＋n(우선순위 상위만 생존, 픽셀측정 대신 count-cap)
-export function ObjCard({ badge, badgeTone = 'gray', co, rail = 'none', plate, name, carType, title, sub, right, fields, onClick }: {
+export type ObjCardProps = {
   badge?: React.ReactNode; badgeTone?: BadgeTone; co?: string; rail?: RailTone;
   plate?: string; name?: React.ReactNode; carType?: React.ReactNode; title?: React.ReactNode;
   sub?: React.ReactNode; right?: React.ReactNode; fields?: [React.ReactNode, React.ReactNode][]; onClick?: () => void;
-}) {
+  /** 선택 하이라이트 등 — 상태 틴트 금지(배지만). */
+  style?: React.CSSProperties;
+};
+export function ObjCard({ badge, badgeTone = 'gray', co, rail = 'none', plate, name, carType, title, sub, right, fields, onClick, style }: ObjCardProps) {
   const mobile = useIsMobile();
   const { h, on } = useHover();
   const grouped = React.useContext(CardGroupContext);   // 그룹 박스 안 → 개별 테두리·그림자 제거
-  const rl = RAIL[rail];
   const usingFields = sub == null && !!fields && fields.length > 0;
   const shown = usingFields ? fields!.slice(0, ATOM_CAP) : [];
   const moreN = usingFields ? fields!.length - shown.length : 0;
@@ -127,18 +225,33 @@ export function ObjCard({ badge, badgeTone = 'gray', co, rail = 'none', plate, n
     : name != null
       ? <span style={{ flex: '0 1 auto', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: mobile ? 15 : 13, fontWeight: 700, color: C.ink }}>{name}</span>
       : <span style={{ flex: '0 1 auto', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: mobile ? 14 : 12.5, fontWeight: 600, color: C.ink }}>{title}</span>;
+  // rail danger 틴트는 잔여(모바일). 상태 신호의 SSOT는 Badge.
+  const tintBg = style?.background ?? (rail === 'danger' ? 'var(--danger-tint)' : undefined);
   return (
-    <div onClick={onClick} {...on} style={{
+    <div
+      onClick={onClick}
+      role={onClick ? 'button' : undefined}
+      tabIndex={onClick ? 0 : undefined}
+      onKeyDown={onClick ? (event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          onClick();
+        }
+      } : undefined}
+      {...on}
+      style={{
       ...(grouped
-        ? { background: h && !!onClick ? C.hover : 'transparent', cursor: onClick ? 'pointer' : 'default', transition: 'background .12s ease' }
-        : cardStyle(h, !!onClick)),
+        ? { background: h && !!onClick ? C.hover : (tintBg ?? 'transparent'), cursor: onClick ? 'pointer' : 'default', transition: 'background .12s ease' }
+        : {
+            ...cardStyle(h, !!onClick),
+            ...(!h && tintBg ? { background: tintBg } : {}),
+          }),
       position: 'relative', overflow: 'hidden',
       height: mobile ? 'auto' : 56, minHeight: mobile ? 60 : 56,
       padding: mobile ? '10px 14px' : '0 12px 0 14px',
       display: 'flex', alignItems: 'center', minWidth: 0,
       WebkitTapHighlightColor: 'transparent',
     }}>
-      <span style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 2, background: rl.c, opacity: rl.o }} />
       <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 3 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 7, minWidth: 0, overflow: 'hidden' }}>
           {co ? <span style={{ flex: '0 0 auto' }}><CompanyBadge co={co} /></span> : null}
@@ -163,7 +276,9 @@ export function OcrCrosscheck({ result }: { result?: CrosscheckResult | null }) 
   const color = result.level === 'error' ? C.danger : C.warn;
   return (
     <div style={{ marginTop: 8, padding: '9px 11px', border: `1px solid ${color}`, borderRadius: R, background: 'var(--bg-card)' }}>
-      <div style={{ fontSize: 12, fontWeight: 700, color, marginBottom: 5 }}>⚠ OCR 재확인 권장 · 신뢰도 {result.confidence}%</div>
+      <div style={{ fontSize: 12, fontWeight: 700, color, marginBottom: 5, display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+        <AlertTriangle size={13} strokeWidth={2.2} aria-hidden /> OCR 재확인 권장 · 신뢰도 {result.confidence}%
+      </div>
       <ul style={{ margin: 0, paddingLeft: 17 }}>
         {result.issues.map((it, i) => <li key={i} style={{ fontSize: 11.5, color: C.mute, lineHeight: 1.55 }}>{it.message}</li>)}
       </ul>
@@ -174,10 +289,64 @@ export function OcrCrosscheck({ result }: { result?: CrosscheckResult | null }) 
 /**
  * 빈 상태 SSOT — 손롤 div 금지.
  *   · page  페이지·필터 전체 없음(+CTA). 박스 센터.
+ *   · page  기본. 본문 빈 목록(박스+안내).
+ *   · sheet 원장 시트 칸(필터 아래·패널 옆). 남은 높이 채우고 가운데 — 패널과 높이 맞춤.
  *   · sec   Sec 안 목록 없음. 조용한 한 줄(현황 생애·상세 하위).
  *   · ok    미결/리스크 큐가 비어 있음 = 정상. 초록 체크(홈·업무).
  */
-export type EmptyVariant = 'page' | 'sec' | 'ok';
+export type EmptyVariant = 'page' | 'sheet' | 'sec' | 'ok';
+/**
+ * 조회 실패 상태 — «데이터 0건»과 반드시 구분해야 한다.
+ *   실패를 빈 목록으로 보여주면 리스크 화면이 «위험 없음»으로 위장돼 거짓 안심을 준다(QA 중요).
+ *   variant='sheet' = 원장 표 자리를 채우는 카드(EmptyState와 동일 규격), 'sec' = 섹션 안 한 줄.
+ */
+export function ErrorState({
+  message, onRetry, variant = 'sheet',
+}: {
+  message: string;
+  onRetry?: () => void;
+  variant?: 'sheet' | 'sec';
+}) {
+  const retry = onRetry ? (
+    <button
+      type="button"
+      onClick={onRetry}
+      style={{
+        marginTop: variant === 'sec' ? 0 : 10, marginLeft: variant === 'sec' ? 8 : 0,
+        border: `1px solid ${C.line}`, borderRadius: R, background: C.card,
+        padding: '4px 10px', fontSize: 12, fontWeight: 700, color: C.ink,
+        cursor: 'pointer', fontFamily: 'inherit',
+      }}
+    >
+      다시 시도
+    </button>
+  ) : null;
+
+  if (variant === 'sec') {
+    return (
+      <div role="alert" style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12.5, color: C.danger, padding: '2px 0' }}>
+        <AlertTriangle size={13} strokeWidth={2.5} /> {message}{retry}
+      </div>
+    );
+  }
+  return (
+    <div role="alert" style={{
+      flex: 1, alignSelf: 'stretch', width: '100%', minHeight: 0,
+      display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+      padding: '28px 24px', textAlign: 'center',
+      border: `1px solid ${C.danger}`, borderRadius: R, background: 'var(--danger-tint)',
+      fontSize: 13, lineHeight: 1.55, color: C.ink, boxSizing: 'border-box',
+    }}>
+      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7, fontWeight: 700, color: C.danger }}>
+        <AlertTriangle size={15} strokeWidth={2.5} /> 데이터를 불러오지 못했습니다
+      </span>
+      <span style={{ marginTop: 6, color: C.mute, fontSize: 12.5 }}>{message}</span>
+      <span style={{ marginTop: 4, color: C.faint, fontSize: 11.5 }}>※ 목록이 비어 보이는 것은 «없음»이 아니라 «못 읽음»입니다.</span>
+      {retry}
+    </div>
+  );
+}
+
 export function EmptyState({ children, variant = 'page' }: { children: React.ReactNode; variant?: EmptyVariant }) {
   if (variant === 'ok') {
     return (
@@ -188,6 +357,31 @@ export function EmptyState({ children, variant = 'page' }: { children: React.Rea
   }
   if (variant === 'sec') {
     return <div style={{ fontSize: 12.5, color: C.faint, padding: '2px 0' }}>{children}</div>;
+  }
+  if (variant === 'sheet') {
+    // 원장·데이터센터 작업칸 — 패널과 같은 1px 카드로 남은 높이 채움(어정쩡한 상단 박스 금지).
+    return (
+      <div role="status" style={{
+        flex: 1,
+        alignSelf: 'stretch',
+        width: '100%',
+        minHeight: 0,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '28px 24px',
+        textAlign: 'center',
+        color: C.mute,
+        border: `1px solid ${C.line}`,
+        borderRadius: R,
+        background: C.card,
+        fontSize: 13,
+        lineHeight: 1.55,
+        boxSizing: 'border-box',
+      }}>
+        {children}
+      </div>
+    );
   }
   return (
     <div style={{
@@ -279,13 +473,13 @@ const BADGE: Record<BadgeTone, [string, string, string]> = {
 export function Badge({ children, tone = 'gray' }: { children: React.ReactNode; tone?: BadgeTone }) {
   const mobile = useIsMobile();
   const m = BADGE[tone] || BADGE.gray;
-  return <span style={{ display: 'inline-flex', alignItems: 'center', height: mobile ? 22 : 18, boxSizing: 'border-box', fontSize: mobile ? 11.5 : 10.5, fontWeight: 700, padding: mobile ? '0 8px' : '0 6px', borderRadius: R, color: m[0], background: m[1], border: `1px solid ${m[2]}`, whiteSpace: 'nowrap', letterSpacing: '.01em', lineHeight: 1 }}>{children}</span>;
+  return <span style={{ display: 'inline-flex', alignItems: 'center', height: mobile ? 22 : 18, boxSizing: 'border-box', fontSize: mobile ? 11.5 : 10.5, fontWeight: 700, padding: mobile ? '0 8px' : '0 6px', borderRadius: 'var(--radius-badge)', color: m[0], background: m[1], border: `1px solid ${m[2]}`, whiteSpace: 'nowrap', letterSpacing: '.01em', lineHeight: 1 }}>{children}</span>;
 }
 // 회사(법인) 뱃지 = 아웃라인 + 색점. 상태 뱃지(채움형)와 스타일로 확실히 구분 — 색이 겹쳐도 정체성 vs 상태 안 헷갈림.
 export function CompanyBadge({ co }: { co: string }) {
   const mobile = useIsMobile();
   const m = BADGE[companyTone(co)] || BADGE.gray;
-  return <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, height: mobile ? 22 : 18, boxSizing: 'border-box', padding: mobile ? '0 8px 0 6px' : '0 6px 0 5px', borderRadius: R, border: `1px solid ${m[2]}`, background: C.card, color: m[0], fontSize: mobile ? 11.5 : 10.5, fontWeight: 700, whiteSpace: 'nowrap', lineHeight: 1 }}>
+  return <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, height: mobile ? 22 : 18, boxSizing: 'border-box', padding: mobile ? '0 8px 0 6px' : '0 6px 0 5px', borderRadius: 'var(--radius-badge)', border: `1px solid ${m[2]}`, background: C.card, color: m[0], fontSize: mobile ? 11.5 : 10.5, fontWeight: 700, whiteSpace: 'nowrap', lineHeight: 1 }}>
     <span style={{ width: 6, height: 6, borderRadius: '50%', background: m[0], flex: '0 0 auto' }} />{companyShort(co)}
   </span>;
 }

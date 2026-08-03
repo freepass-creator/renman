@@ -14,7 +14,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
 
       - name: Install
@@ -23,14 +23,17 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
+      - name: Secret scan
+        run: npm run security:secrets
+
       - name: Unit tests (미수·상태·스키마)
         run: npm test
 
       - name: Build
         run: npm run build
-        env:
-          # 빌드 시 필요한 공개 env — 실제 값은 배포에서 주입. CI는 존재만 있으면 통과.
-          NEXT_PUBLIC_MASTER_EMAIL: pyh@teamjpk.com
+
+      - name: Production route smoke test
+        run: npm run test:smoke
 
   rules:
     runs-on: ubuntu-latest
@@ -39,14 +42,14 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
 
       # Firestore 에뮬레이터는 JRE 필요.
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: 17
+          java-version: 21
 
       - name: Install
         run: npm ci

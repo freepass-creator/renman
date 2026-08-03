@@ -10,7 +10,7 @@ import { LENS_FILTERS, type FacetGroup } from '@/lib/lens-filters';
 import { useIsMobile } from '@/lib/use-mobile';
 import { useRegisterFacetFilter, useFacetFilterApi, useFacetFilterOpen } from '@/lib/facet-filter-ctx';
 import { haptic } from '@/lib/haptics';
-import { C, R, NUM, ToggleChips, ctrlH, FilterSheet } from '@/components/ui';
+import { C, R, NUM, TextLink, ToggleChips, ctrlH, FilterSheet } from '@/components/ui';
 import { SlidersHorizontal, ChevronDown } from 'lucide-react';
 
 /** 선택 개수 박스 — freepasserp4 CountPill 스펙 그대로.
@@ -80,11 +80,10 @@ function FacetGroups({ groups, facets, onToggle, touch }: {
                 {g.dim !== '보유' && <CountPill n={nOn} tone="accent" />}{/* 섹션 선택수(accent). 보유(단일선택·기본뷰)는 필터 아님 → 카운트 안 함 */}
               </button>
               {nOn > 0 && (
-                <button
-                  type="button"
+                <TextLink
                   onClick={() => g.chips.forEach((c) => { if (facets.has(c.label)) onToggle(c.label); })}
-                  style={{ flexShrink: 0, border: 'none', background: 'none', color: C.accent, fontSize: touch ? 12.5 : 11, fontWeight: 700, cursor: 'pointer', padding: '0 0 0 8px', WebkitTapHighlightColor: 'transparent' }}
-                >해제</button>
+                  style={{ flexShrink: 0, fontSize: touch ? 12.5 : 11, paddingLeft: 8 }}
+                >해제</TextLink>
               )}
             </div>
             {/* erp4 동일: 칩은 라벨만(매치 카운트 '(N)' 제거) · 숫자는 그룹 헤더 CountPill(선택 개수)로만. */}
@@ -158,7 +157,7 @@ export function FacetRail({ lensKey, groups: groupsProp, facets, onToggle, onRes
       <SlidersHorizontal size={13} color={C.mute} />
       <span style={{ fontSize: 12.5, fontWeight: 800, color: C.ink }}>필터</span>
       <span style={{ flex: 1 }} />
-      {facets.size > 0 && <button onClick={onReset} style={{ border: 'none', background: 'none', color: C.accent, fontSize: 11, fontWeight: 700, cursor: 'pointer', padding: 0 }}>초기화</button>}
+      {facets.size > 0 && <TextLink onClick={onReset} style={{ fontSize: 11 }}>초기화</TextLink>}
     </div>
   );
 

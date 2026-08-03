@@ -1,6 +1,8 @@
-/** 운영 스냅샷 셀렉터 — 미수 집계 SSOT. 페이지 reduce/filter 손롤 금지. */
+/** 운영 스냅샷 셀렉터 — 미수·미결 집계 SSOT. 페이지 reduce/filter 손롤 금지. */
 import { type EntityRecord } from '../intake/entities';
 import { computeContractView } from '../contract-ops';
+import type { Dashboard } from '../operating-snapshot';
+import { buildHomePendingRows, selectTodayFocus, type HomeQueueRow } from '../home-rows';
 
 export type ReceivablesSnapshot = {
   /** 운행중+반납 미수 합(max(0,net)) */
@@ -21,7 +23,7 @@ export type ReceivablesSnapshot = {
   overpayTotal: number;
 };
 
-/** 미수 집계 1곳 — 홈·미수·리스크·재무·KPI가 동일 숫자. 음수 net=과오납(합산 제외). */
+/** 미수 집계 1곳 — 홈·미수·리스크·재무·KPI가 동일 숫자. 과오납은 view.overpay. */
 export function selectReceivables(contracts: EntityRecord[], today: string): ReceivablesSnapshot {
   const views = contracts.map((c) => computeContractView(c, today));
   let misuActive = 0, misuReturned = 0, overpayTotal = 0;
@@ -29,8 +31,8 @@ export function selectReceivables(contracts: EntityRecord[], today: string): Rec
   let over30 = 0, over90 = 0;
 
   for (const v of views) {
+    if (v.overpay > 0) overpayTotal += v.overpay;
     const net = v.net;
-    if (net < 0) { overpayTotal += -net; continue; }
     if (net <= 0) continue;
     unpaidCount++;
     if (v.ended) {
@@ -53,3 +55,30 @@ export function selectReceivables(contracts: EntityRecord[], today: string): Rec
     activeContractCount, rate, over30, over90, overpayTotal,
   };
 }
+
+export type PendingWorkSnapshot = {
+  count: number;
+  rows: HomeQueueRow[];
+};
+
+/**
+ * 미결 큐 SSOT — buildHomePendingRows(반납지남·배차충돌·과태료·todo·서류·자금미분류).
+ * 홈 Metric·필요 시 desk 연동은 이 숫자만. 페이지에서 returnFlow+penalty 손합 금지.
+ */
+export function selectPendingWork(D: Dashboard): PendingWorkSnapshot {
+  const rows = buildHomePendingRows(D);
+  return { count: rows.length, rows };
+}
+
+export type TodayFocusSnapshot = {
+  count: number;
+  rows: HomeQueueRow[];
+};
+
+/** 홈 «오늘 할 일» — selectTodayFocus SSOT. */
+export function selectTodayWork(D: Dashboard, cap = 5): TodayFocusSnapshot {
+  return selectTodayFocus(D, cap);
+}
+
+/** 홈 우측 패널 «할 일·미점검» 시점별 — home-rows selectTodayPanel SSOT. */
+export { selectTodayPanel, type TodayBucketGroup, type DueBucket } from '../home-rows';

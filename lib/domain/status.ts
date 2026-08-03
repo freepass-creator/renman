@@ -12,7 +12,7 @@ export const CONTRACT_ENDED = new Set<string>(['반납', '해지', '채권']);
 export const CONTRACT_ACTIVE = new Set<string>(['운행']); // 인도완료·미반납 표시값
 
 /* ── 차량 소유·가동 파티션 (classifyVehicle 과 동일) ── */
-export const VEHICLE_OUT = new Set(['매각', '말소']); // 처분완료
+export const VEHICLE_OUT = new Set(['매각', '말소', '폐차']); // 처분완료
 /** 유휴(세워둔 차). 매각대기는 아직 보유 → OUT 아님. */
 export const VEHICLE_IDLE = new Set([
   '대기', '상품대기', '휴차', '유휴', '구매대기', '등록대기', '상품화', '연장대기', '종료대기', '매각대기',
@@ -66,13 +66,17 @@ export function isDeliveryPending(c: EntityRecord): boolean {
   return !!c.plate && !c.deliveredDate && !c.returnedDate && String(c.status || '') === '대기';
 }
 
-/** 반납 대상 — 인도완료 + 미반납 + 종료상태 아님 */
+/** 반납 대상 — 인도완료 + 미반납 + 종료상태 아님.
+ *  과거 이관 데이터는 deliveredDate 없이 status=운행만 남은 경우가 있으므로
+ *  명시적 운행 상태도 인도 완료 증거로 인정한다. */
 export function isReturnable(c: EntityRecord): boolean {
-  return !!c.plate && !!c.deliveredDate && !c.returnedDate && !isContractEndedStatus(c.status);
+  const status = String(c.status || '');
+  const delivered = !!c.deliveredDate || CONTRACT_ACTIVE.has(status);
+  return !!c.plate && delivered && !c.returnedDate && !isContractEndedStatus(status);
 }
 
 /* ── 미수 회수 SLA (구 collection.ts) ── */
-export type CollectionStage = '정상' | '경고' | '시동제어' | '내용증명' | '채권화';
+export type CollectionStage = '계약조건 확인' | '회수대기' | '경고' | '시동제어' | '차량회수' | '내용증명' | '채권화';
 export interface CollectionInfo {
   stage: CollectionStage;
   tone: 'gray' | 'amber' | 'orange' | 'red' | 'purple';
@@ -81,13 +85,18 @@ export interface CollectionInfo {
 }
 export interface CollectionSLA { warn?: number; engineLock?: number; notice?: number; debt?: number }
 
-/** 기본 SLA: 경고 D+1 · 시동 D+3 · 내용증명 D+10 · 채권화 D+30 */
+/**
+ * 레거시 호환 판정. 계약별 조건을 명시적으로 넘긴 경우에만 단계를 계산한다.
+ * 조건이 없을 때 업계 관행이나 회사 공통 D+값을 임의 적용하지 않는다.
+ */
 export function collectionStage(overdueDays: number, sla?: CollectionSLA): CollectionInfo {
-  const warn = sla?.warn ?? 1, lock = sla?.engineLock ?? 3, notice = sla?.notice ?? 10, debt = sla?.debt ?? 30;
   const d = Math.max(0, Math.round(overdueDays));
-  if (d < warn) return { stage: '정상', tone: 'gray', nextAction: '', overdueDays: d };
-  if (d < lock) return { stage: '경고', tone: 'amber', nextAction: '독촉 연락', overdueDays: d };
-  if (d < notice) return { stage: '시동제어', tone: 'orange', nextAction: '시동 제어', overdueDays: d };
-  if (d < debt) return { stage: '내용증명', tone: 'red', nextAction: '내용증명 발송', overdueDays: d };
-  return { stage: '채권화', tone: 'purple', nextAction: '법적조치·채권화', overdueDays: d };
+  if (!sla || Object.values(sla).every((day) => day == null)) {
+    return { stage: '계약조건 확인', tone: 'amber', nextAction: '계약서 연체조항 확인·등록', overdueDays: d };
+  }
+  if (sla.debt != null && d >= sla.debt) return { stage: '채권화', tone: 'purple', nextAction: '법적조치·채권화', overdueDays: d };
+  if (sla.notice != null && d >= sla.notice) return { stage: '내용증명', tone: 'red', nextAction: '내용증명 발송', overdueDays: d };
+  if (sla.engineLock != null && d >= sla.engineLock) return { stage: '시동제어', tone: 'orange', nextAction: '계약조건 확인 후 시동 제어', overdueDays: d };
+  if (sla.warn != null && d >= sla.warn) return { stage: '경고', tone: 'amber', nextAction: '계약상 경고 이행', overdueDays: d };
+  return { stage: '회수대기', tone: 'gray', nextAction: '계약조건 도래 대기', overdueDays: d };
 }

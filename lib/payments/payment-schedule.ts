@@ -87,7 +87,7 @@ export function recalcContract<T extends Contract>(c: T, today: string): T {
   // 선불/후불 정책 반영 — 1회차 dueDate 자동 재계산.
   // 선불: 1회차 = 계약일. 후불: 1회차 = 계약일 + 1개월.
   // paidAmount/status 보존 (이미 입금된 회차 보호) — dueDate 만 갱신.
-  const isPostpaid = c.paymentTiming === '후불';
+  const isPostpaid = c.paymentTiming === '후불' || c.paymentTiming === '후납';
   const recalcedSchedules = c.schedules.map((s) => {
     const expectedDueDate = c.contractDate
       ? addMonths(c.contractDate, isPostpaid ? s.seq : s.seq - 1, c.paymentDay)
@@ -150,7 +150,7 @@ export function distributeEntry<T extends PaymentScheduleInline>(
   // seq → 원본 인덱스 Map (find 반복 회피 — O(N²) → O(N))
   const idxBySeq = new Map<number, number>();
   list.forEach((s, i) => idxBySeq.set(s.seq, i));
-  // 미납 우선 (연체·부분납 → 예정), 같은 카테고리 안에서는 seq 오름차순
+  // 미납 우선 (연체·부분납은 같은 우선순위 → 오래된 회차부터), 그 다음 예정.
   const ordered = [...list].sort((a, b) => {
     const ra = rank(a.status);
     const rb = rank(b.status);
@@ -214,11 +214,11 @@ export function generateSchedules(c: {
   termMonths: number;
   monthlyRent: number;
   paymentDay: number;
-  paymentTiming?: '선불' | '후불';
+  paymentTiming?: '선납' | '후납' | '선불' | '후불';
 }): Array<Omit<PaymentSchedule, 'id' | 'contractId'>> {
   const out: Array<Omit<PaymentSchedule, 'id' | 'contractId'>> = [];
   const total = Math.max(0, c.termMonths | 0);
-  const isPostpaid = c.paymentTiming === '후불';
+  const isPostpaid = c.paymentTiming === '후불' || c.paymentTiming === '후납';
   for (let i = 0; i < total; i++) {
     const offset = isPostpaid ? i + 1 : i;
     out.push({
@@ -311,9 +311,12 @@ export function distributeUnpaid<T extends PaymentScheduleInline>(
   return list.map((s) => map.get(s.seq) ?? s) as T[];
 }
 
-/** 재구성(자동정리) entry 판별 — synthetic 플래그 또는 구데이터 source='정산' 폴백. 실입금만 골라낼 때(회계·期초). */
-export function isSyntheticPayment(p: { synthetic?: boolean; source?: string }): boolean {
-  return p.synthetic === true || p.source === '정산';
+/** 재구성·보증금충당 등 실입금 아님. 입금누계·수납피드에서 제외할 때 사용. */
+export function isSyntheticPayment(p: { synthetic?: boolean; source?: string; kind?: string }): boolean {
+  if (p.synthetic === true) return true;
+  if (String(p.kind || '') === 'deposit-offset') return true;
+  // 구 스냅샷 자동정리: source=정산 (실입금 계좌/카드/현금/수동/CMS는 제외)
+  return p.source === '정산';
 }
 
 /** 회차 배열에서 currentSeq (가장 오래된 미납 또는 부분납. 없으면 다음 예정) 계산 */
@@ -374,9 +377,8 @@ export function applyPayment<T extends PaymentScheduleInline>(
 }
 
 function rank(status: PaymentSchedule['status']): number {
-  if (status === '연체') return 0;
-  if (status === '부분납') return 1;
-  if (status === '예정') return 2;
-  if (status === '완료') return 3;
-  return 4;
+  if (status === '연체' || status === '부분납') return 0;
+  if (status === '예정') return 1;
+  if (status === '완료') return 2;
+  return 3;
 }

@@ -9,6 +9,11 @@ import { PaymentEntrySchema, DiscountEntrySchema } from './payment';
 
 const numlike = z.union([z.number(), z.string()]).optional(); // 소스가 숫자/문자 혼재(느슨한 원본 방어)
 
+/** 대여형태(상품) 분류 — 청구분기·세부는 별도. 기존 계약은 미지정 허용. */
+export const RENTAL_TYPES = ['셀프', '보험', '월렌트', '장기', '업무용', '기타'] as const;
+export type RentalType = (typeof RENTAL_TYPES)[number];
+export const RentalTypeSchema = z.enum(RENTAL_TYPES);
+
 export const ContractSchema = z.object({
   _key: z.string().optional(),
   companyId: z.string().optional(),
@@ -20,6 +25,7 @@ export const ContractSchema = z.object({
 
   // 생애
   status: z.string().optional(),            // 대기|운행|반납|해지|채권 (domain/status 어휘)
+  rentalType: RentalTypeSchema.optional(),  // 대여형태(상품) — 미지정 허용
   startDate: z.string().optional(),
   endDate: z.string().optional(),
   contractDate: z.string().optional(),
@@ -33,7 +39,15 @@ export const ContractSchema = z.object({
   rentalMonths: numlike,
   deposit: numlike,
   paymentDay: numlike,
-  paymentTiming: z.enum(['선불', '후불']).optional(),
+  paymentTiming: z.enum(['선납', '후납', '선불', '후불']).optional(), // 표시·입력=선납/후납 · 레거시 선불/후불 허용
+
+  // 계약서에 명시된 연체 조치 조건. 비어 있으면 전사 기본값을 임의 적용하지 않는다.
+  arrearsClause: z.string().optional(),
+  warningAfterDays: numlike,
+  engineLockAfterDays: numlike,
+  repossessionAfterDays: numlike,
+  legalNoticeAfterDays: numlike,
+  debtTransferAfterDays: numlike,
 
   // 시동제어
   engineDisabled: z.boolean().optional(),
@@ -45,10 +59,37 @@ export const ContractSchema = z.object({
   _paidTotal: z.number().optional(),         // 개시 역산 납부(표시용)
   _payments: z.array(PaymentEntrySchema).optional(),
   _discounts: z.array(DiscountEntrySchema).optional(),
+  _charges: z.array(z.object({
+    date: z.string(),
+    amount: z.number(),
+    kind: z.string(),
+    memo: z.string().optional(),
+    synthetic: z.boolean().optional(),
+  }).loose()).optional(),
 }).loose();                                  // 그 외 필드(cdw·deductible·mileageOut 등)는 허용
 export type ContractRecord = z.infer<typeof ContractSchema>;
 
 /** 안전 파싱 — 실패해도 던지지 않음. 경계(commit·seed 검증)에서 점진 도입용. */
 export function parseContract(v: unknown) {
   return ContractSchema.safeParse(v);
+}
+
+/** 레코드 → 표시용 대여형태(미지정·비어있음 = ''). */
+export function rentalTypeOf(rec: { rentalType?: unknown } | null | undefined): string {
+  const v = String(rec?.rentalType || '');
+  return (RENTAL_TYPES as readonly string[]).includes(v) ? v : '';
+}
+
+/** 납부시기 표시값 — 레거시 선불/후불 → 선납/후납. */
+export const PAYMENT_TIMINGS = ['선납', '후납'] as const;
+export type PaymentTiming = (typeof PAYMENT_TIMINGS)[number];
+
+export function paymentTimingOf(v: unknown): PaymentTiming {
+  const s = String(v || '');
+  if (s === '후납' || s === '후불') return '후납';
+  return '선납';
+}
+
+export function isPostpaidTiming(v: unknown): boolean {
+  return paymentTimingOf(v) === '후납';
 }

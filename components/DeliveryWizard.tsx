@@ -16,9 +16,10 @@ import { toast } from '@/lib/toast';
 import { haptic } from '@/lib/haptics';
 import { resolveWriteCompany, NEED_COMPANY } from '@/lib/scope';
 import { FUEL_LEVELS } from '@/lib/domain/fuel';
-import { Stepper, Btn, Message, C, toggleStyle, WizPanel, WizCard, WizField, WizPhotos, wizInput, type Step } from '@/components/ui';
+import { Stepper, Btn, Input, PillTabs, Message, C, WizPanel, WizCard, WizField, WizPhotos, type Step } from '@/components/ui';
 import { type EntityRecord } from '@/lib/intake/entities';
 import { todayKST as TODAY } from '@/lib/contracts/dates'; // KST 기준 오늘(인도일 기록)
+import { companyLabel } from '@/lib/companies';
 const STEP_LABELS = ['확인', '주행·연료', '사진·서명', '확정'];
 
 export function DeliveryWizard({ contract, vehicle, onClose, onDone }: {
@@ -39,6 +40,7 @@ export function DeliveryWizard({ contract, vehicle, onClose, onDone }: {
   const contractNo = String(contract._key || contract.contractNo || '');
   const carName = String(vehicle?.carName || vehicle?.model || contract.carName || '');
   const period = [contract.startDate, contract.endDate].filter(Boolean).join(' ~ ');
+  const company = companyLabel(String(target || contract.companyId || ''));
 
   async function commit() {
     if (!contractNo) { toast('계약 식별 불가', 'error'); return; }
@@ -105,7 +107,7 @@ export function DeliveryWizard({ contract, vehicle, onClose, onDone }: {
   const last = step === STEP_LABELS.length - 1;
 
   return (
-    <WizPanel title={`인도 처리 · ${plate}`} meta={`${who}${carName ? ` · ${carName}` : ''}`} onClose={onClose}
+    <WizPanel title={`인도 처리 · ${plate}`} meta={`${company} · ${who}${carName ? ` · ${carName}` : ''}`} onClose={onClose}
       footer={<>
         <Btn variant="ghost" size="lg" onClick={() => (step === 0 ? onClose() : setStep((s) => s - 1))} disabled={saving}>{step === 0 ? '취소' : '이전'}</Btn>
         <span style={{ flex: 1 }} />
@@ -121,6 +123,7 @@ export function DeliveryWizard({ contract, vehicle, onClose, onDone }: {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             <Message variant="info">이 계약을 <b>인도(출차)</b> 처리합니다. 계기판·연료를 기록하고 사진·서명을 남기면 반납 정산의 기준이 됩니다.</Message>
             <WizCard>
+              <Row k="회사" v={company} />
               <Row k="차량" v={`${plate}${carName ? ` · ${carName}` : ''}`} />
               <Row k="계약자" v={who} />
               {contractNo && <Row k="계약번호" v={contractNo} mono />}
@@ -133,17 +136,13 @@ export function DeliveryWizard({ contract, vehicle, onClose, onDone }: {
         {step === 1 && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             <WizField label="인도일">
-              <input type="date" value={date} onChange={(e) => setDate(e.target.value)} style={wizInput} />
+              <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} style={{ width: '100%' }} />
             </WizField>
             <WizField label="출고 주행거리 (계기판 km)">
-              <input inputMode="numeric" value={mileage} onChange={(e) => setMileage(e.target.value.replace(/[^\d]/g, ''))} placeholder="예: 43120" style={{ ...wizInput, fontFamily: 'var(--font-mono)' }} />
+              <Input inputMode="numeric" value={mileage} onChange={(e) => setMileage(e.target.value.replace(/[^\d]/g, ''))} placeholder="예: 43120" style={{ width: '100%', fontFamily: 'var(--font-mono)' }} />
             </WizField>
             <WizField label="출고 연료량">
-              <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap' }}>
-                {FUEL_LEVELS.map((f) => (
-                  <button key={f} type="button" data-ui="toggle" onClick={() => { setFuel(f); haptic.select(); }} aria-pressed={fuel === f} style={toggleStyle(fuel === f, 'lg')}>{f}</button>
-                ))}
-              </div>
+              <PillTabs size="lg" value={fuel} onChange={setFuel} tabs={FUEL_LEVELS.map((key) => ({ key, label: key }))} />
             </WizField>
           </div>
         )}
@@ -166,6 +165,7 @@ export function DeliveryWizard({ contract, vehicle, onClose, onDone }: {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             <Message variant="info">아래 내용으로 인도를 확정하면 계약이 <b>운행</b> 상태로 전환됩니다.</Message>
             <WizCard>
+              <Row k="회사" v={company} />
               <Row k="차량" v={`${plate}${carName ? ` · ${carName}` : ''}`} />
               <Row k="계약자" v={who} />
               <Row k="인도일" v={date} />

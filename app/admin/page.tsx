@@ -3,7 +3,6 @@ import { useSession, roleLabel, DEV_USERS } from '@/lib/session';
 import { companyLabel, COMPANIES } from '@/lib/companies';
 import { AccountAliases } from '@/components/AccountAliases';
 import { CompanyRegistry } from '@/components/CompanyRegistry';
-import { StaffConsole } from '@/components/StaffConsole';
 import { Page, Panel, DetailGrid, DetailEmpty, Btn, C } from '@/components/ui';
 import { WorkbenchBar } from '@/components/WorkbenchBar';
 
@@ -28,16 +27,19 @@ export default function AdminPage() {
           <div style={{ marginTop: 10, display: 'flex', flexWrap: 'wrap', gap: 8 }}>{targets.map((c) => (
             <Btn key={c} variant="ghost" href={`/company/${c}`}>{companyLabel(c)} →</Btn>
           ))}</div>
+          <div style={{ marginTop: 10 }}>
+            직원·권한 관리는 <Btn size="sm" variant="ghost" href="/management">경영관리 → 직원</Btn> 탭에서 합니다.
+          </div>
         </div>
       </Panel>
 
       <AccountAliases />
 
-      <Panel title="계정 (dev)">
-        <DetailGrid rows={DEV_USERS.map((u) => [u.name, `${roleLabel(u.role)} · ${u.email} · ${u.companyId ? companyLabel(u.companyId) : '전 법인'}`])} />
-      </Panel>
-
-      {isOperator && <StaffConsole />}
+      {process.env.NODE_ENV !== 'production' && (
+        <Panel title="계정 (dev)">
+          <DetailGrid rows={DEV_USERS.map((u) => [u.name, `${roleLabel(u.role)} · ${u.email} · ${u.companyId ? companyLabel(u.companyId) : '전 법인'}`])} />
+        </Panel>
+      )}
 
       <Panel title="거래처">
         <DetailEmpty>거래처(정비·보험·GPS·매입처) 마스터는 엔티티 추가 예정.</DetailEmpty>

@@ -8,7 +8,7 @@ import { COMPANIES, ALL_COMPANIES } from './companies';
 import { notifySaved } from './ui-bus';
 
 // 화면이 실시간으로 봐야 하는 핵심 엔티티(운영·리스크·자산·계약·재무).
-const LIVE_ENTITIES = ['contract', 'vehicle', 'bank_tx', 'insurance', 'penalty', 'history'];
+const LIVE_ENTITIES = ['contract', 'vehicle', 'bank_account', 'bank_tx', 'insurance', 'penalty', 'work_item', 'history'];
 
 /** 현재 회사 스코프의 핵심 컬렉션을 구독. 원격 변경 시 notifySaved → 전 화면 재조회. 반환=구독 해제. */
 export function startLiveSync(companyId: string): () => void {

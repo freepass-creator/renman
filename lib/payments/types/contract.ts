@@ -19,7 +19,7 @@ export type AdditionalDriver = {
 
 export type Contract = {
   id: string;
-  contractNo: string;          // ICR-YYMM-XXXX
+  contractNo: string;          // C-YYMM-#### (lib/domain/contract-no.ts 발번)
   company: CompanyCode;
   manager?: string;            // 담당자
   // 고객 (임베드)
@@ -99,7 +99,7 @@ export type Contract = {
    * 결제 시기 — 선불(당월 1일 인출) vs 후불(말일 결제)
    * default = '선불' (입력 안 했을 때 안전 가정)
    */
-  paymentTiming?: '선불' | '후불';
+  paymentTiming?: '선납' | '후납' | '선불' | '후불';
   // 옵션
   insuranceAge?: number;
   selfInsured?: boolean;

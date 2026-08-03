@@ -129,6 +129,8 @@ export function parseBankRow(row: Record<string, unknown>, fileName: string, ban
   };
   if (finalWithdraw > 0) rec.withdraw = finalWithdraw;
   if (balance > 0) rec.balance = balance;
+  const txTime = extractTxTime(get(row, '거래일시', '거래시각', '거래시간', '처리일시'));
+  if (txTime) rec.txTime = txTime;
   const contractNo = get(row, '계약번호', '약정번호'); if (contractNo) rec.contractNo = contractNo;
   return rec;
 }
@@ -141,7 +143,8 @@ export function parseCmsRow(row: Record<string, unknown>, _fileName: string): En
   if (amount <= 0) return null;
   const status = get(row, '수납상태', '결제상태', '납부상태');
   if (status && /미납|연체|미수|취소|정지|보류|실패/.test(status)) return null;
-  const txDate = normalizeKoreanDate(get(row, '청구완납일자', '결제일(납부기간)', '결제일', '정산일', '약정일'));
+  // 결제일 = CMS 성공일. 통장 집금은 보통 3~5일 후(cms-matching LAG). 정산일보다 결제일을 우선.
+  const txDate = normalizeKoreanDate(get(row, '결제일', '청구완납일자', '결제일(납부기간)', '정산일', '약정일'));
   if (!txDate) return null;
   const memo = [get(row, '상품', '상품명'), get(row, '청구월', '최초청구월'), get(row, '결제수단', '결제방식')].filter(Boolean).join(' / ');
   const rec: EntityRecord = {
@@ -153,24 +156,81 @@ export function parseCmsRow(row: Record<string, unknown>, _fileName: string): En
 }
 
 /* ── 파일 전체 → bank_tx 레코드 (은행/CMS 자동판별) ── */
-export async function parseTxFile(file: File): Promise<EntityRecord[]> {
+/** 거래시각 — 날짜만 남기는 normalize와 별도. HH:mm[:ss] */
+export function extractTxTime(raw: string): string {
+  const t = String(raw || '').trim();
+  if (!t) return '';
+  const m = t.match(/(?:T|\s)(\d{1,2}):(\d{2})(?::(\d{2}))?/);
+  if (!m) return '';
+  return `${String(+m[1]).padStart(2, '0')}:${m[2]}${m[3] != null ? `:${m[3]}` : ''}`;
+}
+
+/** 내용 fingerprint — 재임포트 안정 · 동일키 N건은 #2… */
+export function bankTxFingerprint(r: EntityRecord): string {
+  return [
+    r.account ?? '',
+    r.txDate ?? '',
+    r.txTime ?? '',
+    r.amount ?? 0,
+    r.withdraw ?? 0,
+    r.balance ?? '',
+    r.counterparty ?? '',
+    r.memo ?? '',
+    r.method ?? '',
+  ].join('|');
+}
+
+/** 파일 내 등장 순으로 txKey 부여. 1건=fp · 2건째=fp#2 (재임포트 동일키 → store dedupe). */
+export function assignBankTxKeys(rows: EntityRecord[]): EntityRecord[] {
+  const counts = new Map<string, number>();
+  for (const rec of rows) {
+    const fp = bankTxFingerprint(rec);
+    const n = (counts.get(fp) ?? 0) + 1;
+    counts.set(fp, n);
+    rec.txKey = n === 1 ? fp : `${fp}#${n}`;
+  }
+  return rows;
+}
+
+export type TxParseRejection = { sheet: string; row: number; reason: string; values: Record<string, unknown> };
+export type TxParseReport = {
+  records: EntityRecord[];
+  rejected: TxParseRejection[];
+  warnings: string[];
+};
+
+function bankRejectReason(row: Record<string, unknown>, cms: boolean): string {
+  const status = get(row, '수납상태', '납부상태', '결제상태');
+  if (status && /미납|연체|미수|취소|정지|보류|실패/.test(status)) return `미완료 거래 상태(${status})`;
+  const date = normalizeKoreanDate(get(row, '거래일자', '거래일', '거래일시', '거래시각', '거래시간', '입금일', '출금일', '일자', '발생일', '처리일', '결제일', '청구완납일자', '수납일'));
+  if (!date) return '거래일을 판독할 수 없음';
+  if (cms && !get(row, '회원명', '고객명', '납부자', '납부자명')) return 'CMS 회원·납부자 없음';
+  return '입금·출금 금액을 판독할 수 없음';
+}
+
+export async function parseTxFileReport(file: File): Promise<TxParseReport> {
   const buf = await file.arrayBuffer();
   const wb = XLSX.read(buf, { type: 'array', cellDates: true });
   const bankHint = detectBankFromFileName(file.name);
   const out: EntityRecord[] = [];
+  const rejected: TxParseRejection[] = [];
+  const warnings: string[] = [];
   for (const sheetName of wb.SheetNames) {
     const ws = wb.Sheets[sheetName];
     if (!ws) continue;
     const aoa = XLSX.utils.sheet_to_json<unknown[]>(ws, { header: 1, blankrows: false, defval: null }) as unknown[][];
     if (aoa.length < 2) continue;
     const det = detectHeaderRow(aoa);
-    if (det.kind === 'unknown') continue;
+    if (det.kind === 'unknown') {
+      warnings.push(`${sheetName}: 거래내역 헤더를 찾지 못함`);
+      continue;
+    }
     const rawHeaders = (aoa[det.headerRow] || []).map((v, i) => (v == null || v === '' ? `col${i + 1}` : String(v).trim().replace(/\s*\*\s*$/, '')));
     const dropIdx = new Set<number>();
     rawHeaders.forEach((h, i) => { if (CHECKBOX_RE.test(h)) dropIdx.add(i); });
     const headers = rawHeaders.filter((_, i) => !dropIdx.has(i));
     const isCms = det.kind === 'auto-debit';
-    for (const r of aoa.slice(det.headerRow + 1)) {
+    for (const [offset, r] of aoa.slice(det.headerRow + 1).entries()) {
       if (!r.some((v) => v != null && String(v).trim() !== '')) continue;
       if (FOOTER_RE.test(String(r[0] ?? '').trim()) || FOOTER_RE.test(String(r[1] ?? '').trim())) continue;
       const filtered = dropIdx.size === 0 ? r : r.filter((_, i) => !dropIdx.has(i));
@@ -178,7 +238,12 @@ export async function parseTxFile(file: File): Promise<EntityRecord[]> {
       headers.forEach((h, i) => { obj[h] = filtered[i] ?? null; });
       const rec = isCms ? parseCmsRow(obj, file.name) : parseBankRow(obj, file.name, bankHint);
       if (rec) out.push(rec);
+      else rejected.push({ sheet: sheetName, row: det.headerRow + offset + 2, reason: bankRejectReason(obj, isCms), values: obj });
     }
   }
-  return out;
+  return { records: assignBankTxKeys(out), rejected, warnings };
+}
+
+export async function parseTxFile(file: File): Promise<EntityRecord[]> {
+  return (await parseTxFileReport(file)).records;
 }

@@ -14,7 +14,8 @@ import {
   stampCreateFields, stampUpdateFields, stampDeleteFields, stampRestoreFields,
 } from './audit';
 import { newId } from './domain/ids';
-import { assertMoneyMutable } from './finance/period-lock';
+import { assertMoneyMutable, ensurePeriodLocksHydrated, isPeriodLocked } from './finance/period-lock';
+import { normPlate } from './plate';
 import { assertNoLockConflict, peelExpectedUpdatedAt } from './lock-conflict';
 import { withTimeout } from './async';
 
@@ -32,6 +33,31 @@ export interface StoreAdapter {
   remove(entityKey: string, companyId: string, key: string, reason?: string): Promise<void>;   // #6 소프트삭제
   listDeleted(entityKey: string, companyId: string): Promise<EntityRecord[]>;
   restore(entityKey: string, companyId: string, key: string): Promise<void>;
+}
+
+/**
+ * 차량번호 변경 이력 승계 — 임판(12가3456 임시) → 정식번호 전환이 신차의 기본 흐름이다.
+ *
+ * 왜 필요한가: 계약·정비·과태료·보험은 차량을 «번호»로 찾는다(lib/plate.ts vehicleMatchesPlate).
+ *   번호를 바꾸면 옛 번호로 걸려 있던 모든 건이 그 차에서 떨어져 나가고, 재투입하면 문서ID가
+ *   `{회사}__{번호}`라서 같은 차가 2대로 갈라진다. vehicleMatchesPlate는 이미 plateHistory를
+ *   폴백으로 보는데 «그 이력을 쌓는 코드»가 없었다(읽기만 존재) → 여기서 쌓는다.
+ *   오픈 후 데이터가 붙은 뒤에는 수동 병합밖에 없어 사실상 복구 불가.
+ */
+function carryPlateHistory(
+  entityKey: string,
+  before: EntityRecord | null,
+  patch: EntityRecord,
+): EntityRecord {
+  if (entityKey !== 'vehicle' || !before) return {};
+  if (!('plate' in patch)) return {};
+  const oldPlate = String(before.plate ?? '');
+  const newPlate = String(patch.plate ?? '');
+  if (!oldPlate || !newPlate || normPlate(oldPlate) === normPlate(newPlate)) return {};
+  const prior = Array.isArray(before.plateHistory) ? before.plateHistory.map((h) => String(h)) : [];
+  // 이미 이력에 있으면(번호 원복 등) 중복 적재하지 않는다.
+  if (prior.some((h) => normPlate(h) === normPlate(oldPlate))) return {};
+  return { plateHistory: [...prior, oldPlate] };
 }
 
 function naturalKey(entityKey: string, rec: EntityRecord): string {
@@ -148,8 +174,24 @@ class FirestoreAdapter implements StoreAdapter {
     const db = getFirestore(getFirebaseApp()!);
     const col = collection(db, entityKey);
     const seen = new Set<string>();
+    /* 차량 별칭(번호변경 이력) → 기존 문서 _key.
+       차량 자연키가 plate이므로 번호를 바꾼 차를 재투입하면 «새 차»로 저장돼 같은 차가 2대로 갈라진다
+       (임판→정식번호는 신차의 기본 흐름). plateHistory를 별칭으로 보고 같은 차로 인식한다. */
+    const plateAliases = new Set<string>();
     // dedup: 같은 회사·자연키 존재 확인. audit_logs는 id 유니크(무한증가) → 스캔 생략.
-    if (entityKey !== AUDIT_COLL) {
+    if (entityKey === 'vehicle') {
+      // 차량은 항상 전량 스캔 — 별칭(옛 번호)까지 봐야 하므로 문서ID 단건 확인으로는 부족하다.
+      const snap = await withTimeout(getDocs(query(col, where('companyId', '==', companyId))));
+      snap.forEach((d) => {
+        const r = d.data() as EntityRecord;
+        if (r._key) seen.add(String(r._key));
+        const hist = Array.isArray(r.plateHistory) ? r.plateHistory : [];
+        for (const cand of [r.plate, ...hist]) {
+          const n = normPlate(cand);
+          if (n) plateAliases.add(n);
+        }
+      });
+    } else if (entityKey !== AUDIT_COLL) {
       if (records.length > 5) {
         // 대량(import): 컬렉션 1회 스캔으로 기존 자연키 수집(N건에 read 1회).
         const snap = await withTimeout(getDocs(query(col, where('companyId', '==', companyId))));
@@ -170,12 +212,61 @@ class FirestoreAdapter implements StoreAdapter {
     for (const rec of records) {
       const key = persistKeyOf(entityKey, rec);
       if (key && seen.has(key)) { duplicates++; continue; }
+      // ★번호변경 이력에 걸린 같은 차 — 새 문서를 만들지 않는다(차량이 2대로 갈라지는 것 차단).
+      if (entityKey === 'vehicle' && plateAliases.has(normPlate(rec.plate))) { duplicates++; continue; }
       const id = key ? firestoreDocId(companyId, key) : `${companyId}__${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
       // Firestore는 undefined 필드를 거부 → 저장 전 제거(실파서 등 undefined 섞인 레코드도 안전).
       pending.push({ id, data: pruneUndefined(stampPersist(entityKey, companyId, rec, key, 'system')) });
       if (key) seen.add(key);
       saved++;
     }
+    // 브라우저에서 권한 실패를 기다렸다가 재시도하지 않고 인증된 서버 경로를 우선 사용한다.
+    // ★서버 라우트는 요청당 500건 상한 → 청크로 나눠 보낸다. (전량 1회로 보내면 대량 임포트가
+    //   항상 400을 받아 «검증 없는 직접 경로»로 새던 문제 — QA 적대검증 지적)
+    if (typeof window !== 'undefined' && pending.length > 0) {
+      /* ★서버는 요청(청크) 단위로 «마감월 섞이면 전량 거부»를 보장한다. 500건을 넘으면 앞선 청크는
+         이미 저장된 뒤 뒤 청크가 거부돼 «부분 저장 + 전량 거부 메시지»가 된다.
+         그래서 보내기 전에 여기서 한 번 선검사해 한 건이라도 마감월이면 아예 시작하지 않는다.
+         (마감 캐시가 비어 있으면 통과하지만, 그 경우 서버가 다시 잡는다 — 이중 방어) */
+      if (entityKey === 'bank_tx' || entityKey === 'card_tx') {
+        await ensurePeriodLocksHydrated(companyId);
+        const blocked = new Set<string>();
+        for (const { data } of pending) {
+          const ym = String((data as { txDate?: string }).txDate || '').slice(0, 7);
+          if (ym && isPeriodLocked(companyId, `${ym}-01`)) blocked.add(ym);
+        }
+        if (blocked.size > 0) {
+          throw new Error(`마감된 기간(${[...blocked].sort().join(', ')})의 자금거래가 포함되어 저장하지 않았습니다 — 설정에서 해당 월 마감을 해제한 뒤 다시 투입하세요`);
+        }
+      }
+      const { apiAuthHeaders } = await import('./api-headers');
+      const headers = await apiAuthHeaders();
+      headers.set('content-type', 'application/json');
+      const CHUNK = 500;
+      let allOk = true;
+      for (let i = 0; i < pending.length; i += CHUNK) {
+        const res = await fetch(`/api/entities/${encodeURIComponent(entityKey)}`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({ companyId, docs: pending.slice(i, i + CHUNK) }),
+        });
+        if (!res.ok) {
+          /* ★«정당한 거부»와 «일시적 실패»를 구분한다.
+             서버가 규칙 위반(400 격리·409 회계마감·403 권한)으로 거부한 것을 직접 경로로 폴백하면
+             그 검증을 통째로 우회한다 — 특히 생성은 firestore.rules에 마감 가드가 없어 그대로 통과한다.
+             거부는 그대로 실패시켜 사용자에게 사유를 보여주고, 네트워크·5xx만 직접 경로로 넘긴다. */
+          if (res.status === 400 || res.status === 403 || res.status === 409) {
+            const body = await res.json().catch(() => null) as { error?: string } | null;
+            throw new Error(body?.error || `서버가 저장을 거부했습니다 (${res.status})`);
+          }
+          allOk = false;
+          console.warn(`Firestore save(${entityKey}) 서버 저장 실패 (${res.status}) — 직접 저장 경로로 전환`);
+          break;
+        }
+      }
+      if (allOk) return { saved, duplicates, backend: this.backend };
+    }
+    try {
     if (pending.length === 1) {
       await withTimeout(setDoc(doc(col, pending[0].id), pending[0].data));
     } else {
@@ -188,15 +279,68 @@ class FirestoreAdapter implements StoreAdapter {
       }
       await Promise.all(commits);
     }
+    } catch (error) {
+      console.warn(`Firestore save(${entityKey}) 직접 저장 실패 — 서버 인증 경로로 전환:`, (error as Error).message);
+      const { apiAuthHeaders } = await import('./api-headers');
+      const headers = await apiAuthHeaders();
+      headers.set('content-type', 'application/json');
+      const res = await fetch(`/api/entities/${encodeURIComponent(entityKey)}`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ companyId, docs: pending }),
+      });
+      if (!res.ok) {
+        const detail = await res.json().catch(() => null) as { error?: string } | null;
+        throw new Error(detail?.error || `서버 저장 실패 (${res.status})`);
+      }
+    }
     return { saved, duplicates, backend: this.backend };
   }
   async list(entityKey: string, companyId: string): Promise<EntityRecord[]> {
+    if (typeof window !== 'undefined') {
+      // 회계마감 원격 캐시 채우기(회사당 1회, await 안 함) — 마감 가드가 읽는 localStorage가
+      // 새 기기·시크릿창에서 비어 «마감 없음»으로 보이는 것을 막는다. 서버 강제는 firestore.rules.
+      void ensurePeriodLocksHydrated(companyId);
+      // 법인 마스터도 함께 — 대외문서(내용증명·과태료 공문)가 이 값을 인쇄하므로
+      // «입력하지 않은 PC»에서 공란으로 나가는 것을 막는다.
+      // ★company-master는 'use client' 모듈이라 정적 import 금지(서버 그래프에 섞이면 안 됨) → 동적 import.
+      void import('./company-master').then((m) => m.ensureCompanyMasterHydrated(companyId)).catch(() => {});
+      try {
+        const { apiAuthHeaders } = await import('./api-headers');
+        const headers = await apiAuthHeaders();
+        const res = await withTimeout(
+          fetch(`/api/entities/${encodeURIComponent(entityKey)}?companyId=${encodeURIComponent(companyId)}`, {
+            headers,
+            cache: 'no-store',
+          }),
+          12_000,
+          `list ${entityKey}`,
+        );
+        if (!res.ok) throw new Error(`서버 조회 실패 (${res.status})`);
+        const body = await res.json() as { rows?: EntityRecord[] };
+        return Array.isArray(body.rows) ? body.rows : [];
+      } catch (error) {
+        console.warn(`Firestore list(${entityKey}) 서버 조회 실패 — 직접 조회 경로로 전환:`, (error as Error).message);
+      }
+    }
     try {
       const { getFirestore, collection, query, where, getDocs } = await import('firebase/firestore');
       const db = getFirestore(getFirebaseApp()!);
       const snap = await withTimeout(getDocs(query(collection(db, entityKey), where('companyId', '==', companyId))));
       return snap.docs.map((d) => d.data() as EntityRecord).filter((r) => !r.deletedAt);
-    } catch (e) { console.warn(`Firestore list(${entityKey}) 대기 실패(DB·규칙 확인):`, (e as Error).message); throw e; }   // throw=실패를 캐시 안 함(DispatchStore가 다음에 재시도). 빈 회사와 로드실패 구분.
+    } catch (e) {
+      console.warn(`Firestore list(${entityKey}) 직접 조회 실패 — 서버 인증 경로로 전환:`, (e as Error).message);
+      const { apiAuthHeaders } = await import('./api-headers');
+      const headers = await apiAuthHeaders();
+      const res = await withTimeout(
+        fetch(`/api/entities/${encodeURIComponent(entityKey)}?companyId=${encodeURIComponent(companyId)}`, { headers, cache: 'no-store' }),
+        12_000,
+        `list-fallback ${entityKey}`,
+      );
+      if (!res.ok) throw new Error(`서버 조회 실패 (${res.status})`);
+      const body = await res.json() as { rows?: EntityRecord[] };
+      return Array.isArray(body.rows) ? body.rows : [];
+    }
   }
   async get(entityKey: string, companyId: string, key: string): Promise<EntityRecord | null> {
     try {
@@ -275,7 +419,8 @@ class AuditingStore implements StoreAdapter {
     if (entityKey === AUDIT_COLL) return this.base.update(entityKey, companyId, key, patch);
     const before = await this.base.get(entityKey, companyId, key);
     assertMoneyMutable(entityKey, companyId, before as Record<string, unknown> | null, patch as Record<string, unknown>);
-    await this.base.update(entityKey, companyId, key, { ...patch, ...stampUpdateFields() });
+    const carried = carryPlateHistory(entityKey, before, patch);
+    await this.base.update(entityKey, companyId, key, { ...patch, ...carried, ...stampUpdateFields() });
     void this.writeLog(companyId, { action: 'update', entityType: entityKey, entityId: key, label: this.label(entityKey, key, '수정'), before: beforeSubset(before, patch), after: patch });
   }
 
@@ -305,13 +450,53 @@ class AuditingStore implements StoreAdapter {
 // 모듈 레벨 인메모리 캐시 — list 결과(Promise)를 재사용해 재조회·화면 전환을 즉시로.
 // 저장/수정/삭제 시 해당 엔티티 캐시만 무효화(다음 list에서 신선하게 재조회). 세션 한정(새로고침 시 초기화).
 const _listCache = new Map<string, Promise<EntityRecord[]>>();
-function _invalidate(entityKey: string) { for (const k of [..._listCache.keys()]) if (k.startsWith(entityKey + '::')) _listCache.delete(k); }
-export function clearStoreCache() { _listCache.clear(); }
+
+/**
+ * ★조회 실패 레지스트리 — list()는 화면을 깨뜨리지 않기 위해 실패 시 빈 배열로 resolve한다.
+ *   그런데 그러면 «로드 실패»가 «데이터 0건(문제 없음)»으로 위장돼, 리스크 화면이 «위험 없음»으로
+ *   보이는 거짓 안심이 생긴다(QA 중요). 그래서 실패 사실을 여기 남기고 훅·UI가 읽어 오류로 표시한다.
+ *   합본(__ALL__)에서 일부 법인만 실패한 경우도 기록 — 부분 합계를 완전한 것처럼 보여주지 않기 위해.
+ */
+const _listErrors = new Map<string, string>();
+const LIST_ERROR_EVENT = 'jpk:list-error';
+
+function markListError(ck: string, message: string) {
+  _listErrors.set(ck, message);
+  if (typeof window !== 'undefined') window.dispatchEvent(new Event(LIST_ERROR_EVENT));
+}
+function clearListError(ck: string) {
+  if (!_listErrors.delete(ck)) return;
+  if (typeof window !== 'undefined') window.dispatchEvent(new Event(LIST_ERROR_EVENT));
+}
+
+/** 주어진 엔티티들 중 조회가 실패한 게 있으면 사용자용 메시지, 없으면 null. */
+export function listErrorFor(keys: readonly string[], companyId: string): string | null {
+  const hits = keys.map((k) => _listErrors.get(`${k}::${companyId}`)).filter(Boolean);
+  return hits.length ? String(hits[0]) : null;
+}
+
+/** 조회 실패 상태 변화 구독(훅에서 사용). */
+export function subscribeListErrors(fn: () => void): () => void {
+  if (typeof window === 'undefined') return () => {};
+  window.addEventListener(LIST_ERROR_EVENT, fn);
+  return () => window.removeEventListener(LIST_ERROR_EVENT, fn);
+}
+const _listValueCache = new Map<string, EntityRecord[]>();
+function _invalidate(entityKey: string) {
+  for (const k of [..._listCache.keys()]) if (k.startsWith(entityKey + '::')) _listCache.delete(k);
+  for (const k of [..._listValueCache.keys()]) if (k.startsWith(entityKey + '::')) _listValueCache.delete(k);
+}
+export function clearStoreCache() { _listCache.clear(); _listValueCache.clear(); }
 /** 엔티티 단위 무효화 — 감사 등 단건 최신이 필요할 때 전체 clear 금지. */
 export function invalidateEntityCache(entityKey: string) { _invalidate(entityKey); }
 /** 캐시 hit 판정 — soft-load(스피너 생략)용. */
 export function listsCached(entityKeys: readonly string[], companyId: string): boolean {
   return entityKeys.length > 0 && entityKeys.every((k) => _listCache.has(`${k}::${companyId}`));
+}
+export function cachedListValues(entityKeys: readonly string[], companyId: string): EntityRecord[][] | null {
+  if (!entityKeys.length) return [];
+  const values = entityKeys.map((key) => _listValueCache.get(`${key}::${companyId}`));
+  return values.every((value): value is EntityRecord[] => value != null) ? values : null;
 }
 
 class DispatchStore implements StoreAdapter {
@@ -328,13 +513,37 @@ class DispatchStore implements StoreAdapter {
     const ck = `${entityKey}::${companyId}`;
     let p = _listCache.get(ck);
     if (!p) {
-      p = this.all(companyId)
-        ? Promise.all(COMPANIES.map((c) => this.base.list(entityKey, c).catch(() => []))).then((a) => a.flat())   // 회사별 격리: 한 법인 오류가 합본 전체를 안 비움(정상분은 캐시)
-        : this.base.list(entityKey, companyId);   // 단일 스코프는 throw→캐시제거→다음 재시도
+      const failedCompanies: string[] = [];
+      const raw = this.all(companyId)
+        ? Promise.all(COMPANIES.map((c) => this.base.list(entityKey, c).catch((e) => {
+            // 합본에서 일부 법인만 실패 → 부분 합계를 완전한 것처럼 보여주지 않도록 기록.
+            console.error(`list(${entityKey}) ${c} 실패:`, (e as Error).message);
+            failedCompanies.push(c);
+            return [] as EntityRecord[];
+          }))).then((a) => a.flat())
+        : this.base.list(entityKey, companyId);
+      // hang 방지 — 미결 Promise가 캐시에 남으면 PageLoading 영구. 실패·타임아웃은 캐시 제거→재시도.
+      p = withTimeout(raw, 15_000, `store.list ${entityKey}`)
+        .then((rows) => {
+          if (failedCompanies.length) {
+            markListError(ck, `일부 법인 조회 실패(${failedCompanies.join('·')}) — 합계가 불완전합니다`);
+            _listCache.delete(ck);   // 재조회 가능하게(부분 결과를 캐시로 굳히지 않음)
+          } else {
+            clearListError(ck);
+            _listValueCache.set(ck, rows);
+          }
+          return rows;
+        })
+        .catch((e) => {
+          console.error(e);
+          _listCache.delete(ck);
+          _listValueCache.delete(ck);
+          markListError(ck, `조회 실패 — ${(e as Error).message || '네트워크·권한 확인'}`);
+          return [] as EntityRecord[];
+        });
       _listCache.set(ck, p);
-      p.catch(() => _listCache.delete(ck)); // 실패는 캐시 안 함(다음에 재시도)
     }
-    return p.catch(() => []); // 호출자에겐 빈 배열(행 방지) — 캐시는 위 catch로 제거돼 다음 조회 때 재시도
+    return p;
   }
   async listDeleted(entityKey: string, companyId: string) {
     if (!this.all(companyId)) return this.base.listDeleted(entityKey, companyId);

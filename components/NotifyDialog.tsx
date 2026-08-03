@@ -10,18 +10,15 @@ import { useSession } from '@/lib/session';
 import { saveIntake } from '@/lib/intake';
 import { notifySaved } from '@/lib/ui-bus';
 import { apiAuthHeaders } from '@/lib/api-headers';
-import { Modal, Btn, C, toggleStyle } from '@/components/ui';
+import { Modal, Btn, TextArea, PillTabs, C } from '@/components/ui';
 import { todayKST } from '@/lib/contracts/dates'; // KST 기준 오늘
-import { useIsMobile } from '@/lib/use-mobile';
 
-export type NotifyRecipient = {
-  contractKey: string; companyId: string;
-  name: string; plate: string; phone: string; contractNo?: string;
-  unpaidAmount: number; unpaidSeqCount: number; currentSeq: number; monthlyRent: number;
-  depositDue: number; depositReceived: number; depositUnreceived: number; depositRefund: number;
-};
+import type { NotifyRecipient } from '@/lib/notify/types';
+export type { NotifyRecipient };
 
-const TEMPLATES: { label: string; body: string }[] = [
+/** needsDeposit=true 인 템플릿은 «보증금 실수령액»이 기록된 계약에만 쓸 수 있다. */
+/** needsDeposit = 실수령 기록 필요 · needsReceived = 실제로 받은 금액(>0)이 있어야 함. */
+const TEMPLATES: { label: string; body: string; needsDeposit?: boolean; needsReceived?: boolean }[] = [
   { label: '미납 1차 안내', body: '[렌터카매니저] {{고객명}} 님, {{차량번호}} 미수금 {{미수금}} ({{미납회차}}). 금일 중 입금 부탁드립니다.' },
   { label: '미납 2차 독촉', body: '[렌터카매니저] {{고객명}} 님, {{차량번호}} 미수금 {{미수금}} ({{미납회차}}) 미납이 계속되어 시동제어 등 조치가 진행될 수 있습니다. 즉시 입금 또는 연락 부탁드립니다.' },
   { label: '시동제어 예고', body: '[렌터카매니저] {{고객명}} 님, {{차량번호}} 미납 누적으로 시동제어가 곧 시행됩니다. 입금 또는 회신 부탁드립니다.' },
@@ -31,9 +28,9 @@ const TEMPLATES: { label: string; body: string }[] = [
   { label: '반납 임박', body: '[렌터카매니저] {{고객명}} 님, {{차량번호}} 차량 반납 예정일이 임박했습니다. 일정 확인 부탁드립니다.' },
   { label: '정기점검 안내', body: '[렌터카매니저] {{고객명}} 님, {{차량번호}} 차량 정기점검 일정 안내드립니다. 가까운 영업소 방문 부탁드립니다.' },
   { label: '대여료 청구', body: '[렌터카매니저] {{고객명}} 님, {{차량번호}} {{이번회차}} 대여료 {{월대여료}} 결제일이 도래했습니다. 입금 부탁드립니다.' },
-  { label: '보증금 입금 안내', body: '[렌터카매니저] {{고객명}} 님, {{차량번호}} 계약 보증금 {{보증금}} 입금 부탁드립니다 (미수령 {{보증금미수령}}). 입금 후 출고 일정 안내드리겠습니다.' },
-  { label: '보증금 입금 확인', body: '[렌터카매니저] {{고객명}} 님, {{차량번호}} 보증금 {{보증금수령}} 입금 확인되었습니다. 출고 일정 별도 안내드리겠습니다.' },
-  { label: '반납 정산 안내', body: '[렌터카매니저] {{고객명}} 님, {{차량번호}} 반납 정산 — 보증금 {{보증금수령}} 중 차감액 제외 후 환불 {{보증금환불}} 예정입니다. 환불계좌 확인 부탁드립니다.' },
+  { label: '보증금 입금 안내', body: '[렌터카매니저] {{고객명}} 님, {{차량번호}} 계약 보증금 {{보증금}} 입금 부탁드립니다 (미수령 {{보증금미수령}}). 입금 후 출고 일정 안내드리겠습니다.' , needsDeposit: true },
+  { label: '보증금 입금 확인', body: '[렌터카매니저] {{고객명}} 님, {{차량번호}} 보증금 {{보증금수령}} 입금 확인되었습니다. 출고 일정 별도 안내드리겠습니다.' , needsDeposit: true, needsReceived: true },
+  { label: '반납 정산 안내', body: '[렌터카매니저] {{고객명}} 님, {{차량번호}} 반납 정산 — 보증금 {{보증금수령}} 중 차감액 제외 후 환불 {{보증금환불}} 예정입니다. 환불계좌 확인 부탁드립니다.' , needsDeposit: true, needsReceived: true },
   { label: '직접 입력', body: '' },
 ];
 
@@ -47,31 +44,46 @@ function fill(body: string, r: NotifyRecipient): string {
     .replace(/\{\{이번회차\}\}/g, `${r.currentSeq}회차`)
     .replace(/\{\{월대여료\}\}/g, won(r.monthlyRent))
     .replace(/\{\{보증금\}\}/g, won(r.depositDue))
-    .replace(/\{\{보증금수령\}\}/g, won(r.depositReceived))
-    .replace(/\{\{보증금미수령\}\}/g, won(r.depositUnreceived))
-    .replace(/\{\{보증금환불\}\}/g, won(r.depositRefund));
+    .replace(/\{\{보증금수령\}\}/g, r.depositReceived == null ? '(미확인)' : won(r.depositReceived))
+    .replace(/\{\{보증금미수령\}\}/g, r.depositUnreceived == null ? '(미확인)' : won(r.depositUnreceived))
+    .replace(/\{\{보증금환불\}\}/g, r.depositRefund == null ? '(미확인)' : won(r.depositRefund));
 }
 const today = todayKST;
 
-export function NotifyDialog({ recipients, onClose, onSent }: {
+export function NotifyDialog({ recipients, onClose, onSent, initialLabel }: {
   recipients: NotifyRecipient[];
   onClose: () => void;
   onSent?: () => void;
+  /** 열릴 때 고를 템플릿 라벨(TEMPLATES.label). 없으면 첫 항목. */
+  initialLabel?: string;
 }) {
   const { user } = useSession();
-  const mobile = useIsMobile();
-  const [idx, setIdx] = useState(0);
-  const [body, setBody] = useState(TEMPLATES[0].body);
+  const startIdx = (() => {
+    if (!initialLabel) return 0;
+    const i = TEMPLATES.findIndex((t) => t.label === initialLabel);
+    return i >= 0 ? i : 0;
+  })();
+  const [idx, setIdx] = useState(startIdx);
+  const [body, setBody] = useState(TEMPLATES[startIdx].body);
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<string>('');
 
   const targets = useMemo(() => recipients.filter((r) => r.phone), [recipients]);
   const isLong = body.length > 90;
+  /* 보증금 실수령액이 기록되지 않은 대상 — 보증금 문구가 든 문자는 이 대상에게 보낼 수 없다.
+     ★ERP가 «모르는 값을 0으로» 인쇄해 고객에게 틀린 안내를 보내는 것을 막는다. */
+  const depositUnknown = useMemo(() => targets.filter((r) => r.depositReceived == null).length, [targets]);
+  /* «받은 돈이 0원»인 대상에게 '보증금 입금 확인'·'반납 정산 안내'를 보내면
+     «보증금 0원 입금 확인되었습니다» 같은 문자가 나간다 → 수령액이 실제로 있어야만 허용. */
+  const depositZero = useMemo(() => targets.filter((r) => r.depositReceived != null && r.depositReceived <= 0).length, [targets]);
+  const usesDeposit = /\{\{보증금(수령|미수령|환불)\}\}/.test(body);
+  const usesReceived = /\{\{보증금(수령|환불)\}\}/.test(body);
+  const depositBlocked = (usesDeposit && depositUnknown > 0) || (usesReceived && depositZero > 0);
 
   function applyTemplate(i: number) { setIdx(i); setBody(TEMPLATES[i].body); }
 
   async function send() {
-    if (!body.trim() || targets.length === 0) return;
+    if (!body.trim() || targets.length === 0 || depositBlocked) return;
     setBusy(true); setResult('');
     const label = TEMPLATES[idx].label;
     let sent = 0, failed = 0, mocked = 0;
@@ -79,7 +91,7 @@ export function NotifyDialog({ recipients, onClose, onSent }: {
     for (const r of targets) {
       try {
         const res = await fetch('/api/notify', {
-          method: 'POST', headers: apiAuthHeaders({ 'Content-Type': 'application/json' }),
+          method: 'POST', headers: await apiAuthHeaders({ 'Content-Type': 'application/json' }),
           body: JSON.stringify({ tel: r.phone, message: fill(body, r), subject: label }),
         });
         const json = await res.json();
@@ -112,9 +124,16 @@ export function NotifyDialog({ recipients, onClose, onSent }: {
   return (
     <Modal title="문자 발송" meta={`${targets.length}건`} width={860} onClose={onClose}
       footer={<>
-        <Btn onClick={send} disabled={busy || !body.trim() || targets.length === 0}>{busy ? '발송 중…' : `${targets.length}건 발송`}</Btn>
+        <Btn onClick={send} disabled={busy || !body.trim() || targets.length === 0 || depositBlocked}>{busy ? '발송 중…' : `${targets.length}건 발송`}</Btn>
         <Btn variant="ghost" onClick={onClose}>닫기</Btn>
         {result && <span style={{ fontSize: 12, color: result.startsWith('발송 완료') ? C.ok : C.warn }}>{result}</span>}
+        {depositBlocked && !result && (
+          <span style={{ fontSize: 12, color: C.danger }}>
+            {depositUnknown > 0
+              ? `보증금 실수령액이 기록되지 않은 대상 ${depositUnknown}건 — 이 문구로는 발송할 수 없습니다(0원으로 잘못 안내됨)`
+              : `보증금을 아직 받지 않은 대상 ${depositZero}건 — «0원 입금 확인» 문자가 나갑니다`}
+          </span>
+        )}
         <span style={{ flex: 1 }} />
         <span style={{ fontSize: 11, color: C.faint }}>예상비용 {targets.length * (isLong ? 25 : 10)}원 ({isLong ? 'LMS 25' : 'SMS 10'}원 × {targets.length})</span>
       </>}>
@@ -139,17 +158,28 @@ export function NotifyDialog({ recipients, onClose, onSent }: {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12, minWidth: 0 }}>
           <div>
             <div style={lbl}>템플릿</div>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: mobile ? 8 : 6 }}>
-              {TEMPLATES.map((t, i) => <button key={t.label} type="button" data-ui="toggle" style={toggleStyle(idx === i, 'sm', mobile)} onClick={() => applyTemplate(i)} aria-pressed={idx === i}>{t.label}</button>)}
-            </div>
+            <PillTabs
+              size="sm"
+              value={String(idx)}
+              onChange={(key) => applyTemplate(Number(key))}
+              tabs={TEMPLATES.map((template, i) => {
+                const locked = (!!template.needsDeposit && depositUnknown > 0) || (!!template.needsReceived && depositZero > 0);
+                return {
+                  key: String(i),
+                  label: `${template.label}${locked ? ' 🔒' : ''}`,
+                  title: locked ? '보증금 실수령액이 기록되지 않아 사용할 수 없습니다' : undefined,
+                  disabled: locked,
+                };
+              })}
+            />
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
             <div style={{ ...lbl, display: 'flex', justifyContent: 'space-between' }}>
               <span>본문 · 변수 {'{{고객명}} {{차량번호}} {{미수금}} {{미납회차}} {{월대여료}} {{보증금}}'}</span>
               <span style={{ fontFamily: 'var(--font-mono)', color: isLong ? C.warn : C.mute }}>{body.length}자 · {isLong ? 'LMS' : 'SMS'}</span>
             </div>
-            <textarea value={body} onChange={(e) => setBody(e.target.value)} placeholder="문자 본문을 입력하세요"
-              style={{ flex: 1, minHeight: 150, padding: 12, border: `1px solid ${C.line}`, borderRadius: 8, fontSize: 13, fontFamily: 'inherit', lineHeight: 1.6, resize: 'vertical', outline: 'none', color: C.ink, background: C.card }} />
+            <TextArea value={body} onChange={(e) => setBody(e.target.value)} placeholder="문자 본문을 입력하세요"
+              style={{ flex: 1, minHeight: 150, lineHeight: 1.6 }} />
           </div>
           {targets[0] && (
             <div style={{ fontSize: 12, color: C.mute }}>

@@ -1,16 +1,18 @@
-/**
- * 클라이언트 → /api/* 공용 헤더.
- * production에서 API_SHARED_SECRET을 쓰면 같은 값을 NEXT_PUBLIC_API_SHARED_SECRET에도 넣는다.
- * (브라우저 노출 한계 — 장기적으로는 Firebase ID 토큰 검증으로 교체. DEPLOY.md)
- */
-export function apiAuthHeaders(extra?: HeadersInit): HeadersInit {
-  const secret = (process.env.NEXT_PUBLIC_API_SHARED_SECRET || '').trim();
-  const base: Record<string, string> = {};
-  if (secret) base.Authorization = `Bearer ${secret}`;
-  if (!extra) return base;
-  if (extra instanceof Headers) {
-    extra.forEach((v, k) => { base[k] = v; });
-    return base;
+'use client';
+
+import { withTimeout } from './async';
+
+/** Build API headers from the current Firebase session's short-lived ID token. */
+export async function apiAuthHeaders(extra?: HeadersInit): Promise<Headers> {
+  const headers = new Headers(extra);
+  const { getAuthClient, firebaseReady } = await import('./firebase/client');
+
+  if (firebaseReady()) {
+    const user = getAuthClient()?.currentUser;
+    if (!user) throw new Error('로그인이 필요합니다.');
+    // getIdToken이 멈추면 목록 스피너가 영구 고정됨 → 상한.
+    headers.set('Authorization', `Bearer ${await withTimeout(user.getIdToken(), 8_000, 'getIdToken')}`);
   }
-  return { ...base, ...(extra as Record<string, string>) };
+
+  return headers;
 }

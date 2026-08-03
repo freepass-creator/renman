@@ -98,8 +98,14 @@ export type BankTransaction = {
   /** 계정과목 — 분개. ledger-subjects.ts 의 enum */
   subject?: string;
   matchedContractId?: string;
+  /** 계약 귀속 종류 — 대여료 회차 수납과 보증금 수령을 섞지 않는다. */
+  matchedKind?: 'receivable' | 'deposit';
   matchedScheduleId?: string;
   matchedScheduleSeq?: number; // schedule 의 회차 번호 (인라인 schedules 매칭용)
+  /** 한 입금이 여러 회차를 충당한 실제 배분 내역. matchedScheduleSeq는 첫 회차 호환 필드. */
+  matchedScheduleAllocations?: Array<{ seq: number; amount: number }>;
+  /** 계약 청구액을 모두 충당하고 남은 과오납·미배분 금액. */
+  matchedUnappliedAmount?: number;
   matchedAt?: string;          // 매칭 처리 시각 (ISO)
   matchedBy?: string;          // 매칭 처리자 (이메일/uid)
   /**

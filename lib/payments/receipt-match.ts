@@ -36,6 +36,13 @@ function counterpartySuffix4(name: string): string {
   return m ? m[1] : '';
 }
 
+/** 상대방·적요 안의 실제 차번 패턴에서 끝 4자리를 찾는다. 날짜(2026-06)는 차번으로 보지 않는다. */
+function plateSuffixesInEvidence(text: string): Set<string> {
+  const suffixes = new Set<string>();
+  for (const match of (text ?? '').matchAll(/\d{2,3}[가-힣]\s*(\d{4})/g)) suffixes.add(match[1]);
+  return suffixes;
+}
+
 export type MatchCandidate = {
   contract: Contract;
   scheduleSeq: number;
@@ -107,10 +114,13 @@ function findCandidatesIndexed(
   txAmount: number,
   txCounterparty: string,
   index: MatchIndex,
+  txMemo = '',
 ): MatchCandidate[] {
   const out: MatchCandidate[] = [];
   const cpName = normName(txCounterparty);
   const cpSuffix = counterpartySuffix4(txCounterparty);
+  const plateSuffixes = plateSuffixesInEvidence(`${txCounterparty} ${txMemo}`);
+  if (cpSuffix) plateSuffixes.add(cpSuffix);
   // 입금자명에서 4자리 숫자 추출했으면, 그 4자리 제거한 prefix 도 이름 매칭에 사용
   // 예: '박영협8309' → cpName='박영협8309', cpNamePrefix='박영협'
   const cpNamePrefix = cpSuffix ? normName(txCounterparty.replace(/\d{4}\s*$/, '')) : '';
@@ -132,8 +142,8 @@ function findCandidatesIndexed(
 
   // 차량번호 끝 4자리 매칭 — '박영협8309' suffix='8309' → 그 plate 의 계약
   const plateMatched = new Set<Contract>();
-  if (cpSuffix.length === 4) {
-    const arr = index.byPlateSuffix.get(cpSuffix);
+  for (const suffix of plateSuffixes) {
+    const arr = index.byPlateSuffix.get(suffix);
     if (arr) for (const c of arr) plateMatched.add(c);
   }
 
@@ -192,7 +202,7 @@ export function findCandidates(tx: BankTransaction, contracts: Contract[]): Matc
   if (tx.amount <= 0) return [];
   if (tx.matchedContractId) return [];
   const index = buildMatchIndex(contracts);
-  return findCandidatesIndexed(tx.amount, tx.counterparty, index);
+  return findCandidatesIndexed(tx.amount, tx.counterparty, index, tx.memo);
 }
 
 /** 매칭 한 건 적용 — BankTransaction patch + Contract patch 반환 */
@@ -314,7 +324,7 @@ export function autoMatchAll(
     if (t.amount <= 0) continue;
     if (t.matchedContractId) continue;
     if (t.settlementRole === 'deposit') continue; // CMS 집금 대표건 — 계약 매칭 제외
-    const candidates = findCandidatesIndexed(t.amount, t.counterparty, index);
+    const candidates = findCandidatesIndexed(t.amount, t.counterparty, index, t.memo);
     const high = candidates.filter((c) => c.confidence === 'high' && !used.has(`${c.contract.id}:${c.scheduleSeq}`));
     if (high.length === 0) continue;
     // 동명이인·금액 충돌 안전장치 — high 후보가 여러 계약을 가리키면 자동매칭 격하 (수동 검토 유도).

@@ -1,6 +1,7 @@
 node_modules
 # Next 산출물은 형제 ../cache/jpkerp6/.next (docs/CACHE.md). 로컬에 남아도 ignore.
 .next
+.next-*
 out
 .env.local
 .env*.local
@@ -14,3 +15,19 @@ tmp_*.txt
 
 tsc-out.txt
 tsc-result.txt
+
+.vercel
+.env*
+
+# Firebase Admin service-account credentials (never commit)
+renman-dd0a2-firebase-adminsdk-fbsvc-c489c146ce.json
+firebase-debug.log
+
+# --- redesign session hygiene ---
+*.log
+.tmp-browser/
+tools/_tmp*
+.vercel/
+# 루트 민감/사무 문서 — 절대 커밋 금지
+/*.pdf
+/*.xlsx

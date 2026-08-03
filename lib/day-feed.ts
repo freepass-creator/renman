@@ -67,6 +67,8 @@ export function buildDayFeed(
     const pays = Array.isArray(c._payments) ? (c._payments as Array<Record<string, unknown>>) : [];
     for (const p of pays) {
       if (dayOf(p.date) !== day) continue;
+      // 보증금충당·synthetic은 실입금 피드에서 제외(R7)
+      if (p.synthetic === true || String(p.kind || '') === 'deposit-offset' || p.source === '정산') continue;
       push({
         kind: '수납매칭',
         plate,

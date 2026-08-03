@@ -10,17 +10,22 @@ import { UploadCloud, Car, ShieldCheck } from 'lucide-react';
 import { useSession } from '@/lib/session';
 import { useEntityLists } from '@/lib/use-entity-lists';
 import { type EntityRecord } from '@/lib/intake/entities';
-import { ocrBatch, mapOcrToEntity } from '@/lib/ocr-client';
+import { ocrBatch, mapOcrToEntity, type OcrOriginal } from '@/lib/ocr-client';
 import { saveIntake } from '@/lib/intake';
 import { uploadDoc, docPath } from '@/lib/storage';
 import { pushDocVersion } from '@/lib/docs';
 import { resolveWriteCompany, NEED_COMPANY } from '@/lib/scope';
 import { normPlate } from '@/lib/plate';
+import { matchDocumentToVehicle } from '@/lib/document-consistency';
 import { companyLabel } from '@/lib/companies';
 import { Page, Panel, Btn, Badge, EmptyState, DataTable, IconSeg, C, SPACE_M, won, type Col } from '@/components/ui';
 import FileDrop from '@/components/FileDrop';
 import { WorkbenchBar } from '@/components/WorkbenchBar';
 import { toast } from '@/lib/toast';
+import { getStore } from '@/lib/store';
+import { crossCheckDocuments, crossCheckSummary } from '@/lib/integrity/doc-crosscheck';
+import { TODAY } from '@/lib/dashboard-consts';
+import { commitUpdate } from '@/lib/commit';
 
 type DocKind = 'vehicle' | 'insurance';
 const KIND: Record<DocKind, { label: string; ocrType: string }> = {
@@ -31,9 +36,11 @@ const KIND: Record<DocKind, { label: string; ocrType: string }> = {
 type Row = {
   file: File;
   rec: EntityRecord;
+  ocrOriginal?: OcrOriginal;
   plate: string;
   match: EntityRecord | null;   // 매칭된 기존 차량
-  status: '매칭' | '신규' | '실패';
+  status: '매칭' | '검토' | '신규' | '실패';
+  matchScore: number;
 };
 
 export default function BulkMatchPage() {
@@ -43,6 +50,7 @@ export default function BulkMatchPage() {
   const [files, setFiles] = useState<File[]>([]);
   const [rows, setRows] = useState<Row[] | null>(null);
   const [busy, setBusy] = useState(false);
+  const [crossMsg, setCrossMsg] = useState('');   // 투입 후 서류 검증 결과 요약
 
   const byPlate = useMemo(() => {
     const m = new Map<string, EntityRecord>();
@@ -60,12 +68,43 @@ export default function BulkMatchPage() {
       setRows(results.map((r, i): Row => {
         const rec = r.ok && r.raw ? mapOcrToEntity(kind, r.raw) : {};
         const plate = normPlate(rec.plate);
-        const match = plate ? byPlate.get(plate) ?? null : null;
-        return { file: files[i], rec, plate: String(rec.plate || ''), match, status: !r.ok ? '실패' : match ? '매칭' : '신규' };
+        const judged = matchDocumentToVehicle(rec, vs);
+        const match = judged.target || (plate ? byPlate.get(plate) ?? null : null);
+        const status: Row['status'] = !r.ok ? '실패'
+          : judged.decision === 'auto' ? '매칭'
+          : match ? '검토'
+          : '신규';
+        return { file: files[i], rec, ocrOriginal: r.ocrOriginal, plate: String(rec.plate || ''), match, status, matchScore: judged.score };
       }));
     } catch (e) {
       toast('OCR 실패: ' + (e as Error).message, 'error');
     } finally { setBusy(false); }
+  };
+
+  /**
+   * 투입 후 교차검증 — 저장된 데이터를 다시 읽어 규칙 5종을 돌린다.
+   * 화면을 옮기지 않고 결과만 알린다(연속 투입 중일 수 있다).
+   */
+  const runCrossCheck = async (target: string) => {
+    try {
+      const store = getStore();
+      const [vehicles, insurances, contracts, bankTx] = await Promise.all([
+        store.list('vehicle', target),
+        store.list('insurance', target).catch(() => [] as EntityRecord[]),
+        store.list('contract', target).catch(() => [] as EntityRecord[]),
+        store.list('bank_tx', target).catch(() => [] as EntityRecord[]),
+      ]);
+      const found = crossCheckDocuments({ vehicles, insurances, contracts, bankTx, today: TODAY });
+      const summary = crossCheckSummary(found);
+      setCrossMsg(summary ? `서류 검증 — ${summary}` : '서류 검증 — 이상 없음');
+      if (summary) {
+        const high = found.filter((f) => f.sev === 'high').length;
+        toast(`서류 검증: ${summary}${high ? ` · 위험 ${high}건` : ''} — 정합성에서 확인하세요`, 'info');
+      }
+    } catch {
+      // 검증 실패가 투입을 되돌리지는 않는다. 다만 «검증했다»고 말해서도 안 된다.
+      setCrossMsg('서류 검증을 실행하지 못했습니다 — 정합성 화면에서 직접 확인하세요');
+    }
   };
 
   const commit = async () => {
@@ -76,15 +115,54 @@ export default function BulkMatchPage() {
     setBusy(true);
     try {
       const recs: EntityRecord[] = [];
+      let updated = 0;
+      let plateSkipped = 0;   // OCR 번호가 기존 차량과 다른데 갱신하지 않은 건수
       for (const r of okRows) {
         const key = String(r.rec.plate || r.rec.policyNo || 'new');
         // 원본 파일 저장(Firebase + 회사 Drive 미러) → 레코드에 첨부.
         const url = await uploadDoc(r.file, docPath(target, kind, key, r.file.name));
-        recs.push(url ? { ...r.rec, _docs: pushDocVersion(r.rec, { type: kind, url, reason: '대량 자동매칭', by: String(user?.name || '') }) } : r.rec);
+        const current = kind === 'vehicle'
+          ? r.match
+          : r.rec.policyNo ? await getStore().get('insurance', target, String(r.rec.policyNo)) : null;
+        const merged = url
+          ? {
+              ...r.rec,
+              _docs: pushDocVersion(current || r.rec, { type: kind, url, ocr: r.ocrOriginal?.raw, reason: '대량 자동매칭', by: String(user?.name || '') }),
+              ...(r.ocrOriginal ? { _ocrOriginal: r.ocrOriginal } : {}),
+            }
+          : { ...r.rec, ...(r.ocrOriginal ? { _ocrOriginal: r.ocrOriginal } : {}) };
+        if (current?._key) {
+          /* ★차량번호(plate)는 자동 갱신 대상에서 제외한다.
+             VIN·차명 등으로 같은 차로 매칭됐더라도 OCR 이 번호를 오독하면 그 값이 그대로 저장되고,
+             번호변경 승계(carryPlateHistory)가 작동해 «오독 번호»가 이력에 영구 박제된다
+             (그 뒤로는 별칭 조인이 잘못된 번호까지 같은 차로 인식한다 = 되돌리기 어려움).
+             번호 변경은 사람이 차량 상세에서 눈으로 확인하고 바꿔야 한다. */
+          const patch = kind === 'vehicle'
+            ? (() => { const { plate: _ocrPlate, ...rest } = merged as Record<string, unknown>; return rest as EntityRecord; })()
+            : merged;
+          if (kind === 'vehicle' && r.plate && normPlate(r.plate) !== normPlate(current.plate)) plateSkipped++;
+          await commitUpdate({
+            entity: kind, sessionCompanyId: target, rec: current,
+            key: String(current._key), patch, source: 'ocr',
+          });
+          updated++;
+        } else {
+          recs.push(merged);
+        }
       }
-      const res = await saveIntake(kind, target, recs);
-      toast(`${res.save.saved}건 반영 (${KIND[kind].label} · ${companyLabel(target)})${res.save.duplicates ? ` · 갱신 ${res.save.duplicates}` : ''}`, 'success');
+      const res = recs.length
+        ? await saveIntake(kind, target, recs, { context: { source: 'ocr' } })
+        : { save: { saved: 0, duplicates: 0, backend: getStore().backend } };
+      toast(
+        `${res.save.saved + updated}건 반영 (${KIND[kind].label} · ${companyLabel(target)})${updated ? ` · 기존 갱신 ${updated}` : ''}`
+        + (plateSkipped ? ` · ★차량번호 불일치 ${plateSkipped}건은 번호를 바꾸지 않았습니다(차량 상세에서 확인)` : ''),
+        plateSkipped ? 'info' : 'success',
+      );
       reset();
+      /* ★투입 직후 서류 교차검증 — 올린 서류가 데이터와 어긋나면 바로 알려준다
+         (사장님: 「올렸을때 저런거 검증도 해줘야지」). 저장 성공 후에만 실행한다.
+         검증의 상주 소비처는 정합성 화면이고 같은 SSOT를 쓰므로 숫자가 어긋날 수 없다. */
+      void runCrossCheck(target);
     } catch (e) {
       toast('반영 실패: ' + (e as Error).message, 'error');
     } finally { setBusy(false); }
@@ -93,11 +171,24 @@ export default function BulkMatchPage() {
   const cols: Col<Row>[] = [
     { key: 'file', label: '파일', render: (r) => <span style={{ fontSize: 12, color: C.mute }}>{r.file.name}</span> },
     { key: 'plate', label: '번호판(OCR)', render: (r) => r.plate || <span style={{ color: C.danger }}>미인식</span> },
-    { key: 'match', label: '매칭 차량', render: (r) => r.match ? `${String(r.match.plate || '')} · ${String(r.match.carName || '')}` : '—' },
+    {
+      key: 'match', label: '매칭 차량',
+      render: (r) => {
+        if (!r.match) return '—';
+        const label = `${String(r.match.plate || '')} · ${String(r.match.carName || '')}`;
+        // OCR 번호와 기존 차량번호가 다르면 «번호는 갱신하지 않는다»는 사실을 미리 알린다.
+        const mismatch = !!r.plate && normPlate(r.plate) !== normPlate(r.match.plate);
+        return mismatch
+          ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>{label}<Badge tone="amber">번호 불일치 · 미갱신</Badge></span>
+          : label;
+      },
+    },
     {
       key: 'status', label: '처리', render: (r) => {
-        const tone = r.status === '실패' ? 'red' : r.status === '신규' ? 'amber' : 'green';
-        const label = r.status === '매칭' ? '기존 갱신' : r.status === '신규' ? '신규 등록' : 'OCR 실패';
+        const tone = r.status === '실패' ? 'red' : r.status === '신규' || r.status === '검토' ? 'amber' : 'green';
+        const label = r.status === '매칭' ? `자동 매칭 ${r.matchScore}`
+          : r.status === '검토' ? `교차검토 ${r.matchScore}`
+          : r.status === '신규' ? '신규 등록' : 'OCR 실패';
         return <Badge tone={tone}>{label}</Badge>;
       },
     },
@@ -113,12 +204,22 @@ export default function BulkMatchPage() {
     <Page
       title="대량 자동매칭"
       tools={<WorkbenchBar actions={
-        <IconSeg value={kind} onChange={(k) => { setKind(k as DocKind); reset(); }} options={[
+        <IconSeg showLabels value={kind} onChange={(k) => { setKind(k as DocKind); reset(); }} options={[
           { key: 'vehicle', label: '등록증', icon: <Car size={15} /> },
           { key: 'insurance', label: '보험증권', icon: <ShieldCheck size={15} /> },
         ]} />
       } />}
     >
+      {/* 투입 후 서류 검증 결과 — 토스트는 사라지므로 상주 표시가 필요하다.
+          이상이 있으면 정합성 화면으로 바로 갈 수 있게 링크를 붙인다. */}
+      {crossMsg && (
+        <Panel title="서류 검증">
+          <div style={{ padding: '10px 16px', fontSize: 12.5, lineHeight: 1.7, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+            <span style={{ color: crossMsg.includes('이상 없음') ? C.ok : C.danger, fontWeight: 700 }}>{crossMsg}</span>
+            {!crossMsg.includes('이상 없음') && <Btn size="sm" variant="ghost" href="/integrity">정합성에서 보기 →</Btn>}
+          </div>
+        </Panel>
+      )}
       <Panel title={`${KIND[kind].label} 대량 업로드`}>
         <p style={{ fontSize: 12.5, color: C.mute, margin: '0 0 10px', lineHeight: 1.6 }}>
           여러 장을 한 번에 올리면 OCR로 <b>번호판</b>을 읽어 기존 차량과 자동으로 맞춥니다. 검토 후 <b>반영</b>하면 원장에 upsert.
@@ -129,7 +230,7 @@ export default function BulkMatchPage() {
           accept="image/*,application/pdf"
           onFiles={(fs) => { setFiles(Array.from(fs)); setRows(null); }}
           hint={files.length ? `${files.length}장 선택됨` : `${KIND[kind].label} 이미지/PDF 여러 장`}
-          note="드래그하거나 클릭해 선택"
+          note="여러 파일 선택 가능"
         />
         <div style={{ display: 'flex', gap: SPACE_M, marginTop: 12, flexWrap: 'wrap', alignItems: 'center' }}>
           <Btn onClick={analyze} disabled={!files.length || busy}><UploadCloud size={15} /> {busy && !rows ? 'OCR 분석 중…' : `${files.length || ''}장 분석`}</Btn>

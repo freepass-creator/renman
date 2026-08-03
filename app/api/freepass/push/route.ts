@@ -6,12 +6,15 @@
  */
 import { NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/api-auth';
+import { enforceApiRateLimit } from '@/lib/api-rate-limit';
 
 export const runtime = 'nodejs';
 
 export async function POST(req: Request) {
-  const actor = await requireAuth();
+  const actor = await requireAuth(req);
   if (actor instanceof NextResponse) return actor;
+  const limited = await enforceApiRateLimit('freepass-push', actor.uid, { limit: 10, windowMs: 10 * 60_000 });
+  if (limited) return limited;
 
   const url = (process.env.FREEPASS_PRODUCT_API || '').trim();
   const secret = (process.env.FREEPASS_API_SECRET || '').trim();
@@ -25,15 +28,19 @@ export async function POST(req: Request) {
   } catch {
     return NextResponse.json({ ok: false, error: 'JSON 파싱 실패' }, { status: 400 });
   }
-  if (!Array.isArray(products) || products.length === 0) {
+  if (!Array.isArray(products) || products.length === 0 || products.length > 500) {
     return NextResponse.json({ ok: false, error: 'products 배열 필요' }, { status: 400 });
+  }
+  const payload = JSON.stringify({ products, companyId: 'freepass' });
+  if (Buffer.byteLength(payload, 'utf8') > 1024 * 1024) {
+    return NextResponse.json({ ok: false, error: 'payload too large' }, { status: 413 });
   }
 
   try {
     const r = await fetch(url, {
       method: 'POST',
       headers: { 'content-type': 'application/json', ...(secret ? { 'x-api-key': secret } : {}) },
-      body: JSON.stringify({ products, companyId: 'freepass' }),
+      body: payload,
     });
     const body = await r.text().catch(() => '');
     let parsed: Record<string, unknown> = {};

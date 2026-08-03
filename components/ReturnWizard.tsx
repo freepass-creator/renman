@@ -16,9 +16,10 @@ import { toast } from '@/lib/toast';
 import { haptic } from '@/lib/haptics';
 import { resolveWriteCompany, NEED_COMPANY } from '@/lib/scope';
 import { FUEL_LEVELS } from '@/lib/domain/fuel';
-import { Stepper, Btn, Message, won, C, toggleStyle, WizPanel, WizCard, WizField, WizPhotos, wizInput, type Step } from '@/components/ui';
+import { Stepper, Btn, Input, TextArea, PillTabs, Message, won, C, WizPanel, WizCard, WizField, WizPhotos, type Step } from '@/components/ui';
 import { type EntityRecord } from '@/lib/intake/entities';
 import { todayKST as TODAY } from '@/lib/contracts/dates'; // KST 기준 오늘(반납일 기록)
+import { companyLabel } from '@/lib/companies';
 const STEP_LABELS = ['확인', '주행·연료', '정산', '사진·서명', '확정'];
 
 export function ReturnWizard({ contract, vehicle, onClose, onDone }: {
@@ -39,6 +40,7 @@ export function ReturnWizard({ contract, vehicle, onClose, onDone }: {
   const who = String(contract.contractorName || '—');
   const contractNo = String(contract._key || contract.contractNo || '');
   const carName = String(vehicle?.carName || vehicle?.model || contract.carName || '');
+  const company = companyLabel(String(target || contract.companyId || ''));
   const baseMileage = Number(contract.mileageOut) || 0;
   const baseFuel = String(contract.fuelOut || '');
   const eff = effectiveEndDate(contract);
@@ -47,8 +49,12 @@ export function ReturnWizard({ contract, vehicle, onClose, onDone }: {
   // 정산 미리보기 = 반납일 what-if(computeContractView) → 공용 computeReturnSettlement(정산서와 동일).
   const settle = useMemo(() => {
     const v = computeContractView({ ...contract, returnedDate: date, status: '반납' }, date);
-    return computeReturnSettlement(Number(contract.deposit) || 0, v);
-  }, [contract, date]);
+    return computeReturnSettlement(Number(contract.deposit) || 0, v, {
+      contract: { ...contract, returnedDate: date },
+      asOf: date,
+      returnMileage: mileage || null,
+    });
+  }, [contract, date, mileage]);
   const drove = mileage ? Number(mileage) - baseMileage : null;
 
   async function commit() {
@@ -117,7 +123,7 @@ export function ReturnWizard({ contract, vehicle, onClose, onDone }: {
   const last = step === STEP_LABELS.length - 1;
 
   return (
-    <WizPanel title={`반납 처리 · ${plate}`} meta={`${who}${carName ? ` · ${carName}` : ''}`} onClose={onClose}
+    <WizPanel title={`반납 처리 · ${plate}`} meta={`${company} · ${who}${carName ? ` · ${carName}` : ''}`} onClose={onClose}
       footer={<>
         <Btn variant="ghost" size="lg" onClick={() => (step === 0 ? onClose() : setStep((s) => s - 1))} disabled={saving}>{step === 0 ? '취소' : '이전'}</Btn>
         <span style={{ flex: 1 }} />
@@ -133,6 +139,7 @@ export function ReturnWizard({ contract, vehicle, onClose, onDone }: {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             <Message variant="info">이 계약을 <b>반납(입고)</b> 처리합니다. 반납 계기판·연료를 기록하고 정산을 확인한 뒤 사진·서명을 남깁니다.</Message>
             <WizCard>
+              <Row k="회사" v={company} />
               <Row k="차량" v={`${plate}${carName ? ` · ${carName}` : ''}`} />
               <Row k="계약자" v={who} />
               {contractNo && <Row k="계약번호" v={contractNo} mono />}
@@ -146,18 +153,15 @@ export function ReturnWizard({ contract, vehicle, onClose, onDone }: {
         {step === 1 && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             <WizField label="반납일">
-              <input type="date" value={date} max={TODAY()} onChange={(e) => { const v = e.target.value; setDate(v && v > TODAY() ? TODAY() : v); }} style={wizInput} />
+              <Input type="date" value={date} max={TODAY()} onChange={(e) => { const v = e.target.value; setDate(v && v > TODAY() ? TODAY() : v); }} style={{ width: '100%' }} />
             </WizField>
             <WizField label={<>반납 주행거리 (계기판 km) {baseMileage ? <span style={{ color: C.faint, fontWeight: 400 }}>· 출고 {baseMileage.toLocaleString()}km</span> : null}</>}>
-              <input inputMode="numeric" value={mileage} onChange={(e) => setMileage(e.target.value.replace(/[^\d]/g, ''))} placeholder={baseMileage ? `${baseMileage} 이상` : '예: 47250'} style={{ ...wizInput, fontFamily: 'var(--font-mono)' }} />
+              <Input inputMode="numeric" value={mileage} onChange={(e) => setMileage(e.target.value.replace(/[^\d]/g, ''))} placeholder={baseMileage ? `${baseMileage} 이상` : '예: 47250'} style={{ width: '100%', fontFamily: 'var(--font-mono)' }} />
               {drove != null && <div style={{ marginTop: 6, fontSize: 12.5, color: drove < 0 ? C.danger : C.mute }}>{drove < 0 ? '출고보다 작음 — 확인 필요' : `주행 ${drove.toLocaleString()}km`}</div>}
+              {!mileage && <div style={{ marginTop: 6 }}><Message variant="warning">주행거리 미입력 — 초과주행 산출 불가(반납은 가능)</Message></div>}
             </WizField>
             <WizField label={<>반납 연료량 {baseFuel ? <span style={{ color: C.faint, fontWeight: 400 }}>· 출고 {baseFuel}</span> : null}</>}>
-              <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap' }}>
-                {FUEL_LEVELS.map((f) => (
-                  <button key={f} type="button" data-ui="toggle" onClick={() => { setFuel(f); haptic.select(); }} aria-pressed={fuel === f} style={toggleStyle(fuel === f, 'lg')}>{f}</button>
-                ))}
-              </div>
+              <PillTabs size="lg" value={fuel} onChange={setFuel} tabs={FUEL_LEVELS.map((key) => ({ key, label: key }))} />
             </WizField>
           </div>
         )}
@@ -165,8 +169,32 @@ export function ReturnWizard({ contract, vehicle, onClose, onDone }: {
         {/* 2. 정산 */}
         {step === 2 && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            {settle.mileageBasis === '산출불가' && (
+              <Message variant="warning">주행거리 미입력 — 초과주행 산출 불가</Message>
+            )}
+            {settle.mileageBasis === '단가미확인' && (
+              <Message variant="warning">
+                초과 {settle.excessKm.toLocaleString('ko-KR')}km — 계약서의 초과주행 단가를 못 읽었습니다.
+                계약 상세에서 «초과주행 단가»를 입력하면 자동 계산됩니다(추측 단가로 청구하지 않습니다).
+              </Message>
+            )}
             <WizCard gap={9}>
               <Row k="미납 대여료 (일할정산 반영)" v={won(settle.unpaid)} strong={settle.unpaid > 0} />
+              {settle.mileageBasis === '산출불가' ? (
+                <Row k="초과주행" v="산출 불가" muted />
+              ) : settle.mileageBasis === '단가미확인' ? (
+                <Row k="초과주행" v={`초과 ${settle.excessKm.toLocaleString('ko-KR')}km · 단가 미확인`} muted />
+              ) : settle.mileageBasis === '한도없음' ? (
+                <Row k="초과주행" v="한도 없음(무제한)" muted />
+              ) : settle.overMileageFee > 0 ? (
+                <Row
+                  k="초과주행"
+                  v={`${settle.excessKm.toLocaleString('ko-KR')}km × ${settle.overMileageRate.toLocaleString('ko-KR')}원 = ${won(settle.overMileageFee)}`}
+                  strong
+                />
+              ) : (
+                <Row k="초과주행" v="과금 없음" muted />
+              )}
               <Row k="예치 보증금" v={won(settle.deposit)} />
               <Row k="보증금 충당" v={settle.offset ? `−${won(settle.offset)}` : won(0)} muted />
               <div style={{ borderTop: `2px solid ${C.ink}`, margin: '2px 0' }} />
@@ -175,7 +203,7 @@ export function ReturnWizard({ contract, vehicle, onClose, onDone }: {
                 : <Row k="보증금 반환액 (임차인 환급)" v={won(settle.refund)} strong />}
             </WizCard>
             <WizField label="정산 특이사항 (손상·연료차액·과태료 등)">
-              <textarea value={note} onChange={(e) => setNote(e.target.value)} placeholder="예: 우측 도어 스크래치, 연료 1/4 부족" rows={3} style={{ ...wizInput, height: 'auto', padding: '10px 12px', fontFamily: 'inherit', resize: 'vertical' }} />
+              <TextArea value={note} onChange={(e) => setNote(e.target.value)} placeholder="예: 우측 도어 스크래치, 연료 1/4 부족" rows={3} />
             </WizField>
             <div style={{ fontSize: 12, color: C.faint, lineHeight: 1.6 }}>※ 정산서(출력)와 동일 계산입니다. 손상·연료차액·미회수 과태료는 특이사항에 남기면 별도 청구 근거가 됩니다.</div>
           </div>
@@ -199,12 +227,16 @@ export function ReturnWizard({ contract, vehicle, onClose, onDone }: {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             <Message variant="info">아래 내용으로 반납을 확정하면 계약이 <b>반납</b> 상태로 전환되고 정산이 확정됩니다.</Message>
             <WizCard>
+              <Row k="회사" v={company} />
               <Row k="차량" v={`${plate}${carName ? ` · ${carName}` : ''}`} />
               <Row k="계약자" v={who} />
               <Row k="반납일" v={date} />
               <Row k="반납 주행거리" v={mileage ? `${Number(mileage).toLocaleString()} km${drove != null && drove >= 0 ? ` (주행 ${drove.toLocaleString()})` : ''}` : '미입력'} />
               <Row k="반납 연료" v={fuel} />
               <div style={{ borderTop: `1px solid ${C.line}`, margin: '2px 0' }} />
+              {settle.mileageBasis === '반납확정' && settle.overMileageFee > 0 && (
+                <Row k="초과주행" v={`${settle.excessKm.toLocaleString('ko-KR')}km × ${settle.overMileageRate.toLocaleString('ko-KR')}원 = ${won(settle.overMileageFee)}`} />
+              )}
               {settle.addCharge > 0
                 ? <Row k="추가 청구액" v={won(settle.addCharge)} strong danger />
                 : <Row k="보증금 반환액" v={won(settle.refund)} strong />}

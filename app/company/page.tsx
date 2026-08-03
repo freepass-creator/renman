@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Building2, ChevronRight } from 'lucide-react';
 import { useSession } from '@/lib/session';
-import { COMPANIES, ALL_COMPANIES, companyLabel, companyShort } from '@/lib/companies';
+import { COMPANIES, ALL_COMPANIES, companyLabel } from '@/lib/companies';
 import { loadMaster, MODULE_CATALOG } from '@/lib/company-master';
 import { Page, C, ActionTile, SPACE_M } from '@/components/ui';
 import { WorkbenchBar } from '@/components/WorkbenchBar';
@@ -32,7 +32,7 @@ export default function CompanyListPage() {
             <ActionTile
               key={c}
               icon={<Building2 size={16} color={C.mute} />}
-              label={<span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>{companyLabel(c)}<span style={{ fontSize: 11, fontWeight: 500, color: C.faint }}>{companyShort(c)}</span><ChevronRight size={14} color={C.faint} /></span>}
+              label={<span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>{companyLabel(c)}<ChevronRight size={14} color={C.faint} /></span>}
               desc={`등록 ${reg}대 · 차고지 ${garages}곳 · ${mods.join(' · ') || '모듈 없음'}`}
               onClick={() => router.push(`/company/${c}`)}
             />

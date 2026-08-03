@@ -3,7 +3,7 @@
  *   오늘 인도·오늘 반납·반납 지남 + 전체 인도대기/반납대상. 페이지에서 filter 손롤 금지.
  */
 import { type EntityRecord } from '@/lib/intake/entities';
-import { isDeliveryPending, isReturnable, effectiveEndDate } from '@/lib/contract-ops';
+import { isDeliveryPending, isReturnable, computeContractView } from '@/lib/contract-ops';
 import { TODAY } from '@/lib/dashboard-consts';
 import { textMatch } from '@/lib/search-match';
 
@@ -20,7 +20,11 @@ export type FieldQueues = {
   deliverAll: EntityRecord[];
   /** 반납 대상 전체(임박순) */
   returnAll: EntityRecord[];
+  /** 실제 작업 큐 — 반납 지남 + 30일 이내 도래 */
+  returnQueue: EntityRecord[];
 };
+
+export const RETURN_QUEUE_DAYS = 30;
 
 function ymd(v: unknown): string {
   const s = String(v || '').slice(0, 10);
@@ -31,32 +35,45 @@ function deliverScheduleDate(c: EntityRecord): string {
   return ymd(c.deliveryScheduledDate) || ymd(c.startDate) || ymd(c.contractDate);
 }
 
-function endKey(c: EntityRecord): string {
-  return effectiveEndDate(c) || '9999-12-31';
+function queueEndDate(c: EntityRecord, asOf: string): string {
+  return ymd(c.returnScheduledDate) || ymd(computeContractView(c, asOf).endDate);
+}
+
+function plusDays(date: string, days: number): string {
+  const d = new Date(`${date}T12:00:00`);
+  d.setDate(d.getDate() + days);
+  return d.toISOString().slice(0, 10);
 }
 
 /** 계약 목록 → 현장 큐. asOf 기본 TODAY. */
 export function buildFieldQueues(contracts: EntityRecord[], asOf: string = TODAY): FieldQueues {
   const deliverAll = contracts.filter(isDeliveryPending);
-  const returnAll = contracts.filter(isReturnable).sort((a, b) => endKey(a).localeCompare(endKey(b)));
+  const returnAll = contracts.filter(isReturnable).sort((a, b) => (
+    queueEndDate(a, asOf) || '9999-12-31'
+  ).localeCompare(queueEndDate(b, asOf) || '9999-12-31'));
 
   const deliverToday = deliverAll.filter((c) => deliverScheduleDate(c) === asOf);
   const returnToday = returnAll.filter((c) => {
-    const end = ymd(c.returnScheduledDate) || ymd(effectiveEndDate(c));
+    const end = queueEndDate(c, asOf);
     return end === asOf;
   });
   const returnOverdue = returnAll.filter((c) => {
-    const end = ymd(effectiveEndDate(c));
+    const end = queueEndDate(c, asOf);
     return !!end && end < asOf;
   });
+  const queueEnd = plusDays(asOf, RETURN_QUEUE_DAYS);
+  const returnQueue = returnAll.filter((c) => {
+    const end = queueEndDate(c, asOf);
+    return !!end && end <= queueEnd;
+  });
 
-  return { deliverToday, returnToday, returnOverdue, deliverAll, returnAll };
+  return { deliverToday, returnToday, returnOverdue, deliverAll, returnAll, returnQueue };
 }
 
 /** 탭별 카드 목록 — 오늘은 인도오늘+반납오늘+지남(중복 plate는 반납 우선). */
 export function fieldListForTab(q: FieldQueues, tab: FieldTab): { kind: '인도' | '반납'; contract: EntityRecord }[] {
   if (tab === '인도') return q.deliverAll.map((c) => ({ kind: '인도' as const, contract: c }));
-  if (tab === '반납') return q.returnAll.map((c) => ({ kind: '반납' as const, contract: c }));
+  if (tab === '반납') return q.returnQueue.map((c) => ({ kind: '반납' as const, contract: c }));
 
   const seen = new Set<string>();
   const out: { kind: '인도' | '반납'; contract: EntityRecord }[] = [];
