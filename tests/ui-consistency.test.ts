@@ -112,11 +112,13 @@ describe('UI 공용 원자 규격', () => {
     expect(vehicle).toContain('buildFleetRows');
     expect(vehicle).toContain('buildRiskSheetRows');
     expect(vehicle).toContain('buildWorkItemLedgerRows');
+    expect(vehicle).toContain('buildMobileVehicleScope(vehicles, contracts, plate, companyId)');
     expect(vehicle).toContain('유지계약 미수');
     expect(vehicle).toContain('종료계약 미수');
     expect(workNew).toContain("params.get('plate')");
     expect(workNew).toContain("params.get('company')");
     expect(workNew).toContain("plate ? mobileVehicleHref(plate, companyId) : '/m/work'");
+    expect(risk).toContain('검색 조건에 맞는 리스크가 없습니다');
   });
 
   it('모바일 전용 셸에는 숨겨진 웹 상단바 여백이 남지 않는다', () => {

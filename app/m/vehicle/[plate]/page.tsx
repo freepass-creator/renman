@@ -12,6 +12,7 @@ import { buildFleetRows } from '@/lib/sheet-rows';
 import { buildRiskSheetRows } from '@/lib/risk-ledger';
 import { buildWorkItemLedgerRows, workAttentionRank, workDueSignal, workStatusTone } from '@/lib/work-ledger';
 import { normPlate } from '@/lib/plate';
+import { buildMobileVehicleScope, scopeMobileVehicleRecords } from '@/lib/mobile-vehicle-scope';
 import type { EntityRecord } from '@/lib/intake/entities';
 
 export const dynamic = 'force-dynamic';
@@ -32,31 +33,35 @@ export default function MVehicle() {
   const focus = params.get('do') || '';
   const { data: [vehicles = [], contracts = [], insurances = [], histories = [], penalties = [], bankTx = [], workItems = []], loading, error, reload } =
     useEntityLists(['vehicle', 'contract', 'insurance', 'history', 'penalty', 'bank_tx', 'work_item']);
-  const normalizedPlate = normPlate(plate);
+  const scope = useMemo(() => buildMobileVehicleScope(vehicles, contracts, plate, companyId), [companyId, contracts, plate, vehicles]);
+  const scopedContracts = useMemo(() => scopeMobileVehicleRecords(scope, contracts), [contracts, scope]);
+  const scopedInsurances = useMemo(() => scopeMobileVehicleRecords(scope, insurances), [insurances, scope]);
+  const scopedHistories = useMemo(() => scopeMobileVehicleRecords(scope, histories), [histories, scope]);
+  const scopedPenalties = useMemo(() => scopeMobileVehicleRecords(scope, penalties), [penalties, scope]);
+  const scopedBankTx = useMemo(() => scopeMobileVehicleRecords(scope, bankTx), [bankTx, scope]);
+  const scopedWorkItems = useMemo(() => scopeMobileVehicleRecords(scope, workItems), [scope, workItems]);
+  const scopedVehicles = scope.vehicles;
+  const canonicalPlate = scope.canonicalPlate;
 
-  const fleet = useMemo(() => linkFleet(vehicles, contracts, TODAY), [vehicles, contracts]);
+  const fleet = useMemo(() => linkFleet(scopedVehicles, scopedContracts, TODAY), [scopedContracts, scopedVehicles]);
   const fleetRows = useMemo(
-    () => buildFleetRows(fleet.vehicles, insurances, fleet.contracts, histories, TODAY),
-    [fleet, insurances, histories],
+    () => buildFleetRows(fleet.vehicles, scopedInsurances, fleet.contracts, scopedHistories, TODAY),
+    [fleet, scopedHistories, scopedInsurances],
   );
-  const row = useMemo(() => fleetRows.find((item) => normPlate(item.plate) === normalizedPlate
-    && (!companyId || item.companyId === companyId))
-    || fleetRows.find((item) => normPlate(item.plate) === normalizedPlate), [companyId, fleetRows, normalizedPlate]);
-  const targetCompanyId = row?.companyId || companyId;
+  const row = useMemo(() => fleetRows.find((item) => normPlate(item.plate) === normPlate(canonicalPlate)), [canonicalPlate, fleetRows]);
 
-  const risks = useMemo(() => buildRiskSheetRows(vehicles, contracts, insurances, penalties, histories, TODAY, bankTx)
-    .filter((item) => normPlate(item.plate) === normalizedPlate && (!targetCompanyId || item.companyId === targetCompanyId)),
-  [bankTx, contracts, histories, insurances, normalizedPlate, penalties, targetCompanyId, vehicles]);
-  const workRows = useMemo(() => buildWorkItemLedgerRows(workItems, contracts, vehicles)
-    .filter((item) => normPlate(item.plate) === normalizedPlate && (!targetCompanyId || item.companyId === targetCompanyId))
+  const risks = useMemo(() => buildRiskSheetRows(scopedVehicles, scopedContracts, scopedInsurances, scopedPenalties, scopedHistories, TODAY, scopedBankTx)
+    .filter((item) => normPlate(item.plate) === normPlate(canonicalPlate)),
+  [canonicalPlate, scopedBankTx, scopedContracts, scopedHistories, scopedInsurances, scopedPenalties, scopedVehicles]);
+  const workRows = useMemo(() => buildWorkItemLedgerRows(scopedWorkItems, scopedContracts, scopedVehicles)
+    .filter((item) => normPlate(item.plate) === normPlate(canonicalPlate))
     .filter((item) => item.status !== '완료')
     .sort((a, b) => workAttentionRank(a, TODAY) - workAttentionRank(b, TODAY)
       || b.updatedAt.localeCompare(a.updatedAt))
-    .slice(0, 5), [contracts, normalizedPlate, targetCompanyId, vehicles, workItems]);
-  const recentHistory = useMemo(() => histories.filter((record) => normPlate(record.plate) === normalizedPlate
-    && (!targetCompanyId || String(record.companyId || '') === targetCompanyId))
+    .slice(0, 5), [canonicalPlate, scopedContracts, scopedVehicles, scopedWorkItems]);
+  const recentHistory = useMemo(() => scopedHistories.filter((record) => normPlate(record.plate) === normPlate(canonicalPlate))
     .sort((a, b) => recentStamp(b).localeCompare(recentStamp(a)))
-    .slice(0, 5), [histories, normalizedPlate, targetCompanyId]);
+    .slice(0, 5), [canonicalPlate, scopedHistories]);
 
   if (loading) return <PageLoading label="차량 정보를 불러오는 중…" />;
   if (error) return <div style={{ padding: 14 }}><ErrorState message={error} onRetry={reload} /></div>;

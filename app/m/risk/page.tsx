@@ -59,7 +59,11 @@ export default function MRisk() {
               ]}
             />
             {shown.length === 0 ? (
-              <EmptyState variant="ok">지금 챙길 위험이 없습니다</EmptyState>
+              <EmptyState variant={query.trim() || group !== '전체' ? 'sec' : 'ok'}>
+                {query.trim() ? '검색 조건에 맞는 리스크가 없습니다'
+                  : group !== '전체' ? `${group} 항목이 없습니다`
+                    : '지금 챙길 위험이 없습니다'}
+              </EmptyState>
             ) : (
               <Rows title={group === '전체' ? '리스크' : group} tone="red" n={shown.length} collapsible id="m-risk-sheet">
                 {visible.map((item) => (
