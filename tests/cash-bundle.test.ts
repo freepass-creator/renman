@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { summarizeCashBundle, type CashBundleItem } from '@/lib/finance/cash-bundle';
 
 const item = (id: string, amount: number, category = '대여료수입'): CashBundleItem => ({
-  id, amount, category, party: `거래처 ${id}`, memo: '',
+  id, amount, category, party: `거래처 ${id}`, memo: '', referenceId: `contract-${id}`,
 });
 
 describe('일반 묶음 입출금 대사', () => {
@@ -39,5 +39,12 @@ describe('일반 묶음 입출금 대사', () => {
       flow: '출금', actualAmount: 100_000, feeAmount: 0,
       items: [{ ...item('1', 100_000, '정비·수리비'), party: '' }],
     })).toMatchObject({ difference: 0, requiredMissingCount: 1, status: '미완료' });
+  });
+
+  it('계약성 구성건은 금액·계정이 맞아도 실제 계약 연결이 없으면 미완료다', () => {
+    expect(summarizeCashBundle({
+      flow: '입금', actualAmount: 100_000, feeAmount: 0,
+      items: [{ ...item('1', 100_000, '대여료수입'), referenceId: '' }],
+    })).toMatchObject({ difference: 0, linkMissingCount: 1, status: '미완료' });
   });
 });

@@ -14,9 +14,12 @@ import { LEDGER_LABEL } from '@/lib/ledger-labels';
 import {
   WORK_SOURCE_LABEL,
   fmtStamp,
+  workGroup,
+  workDueSignal,
   workStatusTone,
   type WorkLedgerRow,
 } from '@/lib/work-ledger';
+import { TODAY } from '@/lib/dashboard-consts';
 
 function KindCell({ kind }: { kind: string }) {
   if (!kind || kind === '미분류' || kind === '일반') {
@@ -138,7 +141,16 @@ const WORK_COL_CATALOG: SheetCol<WorkLedgerRow>[] = [
     render: (r) => fmtStamp(r.updatedAt),
     text: (r) => r.updatedAt,
   },
-  { key: 'due', label: '기한', priority: 1, render: (r) => r.dueDate || LEDGER_EMPTY.dash, text: (r) => r.dueDate },
+  {
+    key: 'due', label: '기한', priority: 1,
+    render: (r) => {
+      if (!r.dueDate) return LEDGER_EMPTY.dash;
+      const signal = workDueSignal(r.dueDate, r.status, TODAY);
+      const color = signal.state === '기한경과' ? C.danger : signal.state === '오늘' || signal.state === '임박' ? C.warn : undefined;
+      return <span style={{ color, fontWeight: color ? 700 : undefined }}>{r.dueDate}{signal.label ? ` · ${signal.label}` : ''}</span>;
+    },
+    text: (r) => r.dueDate,
+  },
   { key: 'amount', label: '금액', align: 'r', render: (r) => (r.amount ? money(r.amount) : LEDGER_EMPTY.dash), text: (r) => r.amount || '' },
   { key: 'source', label: '원천', render: (r) => WORK_SOURCE_LABEL[r.source], text: (r) => r.source },
 ];
@@ -165,6 +177,9 @@ const WORK_KIND_DETAIL_COLS: SheetCol<WorkLedgerRow>[] = [
   detailStr('callDirection', '방향'),
   detailStr('callResult', '상담결과'),
   detailStr('nextActionDate', '다음조치일'),
+  detailStr('description', '상세내용'),
+  detailStr('vendor', '업체/거래처'),
+  detailNum('mileage', '주행거리', 'km'),
   // 정비 2
   detailStr('maintType', '정비유형'),
   detailStr('nextMaintDate', '다음정비예정'),
@@ -190,11 +205,60 @@ const WORK_KIND_DETAIL_COLS: SheetCol<WorkLedgerRow>[] = [
   detailStr('disputeType', '분쟁유형'),
   detailStr('counterparty', '상대방'),
   detailStr('claimType', '클레임유형'),
+  detailStr('cashFlow', '자금방향'),
 ];
 
 const WORK_DETAIL_CATALOG: SheetCol<WorkLedgerRow>[] = [
   ...WORK_COL_CATALOG,
   ...WORK_KIND_DETAIL_COLS,
+];
+
+const INBOX_TARGET_LABEL: Record<string, string> = {
+  vehicle: '차량',
+  contract: '계약',
+  bank_tx: '자금',
+};
+
+function inboxStateCol(key: string, label: string): SheetCol<WorkLedgerRow> {
+  return {
+    key,
+    label,
+    render: (r) => rawStr(r, key) || LEDGER_EMPTY.dash,
+    text: (r) => rawStr(r, key),
+  };
+}
+
+const INBOX_DETAIL_CATALOG: SheetCol<WorkLedgerRow>[] = [
+  ...WORK_COL_CATALOG,
+  {
+    key: 'inboxOriginal', label: '원본',
+    render: (r) => {
+      const url = rawStr(r, 'url');
+      return url
+        ? <a href={url} target="_blank" rel="noreferrer" style={{ color: C.accent, fontWeight: 700 }}>원본 열기</a>
+        : LEDGER_EMPTY.dash;
+    },
+    text: (r) => rawStr(r, 'url'),
+  },
+  inboxStateCol('filename', '파일명'),
+  inboxStateCol('processingState', '처리상태'),
+  inboxStateCol('classificationState', '분류상태'),
+  inboxStateCol('intakeState', '실행상태'),
+  inboxStateCol('assignmentState', '배정상태'),
+  inboxStateCol('classificationReason', '분류근거'),
+  {
+    key: 'suggestedEntity', label: '연결후보',
+    render: (r) => INBOX_TARGET_LABEL[rawStr(r, 'suggestedEntity')] || rawStr(r, 'suggestedEntity') || LEDGER_EMPTY.dash,
+    text: (r) => INBOX_TARGET_LABEL[rawStr(r, 'suggestedEntity')] || rawStr(r, 'suggestedEntity'),
+  },
+  {
+    key: 'matchedEntity', label: '연결대상',
+    render: (r) => INBOX_TARGET_LABEL[rawStr(r, 'matchedEntity')] || rawStr(r, 'matchedEntity') || LEDGER_EMPTY.dash,
+    text: (r) => INBOX_TARGET_LABEL[rawStr(r, 'matchedEntity')] || rawStr(r, 'matchedEntity'),
+  },
+  inboxStateCol('uploadedBy', '올린이'),
+  inboxStateCol('uploadedAt', '업로드시각'),
+  inboxStateCol('note', '메모'),
 ];
 
 const PENALTY_COL_CATALOG: SheetCol<WorkLedgerRow>[] = [
@@ -252,58 +316,52 @@ const _penViews = buildSheetViews(PENALTY_COL_CATALOG, PENALTY_SHEET_KEYS);
 export const PENALTY_BASIC_COLS = _penViews.basic;
 export const PENALTY_ALL_COLS = _penViews.expanded;
 
-export const WORK_DETAIL_DEFS: DetailSectionDef[] = [
+const WORK_COMMON_DETAIL_DEFS: DetailSectionDef[] = [
   { title: '업무 분류', open: true, keys: ['company', 'kind', 'priority', 'status', 'source'] },
-  { title: '신원·내용', keys: ['plate', 'contractor', 'contractNo', 'title'] },
+  { title: '신원·내용', keys: ['plate', 'contractor', 'contractNo', 'title', 'description'] },
   { title: '처리정보', keys: ['workDate', 'created', 'updated', 'due', 'assignee', 'amount'] },
-  {
+];
+
+const WORK_KIND_DETAIL_DEFS: Record<WorkLedgerRow['group'], DetailSectionDef[]> = {
+  일정: [{ title: '일정', keys: ['endDate', 'location'] }],
+  고객상담: [{ title: '고객상담', keys: ['callChannel', 'callDirection', 'callResult', 'nextActionDate'] }],
+  연락기록: [{ title: '연락기록', keys: ['callChannel', 'callDirection', 'callResult', 'nextActionDate'] }],
+  '정비·수선': [{ title: '정비·수선', keys: ['maintType', 'vendor', 'mileage', 'nextMaintDate'] }],
+  사고: [{
     title: '사고',
     keys: [
       'accRole', 'faultPct', 'damageArea', 'damageFrame',
       'insuranceAmount', 'selfPay', 'repairInDate', 'repairOutDate', 'rentalCar',
       'insuranceCompany', 'insuranceNo', 'otherCar', 'otherInsurance', 'otherInsuranceNo',
     ],
-  },
-  {
-    title: '상담',
-    keys: ['callChannel', 'callDirection', 'callResult', 'nextActionDate'],
-  },
-  {
-    title: '정비',
-    keys: ['maintType', 'nextMaintDate'],
-  },
-  {
-    title: '문서',
-    keys: ['docKind', 'docStatus'],
-  },
-  {
-    title: '일정',
-    keys: ['endDate', 'location'],
-  },
-  {
-    title: '검사',
-    keys: ['inspectionType', 'inspectionResult', 'nextInspectionDate'],
-  },
-  {
-    title: '세차',
-    keys: ['washType'],
-  },
-  {
-    title: '보험',
-    keys: ['insuranceAction', 'insuranceCompany', 'insuranceNo', 'insuranceExpiryDate'],
-  },
-  {
-    title: '부품교체',
-    keys: ['partName', 'partQty'],
-  },
-  {
-    title: '수납이슈',
-    keys: ['paymentIssueType', 'expectedAmount', 'receivedAmount'],
-  },
-  {
-    title: '분쟁·클레임',
-    keys: ['disputeType', 'counterparty', 'claimType'],
-  },
+  }],
+  검사: [{ title: '검사', keys: ['inspectionType', 'inspectionResult', 'vendor', 'mileage', 'nextInspectionDate'] }],
+  세차: [{ title: '세차', keys: ['washType', 'vendor'] }],
+  보험: [{ title: '보험', keys: ['insuranceAction', 'insuranceCompany', 'insuranceNo', 'insuranceExpiryDate'] }],
+  자금: [{ title: '자금예정', keys: ['cashFlow', 'expectedAmount', 'counterparty'] }],
+  부품교체: [{ title: '부품교체', keys: ['partName', 'partQty', 'vendor', 'mileage', 'nextMaintDate'] }],
+  수납이슈: [{ title: '수납이슈', keys: ['paymentIssueType', 'expectedAmount', 'receivedAmount', 'nextActionDate'] }],
+  분쟁: [{ title: '분쟁', keys: ['disputeType', 'counterparty', 'nextActionDate'] }],
+  클레임: [{ title: '클레임', keys: ['claimType', 'callChannel', 'nextActionDate'] }],
+  문서: [{ title: '문서', keys: ['docKind', 'docStatus'] }],
+  메모: [],
+  기타: [{ title: '처리정보 보충', keys: ['vendor'] }],
+  과태료: [],
+};
+
+/** 선택 업무구분에 해당하는 섹션만 구성한다. 공통 필드가 다른 업무 섹션에 잘못 노출되지 않는다. */
+export function workDetailSectionsFor(category: unknown) {
+  const group = workGroup(category);
+  return buildDetailSections(WORK_DETAIL_CATALOG, [
+    ...WORK_COMMON_DETAIL_DEFS,
+    ...(WORK_KIND_DETAIL_DEFS[group] || []),
+  ]);
+}
+
+/** 전체 필드 카탈로그 검증·하위호환용. 실제 패널은 workDetailSectionsFor를 사용한다. */
+export const WORK_DETAIL_DEFS: DetailSectionDef[] = [
+  ...WORK_COMMON_DETAIL_DEFS,
+  ...Object.values(WORK_KIND_DETAIL_DEFS).flat(),
 ];
 
 export const PENALTY_DETAIL_DEFS: DetailSectionDef[] = [
@@ -313,5 +371,12 @@ export const PENALTY_DETAIL_DEFS: DetailSectionDef[] = [
 
 export const WORK_DETAIL_SECTIONS = buildDetailSections(WORK_DETAIL_CATALOG, WORK_DETAIL_DEFS);
 export const PENALTY_DETAIL_SECTIONS = buildDetailSections(PENALTY_DETAIL_CATALOG, PENALTY_DETAIL_DEFS);
+
+export const INBOX_DETAIL_SECTIONS = buildDetailSections(INBOX_DETAIL_CATALOG, [
+  { title: '문서 분류', open: true, keys: ['company', 'kind', 'status', 'processingState', 'classificationState'] },
+  { title: '원본', keys: ['inboxOriginal', 'filename', 'uploadedBy', 'uploadedAt'] },
+  { title: '처리정보', keys: ['intakeState', 'assignmentState', 'assignee', 'due', 'note', 'classificationReason'] },
+  { title: '연결정보', keys: ['suggestedEntity', 'matchedEntity', 'plate', 'contractNo', 'contractor'] },
+]);
 
 export { workStatusTone };

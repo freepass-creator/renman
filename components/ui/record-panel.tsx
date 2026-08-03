@@ -6,6 +6,15 @@ import type { SheetCol } from './excel-sheet';
 import { LedgerPanelFooter } from './ledger-actions';
 import { revealSectionInPanel } from './ledger-panel-scroll';
 import { C } from './tokens';
+import { haptic } from '@/lib/haptics';
+
+export function LedgerPanelCloseButton({ onClose, label = '상세패널 닫기' }: { onClose: () => void; label?: string }) {
+  return (
+    <button type="button" className="ledger-record-panel__close" onClick={() => { haptic.tap(); onClose(); }} aria-label={label}>
+      <X size={14} />
+    </button>
+  );
+}
 
 export type LedgerRecordSection<T> = {
   title: React.ReactNode;
@@ -132,9 +141,7 @@ export function LedgerRecordPanel<T>({
           <div className="ledger-record-panel__title">{title}</div>
           {meta}
         </div>
-        <button type="button" className="ledger-record-panel__close" onClick={onClose} aria-label="상세패널 닫기">
-          <X size={14} />
-        </button>
+        <LedgerPanelCloseButton onClose={onClose} />
       </header>
 
       <div className="ledger-record-panel__body">

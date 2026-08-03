@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
   calculateCashDaily,
+  cashDailyCloseSnapshotMatches,
   closeCashDaily,
   validateCashDailyClose,
+  validateCashDailyCloseInput,
 } from "@/lib/finance/cash-daily";
 import type { CashRow } from "@/lib/finance/cash-ledger";
 
@@ -78,5 +80,36 @@ describe("자금일보 마감", () => {
     expect(daily.unclassifiedCount).toBe(0);
     expect(daily.bundleIncompleteCount).toBe(1);
     expect(validateCashDailyClose(daily)).toContain("묶음 분해 미완료 1건을 자금관리에서 마쳐야 합니다.");
+  });
+
+  it("과거에 대사완료로 저장됐어도 계약성 구성건의 연결이 없으면 현재 규칙으로 다시 막는다", () => {
+    const daily = calculateCashDaily(
+      [row({
+        category: '', inAmt: 100_000, nest: 'bundle-parent',
+        raw: {
+          bundleReviewStatus: '대사완료', bundleFeeAmount: 0,
+          bundleItems: [{ id: '1', party: '고객', amount: 100_000, category: '대여료수입', referenceId: '' }],
+        },
+      })],
+      "2026-07-26",
+      1_000_000,
+      1_100_000,
+    );
+
+    expect(daily.bundleIncompleteCount).toBe(1);
+    expect(validateCashDailyClose(daily)).toContain("묶음 분해 미완료 1건을 자금관리에서 마쳐야 합니다.");
+  });
+
+  it("기초잔액 입력이 없으면 잔액이 우연히 맞아도 마감을 막는다", () => {
+    const daily = calculateCashDaily([], "2026-07-26", 0, 0);
+    expect(validateCashDailyClose(daily)).toEqual([]);
+    expect(validateCashDailyCloseInput(daily, { openingProvided: false }))
+      .toContain("기초잔액이 필요합니다.");
+  });
+
+  it("동일 마감 결과는 중복 저장 대상으로 보지 않고 변경된 결과만 정정 대상으로 본다", () => {
+    const daily = calculateCashDaily([row({ inAmt: 100_000 })], "2026-07-26", 1_000_000, 1_100_000);
+    expect(cashDailyCloseSnapshotMatches({ ...daily, status: "closed" }, daily)).toBe(true);
+    expect(cashDailyCloseSnapshotMatches({ ...daily, inflow: 90_000, status: "closed" }, daily)).toBe(false);
   });
 });

@@ -22,7 +22,7 @@ import { openCar, openFinance, openIngest, openReceivables } from '@/lib/ui-bus'
 import { useTableSelection } from '@/lib/use-table-selection';
 import { useRowSelection, useCtrlASelectAll } from '@/lib/use-row-selection';
 import {
-  Badge, Btn, C, ContextMenu, type ContextMenuItem, LedgerFilterButton, LedgerFilterFields, LedgerFilterPanel, LedgerFrame, LedgerRecordPanel, LedgerSelectionBar, PageLoading, PeriodBar, Search, useSheetExport, won,
+  Badge, Btn, C, ContextMenu, type ContextMenuItem, LedgerActiveFilters, LedgerFilterButton, LedgerFilterFields, LedgerFilterPanel, LedgerFrame, LedgerRecordPanel, LedgerSelectionBar, PageLoading, PeriodBar, Search, useSheetExport, won,
   useConfirm,
   type LedgerColView,
 } from '@/components/ui';
@@ -135,10 +135,8 @@ function RiskLedgerInner() {
 
   const latest = useMemo(() => latestDateOf(allRows, (r) => r.dueDate, TODAY), [allRows]);
   const counts = useMemo(() => countRiskSheetGroups(searched), [searched]);
-  const filterCount = countActiveFilters(
-    { ...detailFilters, group: group === '전체' ? '' : group },
-    RISK_FILTER_DEFS,
-  );
+  const activeFilterValues = { ...detailFilters, group: group === '전체' ? '' : group };
+  const filterCount = countActiveFilters(activeFilterValues, RISK_FILTER_DEFS);
 
   const rowById = useMemo(() => new Map(rows.map((r) => [r.id, r])), [rows]);
   const selectedRows = useMemo(
@@ -245,6 +243,19 @@ function RiskLedgerInner() {
               style={{ width: mobile ? 160 : 280, flexShrink: 0 }}
             />
             <LedgerFilterButton open={filterOpen} count={filterCount} onClick={() => setFilterOpen((o) => !o)} />
+            {!filterOpen && <LedgerActiveFilters
+              defs={RISK_FILTER_DEFS}
+              values={activeFilterValues}
+              onClear={(key) => {
+                if (key === 'group') {
+                  setGroup('전체');
+                  setDetailFilters((prev) => ({ ...prev, group: '', kind: '', status: '' }));
+                  return;
+                }
+                setDetailFilters((prev) => ({ ...prev, [key]: '' }));
+              }}
+              onClearAll={() => { setDetailFilters(emptyFilterValues(RISK_FILTER_DEFS)); setGroup('전체'); }}
+            />}
             <PeriodBar latest={latest || TODAY} initial="전체" size="sm" onRange={setRange} />
           </>
         )}

@@ -84,7 +84,7 @@ export function StaffConsole() {
               {companies.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}
             </Select>
             <Btn size="sm" variant={s.status === '활성' ? 'ghost' : 'danger'} disabled={busyId === s.id} onClick={() => { void toggleSuspend(s); }}>{busyId === s.id ? '처리 중…' : (s.status === '활성' ? '정지' : '활성화')}</Btn>
-            <button onClick={() => del(s.id, s.name)} title="삭제" style={{ border: 'none', background: 'none', cursor: 'pointer', color: C.faint, display: 'inline-flex', padding: 4 }} onMouseEnter={(e) => (e.currentTarget.style.color = C.danger)} onMouseLeave={(e) => (e.currentTarget.style.color = C.faint)}><Trash2 size={15} /></button>
+            <Btn size="sm" variant="danger" iconOnly tip="직원 제거" onClick={() => del(s.id, s.name)}><Trash2 size={14} /></Btn>
           </div>
         ) : (
           // ── 읽기 전용 ──

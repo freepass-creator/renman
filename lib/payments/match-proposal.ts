@@ -3,6 +3,7 @@ import type { BankTransaction, Contract } from './types';
 import { findCandidates, type MatchCandidate } from './receipt-match';
 import { autoMatchAll, type AutoMatchResult } from './receipt-match';
 import { buildMatchContract } from '@/lib/contract-ops';
+import { canReviewReceivableMatch } from '@/lib/finance/cash-rules';
 
 export type MatchProposalState = '자동후보' | '복수후보' | '검토후보' | '미매칭' | '해당없음';
 export type MatchProposal = {
@@ -20,7 +21,81 @@ export function toBankTransaction(rec: EntityRecord): BankTransaction {
     counterparty: String(rec.counterparty || rec.memo || ''), memo: String(rec.memo || ''),
     source: method, method, companyCode: String(rec.companyId || ''),
     matchedContractId: rec.matchedContractId ? String(rec.matchedContractId) : undefined,
+    settlementId: rec.settlementId ? String(rec.settlementId) : undefined,
+    settlementRole: rec.settlementRole === 'deposit' || rec.settlementRole === 'item' ? rec.settlementRole : undefined,
   } as BankTransaction;
+}
+
+export type MatchBacklogScope = 'date' | '30d' | 'all';
+export type MatchBacklogRow = {
+  tx: BankTransaction;
+  proposal: MatchProposal;
+  /** 동일 계약·회차 중복까지 제거한 뒤 작업자가 승인할 수 있는 단일 안전후보. */
+  automatic?: AutoMatchResult;
+};
+
+function moveDate(iso: string, days: number): string {
+  const [year, month, day] = iso.split('-').map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
+}
+
+function isInScope(txDate: string, anchorDate: string, scope: MatchBacklogScope): boolean {
+  const date = txDate.slice(0, 10);
+  if (!date) return false;
+  if (scope === 'date') return date === anchorDate;
+  if (scope === '30d') return date >= moveDate(anchorDate, -29) && date <= anchorDate;
+  return true;
+}
+
+/**
+ * 자금일보의 미수 입금 처리대기열을 만든다.
+ * 후보를 계산할 뿐 원장이나 계약을 수정하지 않는다.
+ */
+export function buildMatchBacklog(
+  transactionRecords: EntityRecord[],
+  contractRecords: EntityRecord[],
+  anchorDate: string,
+  scope: MatchBacklogScope,
+): MatchBacklogRow[] {
+  const scoped = transactionRecords
+    .map((record) => ({ record, tx: toBankTransaction(record) }))
+    .filter(({ record, tx }) =>
+      Boolean(tx.id && tx.companyCode)
+      && tx.amount > 0
+      && !(tx.withdraw && tx.withdraw > 0)
+      && !tx.matchedContractId
+      && canReviewReceivableMatch(record.category || record.subject, tx.settlementRole)
+      && isInScope(tx.txDate, anchorDate, scope));
+
+  const contractsByCompany = new Map<string, Contract[]>();
+  for (const record of contractRecords) {
+    const companyId = String(record.companyId || '');
+    if (!companyId) continue;
+    const contract = buildMatchContract(record, anchorDate);
+    const group = contractsByCompany.get(companyId);
+    if (group) group.push(contract);
+    else contractsByCompany.set(companyId, [contract]);
+  }
+
+  // 오래된 입금부터 회차를 예약해야 최근 입금이 과거 회차를 먼저 차지하지 않는다.
+  const matchingOrder = [...scoped]
+    .sort((a, b) => a.tx.txDate.localeCompare(b.tx.txDate) || a.tx.id.localeCompare(b.tx.id))
+    .map(({ tx }) => tx);
+  const automaticByTx = new Map(
+    autoMatchScoped(matchingOrder, contractRecords, anchorDate)
+      .map((result) => [String(result.tx.companyCode || '') + ':' + result.tx.id, result]),
+  );
+
+  return scoped.map(({ tx }) => {
+    const proposal = analyzeMatchProposal(tx, contractsByCompany.get(String(tx.companyCode || '')) || []);
+    const automatic = automaticByTx.get(String(tx.companyCode || '') + ':' + tx.id);
+    const safeProposal = proposal.state === '자동후보' && !automatic
+      ? { ...proposal, state: '검토후보' as const, preferred: undefined, reason: '동일 계약 회차에 다른 입금 후보가 있어 확인 필요' }
+      : proposal;
+    return { tx, proposal: safeProposal, automatic };
+  }).sort((a, b) => b.tx.txDate.localeCompare(a.tx.txDate) || b.tx.id.localeCompare(a.tx.id));
 }
 
 /** 후보만 산출한다. 계약·거래를 수정하지 않으며 자동 적용은 자금일보 확인 절차가 담당한다. */

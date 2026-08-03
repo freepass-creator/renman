@@ -174,6 +174,11 @@ export const TYPE_SPECS: Record<string, TypeSpec> = {
 - **payment_account_holder**: 입금계좌 예금주 = 회사명
 - **autopay_day**: "대여료 자동이체일" 라인. 5/10/15/20/25 중 □ 체크된 거 우선. 체크 인식 어려우면 가장 명확한 숫자 1개
 
+### 연체 조치 계약조건
+- **arrears_clause**: 연체·미납 시 경고, 시동제어, 계약해지, 차량회수, 내용증명 또는 법적조치를 정한 조항의 원문을 짧게 보존
+- **warning_after_days / engine_lock_after_days / repossession_after_days / legal_notice_after_days / debt_transfer_after_days**: 해당 조치를 할 수 있는 연체 D+일을 계약서가 숫자로 명시한 경우에만 추출
+- 회사 관행이나 일반적인 기준을 추정하지 말 것. "상당 기간", "즉시"처럼 숫자가 없거나 조치별 일수를 확정할 수 없으면 해당 숫자는 null
+
 ### 자동이체신청서 (CMS, 보통 9페이지)
 - **auto_debit_bank**: 출금은행 (예: "국민은행", "신한은행")
 - **auto_debit_account**: 출금계좌번호 (마스킹/하이픈 포함 그대로)

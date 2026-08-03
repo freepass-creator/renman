@@ -6,7 +6,7 @@ import { useSession } from '@/lib/session';
 import { haptic } from '@/lib/haptics';
 import { C, R, SH, thX, thXR, thXC, thXPin, tdX, tdXR, tdXC, tdXPin, ctrlH, ctrlFs } from './tokens';
 import { ObjCard, Cards, type ObjCardProps } from './misc';
-import { Search } from './controls';
+import { Btn, Search } from './controls';
 
 /**
  * 엑셀 시트 뷰 — 프리패스 ERP4 엑셀뷰 이식(현황 한눈).
@@ -86,9 +86,9 @@ function FilterPop<T>({ col, x, y, rows, sel, onSel, sort, onSort, onClose }: {
   }, [rows, col]);
 
   const shown = entries.filter(([k]) => !q || k.toLowerCase().includes(q.toLowerCase()));
-  const toggle = (v: string) => { const n = new Set(sel); if (n.has(v)) n.delete(v); else n.add(v); onSel(n); };
+  const toggle = (v: string) => { haptic.select(); const n = new Set(sel); if (n.has(v)) n.delete(v); else n.add(v); onSel(n); };
   const isS = (dir: 'asc' | 'desc') => !!sort && sort.key === col.key && sort.dir === dir;
-  const setDir = (dir: 'asc' | 'desc') => onSort(isS(dir) ? null : { key: col.key, dir });
+  const setDir = (dir: 'asc' | 'desc') => { haptic.select(); onSort(isS(dir) ? null : { key: col.key, dir }); };
 
   const btn = (active: boolean): React.CSSProperties => ({
     flex: 1, height: ctrlH(false, 'sm'), fontSize: ctrlFs(false, 'sm'), fontWeight: 600, boxSizing: 'border-box',
@@ -109,7 +109,7 @@ function FilterPop<T>({ col, x, y, rows, sel, onSel, sort, onSort, onClose }: {
           <button type="button" onClick={() => setDir('asc')} style={btn(isS('asc'))}><ChevronUp size={12} strokeWidth={2.4} aria-hidden /> 오름</button>
           <button type="button" onClick={() => setDir('desc')} style={btn(isS('desc'))}><ChevronDown size={12} strokeWidth={2.4} aria-hidden /> 내림</button>
         </div>
-        <Search value={q} onChange={(e) => setQ(e.target.value)} placeholder="값 검색" size="sm" wrapStyle={{ width: '100%', marginBottom: 6 }} />
+        <Search autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder="값 검색" size="sm" wrapStyle={{ width: '100%', marginBottom: 6 }} />
         <div style={{ maxHeight: 240, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 1 }}>
           {shown.length === 0 ? <div style={{ fontSize: 12, color: C.faint, padding: '10px 4px' }}>값 없음</div>
             : shown.map(([v, n]) => {
@@ -129,9 +129,9 @@ function FilterPop<T>({ col, x, y, rows, sel, onSel, sort, onSort, onClose }: {
               );
             })}
         </div>
-        <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
-          <button type="button" onClick={() => { onSel(new Set()); onSort(null); }} style={btn(false)}>초기화</button>
-          <button type="button" onClick={onClose} style={btn(false)}>닫기</button>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 6, marginTop: 8 }}>
+          <Btn size="sm" variant="ghost" onClick={() => { onSel(new Set()); onSort(null); }}>초기화</Btn>
+          <Btn size="sm" variant="ghost" onClick={onClose}>닫기</Btn>
         </div>
       </div>
     </>
@@ -139,13 +139,15 @@ function FilterPop<T>({ col, x, y, rows, sel, onSel, sort, onSort, onClose }: {
 }
 
 export function ExcelSheet<T>({
-  cols, rows, onRow, onRowDoubleClick, rowKey, selectedRowKey,
+  cols, rows, exportRows, onRow, onRowDoubleClick, rowKey, selectedRowKey,
   onView, mode = 'excel', fit = false, rowClickable,
   selectedKeys,
   onRowMouseDown, onRowClickEvent, onRowContextMenu, mobileCard,
 }: {
   cols: SheetCol<T>[];
   rows: T[];
+  /** 화면 성능상 rows를 자를 때 내보내기·헤더필터에는 사용할 전체 행. */
+  exportRows?: T[];
   onRow?: (row: T) => void;
   /**
    * 상세 진입. 데스크톱=더블클릭 · 모바일 카드=한 번 탭.
@@ -193,11 +195,11 @@ export function ExcelSheet<T>({
     if (clickTimer.current) clearTimeout(clickTimer.current);
   }, []);
 
-  const view = React.useMemo(() => {
+  const applyView = React.useCallback((sourceRows: T[]) => {
     const active = Object.entries(colFilter).filter(([, s]) => s.size);
     let out = active.length
-      ? rows.filter((r) => active.every(([k, s]) => { const c = byKey.get(k); return !c || matchCol(c, r, s); }))
-      : rows;
+      ? sourceRows.filter((r) => active.every(([k, s]) => { const c = byKey.get(k); return !c || matchCol(c, r, s); }))
+      : sourceRows;
     const sc = colSort && byKey.get(colSort.key);
     if (sc) {
       const dir = colSort!.dir === 'asc' ? 1 : -1;
@@ -208,9 +210,14 @@ export function ExcelSheet<T>({
       });
     }
     return out;
-  }, [rows, colFilter, colSort, byKey]);
+  }, [colFilter, colSort, byKey]);
+  const view = React.useMemo(() => applyView(rows), [applyView, rows]);
+  const exportView = React.useMemo(
+    () => (exportRows ? applyView(exportRows) : view),
+    [applyView, exportRows, view],
+  );
 
-  React.useEffect(() => { onView?.({ rows: view, cols: visibleCols }); }, [view, visibleCols, onView]);
+  React.useEffect(() => { onView?.({ rows: exportView, cols: visibleCols }); }, [exportView, visibleCols, onView]);
   React.useEffect(() => { setMobileLimit(25); }, [rows, colFilter, colSort]);
 
   if (mobile || mode === 'card') {
@@ -254,9 +261,10 @@ export function ExcelSheet<T>({
   }
 
   const openC = openCol && byKey.get(openCol.key);
+  const filterSourceRows = exportRows ?? rows;
   // 팝오버 개수는 «내 열을 뺀» 나머지 필터 결과로 센다 — 내 선택 때문에 목록이 쪼그라들지 않게(엑셀 동작).
   const popRows = openCol
-    ? rows.filter((r) => Object.entries(colFilter).every(([k, s]) => {
+    ? filterSourceRows.filter((r) => Object.entries(colFilter).every(([k, s]) => {
       if (k === openCol.key || !s.size) return true;
       const c = byKey.get(k); return !c || matchCol(c, r, s);
     }))
@@ -289,12 +297,24 @@ export function ExcelSheet<T>({
                   <th
                     key={c.key}
                     className={`excel-sheet__col excel-sheet__col--p${c.priority ?? Math.min(4, Math.floor(colIndex / 3) + 1)}`}
-                    style={{ ...base, cursor: canFilter ? 'pointer' : 'default', color: on ? C.brand : base.color, userSelect: 'none' }}
-                    title={canFilter ? `${c.label} 필터` : undefined}
-                    onClick={canFilter ? (e) => {
-                      const rc = e.currentTarget.getBoundingClientRect();
-                      setOpenCol((o) => (o?.key === c.key ? null : { key: c.key, x: rc.left, y: rc.bottom }));
-                    } : undefined}>
+                    style={{ ...base, color: on ? C.brand : base.color, userSelect: 'none' }}>
+                    {canFilter ? (
+                    <button
+                      type="button"
+                      aria-haspopup="dialog"
+                      aria-expanded={openCol?.key === c.key}
+                      title={`${c.label} 필터`}
+                      onClick={(event) => {
+                        haptic.tap();
+                        const rc = event.currentTarget.getBoundingClientRect();
+                        setOpenCol((current) => (current?.key === c.key ? null : { key: c.key, x: rc.left, y: rc.bottom }));
+                      }}
+                      style={{
+                        display: 'flex', alignItems: 'center', justifyContent: c.align === 'r' ? 'flex-end' : c.align === 'c' ? 'center' : 'flex-start',
+                        width: '100%', minWidth: 0, padding: 0, border: 'none', background: 'transparent',
+                        color: 'inherit', cursor: 'pointer', font: 'inherit', fontWeight: 'inherit', textAlign: c.align === 'r' ? 'right' : c.align === 'c' ? 'center' : 'left',
+                      }}
+                    >
                     <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
                       {c.label}
                       {colSort?.key === c.key && (colSort.dir === 'asc'
@@ -302,6 +322,8 @@ export function ExcelSheet<T>({
                         : <ChevronDown size={11} strokeWidth={2.4} aria-hidden />)}
                       {!!colFilter[c.key]?.size && <ChevronDown size={10} strokeWidth={2.4} aria-hidden />}
                     </span>
+                    </button>
+                    ) : <span>{c.label}</span>}
                   </th>
                 );
               })}

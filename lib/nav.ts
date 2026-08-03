@@ -56,7 +56,7 @@ export const PAGE_IA: PageIA[] = [
   { href: '/ingest', label: DATA_CENTER_TITLE, role: 'input', layer: 'mixed', tier: '라이트', view: '원본 투입·분석·연결·반영', grab: 'batch', grabHow: '담기' },
 
   // ── 원장 ──
-  { href: '/asset', label: '자산관리', role: 'view', layer: 'ledger', tier: '라이트', assetKind: 'physical', view: '차량 1대=1행 · 더블클릭 상세패널', grab: 'both', grabHow: '생성·패널수정 · 마이그레이션' },
+  { href: '/asset', label: '자산관리', role: 'view', layer: 'ledger', tier: '라이트', assetKind: 'physical', view: '차량 1대=1행 · 더블클릭 상세패널', grab: 'both', grabHow: '생성·패널수정 · 데이터센터' },
   { href: '/contract', label: '계약관리', role: 'view', layer: 'ledger', tier: '라이트', assetKind: 'contract', view: '계약 1건=1행 · 더블클릭 상세패널', grab: 'both', grabHow: '생성·패널수정' },
   { href: '/cash', label: '자금관리', role: 'view', layer: 'ledger', tier: '라이트', assetKind: 'cash', view: '계좌·카드·자동이체 Cash-in/out · 묶음 1차 분류·대사', grab: 'batch', grabHow: '단건·대량 입력 · 담기' },
 
@@ -90,7 +90,7 @@ export function pageLayer(role: PageRole): DataLayer | 'mixed' {
   return layerOfPageRole(role);
 }
 
-export type NavItem = { href: string; label: string; icon: LucideIcon; tier?: Tier; hqOnly?: boolean; webOnly?: boolean };
+export type NavItem = { href: string; label: string; icon: LucideIcon; tier?: Tier; hqOnly?: boolean; webOnly?: boolean; devOnly?: boolean };
 export type NavGroup = { title: string; items: NavItem[] };
 
 /**
@@ -111,6 +111,7 @@ export type ErpMenuNode = {
   icon: LucideIcon;
   tier?: Tier;
   hqOnly?: boolean;
+  devOnly?: boolean;
   children?: ErpMenuNode[];
   views?: MenuView[];
 };
@@ -156,7 +157,7 @@ export const ERP_MENU_TREE: ErpMenuNode[] = [
     icon: Building2,
     children: [
       { id: 'management', label: '경영관리', href: '/management', icon: Building2 },
-      { id: 'dev-tools', label: '개발도구', href: '/dev/data', icon: Database, hqOnly: true },
+      { id: 'dev-tools', label: '개발도구', href: '/dev/data', icon: Database, hqOnly: true, devOnly: true },
       { id: 'settings', label: '설정', href: '/settings', icon: Settings },
     ],
   },
@@ -181,7 +182,7 @@ export const NAV_GROUPS: NavGroup[] = [
   ] },
   { title: '하단', items: [
     { href: '/management', label: '경영관리', icon: Building2, tier: '라이트' },
-    { href: '/dev/data', label: '개발도구', icon: Database, tier: '라이트', hqOnly: true },
+    { href: '/dev/data', label: '개발도구', icon: Database, tier: '라이트', hqOnly: true, devOnly: true },
     { href: '/settings', label: '설정', icon: Settings, tier: '라이트' },
   ] },
 ];

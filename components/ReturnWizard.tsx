@@ -16,7 +16,7 @@ import { toast } from '@/lib/toast';
 import { haptic } from '@/lib/haptics';
 import { resolveWriteCompany, NEED_COMPANY } from '@/lib/scope';
 import { FUEL_LEVELS } from '@/lib/domain/fuel';
-import { Stepper, Btn, Message, won, C, toggleStyle, WizPanel, WizCard, WizField, WizPhotos, wizInput, type Step } from '@/components/ui';
+import { Stepper, Btn, Input, TextArea, PillTabs, Message, won, C, WizPanel, WizCard, WizField, WizPhotos, type Step } from '@/components/ui';
 import { type EntityRecord } from '@/lib/intake/entities';
 import { todayKST as TODAY } from '@/lib/contracts/dates'; // KST 기준 오늘(반납일 기록)
 import { companyLabel } from '@/lib/companies';
@@ -153,19 +153,15 @@ export function ReturnWizard({ contract, vehicle, onClose, onDone }: {
         {step === 1 && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             <WizField label="반납일">
-              <input type="date" value={date} max={TODAY()} onChange={(e) => { const v = e.target.value; setDate(v && v > TODAY() ? TODAY() : v); }} style={wizInput} />
+              <Input type="date" value={date} max={TODAY()} onChange={(e) => { const v = e.target.value; setDate(v && v > TODAY() ? TODAY() : v); }} style={{ width: '100%' }} />
             </WizField>
             <WizField label={<>반납 주행거리 (계기판 km) {baseMileage ? <span style={{ color: C.faint, fontWeight: 400 }}>· 출고 {baseMileage.toLocaleString()}km</span> : null}</>}>
-              <input inputMode="numeric" value={mileage} onChange={(e) => setMileage(e.target.value.replace(/[^\d]/g, ''))} placeholder={baseMileage ? `${baseMileage} 이상` : '예: 47250'} style={{ ...wizInput, fontFamily: 'var(--font-mono)' }} />
+              <Input inputMode="numeric" value={mileage} onChange={(e) => setMileage(e.target.value.replace(/[^\d]/g, ''))} placeholder={baseMileage ? `${baseMileage} 이상` : '예: 47250'} style={{ width: '100%', fontFamily: 'var(--font-mono)' }} />
               {drove != null && <div style={{ marginTop: 6, fontSize: 12.5, color: drove < 0 ? C.danger : C.mute }}>{drove < 0 ? '출고보다 작음 — 확인 필요' : `주행 ${drove.toLocaleString()}km`}</div>}
               {!mileage && <div style={{ marginTop: 6 }}><Message variant="warning">주행거리 미입력 — 초과주행 산출 불가(반납은 가능)</Message></div>}
             </WizField>
             <WizField label={<>반납 연료량 {baseFuel ? <span style={{ color: C.faint, fontWeight: 400 }}>· 출고 {baseFuel}</span> : null}</>}>
-              <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap' }}>
-                {FUEL_LEVELS.map((f) => (
-                  <button key={f} type="button" data-ui="toggle" onClick={() => { setFuel(f); haptic.select(); }} aria-pressed={fuel === f} style={toggleStyle(fuel === f, 'lg')}>{f}</button>
-                ))}
-              </div>
+              <PillTabs size="lg" value={fuel} onChange={setFuel} tabs={FUEL_LEVELS.map((key) => ({ key, label: key }))} />
             </WizField>
           </div>
         )}
@@ -207,7 +203,7 @@ export function ReturnWizard({ contract, vehicle, onClose, onDone }: {
                 : <Row k="보증금 반환액 (임차인 환급)" v={won(settle.refund)} strong />}
             </WizCard>
             <WizField label="정산 특이사항 (손상·연료차액·과태료 등)">
-              <textarea value={note} onChange={(e) => setNote(e.target.value)} placeholder="예: 우측 도어 스크래치, 연료 1/4 부족" rows={3} style={{ ...wizInput, height: 'auto', padding: '10px 12px', fontFamily: 'inherit', resize: 'vertical' }} />
+              <TextArea value={note} onChange={(e) => setNote(e.target.value)} placeholder="예: 우측 도어 스크래치, 연료 1/4 부족" rows={3} />
             </WizField>
             <div style={{ fontSize: 12, color: C.faint, lineHeight: 1.6 }}>※ 정산서(출력)와 동일 계산입니다. 손상·연료차액·미회수 과태료는 특이사항에 남기면 별도 청구 근거가 됩니다.</div>
           </div>

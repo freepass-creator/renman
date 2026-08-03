@@ -10,12 +10,11 @@ import { latestDateOf, summarizeContractLedgerStats } from '@/lib/ledger-stats';
 import { useEntityList } from '@/lib/use-entity-lists';
 import { textMatch } from '@/lib/search-match';
 import {
-  Badge, Btn, C, ContextMenu, type ContextMenuItem, LedgerActions, LedgerCreatePanel, LedgerEditPanel, LedgerFilterButton, LedgerFilterFields, LedgerFilterPanel, LedgerFrame, LedgerRecordPanel, Message, PageLoading, PeriodBar, PillTabs, Search, Select, useSheetExport, won,
+  Badge, Btn, C, ContextMenu, type ContextMenuItem, LedgerActions, LedgerActiveFilters, LedgerCreatePanel, LedgerEditPanel, LedgerFilterButton, LedgerFilterFields, LedgerFilterPanel, LedgerFrame, LedgerRecordPanel, Message, PageLoading, PeriodBar, PillTabs, Search, Select, useSheetExport, won,
   type LedgerFormSection,
 } from '@/components/ui';
 import { useIsMobile } from '@/lib/use-mobile';
 import { useSession } from '@/lib/session';
-import { MigrateDataButton } from '@/components/MigrateDataButton';
 import { openIngest, openReceivables } from '@/lib/ui-bus';
 import { sendNoticeCert } from '@/lib/docs/send-notice';
 import {
@@ -188,15 +187,16 @@ function ContractLedgerInner() {
     ...(isOperator ? [xl.exportItem({ unmasked: true })] : []),
   ];
 
-  const filterCount = countActiveFilters(
-    {
-      ...detailFilters,
-      // '진행'은 계약 원장의 기본 업무 범위다. 사용자가 건 필터로 세지 않는다.
-      bucket: sheetView === '회차' || bucket === '전체' || bucket === '진행' ? '' : bucket,
-      rentalType: sheetView === '회차' || rentalChip === '전체' ? '' : rentalChip,
-    },
-    CONTRACT_FILTER_DEFS,
-  );
+  const activeContractFilterDefs = sheetView === '회차'
+    ? CONTRACT_FILTER_DEFS.filter((def) => def.key === 'scheduleStatus')
+    : CONTRACT_FILTER_DEFS.filter((def) => def.key !== 'scheduleStatus');
+  const activeFilterValues = {
+    ...detailFilters,
+    // '진행'은 계약 원장의 기본 업무 범위다. 사용자가 건 필터로 세지 않는다.
+    bucket: sheetView === '회차' || bucket === '전체' || bucket === '진행' ? '' : bucket,
+    rentalType: sheetView === '회차' || rentalChip === '전체' ? '' : rentalChip,
+  };
+  const filterCount = countActiveFilters(activeFilterValues, activeContractFilterDefs);
 
   const isSchedule = sheetView === '회차';
   const frameCols = isSchedule
@@ -230,6 +230,21 @@ function ContractLedgerInner() {
           style={{ width: mobile ? 160 : 280, flexShrink: 0 }}
         />
         <LedgerFilterButton open={filterOpen} count={filterCount} onClick={() => setFilterOpen((o) => !o)} />
+        {!filterOpen && <LedgerActiveFilters
+          defs={activeContractFilterDefs}
+          values={activeFilterValues}
+          onClear={(key) => {
+            if (key === 'bucket') { setBucket('진행'); setDetailFilters((prev) => ({ ...prev, bucket: '' })); return; }
+            if (key === 'rentalType') { setRentalChip('전체'); setDetailFilters((prev) => ({ ...prev, rentalType: '' })); return; }
+            setDetailFilters((prev) => ({ ...prev, [key]: '' }));
+          }}
+          onClearAll={() => {
+            setDetailFilters(emptyFilterValues(CONTRACT_FILTER_DEFS));
+            setBucket('진행');
+            setRentalChip('전체');
+            setDateBasis('계약일');
+          }}
+        />}
         <PeriodBar key={sheetView} latest={latest} initial={isSchedule ? '월간' : '전체'} size="sm" onRange={setRange} />
       </>}
       filterPanel={filterOpen ? (
@@ -244,9 +259,7 @@ function ContractLedgerInner() {
           onClose={() => setFilterOpen(false)}
         >
           <LedgerFilterFields
-            defs={isSchedule
-              ? CONTRACT_FILTER_DEFS.filter((d) => d.key === 'scheduleStatus')
-              : CONTRACT_FILTER_DEFS.filter((d) => d.key !== 'scheduleStatus')}
+            defs={activeContractFilterDefs}
             values={{
               ...detailFilters,
               bucket: bucket === '전체' ? '' : bucket,
@@ -326,17 +339,47 @@ function ContractLedgerInner() {
           등록된 계약이 없습니다. 계약서는 데이터센터에 먼저 담으세요.
           <div style={{ marginTop: 14, display: 'flex', justifyContent: 'center', gap: 8 }}>
             <Btn size="sm" variant="ghost" onClick={() => openIngest('contract')}><UploadCloud size={14} /> 데이터센터</Btn>
-            <MigrateDataButton size="sm" />
           </div>
         </>}
       cols={frameCols as typeof CONTRACT_MASTER_BASIC_COLS}
       rows={frameRows as typeof rows}
+      exportRows={(isSchedule ? scheduleRows : undefined) as typeof rows | undefined}
       rowKey={(r) => {
         if (isSchedule) return (r as unknown as ScheduleLedgerRow).id;
         const c = r as ReturnType<typeof contractMasterRow>;
         return String(c.raw._key || c.contractNo || '');
       }}
       selectedRowKey={selected ? String(selected.raw._key || selected.contractNo || '') : null}
+      mobileCard={(row) => {
+        if (isSchedule) {
+          const schedule = row as unknown as ScheduleLedgerRow;
+          return {
+            co: isOperator ? schedule.companyId : undefined,
+            badge: schedule.status,
+            badgeTone: schedule.status === '연체' ? 'red' : schedule.status === '부분납' || schedule.status === '예정' ? 'amber' : 'green',
+            plate: schedule.plate || LEDGER_EMPTY.unassigned,
+            carType: `${schedule.contractorName || LEDGER_EMPTY.none} · ${schedule.seq}/${schedule.seqTotal}회차`,
+            fields: [['납기', schedule.dueDate || LEDGER_EMPTY.dash], ['구분', schedule.kind]],
+            right: won(schedule.balance > 0 ? schedule.balance : schedule.charge),
+            rail: schedule.status === '연체' ? 'danger' as const : 'none' as const,
+          };
+        }
+        const contract = row as ReturnType<typeof contractMasterRow>;
+        return {
+          co: isOperator ? contract.companyId : undefined,
+          badge: contract.status,
+          badgeTone: contract.atRisk ? 'red' as const : contract.ended ? 'gray' as const : 'green' as const,
+          plate: contract.plate || LEDGER_EMPTY.unassigned,
+          carType: contract.contractorName || contract.carName || LEDGER_EMPTY.none,
+          fields: [
+            ['계약', contract.contractNo || LEDGER_EMPTY.dash],
+            ['만기', contract.endDate || LEDGER_EMPTY.dash],
+            ...(contract.riskLabel ? [['확인', contract.riskLabel] as [string, string]] : []),
+          ],
+          right: contract.net > 0 ? won(contract.net) : won(contract.monthlyRent),
+          rail: contract.atRisk ? 'danger' as const : 'none' as const,
+        };
+      }}
       onView={xl.onView as (v: { rows: typeof rows; cols: typeof CONTRACT_MASTER_BASIC_COLS }) => void}
       onRowContextMenu={(e) => {
         e.preventDefault();

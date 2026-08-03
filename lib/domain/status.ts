@@ -76,7 +76,7 @@ export function isReturnable(c: EntityRecord): boolean {
 }
 
 /* ── 미수 회수 SLA (구 collection.ts) ── */
-export type CollectionStage = '회수대기' | '경고' | '시동제어' | '내용증명' | '채권화';
+export type CollectionStage = '계약조건 확인' | '회수대기' | '경고' | '시동제어' | '차량회수' | '내용증명' | '채권화';
 export interface CollectionInfo {
   stage: CollectionStage;
   tone: 'gray' | 'amber' | 'orange' | 'red' | 'purple';
@@ -85,13 +85,18 @@ export interface CollectionInfo {
 }
 export interface CollectionSLA { warn?: number; engineLock?: number; notice?: number; debt?: number }
 
-/** 기본 SLA: 경고 D+1 · 시동 D+3 · 내용증명 D+10 · 채권화 D+30 */
+/**
+ * 레거시 호환 판정. 계약별 조건을 명시적으로 넘긴 경우에만 단계를 계산한다.
+ * 조건이 없을 때 업계 관행이나 회사 공통 D+값을 임의 적용하지 않는다.
+ */
 export function collectionStage(overdueDays: number, sla?: CollectionSLA): CollectionInfo {
-  const warn = sla?.warn ?? 1, lock = sla?.engineLock ?? 3, notice = sla?.notice ?? 10, debt = sla?.debt ?? 30;
   const d = Math.max(0, Math.round(overdueDays));
-  if (d < warn) return { stage: '회수대기', tone: 'gray', nextAction: '납부·정산 확인', overdueDays: d };
-  if (d < lock) return { stage: '경고', tone: 'amber', nextAction: '독촉 연락', overdueDays: d };
-  if (d < notice) return { stage: '시동제어', tone: 'orange', nextAction: '시동 제어', overdueDays: d };
-  if (d < debt) return { stage: '내용증명', tone: 'red', nextAction: '내용증명 발송', overdueDays: d };
-  return { stage: '채권화', tone: 'purple', nextAction: '법적조치·채권화', overdueDays: d };
+  if (!sla || Object.values(sla).every((day) => day == null)) {
+    return { stage: '계약조건 확인', tone: 'amber', nextAction: '계약서 연체조항 확인·등록', overdueDays: d };
+  }
+  if (sla.debt != null && d >= sla.debt) return { stage: '채권화', tone: 'purple', nextAction: '법적조치·채권화', overdueDays: d };
+  if (sla.notice != null && d >= sla.notice) return { stage: '내용증명', tone: 'red', nextAction: '내용증명 발송', overdueDays: d };
+  if (sla.engineLock != null && d >= sla.engineLock) return { stage: '시동제어', tone: 'orange', nextAction: '계약조건 확인 후 시동 제어', overdueDays: d };
+  if (sla.warn != null && d >= sla.warn) return { stage: '경고', tone: 'amber', nextAction: '계약상 경고 이행', overdueDays: d };
+  return { stage: '회수대기', tone: 'gray', nextAction: '계약조건 도래 대기', overdueDays: d };
 }

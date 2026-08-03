@@ -1,4 +1,4 @@
-export type DocumentRouteEntity = 'vehicle' | 'contract' | 'insurance' | 'bank_tx' | 'expense' | 'inbox';
+export type DocumentRouteEntity = 'vehicle' | 'contract' | 'insurance' | 'bank_tx' | 'inbox';
 
 export type DocumentRoute = {
   kind: string;
@@ -12,7 +12,7 @@ const rules: Array<{ words: string[]; kind: string; entity: DocumentRouteEntity;
   { words: ['보험증권', '보험가입', '보험계약'], kind: '보험증권', entity: 'insurance', reason: '파일명에서 보험 문서를 식별' },
   { words: ['렌탈계약', '대여계약', '임대차계약', '계약서'], kind: '계약서', entity: 'contract', reason: '파일명에서 계약 문서를 식별' },
   { words: ['계좌거래', '거래내역', '입출금', '통장내역', 'bank'], kind: '계좌거래내역', entity: 'bank_tx', reason: '파일명에서 계좌 거래 자료를 식별' },
-  { words: ['영수증', 'receipt', '세금계산서', '카드전표'], kind: '지출증빙', entity: 'expense', reason: '파일명에서 지출 증빙을 식별' },
+  { words: ['영수증', 'receipt', '세금계산서', '카드전표'], kind: '지출증빙', entity: 'bank_tx', reason: '파일명에서 자금 거래 증빙을 식별' },
   { words: ['서명', 'signature'], kind: '서명', entity: 'contract', reason: '파일명에서 서명 자료를 식별' },
 ];
 

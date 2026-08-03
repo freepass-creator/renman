@@ -13,7 +13,7 @@ import { summarizeFleetStatusStats, latestDateOf } from '@/lib/ledger-stats';
 import { useEntityLists } from '@/lib/use-entity-lists';
 import { textMatch } from '@/lib/search-match';
 import {
-  Btn, C, ContextMenu, type ContextMenuItem, LedgerFilterButton, LedgerFilterFields, LedgerFilterPanel, LedgerFrame, LedgerRecordPanel,
+  Btn, C, ContextMenu, type ContextMenuItem, LedgerActiveFilters, LedgerFilterButton, LedgerFilterFields, LedgerFilterPanel, LedgerFrame, LedgerRecordPanel,
   PeriodBar, Search, useSheetExport, won,
   type LedgerColView,
 } from '@/components/ui';
@@ -99,10 +99,8 @@ export default function StatusPage() {
     [searched, rows],
   );
 
-  const filterCount = countActiveFilters(
-    { ...detailFilters, scope: activeScope === '전체' ? '' : activeScope },
-    FLEET_FILTER_DEFS,
-  );
+  const activeFilterValues = { ...detailFilters, scope: activeScope === '전체' ? '' : activeScope };
+  const filterCount = countActiveFilters(activeFilterValues, FLEET_FILTER_DEFS);
 
   return (
     <>
@@ -118,6 +116,15 @@ export default function StatusPage() {
           style={{ width: mobile ? 160 : 280, flexShrink: 0 }}
         />
         <LedgerFilterButton open={filterOpen} count={filterCount} onClick={() => setFilterOpen((o) => !o)} />
+        {!filterOpen && <LedgerActiveFilters
+          defs={FLEET_FILTER_DEFS}
+          values={activeFilterValues}
+          onClear={(key) => {
+            if (key === 'scope') setScope('전체');
+            setDetailFilters((prev) => ({ ...prev, [key]: '' }));
+          }}
+          onClearAll={() => { setDetailFilters(emptyFilterValues(FLEET_FILTER_DEFS)); setScope('전체'); }}
+        />}
         <PeriodBar latest={latest} initial="전체" size="sm" onRange={setRange} />
       </>}
       filterPanel={filterOpen ? (
@@ -166,6 +173,19 @@ export default function StatusPage() {
       rows={rows}
       rowKey={(r) => `${r.companyId}:${r.plate || r.customer}`}
       selectedRowKey={selected ? `${selected.companyId}:${selected.plate || selected.customer}` : null}
+      mobileCard={(r) => ({
+        co: isOperator ? r.companyId : undefined,
+        badge: r.status,
+        badgeTone: r.tone === 'danger' ? 'red' : r.tone === 'warn' ? 'amber' : r.tone === 'ok' ? 'green' : 'gray',
+        plate: r.plate || LEDGER_EMPTY.unassigned,
+        carType: r.carName || r.ownership || undefined,
+        fields: [
+          ['계약', r.contractState],
+          ['사용처', r.customer || LEDGER_EMPTY.noContract],
+          ...(r.warnings.length ? [['확인', `${r.warnings.length}건`] as [string, string]] : []),
+        ],
+        right: r.net > 0 ? won(r.net) : undefined,
+      })}
       onView={xl.onView}
       onRowContextMenu={(e) => {
         e.preventDefault();

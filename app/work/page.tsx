@@ -8,7 +8,7 @@ import { companyDisplay } from '@/lib/companies';
 import type { EntityRecord } from '@/lib/intake/entities';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
-  Badge, Btn, C, ContextMenu, type ContextMenuItem, LedgerActions, LedgerCreatePanel, LedgerEditPanel, LedgerFilterButton, LedgerFilterFields, LedgerFilterPanel, LedgerFrame, LedgerRecordPanel, PageLoading, Search, won,
+  Badge, Btn, C, ContextMenu, type ContextMenuItem, LedgerActions, LedgerActiveFilters, LedgerCreatePanel, LedgerEditPanel, LedgerFilterButton, LedgerFilterFields, LedgerFilterPanel, LedgerFrame, LedgerRecordPanel, PageLoading, Search, won,
   PeriodBar, useConfirm, useSheetExport, type LedgerColView,
 } from '@/components/ui';
 import { useSession } from '@/lib/session';
@@ -34,11 +34,12 @@ import { WORK_SECTIONS_BY_KIND, workSectionsFor } from '@/lib/work-form-sections
 import { PenaltyBucketPanel } from '@/components/work/PenaltyBucketPanel';
 import {
   WORK_GROUPS, WORK_SOURCE_LABEL,
-  carNameOf, contractMeta, normalizeWorkStatus, parseWorkGroup, summarizeWorkLedgerRows, workGroup,
+  carNameOf, contractMeta, inboxWorkStatus, normalizeWorkStatus, parseWorkGroup, summarizeWorkLedgerRows, workGroup,
+  workAttentionRank, workDueSignal,
   type WorkGroupFilter, type WorkLedgerRow, type WorkSource, type WorkStatus,
 } from '@/lib/work-ledger';
 import {
-  WORK_BASIC_COLS, WORK_ALL_COLS, WORK_DETAIL_SECTIONS,
+  WORK_BASIC_COLS, WORK_ALL_COLS, workDetailSectionsFor, INBOX_DETAIL_SECTIONS,
   PENALTY_BASIC_COLS, PENALTY_ALL_COLS, PENALTY_DETAIL_SECTIONS,
   workStatusTone,
 } from '@/lib/work-cols';
@@ -145,7 +146,7 @@ function WorkLedgerInner() {
         kind,
         group: workGroup(kind),
         target: [plate, carName, customerName, contractNo].filter(Boolean).join(' '),
-        title: String(r.title || r.memo || ''),
+        title: String(r.title || r.description || r.memo || ''),
         workAt: createdAt,
         workDate: createdAt.slice(0, 10),
         createdAt,
@@ -201,9 +202,7 @@ function WorkLedgerInner() {
       const contractNo = String(r.contractNo || meta.contractNo || '');
       const carName = carNameOf(plate, vehicles);
       const kind = String(r.workType || r.kind || '').trim() || '문서검토';
-      let status = normalizeWorkStatus(r.status || (r.matchedAt ? '완료' : '대기'));
-      if (String(r.processingState) === '처리완료') status = '완료';
-      if (!plate && status !== '완료' && status !== '보류') status = '미배정';
+      const status = inboxWorkStatus(r);
       return {
         id: `inbox:${String(r._key || r.id)}`,
         company: companyDisplay(String(r.companyId || '')),
@@ -216,7 +215,7 @@ function WorkLedgerInner() {
         workDate: createdAt.slice(0, 10),
         createdAt,
         updatedAt,
-        dueDate: String(r.dueDate || r.uploadedAt || r.createdAt || '').slice(0, 10),
+        dueDate: String(r.dueDate || '').slice(0, 10),
         status,
         assignee: String(r.assignmentState) === '배정됨' ? String(r.assignee || '') : '',
         amount: Number(r.amount) || 0,
@@ -229,7 +228,9 @@ function WorkLedgerInner() {
     });
     // 기본 정렬 = 최종처리 오래된 순(방치 감지)
     return [...scheduled, ...activities, ...documents]
-      .sort((a, b) => (a.updatedAt || '').localeCompare(b.updatedAt || '') || a.kind.localeCompare(b.kind, 'ko'));
+      .sort((a, b) => workAttentionRank(a, TODAY) - workAttentionRank(b, TODAY)
+        || (a.updatedAt || '').localeCompare(b.updatedAt || '')
+        || a.kind.localeCompare(b.kind, 'ko'));
   }, [workItems, history, inbox, vehicles, contracts]);
 
   const penaltyMode = group === '과태료';
@@ -294,8 +295,8 @@ function WorkLedgerInner() {
     );
   }), [allRows, penaltyMode, penProcess, penKind, group, detailFilters, workFilterMatchers, range.from, range.to, q]);
 
-  const { total: rowTotal, inProgress, unmatched: unmatchedPenalty } = useMemo(
-    () => summarizeWorkLedgerRows(rows),
+  const { total: rowTotal, inProgress, unmatched: unmatchedPenalty, unassigned, overdue } = useMemo(
+    () => summarizeWorkLedgerRows(rows, TODAY),
     [rows],
   );
 
@@ -348,15 +349,13 @@ function WorkLedgerInner() {
       ? def.key === 'group' || def.key === 'penProcess' || def.key === 'penKind'
       : def.key === 'group' || def.key === 'status' || def.key === 'assignee' || def.key === 'source'
   ));
-  const filterCount = countActiveFilters(
-    {
-      ...detailFilters,
-      group: group === '전체' ? '' : group,
-      penProcess: penProcess || '',
-      penKind: penKind || '',
-    },
-    workFilterDefs,
-  );
+  const activeFilterValues = {
+    ...detailFilters,
+    group: group === '전체' ? '' : group,
+    penProcess: penProcess || '',
+    penKind: penKind || '',
+  };
+  const filterCount = countActiveFilters(activeFilterValues, workFilterDefs);
 
   return (
     <>
@@ -384,6 +383,22 @@ function WorkLedgerInner() {
           style={{ width: mobile ? 160 : 280, flexShrink: 0 }}
         />
         <LedgerFilterButton open={filterOpen} count={filterCount} onClick={() => setFilterOpen((o) => !o)} />
+        {!filterOpen && <LedgerActiveFilters
+          defs={workFilterDefs}
+          values={activeFilterValues}
+          onClear={(key) => {
+            if (key === 'group') { setGroupAndUrl('전체'); return; }
+            if (key === 'penProcess') { setPenProcess(null); return; }
+            if (key === 'penKind') { setPenKind(null); return; }
+            setDetailFilters((prev) => ({ ...prev, [key]: '' }));
+          }}
+          onClearAll={() => {
+            setDetailFilters(emptyFilterValues(WORK_FILTER_DEFS));
+            setPenProcess(null);
+            setPenKind(null);
+            setGroupAndUrl('전체');
+          }}
+        />}
         <PeriodBar latest={latest} initial="전체" size="sm" onRange={setRange} />
       </>}
       filterPanel={filterOpen ? (
@@ -433,7 +448,7 @@ function WorkLedgerInner() {
       stats={<span style={{ fontSize: 12.5, color: C.mute }}>
         {penaltyMode
           ? <>과태료 <b>{rowTotal}</b> · 미매칭 <b style={{ color: C.danger }}>{unmatchedPenalty}</b></>
-          : <>전체 <b>{rowTotal}</b> · 진행 <b style={{ color: C.warn }}>{inProgress}</b></>}
+          : <>전체 <b>{rowTotal}</b> · 진행 <b style={{ color: C.warn }}>{inProgress}</b> · 기한경과 <b style={{ color: C.danger }}>{overdue}</b> · 미배정 <b style={{ color: C.danger }}>{unassigned}</b></>}
       </span>}
       colView={colView}
       onColView={setColView}
@@ -449,13 +464,15 @@ function WorkLedgerInner() {
         co: r.company,
         badge: r.status,
         badgeTone: workStatusTone(r.status),
-        rail: r.status === '미배정' ? 'danger' : 'none',
+        rail: r.status === '미배정' || workDueSignal(r.dueDate, r.status, TODAY).state === '기한경과' ? 'danger' : 'none',
         plate: r.plate || undefined,
         name: r.plate ? undefined : (r.target || r.title),
         carType: r.plate ? (r.customerName || r.carName) : r.carName,
         fields: [
           ['업무분류', r.kind || r.group],
-          ['일정', r.dueDate || r.workDate || LEDGER_EMPTY.dash],
+          ['일정', r.dueDate
+            ? `${r.dueDate}${workDueSignal(r.dueDate, r.status, TODAY).label ? ` · ${workDueSignal(r.dueDate, r.status, TODAY).label}` : ''}`
+            : r.workDate || LEDGER_EMPTY.dash],
           ['담당', r.assignee || LEDGER_EMPTY.unassigned],
         ],
         right: r.amount > 0 ? won(r.amount) : undefined,
@@ -466,12 +483,6 @@ function WorkLedgerInner() {
       onRowContextMenu={(e) => {
         e.preventDefault();
         setCtxMenu({ open: true, x: e.clientX, y: e.clientY });
-      }}
-      onRow={(row) => {
-        // 표 클릭 = 우측 상세패널만 (다른 페이지 이동 없음)
-        setCreating(false);
-        setEditing(false);
-        setSelected(row);
       }}
       onRowDoubleClick={(row) => {
         setCreating(false);
@@ -519,15 +530,18 @@ function WorkLedgerInner() {
           onClose={() => setCreating(false)}
           onSaved={() => reload()}
         />
-      ) : selected && editing && selected.source === 'work_item' ? (
+      ) : selected && editing && (selected.source === 'work_item' || selected.source === 'inbox') ? (
         <LedgerEditPanel
-          key={`edit-work:${selected.id}`}
-          entityKey="work_item"
+          key={`edit-${selected.source}:${selected.id}`}
+          entityKey={selected.source === 'inbox' ? 'inbox' : 'work_item'}
           title={selected.title || '업무'}
-          sections={workSectionsFor(selected.kind)}
-          sectionsByKind={WORK_SECTIONS_BY_KIND}
-          kindField="category"
-          fallbackKind="기타"
+          sections={selected.source === 'inbox' ? [
+            { title: '담당·기한', fields: ['assignee', 'dueDate'], open: true },
+            { title: '확인 메모', fields: ['note'] },
+          ] : workSectionsFor(selected.kind)}
+          sectionsByKind={selected.source === 'inbox' ? undefined : WORK_SECTIONS_BY_KIND}
+          kindField={selected.source === 'inbox' ? 'kind' : 'category'}
+          fallbackKind={selected.source === 'inbox' ? '문서' : '기타'}
           record={selected.raw}
           onClose={() => setEditing(false)}
           onSaved={() => { setEditing(false); setSelected(null); reload(); }}
@@ -550,16 +564,28 @@ function WorkLedgerInner() {
           title={selected.title || selected.kind}
           identity={selected.source === 'penalty'
             ? `${selected.plate || LEDGER_EMPTY.unassigned} · ${selected.driverName || LEDGER_EMPTY.unmatched}`
+            : selected.source === 'inbox'
+              ? `수집 문서 · ${selected.assignee || LEDGER_EMPTY.unassigned}`
             : `${selected.plate || LEDGER_EMPTY.unassigned} · ${selected.customerName || LEDGER_EMPTY.none}`}
           statusBadge={<Badge tone={workStatusTone(selected.status)}>{selected.status}</Badge>}
           row={selected}
           cols={selected.source === 'penalty' ? PENALTY_ALL_COLS : WORK_ALL_COLS}
-          sections={selected.source === 'penalty' ? PENALTY_DETAIL_SECTIONS : WORK_DETAIL_SECTIONS}
+          sections={selected.source === 'penalty'
+            ? PENALTY_DETAIL_SECTIONS
+            : selected.source === 'inbox' ? INBOX_DETAIL_SECTIONS : workDetailSectionsFor(selected.kind)}
           onClose={() => setSelected(null)}
           actions={(
             <>
               {selected.source === 'work_item' ? (
                 <Btn size="sm" onClick={() => setEditing(true)}><Pencil size={14} /> 이어서 수정</Btn>
+              ) : null}
+              {selected.source === 'inbox' ? (
+                <>
+                  <Btn size="sm" href={`/inbox?open=${encodeURIComponent(String(selected.raw._key || selected.raw.id || ''))}`}>
+                    <FileText size={14} /> 확인·매칭
+                  </Btn>
+                  <Btn size="sm" variant="ghost" onClick={() => setEditing(true)}><Pencil size={14} /> 담당·기한</Btn>
+                </>
               ) : null}
               {selected.source === 'penalty' && matchedDocs > 0 ? (
                 <Btn size="sm" variant="ghost" href="/penalty/docs">

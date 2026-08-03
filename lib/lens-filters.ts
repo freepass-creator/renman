@@ -46,7 +46,7 @@ export const LENS_FILTERS: Record<string, FacetGroup[]> = {
       { label: '계약유지' }, { label: '계약종료' },
     ] },
     { dim: '연체단계', chips: [
-      { label: '회수대기' }, { label: '경고' }, { label: '시동제어' }, { label: '내용증명' }, { label: '채권화' },
+      { label: '계약조건 확인' }, { label: '회수대기' }, { label: '경고' }, { label: '시동제어' }, { label: '차량회수' }, { label: '내용증명' }, { label: '채권화' },
     ] },
     { dim: '연체기간', chips: [
       { label: '1~29일' }, { label: '30~89일' }, { label: '90일+' },
@@ -82,6 +82,8 @@ export const LENS_FILTERS: Record<string, FacetGroup[]> = {
     { dim: '심각도', chips: [{ label: '위험' }, { label: '주의' }] },
     { dim: '종류', chips: [
       { label: '필수누락' }, { label: '만기' }, { label: '고아' }, { label: '날짜역전' }, { label: '미납' }, { label: '보험불일치' }, { label: '반납지남' },
+      { label: '번호오기입' }, { label: '정체불명' }, { label: '무보험' }, { label: '서류미비' },
+      { label: '차종불일치' }, { label: '대여료불일치' }, { label: '연령구간상승' },
     ] },
   ],
 };
@@ -158,6 +160,13 @@ export function riskKindMatch(selected: Set<string>, kind: string): boolean {
     미납: ['미수'],
     보험불일치: ['보험불일치'],
     반납지남: ['반납지남'],
+    번호오기입: ['번호오기입'],
+    정체불명: ['정체불명'],
+    무보험: ['무보험'],
+    서류미비: ['서류미비'],
+    차종불일치: ['차종불일치'],
+    대여료불일치: ['대여료불일치'],
+    연령구간상승: ['연령구간상승'],
   };
   return kinds.some((lab) => (map[lab] || [lab]).includes(kind));
 }

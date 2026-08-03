@@ -10,7 +10,7 @@ import { useBusyAction } from '@/lib/use-busy-action';
 import { safeUpdate } from '@/lib/safe-update';
 import { selectedInDim } from '@/lib/lens-filters';
 import { textMatch } from '@/lib/search-match';
-import { Badge, Btn, C, LedgerFrame, LedgerRecordPanel, LedgerSelectionBar, Search, won, useConfirm, type LedgerColView } from '@/components/ui';
+import { Badge, Btn, C, LedgerActiveFilterTags, LedgerFilterButton, LedgerFrame, LedgerRecordPanel, LedgerSelectionBar, Search, won, useConfirm, type LedgerColView } from '@/components/ui';
 import { FacetRail } from '@/components/FacetRail';
 import { WorkbenchBar } from '@/components/WorkbenchBar';
 import { WorkHubBack } from '@/components/WorkHubTabs';
@@ -26,7 +26,7 @@ import { commitUpdate } from '@/lib/commit';
 import { resolveWriteCompany, NEED_COMPANY } from '@/lib/scope';
 import { useSecOrder } from '@/lib/use-sec-order';
 import {
-  buildReceivablesWorkbench, countReceivableFacets, noticeTodoRows,
+  buildReceivablesWorkbench, countReceivableFacets, engineLockDue, noticeTodoRows,
   type ReceivableRow,
 } from '@/lib/receivables-ledger';
 import { Check } from 'lucide-react';
@@ -42,7 +42,7 @@ const RECV_SECS = ['recv-status', 'recv-list'] as const;
 
 // 미수 워크벤치 = 회수 파트의 "딱 여기만" 메인. 미수율이 핵심축. 자금(수납)과 연동돼 자동 갱신.
 // 담당자가 어떻게 관리했는지(내용증명 발송·시동제어 여부·최근 연락)가 보이고, 그 자리에서 조치.
-const STONE: Record<string, 'gray' | 'amber' | 'orange' | 'red' | 'purple'> = { 회수대기: 'gray', 경고: 'amber', 시동제어: 'orange', 내용증명: 'red', 채권화: 'purple' };
+const STONE: Record<string, 'gray' | 'amber' | 'orange' | 'red' | 'purple'> = { '계약조건 확인': 'amber', 회수대기: 'gray', 경고: 'amber', 시동제어: 'orange', 차량회수: 'red', 내용증명: 'red', 채권화: 'purple' };
 
 export default function ReceivablesPage() {
   const { companyId, scopeAll, user } = useSession();
@@ -177,8 +177,7 @@ export default function ReceivablesPage() {
 
   const selectedKey = selected ? receivableRowKey(selected) : null;
   const selectedImmob = !!selected?.rec.engineDisabled;
-  const selectedNeedLock = !!selected && !selected.v.ended && !selectedImmob
-    && (selected.st.stage === '시동제어' || selected.st.stage === '내용증명' || selected.st.stage === '채권화');
+  const selectedNeedLock = !!selected && !selectedImmob && engineLockDue(selected);
   const selectedLogOpen = !!selectedKey && logKey === selectedKey;
 
   return (
@@ -190,14 +189,13 @@ export default function ReceivablesPage() {
           <>
             <Search
               size="sm"
-              placeholder="고객·차량·계약·연체단계"
+              placeholder="고객·차량·계약·계약조건 이행"
               value={q}
               onChange={(event) => setQ(event.target.value)}
               style={{ width: mobile ? 180 : 280, flexShrink: 0 }}
             />
-            <Btn size="sm" variant={filterOpen || facets.size ? 'solid' : 'ghost'} onClick={() => setFilterOpen((open) => !open)}>
-              필터{facets.size ? ` ${facets.size}` : ''}
-            </Btn>
+            <LedgerFilterButton open={filterOpen} count={facets.size} onClick={() => setFilterOpen((open) => !open)} />
+            {!filterOpen && <LedgerActiveFilterTags values={[...facets]} onClear={toggleFacet} onClearAll={resetFacets} />}
           </>
         )}
         filterPanel={filterOpen && !loading ? (
@@ -233,15 +231,14 @@ export default function ReceivablesPage() {
           name: String(row.rec.contractorName || '—'),
           carType: String(row.rec.plate || ''),
           fields: [
-            ['계약상태', receivableContractState(row)],
+            ['미수분류', receivableContractState(row)],
             ['다음조치', receivableNextAction(row)],
           ],
           right: won(row.v.net),
         })}
-        selectionBar={(
-          <div style={{ visibility: sel.size > 0 ? 'visible' : 'hidden', flexShrink: 0 }} aria-hidden={sel.size > 0 ? undefined : true}>
+        selectionBar={sel.size > 0 ? (
             <LedgerSelectionBar
-              count={sel.size || 1}
+              count={sel.size}
               onSelectAll={() => sel.selectAll(noticeTodoFiltered.map(receivableRowKey))}
               onClear={clearSel}
             >
@@ -254,8 +251,7 @@ export default function ReceivablesPage() {
                 {scopeAll ? '법인 선택 후 내용증명' : `내용증명 일괄${noticeTargets.length ? ` (${noticeTargets.length})` : ''}`}
               </Btn>
             </LedgerSelectionBar>
-          </div>
-        )}
+        ) : null}
         onRowDoubleClick={(row) => {
           setSelected(row);
           setLogKey(null);

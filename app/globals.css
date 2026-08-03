@@ -2583,6 +2583,13 @@ kbd {
   flex-direction: column;
   align-self: stretch;
 }
+
+/* Keep the sheet origin stable between the first and second click of a double-click.
+   Multi-select pages otherwise insert the action bar after click one and move the row. */
+.ledger-selection-slot {
+  min-height: 47px;
+  flex: 0 0 auto;
+}
 /* 시트 안 표·빈상태·로딩이 패널과 같은 높이로 늘어나게 */
 .ledger-workspace__sheet > .excel-sheet,
 .ledger-workspace__sheet > [role='status'] {

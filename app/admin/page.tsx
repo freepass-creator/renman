@@ -35,9 +35,11 @@ export default function AdminPage() {
 
       <AccountAliases />
 
-      <Panel title="계정 (dev)">
-        <DetailGrid rows={DEV_USERS.map((u) => [u.name, `${roleLabel(u.role)} · ${u.email} · ${u.companyId ? companyLabel(u.companyId) : '전 법인'}`])} />
-      </Panel>
+      {process.env.NODE_ENV !== 'production' && (
+        <Panel title="계정 (dev)">
+          <DetailGrid rows={DEV_USERS.map((u) => [u.name, `${roleLabel(u.role)} · ${u.email} · ${u.companyId ? companyLabel(u.companyId) : '전 법인'}`])} />
+        </Panel>
+      )}
 
       <Panel title="거래처">
         <DetailEmpty>거래처(정비·보험·GPS·매입처) 마스터는 엔티티 추가 예정.</DetailEmpty>

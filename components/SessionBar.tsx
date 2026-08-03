@@ -20,9 +20,9 @@ const OPERATOR_BRAND = 'teamjpk';
 const APP_VERSION = '6.0.0';
 
 // 메뉴 = lib/nav NAV_GROUPS SSOT (현황=보기 · 업무=손대기 · 경영=지표).
-//   hqOnly 항목(개발도구 등)은 본사(마스터)에게만 노출 — 직원 계정엔 숨김.
+//   hqOnly 항목은 본사(마스터)에게만, devOnly 항목은 개발 빌드에서만 노출.
 const navGroups = (isOperator: boolean, mobile = false) => NAV_GROUPS
-  .map((g) => ({ ...g, items: g.items.filter((it) => tierIncludes(it.tier ?? '라이트') && (!it.hqOnly || isOperator) && !(mobile && it.webOnly)) }))
+  .map((g) => ({ ...g, items: g.items.filter((it) => tierIncludes(it.tier ?? '라이트') && (!it.hqOnly || isOperator) && (!it.devOnly || process.env.NODE_ENV !== 'production') && !(mobile && it.webOnly)) }))
   .filter((g) => g.items.length > 0);
 
 function NavMenu() {

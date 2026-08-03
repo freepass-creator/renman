@@ -1,5 +1,9 @@
 import type { CashRow } from "./cash-ledger";
 import { isUnclassified } from "@/lib/payments/ledger-subjects";
+import { requiresContractLink } from "./cash-rules";
+import { summarizeStoredCashBundle } from "./cash-bundle";
+
+export { requiresContractLink } from "./cash-rules";
 
 export type CashDailyStatus = "open" | "reviewing" | "closed" | "corrected";
 export type CashDaily = {
@@ -17,11 +21,6 @@ export type CashDaily = {
   unmatchedContractCount: number;
   status: CashDailyStatus;
 };
-
-/** 계약·회차까지 연결되어야 완료되는 렌탈 영업 입금. 기타수입·이체는 계약 매칭 대상이 아니다. */
-export function requiresContractLink(category: unknown): boolean {
-  return /대여료|임대료|보증금|카드매출|미수금회수/.test(String(category || ''));
-}
 
 export function calculateCashDaily(
   rows: CashRow[],
@@ -51,7 +50,7 @@ export function calculateCashDaily(
     unclassifiedCount: selected.filter((r) => r.nest !== 'bundle-parent' && isUnclassified(r.category))
       .length,
     bundleIncompleteCount: selected.filter((r) =>
-      r.nest === 'bundle-parent' && String(r.raw.bundleReviewStatus || '') !== '대사완료',
+      r.nest === 'bundle-parent' && summarizeStoredCashBundle(r).status !== '대사완료',
     ).length,
     missingEvidenceCount: selected.filter(
       (r) => r.outAmt > 0 && !r.raw.documentId && !r.raw.evidenceUrl,
@@ -84,6 +83,31 @@ export function validateCashDailyClose(daily: CashDaily): string[] {
   if (daily.unmatchedContractCount)
     errors.push(`계약 미연결 입금 ${daily.unmatchedContractCount}건을 연결해야 합니다.`);
   return errors;
+}
+
+/** 입력 UI와 배치 마감이 같은 필수값 규칙을 쓰도록 분리한 최종 마감 검증. */
+export function validateCashDailyCloseInput(
+  daily: CashDaily,
+  options: { openingProvided: boolean },
+): string[] {
+  return [
+    ...(options.openingProvided ? [] : ['기초잔액이 필요합니다.']),
+    ...validateCashDailyClose(daily),
+  ];
+}
+
+const CLOSE_SNAPSHOT_FIELDS = [
+  'opening', 'inflow', 'outflow', 'expectedClosing', 'actualClosing', 'difference',
+  'transactionCount', 'unclassifiedCount', 'bundleIncompleteCount',
+  'missingEvidenceCount', 'unmatchedContractCount',
+] as const;
+
+/** 같은 회사·일자의 동일 마감 결과를 다시 저장하지 않기 위한 멱등성 판정. */
+export function cashDailyCloseSnapshotMatches(
+  saved: Partial<CashDaily>,
+  next: CashDaily,
+): boolean {
+  return CLOSE_SNAPSHOT_FIELDS.every((key) => Number(saved[key]) === Number(next[key]));
 }
 
 export function closeCashDaily(daily: CashDaily): CashDaily {

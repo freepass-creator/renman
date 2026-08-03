@@ -16,7 +16,7 @@ import { resolveWriteCompany, NEED_COMPANY } from '@/lib/scope';
 import { todayKST } from '@/lib/contracts/dates';
 import { toast } from '@/lib/toast';
 import FileDrop from '@/components/FileDrop';
-import { Btn, Badge, C, fieldStyle, ctrlH, ctrlInputFs, SPACE_M } from '@/components/ui';
+import { Btn, Input, TextArea, Badge, C, SPACE_M } from '@/components/ui';
 import { companyDisplay, companyTone } from '@/lib/companies';
 import { useIsMobile } from '@/lib/use-mobile';
 
@@ -122,8 +122,6 @@ export function QuickInput({ onDone, onCancel }: { onDone: () => void; onCancel:
   }
 
   const canSave = !!textTrim || !!file;
-  const h = ctrlH(mobile, 'sm');
-
   return (
     <div style={{
       border: `1px solid ${C.line}`, borderRadius: 'var(--radius)', background: C.card,
@@ -133,7 +131,8 @@ export function QuickInput({ onDone, onCancel }: { onDone: () => void; onCancel:
         <div style={{
           display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center',
         }}>
-          <input
+          <Input
+            size="sm"
             value={picked ? picked.plate : q}
             readOnly={!!picked}
             onChange={(e) => { setQ(e.target.value); setPicked(null); setSel(0); setListOpen(true); }}
@@ -147,14 +146,7 @@ export function QuickInput({ onDone, onCancel }: { onDone: () => void; onCancel:
               else if (e.key === 'Enter' && hits[sel]) { e.preventDefault(); pick(hits[sel]); }
             }}
             placeholder="차량번호 검색"
-            style={{
-              width: mobile ? '100%' : 180, height: h, boxSizing: 'border-box',
-              padding: mobile ? '0 12px' : '0 10px',
-              border: `1px solid ${C.line}`, borderRadius: 'var(--radius)',
-              background: picked ? C.bg : C.card, color: C.ink, fontSize: ctrlInputFs(mobile, 'sm'),
-              fontFamily: picked ? 'var(--font-mono)' : 'inherit', fontWeight: picked ? 700 : 400,
-              outline: 'none',
-            }}
+            style={{ width: mobile ? '100%' : 180, background: picked ? C.bg : C.card, fontFamily: picked ? 'var(--font-mono)' : 'inherit', fontWeight: picked ? 700 : 400 }}
           />
 
           {picked ? (
@@ -168,18 +160,7 @@ export function QuickInput({ onDone, onCancel }: { onDone: () => void; onCancel:
               <span style={{ fontSize: 13, fontWeight: 800, color: C.ink, fontFamily: 'var(--font-mono)' }}>{picked.plate}</span>
               {carName ? <span style={{ fontSize: 12.5, color: C.mute }}>{carName}</span> : null}
               <Badge tone={/운행/.test(status) ? 'green' : /정비/.test(status) ? 'amber' : 'gray'}>{status}</Badge>
-              <button
-                type="button"
-                aria-label="선택 해제"
-                onClick={clearPick}
-                style={{
-                  marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                  width: 28, height: 28, border: 'none', borderRadius: 'var(--radius)',
-                  background: 'transparent', color: C.mute, cursor: 'pointer',
-                }}
-              >
-                <X size={14} />
-              </button>
+              <span style={{ marginLeft: 'auto' }}><Btn size="sm" variant="ghost" iconOnly tip="선택 해제" onClick={clearPick}><X size={14} /></Btn></span>
             </div>
           ) : null}
         </div>
@@ -225,14 +206,11 @@ export function QuickInput({ onDone, onCancel }: { onDone: () => void; onCancel:
         gap: mobile ? SPACE_M : 10,
         alignItems: 'stretch',
       }}>
-        <textarea
+        <TextArea
           value={text}
           onChange={(e) => setText(e.target.value)}
           placeholder={plate ? `${plate}에 남길 내용` : '텍스트 (차번 없으면 대기함)'}
-          style={{
-            ...fieldStyle(false, mobile), width: '100%', height: 'auto', minHeight: mobile ? 88 : 120,
-            padding: '10px 12px', lineHeight: 1.5, resize: 'vertical', boxSizing: 'border-box',
-          }}
+          style={{ minHeight: mobile ? 88 : 120 }}
         />
         <FileDrop
           onFile={setFile}

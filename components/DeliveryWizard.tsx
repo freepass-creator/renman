@@ -16,7 +16,7 @@ import { toast } from '@/lib/toast';
 import { haptic } from '@/lib/haptics';
 import { resolveWriteCompany, NEED_COMPANY } from '@/lib/scope';
 import { FUEL_LEVELS } from '@/lib/domain/fuel';
-import { Stepper, Btn, Message, C, toggleStyle, WizPanel, WizCard, WizField, WizPhotos, wizInput, type Step } from '@/components/ui';
+import { Stepper, Btn, Input, PillTabs, Message, C, WizPanel, WizCard, WizField, WizPhotos, type Step } from '@/components/ui';
 import { type EntityRecord } from '@/lib/intake/entities';
 import { todayKST as TODAY } from '@/lib/contracts/dates'; // KST 기준 오늘(인도일 기록)
 import { companyLabel } from '@/lib/companies';
@@ -136,17 +136,13 @@ export function DeliveryWizard({ contract, vehicle, onClose, onDone }: {
         {step === 1 && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             <WizField label="인도일">
-              <input type="date" value={date} onChange={(e) => setDate(e.target.value)} style={wizInput} />
+              <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} style={{ width: '100%' }} />
             </WizField>
             <WizField label="출고 주행거리 (계기판 km)">
-              <input inputMode="numeric" value={mileage} onChange={(e) => setMileage(e.target.value.replace(/[^\d]/g, ''))} placeholder="예: 43120" style={{ ...wizInput, fontFamily: 'var(--font-mono)' }} />
+              <Input inputMode="numeric" value={mileage} onChange={(e) => setMileage(e.target.value.replace(/[^\d]/g, ''))} placeholder="예: 43120" style={{ width: '100%', fontFamily: 'var(--font-mono)' }} />
             </WizField>
             <WizField label="출고 연료량">
-              <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap' }}>
-                {FUEL_LEVELS.map((f) => (
-                  <button key={f} type="button" data-ui="toggle" onClick={() => { setFuel(f); haptic.select(); }} aria-pressed={fuel === f} style={toggleStyle(fuel === f, 'lg')}>{f}</button>
-                ))}
-              </div>
+              <PillTabs size="lg" value={fuel} onChange={setFuel} tabs={FUEL_LEVELS.map((key) => ({ key, label: key }))} />
             </WizField>
           </div>
         )}

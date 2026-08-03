@@ -18,7 +18,7 @@ import { Add, type PanelProps } from './shared';
 export function PenaltyPanel({ plate, vd }: PanelProps) {
   const { penalties, contracts, companyId, v } = vd;
   return (
-    <Sec id="v-penalty" title="과태료 · 변경부과" n={penalties.length} right={<span style={{ display: 'inline-flex', gap: 6 }}>{penalties.length ? <Btn variant="ghost" onClick={() => openPrintDoc('penalty', plate)}>변경부과 공문</Btn> : null}<Add type="penalty" plate={plate} label="+ 추가" /></span>}>
+    <Sec id="v-penalty" title="과태료 · 변경부과" n={penalties.length} right={<span style={{ display: 'inline-flex', gap: 6 }}>{penalties.length ? <Btn size="sm" variant="ghost" onClick={() => openPrintDoc('penalty', plate)}>변경부과 공문</Btn> : null}<Add type="penalty" plate={plate} label="+ 추가" /></span>}>
       {penalties.length ? <Cards min={360}>{penalties.map((p, i) => {
         const drv = matchDriver(p, contracts, v ? [v] : []); const st = penaltyStatus(p);
         const NEXT: Record<string, string | null> = { '접수': '임차인확인', '임차인확인': '변경부과신청', '변경부과신청': '변경부과완료', '변경부과완료': '종결', '종결': null };
@@ -45,7 +45,7 @@ export function WorkPanel({ plate, vd }: PanelProps) {
   return (
     <Sec id="v-work" title="차량 수선 · 정비·사고" n={workList.length} tone={workOpen ? 'ok' : undefined}
       desc="정비·사고수리·상품화·세차 — 휴차는 작업상태가 휴차 워크벤치에 자동 반영"
-      right={<Btn variant="ghost" onClick={() => setWorkOpen((o) => !o)}>{workOpen ? '닫기' : '+ 수선/작업'}</Btn>}>
+      right={<Btn size="sm" variant="ghost" onClick={() => setWorkOpen((o) => !o)}>{workOpen ? '닫기' : '+ 수선/작업'}</Btn>}>
       {workOpen ? <WorkForm plate={plate} companyId={target} vehicle={v} idle={!active} onDone={() => setWorkOpen(false)} onCancel={() => setWorkOpen(false)} style={{ marginBottom: 12 }} /> : null}
       {workList.length ? <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>{workList.map((h, i) => {
         const cat = String(h.category || '수선'); const ws = String(h.work_status || ''); const doc = latestDoc(h); const amt = Number(h.amount) || 0;
@@ -83,7 +83,7 @@ export function WorkPanel({ plate, vd }: PanelProps) {
 export function HistoryPanel({ plate, vd }: PanelProps) {
   const { history, logOpen, setLogOpen, active, contracts } = vd;
   return (
-    <Sec id="v-history" title="활동 · 이력" n={history.length} tone={logOpen ? 'ok' : undefined} right={<Btn variant="ghost" onClick={() => setLogOpen((o) => !o)}>{logOpen ? '닫기' : '+ 기록'}</Btn>}>
+    <Sec id="v-history" title="활동 · 이력" n={history.length} tone={logOpen ? 'ok' : undefined} right={<Btn size="sm" variant="ghost" onClick={() => setLogOpen((o) => !o)}>{logOpen ? '닫기' : '+ 기록'}</Btn>}>
       {logOpen ? <QuickLogForm
         ctx={{ plate, ...(active ? { contractNo: String(active.contractNo || active._key || ''), customer: String(active.contractorName || '') } : {}) }}
         onDone={() => setLogOpen(false)} onCancel={() => setLogOpen(false)} style={{ marginBottom: 12 }} /> : null}

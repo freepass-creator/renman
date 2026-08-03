@@ -8,6 +8,7 @@ export * from './misc';
 export * from './obj-row';
 export * from './layout';
 export * from './controls';
+export * from './action-menu';
 export * from './table';
 export * from './excel-sheet';
 export * from './ledger-frame';

@@ -8,6 +8,7 @@ export const WORK_CATEGORIES = [
   '검사',
   '세차',
   '보험',
+  '자금',
   '부품교체',
   '수납이슈',
   '분쟁',

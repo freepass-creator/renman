@@ -82,6 +82,10 @@ export const WORK_SECTIONS_BY_KIND: Record<WorkCreateKind, WorkFormSection[]> = 
     title: '보험', open: true,
     fields: ['insuranceAction', 'insuranceCompany', 'insuranceNo', 'insuranceExpiryDate', 'amount', 'assigneeName', 'description'],
   }),
+  '자금': secs({
+    title: '자금예정', open: true,
+    fields: ['cashFlow', 'expectedAmount', 'dueDate', 'counterparty', 'assigneeName', 'description'],
+  }),
   '부품교체': secs({
     title: '부품교체', open: true,
     fields: ['partName', 'partQty', 'vendor', 'amount', 'mileage', 'nextMaintDate', 'description'],

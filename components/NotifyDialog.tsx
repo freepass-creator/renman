@@ -10,9 +10,8 @@ import { useSession } from '@/lib/session';
 import { saveIntake } from '@/lib/intake';
 import { notifySaved } from '@/lib/ui-bus';
 import { apiAuthHeaders } from '@/lib/api-headers';
-import { Modal, Btn, C, toggleStyle } from '@/components/ui';
+import { Modal, Btn, TextArea, PillTabs, C } from '@/components/ui';
 import { todayKST } from '@/lib/contracts/dates'; // KST 기준 오늘
-import { useIsMobile } from '@/lib/use-mobile';
 
 import type { NotifyRecipient } from '@/lib/notify/types';
 export type { NotifyRecipient };
@@ -59,7 +58,6 @@ export function NotifyDialog({ recipients, onClose, onSent, initialLabel }: {
   initialLabel?: string;
 }) {
   const { user } = useSession();
-  const mobile = useIsMobile();
   const startIdx = (() => {
     if (!initialLabel) return 0;
     const i = TEMPLATES.findIndex((t) => t.label === initialLabel);
@@ -160,25 +158,28 @@ export function NotifyDialog({ recipients, onClose, onSent, initialLabel }: {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12, minWidth: 0 }}>
           <div>
             <div style={lbl}>템플릿</div>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: mobile ? 8 : 6 }}>
-              {TEMPLATES.map((t, i) => {
-                const locked = (!!t.needsDeposit && depositUnknown > 0) || (!!t.needsReceived && depositZero > 0);
-                return (
-                  <button key={t.label} type="button" data-ui="toggle" disabled={locked}
-                    title={locked ? '보증금 실수령액이 기록되지 않아 사용할 수 없습니다' : undefined}
-                    style={{ ...toggleStyle(idx === i, 'sm', mobile), ...(locked ? { opacity: 0.45, cursor: 'not-allowed' } : {}) }}
-                    onClick={() => applyTemplate(i)} aria-pressed={idx === i}>{t.label}{locked ? ' 🔒' : ''}</button>
-                );
+            <PillTabs
+              size="sm"
+              value={String(idx)}
+              onChange={(key) => applyTemplate(Number(key))}
+              tabs={TEMPLATES.map((template, i) => {
+                const locked = (!!template.needsDeposit && depositUnknown > 0) || (!!template.needsReceived && depositZero > 0);
+                return {
+                  key: String(i),
+                  label: `${template.label}${locked ? ' 🔒' : ''}`,
+                  title: locked ? '보증금 실수령액이 기록되지 않아 사용할 수 없습니다' : undefined,
+                  disabled: locked,
+                };
               })}
-            </div>
+            />
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
             <div style={{ ...lbl, display: 'flex', justifyContent: 'space-between' }}>
               <span>본문 · 변수 {'{{고객명}} {{차량번호}} {{미수금}} {{미납회차}} {{월대여료}} {{보증금}}'}</span>
               <span style={{ fontFamily: 'var(--font-mono)', color: isLong ? C.warn : C.mute }}>{body.length}자 · {isLong ? 'LMS' : 'SMS'}</span>
             </div>
-            <textarea value={body} onChange={(e) => setBody(e.target.value)} placeholder="문자 본문을 입력하세요"
-              style={{ flex: 1, minHeight: 150, padding: 12, border: `1px solid ${C.line}`, borderRadius: 8, fontSize: 13, fontFamily: 'inherit', lineHeight: 1.6, resize: 'vertical', outline: 'none', color: C.ink, background: C.card }} />
+            <TextArea value={body} onChange={(e) => setBody(e.target.value)} placeholder="문자 본문을 입력하세요"
+              style={{ flex: 1, minHeight: 150, lineHeight: 1.6 }} />
           </div>
           {targets[0] && (
             <div style={{ fontSize: 12, color: C.mute }}>

@@ -4,8 +4,8 @@
  * 과태료 집계(버킷) 상세 — 유형별 섹션으로 고지서 목록.
  * CMS집금 패널과 대칭: 펼쳐 보기 · 개별 행 열기/삭제 · 처리는 «과태료» 구분에서.
  */
-import { Badge, Btn, C, won } from '@/components/ui';
-import { FileText, Trash2, UploadCloud, X } from 'lucide-react';
+import { Badge, Btn, C, LedgerPanelCloseButton, won } from '@/components/ui';
+import { FileText, Trash2, UploadCloud } from 'lucide-react';
 import {
   groupPenaltiesByKind,
   type PenaltyWorkRow,
@@ -41,9 +41,7 @@ export function PenaltyBucketPanel({
             {rows.length}건 · 미처리 {openN} · 유형별 조회
           </div>
         </div>
-        <button type="button" className="ledger-record-panel__close" onClick={onClose} aria-label="상세패널 닫기">
-          <X size={14} />
-        </button>
+        <LedgerPanelCloseButton onClose={onClose} />
       </header>
 
       <div className="ledger-record-panel__body" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>

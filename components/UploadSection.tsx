@@ -9,7 +9,7 @@ import { useSession } from '@/lib/session';
 import { uploadToInbox } from '@/lib/inbox-upload';
 import { storageReady } from '@/lib/storage';
 import { toast } from '@/lib/toast';
-import { Sec, Btn, C, SCRIM } from '@/components/ui';
+import { Sec, Btn, TextLink, C, SCRIM } from '@/components/ui';
 import { SignaturePad, dataUrlToFile } from '@/components/SignaturePad';
 import { Camera, Paperclip, PenLine } from 'lucide-react';
 
@@ -33,7 +33,7 @@ export function UploadSection() {
 
   return (
     <Sec title="현장 수집" desc="촬영·업로드 → 원본 처리함에서 차량·계약·자금에 연결"
-      right={<button type="button" onClick={() => router.push('/inbox')} style={{ border: 'none', background: 'none', color: C.accent, fontSize: 12, fontWeight: 700, cursor: 'pointer', padding: 0 }}>원본 처리함 →</button>}>
+      right={<TextLink onClick={() => router.push('/inbox')}>원본 처리함 →</TextLink>}>
       <input ref={camRef} type="file" accept="image/*" capture="environment" style={{ display: 'none' }} onChange={(e) => { const f = e.target.files?.[0]; if (f) up(f, '사진'); e.currentTarget.value = ''; }} />
       <input ref={fileRef} type="file" accept="image/*,application/pdf" style={{ display: 'none' }} onChange={(e) => { const f = e.target.files?.[0]; if (f) up(f, '문서'); e.currentTarget.value = ''; }} />
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>

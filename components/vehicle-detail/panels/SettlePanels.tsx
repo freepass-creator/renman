@@ -89,7 +89,7 @@ export function DepositPanel({ plate, vd }: PanelProps) {
   if (!pendDeposit) return null;
   return (
     <Sec id="v-deposit" title="보증금 정산" n={1} tone="warn" desc={`${String(pendDeposit.c.contractorName || '')} · 반납 ${String(pendDeposit.c.returnedDate || '')} · 미정산`}
-      right={<span style={{ display: 'inline-flex', gap: 6 }}><Btn variant="ghost" onClick={() => openPrintDoc('settlement', plate)}>정산서</Btn><Btn onClick={settleDeposit}>보증금 반환 처리</Btn></span>}>
+      right={<span style={{ display: 'inline-flex', gap: 6 }}><Btn size="sm" variant="ghost" onClick={() => openPrintDoc('settlement', plate)}>정산서</Btn><Btn size="sm" onClick={settleDeposit}>보증금 반환 처리</Btn></span>}>
       <KV rows={[
         ['예치 보증금', '', won(pendDeposit.d.deposit)],
         ['미납 대여료(일할)', '', pendDeposit.d.unpaid ? won(pendDeposit.d.unpaid) : '—'],

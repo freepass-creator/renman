@@ -58,7 +58,7 @@ export default function DocsPage() {
   return (
     <Page title="문서 발급" meta={`${companyLabel(companyId)} · 발급 ${rows.length}건`}
       tools={<WorkbenchBar />}
-      right={<Btn href="/docs/issue">+ 신규 발급</Btn>}>
+      right={<Btn size="sm" href="/docs/issue">+ 신규 발급</Btn>}>
       <Sec title="발급 이력" n={rows.length} desc="재직·거래사실·입금확인·위임장 — 발급 시 문서번호·발급자 기록(감사)" hideable={false}>
         {loading ? <PageLoading />
           : rows.length === 0 ? <EmptyState>발급된 문서가 없습니다 — “신규 발급” 버튼으로 시작하세요</EmptyState>

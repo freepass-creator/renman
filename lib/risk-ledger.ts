@@ -10,7 +10,7 @@ import { linkFleet } from '@/lib/domain/model';
 import { buildFleetRows, type FleetRow } from '@/lib/sheet-rows';
 import { buildAgenda, type AgendaItem } from '@/lib/agenda';
 import { computeContractView } from '@/lib/contract-ops';
-import { collectionStage } from '@/lib/collection';
+import { collectionInfoForReceivable } from '@/lib/receivables-ledger';
 import { selectReceivables } from '@/lib/snapshot/selectors';
 import { computeDashboard } from '@/lib/operating-snapshot';
 import { buildHomePendingRows } from '@/lib/home-rows';
@@ -210,7 +210,7 @@ export function buildRiskSheetRows(
   for (const v of views.filter((x) => x.net > 0).sort((a, b) => b.net - a.net)) {
     const plate = String(v.rec.plate || '');
     const fr = plate ? byPlate.get(plate) : undefined;
-    const collection = collectionStage(v.overdueDays);
+    const collection = collectionInfoForReceivable(v, v.rec);
     push(rowOf('미납', {
       id: riskUnpaidOpenId(v.rec),
       kind: v.ended ? '계약종료 미수' : '계약유지 미수',

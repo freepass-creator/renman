@@ -30,7 +30,7 @@ export function LedgerFrame<R>({
   colView, onColView, showColView = true,
   view, companySlot, body,
   loading, empty, error, onRetry,
-  cols, rows, rowKey, onRow, onRowDoubleClick, onCloseDetail, selectedRowKey,
+  cols, rows, exportRows, rowKey, onRow, onRowDoubleClick, onCloseDetail, selectedRowKey,
   rowClickable,
   selectedKeys,
   onRowMouseDown, onRowClickEvent, onRowContextMenu,
@@ -66,6 +66,8 @@ export function LedgerFrame<R>({
   onRetry?: () => void;
   cols?: SheetCol<R>[];
   rows?: R[];
+  /** 화면 표시 제한과 무관하게 엑셀·헤더필터에 사용할 전체 행. */
+  exportRows?: R[];
   rowKey?: (r: R) => string;
   onRow?: (r: R) => void;
   /** 더블클릭 — 같은 행이면 닫고, 다른 행/미열림이면 연다(페이지에서 토글). */
@@ -184,7 +186,14 @@ export function LedgerFrame<R>({
             </aside>
           )}
           <div className="ledger-workspace__sheet">
-            {selectionBar}
+            {selectedKeys != null ? (
+              <div
+                className="ledger-selection-slot"
+                aria-hidden={selectionBar == null ? true : undefined}
+              >
+                {selectionBar}
+              </div>
+            ) : selectionBar}
             {loading ? (
               <PageLoading />
             ) : error ? (
@@ -198,6 +207,7 @@ export function LedgerFrame<R>({
               <ExcelSheet
                 cols={viewCols}
                 rows={sheetRows}
+                exportRows={exportRows}
                 rowKey={rowKey!}
                 onRow={selectRow}
                 onRowDoubleClick={openDetail}

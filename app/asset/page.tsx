@@ -12,7 +12,7 @@ import { fleetMaintRanking } from '@/lib/asset-econ';
 import { useEntityLists } from '@/lib/use-entity-lists';
 import { textMatch } from '@/lib/search-match';
 import {
-  Btn, C, ContextMenu, type ContextMenuItem, LedgerActions, LedgerCreatePanel, LedgerEditPanel, LedgerFilterButton, LedgerFilterFields, LedgerFilterPanel, LedgerFrame, LedgerRecordPanel, PeriodBar, PillTabs, Search, Select, useSheetExport,
+  Btn, C, ContextMenu, type ContextMenuItem, LedgerActions, LedgerActiveFilters, LedgerCreatePanel, LedgerEditPanel, LedgerFilterButton, LedgerFilterFields, LedgerFilterPanel, LedgerFrame, LedgerRecordPanel, PeriodBar, PillTabs, Search, Select, useSheetExport,
   type LedgerFormSection,
 } from '@/components/ui';
 import { useIsMobile } from '@/lib/use-mobile';
@@ -21,7 +21,6 @@ import { TODAY } from '@/lib/dashboard-consts';
 import { linkFleet, type Fleet } from '@/lib/domain/model';
 import { normPlate } from '@/lib/plate';
 import { latestDateOf, summarizeAssetLedgerStats } from '@/lib/ledger-stats';
-import { MigrateDataButton } from '@/components/MigrateDataButton';
 import { openIngest } from '@/lib/ui-bus';
 import {
   ASSET_FILTER_DEFS, countActiveFilters, emptyFilterValues, eqFilter, matchLedgerFilters,
@@ -155,14 +154,12 @@ export default function AssetLedgerPage() {
     [searchedRows, fleet],
   );
 
-  const filterCount = countActiveFilters(
-    {
-      ...detailFilters,
-      pool: ownershipScope === '보유자산' ? '' : ownershipScope,
-      quick: ownershipScope === '보유자산' ? (quickFilter || '') : ownershipScope === '전체자산' ? (allAssetQuickFilter || '') : '',
-    },
-    ASSET_FILTER_DEFS,
-  );
+  const activeFilterValues = {
+    ...detailFilters,
+    pool: ownershipScope === '보유자산' ? '' : ownershipScope,
+    quick: ownershipScope === '보유자산' ? (quickFilter || '') : ownershipScope === '전체자산' ? (allAssetQuickFilter || '') : '',
+  };
+  const filterCount = countActiveFilters(activeFilterValues, ASSET_FILTER_DEFS);
 
   const sheetCols = sheetView === '정비비'
     ? ASSET_MAINT_BASIC_COLS
@@ -196,6 +193,31 @@ export default function AssetLedgerPage() {
           style={{ width: mobile ? 160 : 280, flexShrink: 0 }}
         />
         <LedgerFilterButton open={filterOpen} count={filterCount} onClick={() => setFilterOpen((o) => !o)} />
+        {!filterOpen && <LedgerActiveFilters
+          defs={ASSET_FILTER_DEFS}
+          values={activeFilterValues}
+          onClear={(key) => {
+            if (key === 'pool') {
+              setOwnershipScope('보유자산');
+              setDateBasis('취득일');
+              setAllAssetQuickFilter(null);
+              setDetailFilters((prev) => ({ ...prev, pool: '' }));
+              return;
+            }
+            if (key === 'quick') {
+              setQuickFilter(null);
+              setAllAssetQuickFilter(null);
+            }
+            setDetailFilters((prev) => ({ ...prev, [key]: '' }));
+          }}
+          onClearAll={() => {
+            setDetailFilters(emptyFilterValues(ASSET_FILTER_DEFS));
+            setOwnershipScope('보유자산');
+            setQuickFilter(null);
+            setAllAssetQuickFilter(null);
+            setDateBasis('취득일');
+          }}
+        />}
         <PeriodBar latest={latest} initial="전체" size="sm" onRange={setRange} />
       </>}
       filterPanel={filterOpen ? (
@@ -290,7 +312,6 @@ export default function AssetLedgerPage() {
         등록된 자산이 없습니다. 등록증은 데이터센터에서 담으세요.
         <div style={{ marginTop: 14, display: 'flex', justifyContent: 'center', gap: 8 }}>
           <Btn size="sm" variant="ghost" onClick={() => openIngest('vehicle')}><UploadCloud size={14} /> 데이터센터</Btn>
-          <MigrateDataButton size="sm" />
         </div>
       </>}
       cols={sheetCols}

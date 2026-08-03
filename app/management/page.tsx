@@ -258,7 +258,7 @@ export default function ManagementPage() {
             row={selectedCo}
             cols={COMPANY_COLS}
             onClose={() => setSelectedCo(null)}
-            actions={<Btn size="sm" variant="ghost" href="/settings">설정에서 편집</Btn>}
+            actions={<Btn size="sm" variant="ghost" href="/admin">관리 회사 설정</Btn>}
           />
         ) : tab === '계좌' && selectedAcct ? (
           <LedgerRecordPanel

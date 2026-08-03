@@ -6,13 +6,17 @@ const nextConfig = {
   poweredByHeader: false,
   reactStrictMode: false,
   async headers() {
+    // Next 개발 번들의 Fast Refresh는 eval을 사용한다. 운영 CSP는 계속 eval을 차단한다.
+    const scriptSrc = process.env.NODE_ENV === 'production'
+      ? "script-src 'self' 'unsafe-inline'"
+      : "script-src 'self' 'unsafe-inline' 'unsafe-eval'";
     const csp = [
       "default-src 'self'",
       "base-uri 'self'",
       "object-src 'none'",
       "frame-ancestors 'none'",
       "form-action 'self'",
-      "script-src 'self' 'unsafe-inline'",
+      scriptSrc,
       "style-src 'self' 'unsafe-inline'",
       "img-src 'self' data: blob: https:",
       "font-src 'self' data:",

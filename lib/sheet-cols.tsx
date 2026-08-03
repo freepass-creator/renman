@@ -9,7 +9,6 @@
 import React from 'react';
 import { Badge, money, C, IconCount, type SheetCol } from '@/components/ui';
 import { type FleetRow } from './sheet-rows';
-import { collectionStage } from './domain/status';
 import { dday } from './dashboard-consts';
 import { AlertTriangle } from 'lucide-react';
 import { buildDetailSections, buildSheetViews, type DetailSectionDef, type SheetViewKeys } from './ledger-ext';
@@ -118,14 +117,14 @@ const FL = {
   util: { key: 'util', label: '가동', render: (r) => r.util || LEDGER_EMPTY.dash, text: (r) => r.util },
   loanStart: { key: 'loanStart', label: '할부시작', render: (r) => ymd(r.loanStart), text: (r) => r.loanStart },
   stage: {
-    key: 'stage', label: '회수단계',
+    key: 'stage', label: '계약조건 이행',
     render: (r) => {
-      if (r.overdueDays <= 0) return LEDGER_EMPTY.dash;
-      const cs = collectionStage(r.overdueDays);
+      const cs = r.collectionInfo;
+      if (!cs) return LEDGER_EMPTY.dash;
       const col = (cs.tone === 'red' || cs.tone === 'purple') ? C.danger : cs.tone === 'orange' ? C.warn : C.mute;
       return <span style={{ color: col, fontWeight: 700 }}>{cs.stage}</span>;
     },
-    text: (r) => (r.overdueDays > 0 ? collectionStage(r.overdueDays).stage : ''),
+    text: (r) => r.collectionInfo?.stage || '',
   },
   // 인라인 경고 — 최고심각도 톤 + 건수. hover=사유. IconCount 원자.
   warn: {

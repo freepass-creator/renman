@@ -17,3 +17,35 @@ export const PROCESSING_STATE_HELP: Record<ProcessingState, string> = {
   오류: '분석 또는 저장에 실패해 재시도가 필요함',
   처리완료: '확인·연결·반영과 후속조치가 끝남',
 };
+
+const PROCESSING_ATTENTION_ORDER: Record<string, number> = {
+  오류: 0,
+  확인필요: 1,
+  미분류: 2,
+  중복: 3,
+  분석중: 4,
+  자동반영: 5,
+  처리완료: 6,
+};
+
+/** 데이터센터 기본 정렬 — 사람이 먼저 봐야 할 상태일수록 작은 값. */
+export function processingAttentionRank(state: unknown): number {
+  return PROCESSING_ATTENTION_ORDER[String(state || '')] ?? 2;
+}
+
+export function summarizeProcessingQueue(rows: Array<Record<string, unknown>>): {
+  needsReview: number;
+  unclassified: number;
+  unassigned: number;
+  errors: number;
+} {
+  let needsReview = 0, unclassified = 0, unassigned = 0, errors = 0;
+  for (const row of rows) {
+    const processing = String(row.processingState || '미분류');
+    if (processing === '확인필요') needsReview++;
+    if (processing === '오류') errors++;
+    if (String(row.classificationState || '미분류') === '미분류') unclassified++;
+    if (String(row.assignmentState || '미배정') === '미배정' && processing !== '처리완료') unassigned++;
+  }
+  return { needsReview, unclassified, unassigned, errors };
+}

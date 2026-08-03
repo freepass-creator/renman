@@ -11,6 +11,7 @@ import type { DataLayer } from '@/lib/domain/layers';
 import { ENTITY_LAYER } from '@/lib/domain/layers';
 import { RENTAL_TYPES } from '@/lib/schema/contract';
 import { WORK_CATEGORIES } from '@/lib/work-taxonomy';
+import { LEDGER_SUBJECTS } from '@/lib/payments/ledger-subjects';
 
 export type FieldType = 'text' | 'number' | 'date' | 'select' | 'vehicle-picker' | 'contract-picker';
 
@@ -166,6 +167,7 @@ export const ENTITIES: Record<string, Entity> = {
       { key: 'assigneeName', label: '담당자', type: 'text' },
       { key: 'vendor', label: '업체/거래처', type: 'text' },
       { key: 'amount', label: '금액(원)', type: 'number' },
+      { key: 'cashFlow', label: '자금방향', type: 'select', options: ['입금예정', '출금예정'], manual: true, note: '자금계획 반영 방향. 미선택이면 분류필요로 보관' },
       { key: 'description', label: '상세내용', type: 'text' },
       // ── 일정 ──
       { key: 'endDate', label: '종료일', type: 'date', manual: true },
@@ -296,6 +298,12 @@ export const ENTITIES: Record<string, Entity> = {
       { key: 'returnPlace', label: '반환장소', type: 'text', manual: true },
       { key: 'paymentDay', label: '결제일', type: 'number', manual: true, note: '매월 N일 (미입력=25일)' },
       { key: 'paymentTiming', label: '납부시기', type: 'select', options: ['선납', '후납'], manual: true, note: '선납=계약일 기준 · 후납=익월 (레거시 선불/후불 호환)' },
+      { key: 'arrearsClause', label: '연체조치 계약조항', type: 'text', ocrFrom: 'arrears_clause', note: '계약서 원문 근거. 조치일은 이 조항에 명시된 경우만 입력' },
+      { key: 'warningAfterDays', label: '경고 도래(D+)', type: 'number', ocrFrom: 'warning_after_days', note: '계약서에 명시된 경우만. 미입력 시 자동 추정하지 않음' },
+      { key: 'engineLockAfterDays', label: '시동제어 도래(D+)', type: 'number', ocrFrom: 'engine_lock_after_days', note: '계약서에 시동제어 조건이 명시된 경우만' },
+      { key: 'repossessionAfterDays', label: '차량회수 도래(D+)', type: 'number', ocrFrom: 'repossession_after_days', note: '계약서에 차량회수 조건이 명시된 경우만' },
+      { key: 'legalNoticeAfterDays', label: '내용증명 도래(D+)', type: 'number', ocrFrom: 'legal_notice_after_days', note: '계약서에 통지 조건이 명시된 경우만' },
+      { key: 'debtTransferAfterDays', label: '채권전환 도래(D+)', type: 'number', ocrFrom: 'debt_transfer_after_days', note: '계약서에 법적조치·채권전환 조건이 명시된 경우만' },
       { key: 'reservationFee', label: '예약금(원)', type: 'number', manual: true, note: '대여예정요금 10% 범위' },
       { key: 'lateFeeRate', label: '지연손해금율(%)', type: 'number', manual: true },
       /* 중도해지 위약금율 — ★계약서에는 «인도일로부터 경과기간»에 따라 두 값이 박혀 있다.
@@ -351,6 +359,7 @@ export const ENTITIES: Record<string, Entity> = {
       { key: 'address', label: '소재지', type: 'text', required: true, manual: true },
       { key: 'deposit', label: '보증금(원)', type: 'number', manual: true },
       { key: 'monthlyRent', label: '월세(원)', type: 'number', manual: true },
+      { key: 'paymentDay', label: '월세 납부일', type: 'number', manual: true, note: '매월 N일. 미입력 시 자금계획에서 일정확인으로 표시' },
       { key: 'startDate', label: '시작일', type: 'date', manual: true },
       { key: 'endDate', label: '만기일', type: 'date', required: true, manual: true },
       { key: 'memo', label: '메모', type: 'text', manual: true },
@@ -367,6 +376,9 @@ export const ENTITIES: Record<string, Entity> = {
       { key: 'counterparty', label: '거래상대/적요', type: 'text' },
       { key: 'memo', label: '내용', type: 'text' },
       { key: 'method', label: '수단', type: 'text', note: '계좌/CMS/카드/현금' },
+      { key: 'category', label: '계정과목', type: 'select', options: LEDGER_SUBJECTS.map((subject) => subject.label), manual: true },
+      { key: 'plate', label: '관련 차량번호', type: 'text', manual: true },
+      { key: 'referenceId', label: '계약·문서 근거', type: 'text', manual: true },
       { key: 'matchProposalState', label: '연결후보상태', type: 'select', options: ['자동후보', '복수후보', '검토후보', '미매칭', '해당없음'] },
       { key: 'matchProposalCount', label: '후보수', type: 'number' },
       { key: 'suggestedContractNo', label: '추천계약', type: 'text' },
@@ -382,7 +394,10 @@ export const ENTITIES: Record<string, Entity> = {
       { key: 'merchant', label: '가맹점', type: 'text' },
       { key: 'approvalNo', label: '승인번호', type: 'text' },
       { key: 'cardLast4', label: '카드끝4', type: 'text' },
-      { key: 'category', label: '분류', type: 'text', manual: true },
+      { key: 'category', label: '계정과목', type: 'select', options: LEDGER_SUBJECTS.filter((subject) => subject.kind !== '수입').map((subject) => subject.label), manual: true },
+      { key: 'plate', label: '관련 차량번호', type: 'text', manual: true },
+      { key: 'memo', label: '내용·판단근거', type: 'text', manual: true },
+      { key: 'referenceId', label: '계약·문서 근거', type: 'text', manual: true },
     ],
   },
   penalty: {
@@ -416,7 +431,9 @@ export const ENTITIES: Record<string, Entity> = {
       { key: 'kind', label: '종류', type: 'select', options: ['사진', '문서', '서명', '기타'], manual: true },
       { key: 'plate', label: '차량번호', type: 'text', manual: true, note: '매칭 대상 차(선택)' },
       { key: 'note', label: '메모', type: 'text', manual: true },
-      { key: 'status', label: '상태', type: 'select', options: ['대기', '매칭'], manual: true },
+      { key: 'assignee', label: '담당자', type: 'text', manual: true, note: '확인·분류를 이어서 처리할 담당자' },
+      { key: 'dueDate', label: '처리기한', type: 'date', manual: true },
+      { key: 'status', label: '상태', type: 'select', options: ['대기', '매칭', '완료'], manual: true },
       { key: 'processingState', label: '처리상태', type: 'select', options: ['분석중', '자동반영', '확인필요', '미분류', '중복', '오류', '처리완료'], manual: true },
       { key: 'classificationState', label: '분류상태', type: 'select', options: ['미분류', '분류됨'], manual: true },
       { key: 'intakeState', label: '실행상태', type: 'select', options: ['미처리', '처리중', '처리완료'], manual: true },
@@ -454,6 +471,10 @@ export function mapOcrToEntity(entityKey: string, ocr: Record<string, unknown>):
       rec[f.key] = ocr[f.ocrFrom];
     }
   }
+  // 회차 배열은 단일 입력 필드로 펼치지 않고 원문 구조를 보존한다.
+  // 보험 분납 일정은 자금계획, 보증금 분납은 계약 정산의 근거가 된다.
+  if (entityKey === 'insurance' && Array.isArray(ocr.installments)) rec.installments = ocr.installments;
+  if (entityKey === 'contract' && Array.isArray(ocr.deposit_installments)) rec.depositInstallments = ocr.deposit_installments;
   return rec;
 }
 

@@ -1,9 +1,7 @@
 'use client';
-import { useState } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
-import { ChevronDown } from 'lucide-react';
 import {
-  Sec, Cards, Metric, ObjCard, Btn, TextLink, Badge, KV, EmptyState, Message, Input, Select,
+  Sec, Cards, Metric, ObjCard, ActionMenu, Btn, TextLink, Badge, KV, EmptyState, Message, Input, Select,
   SectionLabel, Disclosure, th, thR, td, tdR, won, C, SH, PageLoading, SPACE_GROUP_M, type KVRow,
 } from '@/components/ui';
 import { InfoDoc } from '@/components/InfoDoc';
@@ -27,34 +25,15 @@ import { useVehicleDetail, yy, remainText, scheduleTone } from './useVehicleDeta
 import { paymentTimingOf } from '@/lib/schema/contract';
 
 function PrintMenu({ items }: { items: { label: string; run: () => void }[] }) {
-  const [open, setOpen] = useState(false);
   if (!items.length) return null;
   if (items.length === 1) return <Btn size="sm" variant="ghost" onClick={items[0].run}>{items[0].label}</Btn>;
-  return (
-    <span style={{ position: 'relative', display: 'inline-flex' }}>
-      <Btn size="sm" variant="ghost" onClick={() => setOpen((o) => !o)}>출력 <ChevronDown size={13} strokeWidth={2.2} aria-hidden /></Btn>
-      {open && (
-        <>
-          <span style={{ position: 'fixed', inset: 0, zIndex: 40 }} onClick={() => setOpen(false)} />
-          <span style={{
-            position: 'absolute', right: 0, top: '100%', marginTop: 4, zIndex: 41, minWidth: 128,
-            display: 'flex', flexDirection: 'column', gap: 2, padding: 6,
-            background: C.card, border: `1px solid ${C.line}`, borderRadius: 'var(--radius)', boxShadow: SH.pop,
-          }}>
-            {items.map((it) => (
-              <Btn key={it.label} size="sm" variant="ghost" onClick={() => { setOpen(false); it.run(); }}>{it.label}</Btn>
-            ))}
-          </span>
-        </>
-      )}
-    </span>
-  );
+  return <ActionMenu label="출력" menuLabel="출력 문서 선택" items={items.map((item) => ({ key: item.label, label: item.label, onClick: item.run }))} />;
 }
 
 const fLab: CSSProperties = { display: 'flex', flexDirection: 'column', gap: 3 };
 const fLl: CSSProperties = { fontSize: 11, color: C.mute };
 const Add = ({ type, plate, label }: { type: string; plate: string; label: string }) => (
-  <Btn variant="ghost" onClick={() => openIngest(type, plate)}>{label}</Btn>
+  <Btn size="sm" variant="ghost" onClick={() => openIngest(type, plate)}>{label}</Btn>
 );
 
 /** freepass-style 차량 상세 — 고정 스크롤 레이아웃(DnD/순서 없음). embed=원장 우측 패널. */
@@ -258,7 +237,7 @@ export function VehicleDetail({ plate, focus, embed, companyId: targetCompanyId 
         </Sec>
 
         {v && (v.gpsDeviceId || v.gpsProvider) ? (
-          <Sec id="v-gps" title="GPS · 관제" desc="미납 원격 시동제어 연동" right={active ? <span style={{ display: 'inline-flex', gap: 6 }}><Btn variant="danger" onClick={() => logIgnition('제어')} disabled={engineLocked}>시동 제어</Btn><Btn variant="ghost" onClick={() => logIgnition('해제')} disabled={!engineLocked}>시동 해제</Btn></span> : null}>
+          <Sec id="v-gps" title="GPS · 관제" desc="미납 원격 시동제어 연동" right={active ? <span style={{ display: 'inline-flex', gap: 6 }}><Btn size="sm" variant="danger" onClick={() => logIgnition('제어')} disabled={engineLocked}>시동 제어</Btn><Btn size="sm" variant="ghost" onClick={() => logIgnition('해제')} disabled={!engineLocked}>시동 해제</Btn></span> : null}>
             <KV rows={[
               ['공급사', null, String(v.gpsProvider ?? '')],
               ['단말번호', null, String(v.gpsDeviceId ?? '')],
@@ -518,7 +497,7 @@ export function VehicleDetail({ plate, focus, embed, companyId: targetCompanyId 
         </Sec> : null}
 
         {pendDeposit ? <Sec id="v-deposit" title="보증금 정산" n={1} tone="warn" desc={`${String(pendDeposit.c.contractorName || '')} · 반납 ${String(pendDeposit.c.returnedDate || '')} · 미정산`}
-          right={<span style={{ display: 'inline-flex', gap: 6 }}><Btn variant="ghost" onClick={() => openPrintDoc('settlement', plate)}>정산서</Btn><Btn onClick={settleDeposit}>보증금 반환 처리</Btn></span>}>
+          right={<span style={{ display: 'inline-flex', gap: 6 }}><Btn size="sm" variant="ghost" onClick={() => openPrintDoc('settlement', plate)}>정산서</Btn><Btn size="sm" onClick={settleDeposit}>보증금 반환 처리</Btn></span>}>
           <KV rows={[
             ['예치 보증금', '', won(pendDeposit.d.deposit)],
             ['미납 대여료(일할)', '', pendDeposit.d.unpaid ? won(pendDeposit.d.unpaid) : '—'],
@@ -564,7 +543,7 @@ export function VehicleDetail({ plate, focus, embed, companyId: targetCompanyId 
       <div>
         <SectionLabel>이력</SectionLabel>
 
-        <Sec id="v-penalty" title="과태료 · 변경부과" n={penalties.length} right={<span style={{ display: 'inline-flex', gap: 6 }}>{penalties.length ? <Btn variant="ghost" onClick={() => openPrintDoc('penalty', plate)}>변경부과 공문</Btn> : null}<Add type="penalty" plate={plate} label="+ 추가" /></span>}>
+        <Sec id="v-penalty" title="과태료 · 변경부과" n={penalties.length} right={<span style={{ display: 'inline-flex', gap: 6 }}>{penalties.length ? <Btn size="sm" variant="ghost" onClick={() => openPrintDoc('penalty', plate)}>변경부과 공문</Btn> : null}<Add type="penalty" plate={plate} label="+ 추가" /></span>}>
           {penalties.length ? <Cards min={360}>{penalties.map((p, i) => {
             const drv = matchDriver(p, contracts); const st = penaltyStatus(p);
             const NEXT: Record<string, string | null> = { '접수': '임차인확인', '임차인확인': '변경부과신청', '변경부과신청': '변경부과완료', '변경부과완료': '종결', '종결': null };
@@ -586,7 +565,7 @@ export function VehicleDetail({ plate, focus, embed, companyId: targetCompanyId 
 
         <Sec id="v-work" title="차량 수선 · 정비·사고" n={workList.length} tone={workOpen ? 'ok' : undefined}
           desc="정비·사고수리·상품화·세차 — 휴차는 작업상태가 휴차 워크벤치에 자동 반영"
-          right={<Btn variant="ghost" onClick={() => setWorkOpen((o) => !o)}>{workOpen ? '닫기' : '+ 수선/작업'}</Btn>}>
+          right={<Btn size="sm" variant="ghost" onClick={() => setWorkOpen((o) => !o)}>{workOpen ? '닫기' : '+ 수선/작업'}</Btn>}>
           {workOpen ? <WorkForm plate={plate} companyId={target} vehicle={v} idle={!active} onDone={() => setWorkOpen(false)} onCancel={() => setWorkOpen(false)} style={{ marginBottom: 12 }} /> : null}
           {workList.length ? <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>{workList.map((h, i) => {
             const cat = String(h.category || '수선'); const ws = String(h.work_status || ''); const doc = latestDoc(h); const amt = Number(h.amount) || 0;
@@ -619,7 +598,7 @@ export function VehicleDetail({ plate, focus, embed, companyId: targetCompanyId 
           })}</div> : <EmptyState variant="sec">수선/작업 이력 없음 · “+ 수선/작업” 버튼으로 남기세요</EmptyState>}
         </Sec>
 
-        <Sec id="v-history" title="활동 · 이력" n={history.length} tone={logOpen ? 'ok' : undefined} right={<Btn variant="ghost" onClick={() => setLogOpen((o) => !o)}>{logOpen ? '닫기' : '+ 기록'}</Btn>}>
+        <Sec id="v-history" title="활동 · 이력" n={history.length} tone={logOpen ? 'ok' : undefined} right={<Btn size="sm" variant="ghost" onClick={() => setLogOpen((o) => !o)}>{logOpen ? '닫기' : '+ 기록'}</Btn>}>
           {logOpen ? <QuickLogForm
             ctx={{ plate, ...(active ? { contractNo: String(active.contractNo || active._key || ''), customer: String(active.contractorName || '') } : {}) }}
             onDone={() => setLogOpen(false)} onCancel={() => setLogOpen(false)} style={{ marginBottom: 12 }} /> : null}

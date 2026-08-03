@@ -13,6 +13,8 @@ import { companyShort } from './companies';
 import { rowWarnings, type SheetWarning } from './sheet-warnings';
 import { rentalTypeOf, paymentTimingOf } from './schema/contract';
 import type { RailTone as RowRail } from '@/components/ui';   // 타입 전용 — 런타임 커플링 없음
+import { mostUrgentCollectionInfo } from './receivables-ledger';
+import type { CollectionInfo } from './collection';
 
 /**
  * 통합 마스터 행 — 차량 1대 = 1행. 자산 + (활성)계약/손님 + 미수 + 할부·보험·GPS 를 한 줄에.
@@ -41,6 +43,8 @@ export type FleetRow = {
   /** 차량 기준 현재 계약 관계. 미수의 출처 구분은 maintainedNet/endedNet이 담당한다. */
   contractState: '계약유지' | '계약예정' | '계약종료' | '계약없음';
   overdueDays: number;
+  /** 차량에 연결된 미수 계약 중 계약조건상 가장 강한 현재 조치. */
+  collectionInfo: CollectionInfo | null;
   // 인라인 경고(무보험·검사만료·반납지남·미수단계·면허 등) — sheet-warnings 합성. ⚠ 열·'경고' 필터가 씀.
   warnings: SheetWarning[];
   tone: 'ok' | 'warn' | 'danger' | 'mute';
@@ -81,6 +85,11 @@ export function buildFleetRows(vehicles: VehicleNode[], insurance: EntityRecord[
       : pending ? '계약예정'
       : plateContracts.some((c) => c.phase === '종료') ? '계약종료' : '계약없음';
     const overdueDays = plateContracts.reduce((m, c) => Math.max(m, c.view.overdueDays), 0);
+    const collectionInfo = mostUrgentCollectionInfo(
+      plateContracts
+        .filter((c) => c.net > 0)
+        .map((c) => ({ rec: c.view.rec, v: c.view })),
+    );
     const ins = insByPlate.get(joinKey(asset.companyId, plate));
     return {
       plate,
@@ -120,13 +129,13 @@ export function buildFleetRows(vehicles: VehicleNode[], insurance: EntityRecord[
       insurer: String(ins?.insurer || ''),
       insEnd: String(ins?.endDate || ''),
       insPremium: Number(ins?.totalPremium) || 0,
-      net, maintainedNet, endedNet, contractState, overdueDays,
+      net, maintainedNet, endedNet, contractState, overdueDays, collectionInfo,
       warnings: rowWarnings({
         held: asset.ownership !== '처분완료' && asset.status !== '차량없음',
         active: !!active, contractRec: displayContract?.view.rec ?? null, veh,
         util: asset.util, customer: displayContract?.customer || '',
         dday: v?.dday ?? null, rent: Number(v?.rec.monthlyRent) || 0,
-        overdueDays, insEnd: String(ins?.endDate || ''), inspectionTo: String(veh?.inspectionTo || ''), today,
+        overdueDays, collectionInfo, insEnd: String(ins?.endDate || ''), inspectionTo: String(veh?.inspectionTo || ''), today,
       }),
       // 상태 뱃지는 «상태» 톤(운행=초록·유휴=회색·정비=주의). 미수는 미수/연체 열 색으로 별도 표시.
       tone: asset.tone,

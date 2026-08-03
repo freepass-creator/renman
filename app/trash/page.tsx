@@ -63,7 +63,7 @@ export default function TrashPage() {
                 const sub = `${String(it.rec.deletedAt || '').slice(0, 16).replace('T', ' ')}${it.rec.deletedReason ? ' · ' + it.rec.deletedReason : ''}${scopeAll ? ' · ' + companyShort(it.rec.companyId) : ''}`;
                 return (
                   <ListRow key={`${it.entity}:${String(it.rec.companyId || '')}:${String(it.rec._key || i)}`} badge={e.label} main={name} sub={sub}
-                    right={<Btn variant="ghost" onClick={() => restore(it)}><span style={{ color: C.ok }}>복구</span></Btn>} />
+                    right={<Btn size="sm" variant="ghost" onClick={() => restore(it)}><span style={{ color: C.ok }}>복구</span></Btn>} />
                 );
               })}
             </ListBox>

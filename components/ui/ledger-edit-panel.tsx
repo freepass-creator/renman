@@ -109,6 +109,12 @@ export function LedgerEditPanel({
           classificationState: String(form.category || '').trim() ? '분류됨' : '미분류',
           assignmentState: String(form.assigneeName || '').trim() ? '배정됨' : '미배정',
         } : {}),
+        ...(entityKey === 'inbox' ? {
+          assignmentState: String(form.assignee || '').trim() ? '배정됨' : '미배정',
+          intakeState: String(form.processingState || '') === '처리완료'
+            ? '처리완료'
+            : String(form.assignee || form.dueDate || form.note || '').trim() ? '처리중' : '미처리',
+        } : {}),
         companyId: targetCompany,
         updatedAt: new Date().toISOString(),
         updatedBy: user.email || user.name,

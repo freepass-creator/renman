@@ -41,6 +41,14 @@ export const ContractSchema = z.object({
   paymentDay: numlike,
   paymentTiming: z.enum(['선납', '후납', '선불', '후불']).optional(), // 표시·입력=선납/후납 · 레거시 선불/후불 허용
 
+  // 계약서에 명시된 연체 조치 조건. 비어 있으면 전사 기본값을 임의 적용하지 않는다.
+  arrearsClause: z.string().optional(),
+  warningAfterDays: numlike,
+  engineLockAfterDays: numlike,
+  repossessionAfterDays: numlike,
+  legalNoticeAfterDays: numlike,
+  debtTransferAfterDays: numlike,
+
   // 시동제어
   engineDisabled: z.boolean().optional(),
   engineDisabledAt: z.string().optional(),

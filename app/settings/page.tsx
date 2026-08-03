@@ -26,7 +26,7 @@ const EXPORTS: { key: string; label: string }[] = [
   { key: 'insurance', label: '보험' }, { key: 'bank_tx', label: '계좌 거래' }, { key: 'customer', label: '손님' }, { key: 'history', label: '이력' },
 ];
 
-type HubLink = { href: string; label: string; desc: string; icon: typeof Building2; hqOnly?: boolean };
+type HubLink = { href: string; label: string; desc: string; icon: typeof Building2; hqOnly?: boolean; devOnly?: boolean };
 
 const HUB: HubLink[] = [
   { href: '/company', label: '법인관리', desc: '소재지·차고지·등록대수·공문', icon: Building2 },
@@ -35,7 +35,7 @@ const HUB: HubLink[] = [
   { href: '/integrity', label: '리스크·정합성', desc: '데이터 이상·만기 점검', icon: ShieldAlert },
   { href: '/audit', label: '감사 로그', desc: '변경 이력', icon: History },
   { href: '/manage', label: '경영·손익', desc: '가동률·미수 aging·재무 요약', icon: BarChart3, hqOnly: true },
-  { href: '/dev/data', label: '개발도구', desc: '시드·백엔드·회사별 데이터', icon: Wrench, hqOnly: true },
+  { href: '/dev/data', label: '개발도구', desc: '시드·백엔드·회사별 데이터', icon: Wrench, hqOnly: true, devOnly: true },
 ];
 
 function Chevron({ open }: { open?: boolean }) {
@@ -152,9 +152,9 @@ export default function SettingsPage() {
     } finally { setExporting(''); }
   }
 
-  const hub = HUB.filter((h) => !h.hqOnly || isOperator);
+  const hub = HUB.filter((h) => (!h.hqOnly || isOperator) && (!h.devOnly || process.env.NODE_ENV !== 'production'));
   // 초기화면 후보 = 햄버거 메뉴 전 항목(권한 필터). 홈 포함.
-  const landingItems = NAV_GROUPS.flatMap((g) => g.items).filter((it) => !it.hqOnly || isOperator);
+  const landingItems = NAV_GROUPS.flatMap((g) => g.items).filter((it) => (!it.hqOnly || isOperator) && (!it.devOnly || process.env.NODE_ENV !== 'production'));
   const landingLabel = landingItems.find((it) => it.href === landing)?.label || '대시보드';
 
   return (

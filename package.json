@@ -2,6 +2,9 @@
   "name": "jpkerp6",
   "version": "6.0.0-alpha",
   "private": true,
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "dev": "next dev --turbo -p 6006",
     "build": "next build",
@@ -17,7 +20,14 @@
     "test:rules": "firebase emulators:exec --only firestore --project renman-rules-test \"vitest run --config vitest.rules.config.ts\"",
     "admin:set-claims": "node --experimental-strip-types scripts/set-user-claims.mts",
     "security:secrets": "node --experimental-strip-types scripts/check-secrets.mts",
-    "deploy:preflight": "node --experimental-strip-types scripts/deploy-preflight.mts",
+    "security:audit": "node --experimental-strip-types scripts/audit-severity-gate.mts",
+    "backup:preflight": "node --experimental-strip-types scripts/firestore-managed-backup.mts --check-api",
+    "backup:run": "node --experimental-strip-types scripts/firestore-managed-backup.mts --execute --wait",
+    "firestore:delete-protection:check": "node --experimental-strip-types scripts/firestore-delete-protection.mts",
+    "restore:preflight": "node --experimental-strip-types scripts/firestore-managed-restore.mts",
+    "restore:run": "node --experimental-strip-types scripts/firestore-managed-restore.mts --execute",
+    "deploy:preflight": "npm run security:secrets && npm run security:audit && npm run open:scan && node --experimental-strip-types scripts/deploy-preflight.mts",
+    "release:preflight": "npm run deploy:preflight && npm run backup:preflight && npm run open:check",
     "deploy:rules": "npm run deploy:preflight && firebase deploy --only firestore:rules,storage --project renman-dd0a2"
   },
   "dependencies": {
@@ -47,5 +57,11 @@
     "tailwindcss": "^3.4.14",
     "typescript": "^5.6.3",
     "vitest": "^4.1.10"
+  },
+  "overrides": {
+    "next": {
+      "postcss": "8.5.25",
+      "sharp": "0.35.3"
+    }
   }
 }

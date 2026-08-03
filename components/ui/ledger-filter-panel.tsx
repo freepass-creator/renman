@@ -6,6 +6,7 @@ import { Btn, Select } from './controls';
 import { LedgerPanelFooter } from './ledger-actions';
 import { C, R, ctrlH } from './tokens';
 import { useIsMobile } from '@/lib/use-mobile';
+import { haptic } from '@/lib/haptics';
 import type { LedgerFilterFieldDef } from '@/lib/ledger-filter-defs';
 
 /**
@@ -25,6 +26,7 @@ export function LedgerActiveFilters({
   onClear: (key: string) => void;
   onClearAll?: () => void;
 }) {
+  const mobile = useIsMobile();
   const active = defs.filter((d) => values[d.key]);
   if (active.length === 0) return null;
   return (
@@ -33,27 +35,70 @@ export function LedgerActiveFilters({
         <button
           key={d.key}
           type="button"
-          onClick={() => onClear(d.key)}
+          onClick={() => { haptic.tap(); onClear(d.key); }}
           title={`${d.label} 필터 해제`}
           style={{
-            display: 'inline-flex', alignItems: 'center', gap: 5, height: 20, padding: '0 7px',
+            display: 'inline-flex', alignItems: 'center', gap: 5, height: mobile ? 44 : 20, padding: mobile ? '0 10px' : '0 7px',
             border: `1px solid ${C.brand}`, borderRadius: 'var(--radius-badge)',
-            background: C.card, color: C.brand, fontSize: 11, fontWeight: 700,
+            background: C.card, color: C.brand, fontSize: mobile ? 13 : 11, fontWeight: 700,
             cursor: 'pointer', whiteSpace: 'nowrap', maxWidth: 240, overflow: 'hidden',
           }}
         >
           <span style={{ color: C.mute, fontWeight: 600 }}>{d.label}</span>
           <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{values[d.key]}</span>
-          <X size={11} aria-hidden />
+          <X size={mobile ? 15 : 11} aria-hidden />
         </button>
       ))}
       {active.length > 1 && onClearAll && (
         <button
           type="button"
-          onClick={onClearAll}
+          onClick={() => { haptic.tap(); onClearAll(); }}
           style={{
-            height: 20, padding: '0 7px', border: `1px solid ${C.line}`, borderRadius: 'var(--radius-badge)',
-            background: C.card, color: C.mute, fontSize: 11, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap',
+            height: mobile ? 44 : 20, padding: mobile ? '0 10px' : '0 7px', border: `1px solid ${C.line}`, borderRadius: 'var(--radius-badge)',
+            background: C.card, color: C.mute, fontSize: mobile ? 13 : 11, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap',
+          }}
+        >전체 해제</button>
+      )}
+    </span>
+  );
+}
+
+/** 정의형 필드가 아닌 Facet 필터도 같은 활성 칩 문법으로 표시한다. */
+export function LedgerActiveFilterTags({
+  values, onClear, onClearAll,
+}: {
+  values: readonly string[];
+  onClear: (value: string) => void;
+  onClearAll?: () => void;
+}) {
+  const mobile = useIsMobile();
+  if (!values.length) return null;
+  return (
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', minWidth: 0 }}>
+      {values.map((value) => (
+        <button
+          key={value}
+          type="button"
+          onClick={() => { haptic.tap(); onClear(value); }}
+          title={`${value} 필터 해제`}
+          style={{
+            display: 'inline-flex', alignItems: 'center', gap: 5, height: mobile ? 44 : 20, padding: mobile ? '0 10px' : '0 7px',
+            border: `1px solid ${C.brand}`, borderRadius: 'var(--radius-badge)',
+            background: C.card, color: C.brand, fontSize: mobile ? 13 : 11, fontWeight: 700,
+            cursor: 'pointer', whiteSpace: 'nowrap', maxWidth: 240, overflow: 'hidden',
+          }}
+        >
+          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{value}</span>
+          <X size={mobile ? 15 : 11} aria-hidden />
+        </button>
+      ))}
+      {values.length > 1 && onClearAll && (
+        <button
+          type="button"
+          onClick={() => { haptic.tap(); onClearAll(); }}
+          style={{
+            height: mobile ? 44 : 20, padding: mobile ? '0 10px' : '0 7px', border: `1px solid ${C.line}`, borderRadius: 'var(--radius-badge)',
+            background: C.card, color: C.mute, fontSize: mobile ? 13 : 11, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap',
           }}
         >전체 해제</button>
       )}
@@ -70,7 +115,7 @@ export function LedgerFilterButton({ open, count, onClick }: { open: boolean; co
       aria-label="세부 필터"
       aria-pressed={open}
       title="세부 필터"
-      onClick={onClick}
+      onClick={() => { haptic.tap(); onClick(); }}
       style={{
         position: 'relative', width: h, height: h, padding: 0, display: 'inline-grid', placeItems: 'center',
         boxSizing: 'border-box',

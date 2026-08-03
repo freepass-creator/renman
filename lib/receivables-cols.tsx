@@ -1,6 +1,6 @@
 import React from 'react';
 import { Badge, C, money, type SheetCol } from '@/components/ui';
-import type { ReceivableRow } from './receivables-ledger';
+import { collectionTermsLabel, type ReceivableRow } from './receivables-ledger';
 import { buildDetailSections, buildSheetViews, type DetailSectionDef, type SheetViewKeys } from './ledger-ext';
 import { LEDGER_EMPTY } from './ledger-empty';
 import { companyLabel } from './companies';
@@ -8,6 +8,8 @@ import { companyLabel } from './companies';
 const stageTone = (stage: string): 'gray' | 'amber' | 'orange' | 'red' | 'purple' => {
   if (stage === '채권화') return 'purple';
   if (stage === '내용증명') return 'red';
+  if (stage === '차량회수') return 'red';
+  if (stage === '계약조건 확인') return 'amber';
   if (stage === '시동제어') return 'orange';
   if (stage === '경고') return 'amber';
   return 'gray';
@@ -33,12 +35,12 @@ const CATALOG: SheetCol<ReceivableRow>[] = [
     text: (r) => r.rec.companyId ? companyLabel(String(r.rec.companyId)) : '',
   },
   {
-    key: 'contractState', label: '계약상태', priority: 1, align: 'c',
+    key: 'contractState', label: '미수분류', priority: 1, align: 'c',
     render: (r) => <Badge tone={r.v.ended ? 'gray' : 'blue'}>{receivableContractState(r)}</Badge>,
     text: receivableContractState,
   },
   {
-    key: 'stage', label: '연체단계', priority: 1, align: 'c',
+    key: 'stage', label: '미수상태', priority: 1, align: 'c',
     render: (r) => <Badge tone={stageTone(r.st.stage)}>{r.st.stage}</Badge>,
     text: (r) => r.st.stage,
   },
@@ -71,6 +73,11 @@ const CATALOG: SheetCol<ReceivableRow>[] = [
     key: 'nextAction', label: '다음조치', priority: 1,
     render: (r) => receivableNextAction(r),
     text: receivableNextAction,
+  },
+  {
+    key: 'contractTerms', label: '연체조치 계약조건', priority: 2,
+    render: (r) => collectionTermsLabel(r.rec),
+    text: (r) => collectionTermsLabel(r.rec),
   },
   {
     key: 'contractNo', label: '계약번호', priority: 2,
@@ -127,8 +134,8 @@ const CATALOG: SheetCol<ReceivableRow>[] = [
 ];
 
 export const RECEIVABLE_SHEET_KEYS: SheetViewKeys = {
-  basic: ['company', 'contractState', 'stage', 'customer', 'plate', 'unpaid', 'overdueDays', 'unpaidCount', 'nextAction'],
-  all: ['company', 'contractState', 'stage', 'customer', 'plate', 'unpaid', 'overdueDays', 'unpaidCount', 'nextAction', 'contractNo', 'phone', 'period', 'monthlyRent', 'gross', 'paid', 'notice', 'engine', 'lastContact', 'contactMemo'],
+  basic: ['company', 'contractNo', 'customer', 'contractState', 'stage', 'plate', 'unpaid', 'overdueDays', 'unpaidCount', 'nextAction'],
+  all: ['company', 'contractNo', 'customer', 'contractState', 'stage', 'plate', 'unpaid', 'overdueDays', 'unpaidCount', 'nextAction', 'contractTerms', 'phone', 'period', 'monthlyRent', 'gross', 'paid', 'notice', 'engine', 'lastContact', 'contactMemo'],
 };
 
 const views = buildSheetViews(CATALOG, RECEIVABLE_SHEET_KEYS);
@@ -142,7 +149,7 @@ const DETAIL_DEFS: DetailSectionDef[] = [
   },
   {
     title: '계약·고객',
-    keys: ['contractNo', 'customer', 'phone', 'plate', 'period', 'monthlyRent'],
+    keys: ['contractNo', 'customer', 'phone', 'plate', 'period', 'monthlyRent', 'contractTerms'],
   },
   {
     title: '회수 조치',

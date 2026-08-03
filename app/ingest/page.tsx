@@ -5,7 +5,7 @@
  */
 import { Suspense, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { DATA_CENTER_TITLE } from '@/lib/data-center-terms';
+import { DATA_CENTER_TITLE, processingAttentionRank, summarizeProcessingQueue } from '@/lib/data-center-terms';
 import { uploadToInbox } from '@/lib/inbox-upload';
 import { ENTITY_LIST, ENTITIES, mapOcrToEntity, type EntityRecord } from '@/lib/intake/entities';
 import { parseCsv } from '@/lib/intake/csv';
@@ -16,11 +16,11 @@ import { useSession } from '@/lib/session';
 import { companyLabel } from '@/lib/companies';
 import { resolveWriteCompany, NEED_COMPANY, isAllScope } from '@/lib/scope';
 import { layerOfEntity } from '@/lib/domain/layers';
-import { UploadCloud, Trash2, FileSpreadsheet, X, PanelRight, PanelRightClose } from 'lucide-react';
+import { UploadCloud, Trash2, FileSpreadsheet, PanelRight, PanelRightClose, FileText } from 'lucide-react';
 import FileDrop from '@/components/FileDrop';
 import { toast } from '@/lib/toast';
 import {
-  LedgerFrame, Btn, FormGrid, PillTabs, Select, Input, Search,
+  LedgerFrame, LedgerPanelCloseButton, LedgerRecordPanel, Badge, Btn, FormGrid, PillTabs, Select, Input, Search,
   C, Message, Loading, OcrCrosscheck, PageLoading, EmptyState, LedgerActions,
   ExcelSheet, LedgerPanelFooter, type SheetCol,
 } from '@/components/ui';
@@ -89,6 +89,8 @@ function IngestInner() {
     return p ? { plate: p } : {};
   });
   const [savedQ, setSavedQ] = useState('');
+  const [selectedSaved, setSelectedSaved] = useState<EntityRecord | null>(null);
+  const [savedPickedKey, setSavedPickedKey] = useState<string | null>(null);
   const [picked, setPicked] = useState<string | null>(null);
   const [parseNotice, setParseNotice] = useState('');
 
@@ -107,6 +109,11 @@ function IngestInner() {
     if (sheetView === '저장본') reloadSaved();
   }, [sheetView, companyId, entityKey, reloadSaved]);
 
+  useEffect(() => {
+    setSelectedSaved(null);
+    setSavedPickedKey(null);
+  }, [companyId, entityKey, sheetView]);
+
   function resetQueue() {
     setRecords([]);
     setError('');
@@ -124,22 +131,36 @@ function IngestInner() {
     setUniversalBusy(true);
     let saved = 0;
     let duplicates = 0;
+    const failures: string[] = [];
     try {
       for (const original of list) {
-        const result = await uploadToInbox(original, '기타', target, String(user.name || user.email || ''));
-        if (result.ok) {
-          saved += 1;
-          if (result.duplicate) duplicates += 1;
+        try {
+          const result = await uploadToInbox(original, '기타', target, String(user.name || user.email || ''));
+          if (result.ok) {
+            saved += 1;
+            if (result.duplicate) duplicates += 1;
+          } else {
+            failures.push(`${original.name}: ${result.reason || '저장 실패'}`);
+          }
+        } catch (uploadError) {
+          const reason = uploadError instanceof Error ? uploadError.message : String(uploadError || '저장 실패');
+          failures.push(`${original.name}: ${reason}`);
         }
       }
-      if (saved) {
+      if (!failures.length && saved) {
         toast(`원본 ${saved}건 접수${duplicates ? ` · 중복 ${duplicates}건` : ' · 처리대기'}`, 'success');
         setEntityKey('inbox');
         setSheetView('저장본');
         setUniversalOpen(false);
         setPanelOpen(false);
+      } else if (failures.length) {
+        const sample = failures.slice(0, 2).join(' / ');
+        const more = failures.length > 2 ? ` 외 ${failures.length - 2}건` : '';
+        toast(`원본 ${saved}건 접수 · ${failures.length}건 실패 — ${sample}${more}`, 'error');
       }
-      if (saved < list.length) toast(`${list.length - saved}건은 저장하지 못했습니다`, 'error');
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : String(error || '알 수 없는 오류');
+      toast(`원본 업로드 중단 — ${reason}`, 'error');
     } finally {
       setUniversalBusy(false);
     }
@@ -151,9 +172,11 @@ function IngestInner() {
     if (!target) { toast(NEED_COMPANY, 'error'); return; }
     setSaving(true); setError('');
     try {
-      const toSave = ocrRaw && records.length === 1
-        ? [{ ...records[0], _ocrOriginal: { raw: ocrRaw, at: new Date().toISOString(), source: entity.source } }]
-        : records.map(({ _rid, ...rest }) => rest);
+      // _rid는 대기표 선택용 UI 키다. OCR·엑셀·직접입력 어느 경로에서도 원장에 저장하지 않는다.
+      const cleanRecords = records.map(({ _rid: _pendingKey, ...rest }) => rest);
+      const toSave = ocrRaw && cleanRecords.length === 1
+        ? [{ ...cleanRecords[0], _ocrOriginal: { raw: ocrRaw, at: new Date().toISOString(), source: entity.source } }]
+        : cleanRecords;
       const r = await saveIntake(entityKey, target, toSave, {
         context: { source: ocrRaw ? 'ocr' : tab === 'excel' ? 'upload' : 'manual' },
       });
@@ -305,19 +328,44 @@ function IngestInner() {
 
   const savedRows = useMemo(() => {
     if (sheetView !== '저장본') return [];
-    const list = savedList || [];
-    if (!savedQ.trim()) return list;
-    return list.filter((r) => textMatch(savedQ, ...entity.fields.slice(0, 8).map((f) => r[f.key])));
-  }, [sheetView, savedList, savedQ, entity.fields]);
+    const searchFields = entityKey === 'inbox'
+      ? ['filename', 'kind', 'processingState', 'classificationState', 'intakeState', 'assignmentState', 'assignee', 'dueDate', 'suggestedEntity', 'matchedEntity', 'classificationReason']
+      : entity.fields.slice(0, 8).map((field) => field.key);
+    const filtered = !savedQ.trim()
+      ? [...(savedList || [])]
+      : (savedList || []).filter((r) => textMatch(savedQ, ...searchFields.map((key) => r[key])));
+    if (entityKey === 'inbox') {
+      filtered.sort((a, b) => processingAttentionRank(a.processingState) - processingAttentionRank(b.processingState)
+        || String(a.uploadedAt || a.createdAt || '').localeCompare(String(b.uploadedAt || b.createdAt || '')));
+    }
+    return filtered;
+  }, [sheetView, savedList, savedQ, entity.fields, entityKey]);
+
+  const inboxQueueSummary = useMemo(
+    () => entityKey === 'inbox' ? summarizeProcessingQueue(savedList || []) : null,
+    [entityKey, savedList],
+  );
 
   const savedCols = useMemo<SheetCol<EntityRecord>[]>(() => [
-    ...entity.fields.slice(0, 6).map((f, i) => ({
+    ...(entityKey === 'inbox'
+      ? ['filename', 'kind', 'processingState', 'classificationState', 'intakeState', 'assignmentState', 'assignee', 'dueDate']
+        .map((key) => entity.fields.find((field) => field.key === key))
+        .filter((field): field is (typeof entity.fields)[number] => !!field)
+      : entity.fields.slice(0, 6)).map((f, i) => ({
       key: f.key,
       label: f.label,
       pin: i === 0,
       priority: (i < 3 ? 1 : 2) as 1 | 2,
       text: (r: EntityRecord) => String(r[f.key] ?? ''),
-      render: (r: EntityRecord) => String(r[f.key] != null && r[f.key] !== '' ? r[f.key] : '—'),
+      render: (r: EntityRecord) => {
+        const value = String(r[f.key] ?? '').trim();
+        if (!value) return '—';
+        if (entityKey === 'inbox' && /State$/.test(f.key)) {
+          const tone = /완료|분류됨|배정됨/.test(value) ? 'green' : /오류|중복/.test(value) ? 'red' : 'amber';
+          return <Badge tone={tone}>{value}</Badge>;
+        }
+        return value;
+      },
     })),
     {
       key: '_at',
@@ -326,7 +374,40 @@ function IngestInner() {
       text: (r: EntityRecord) => String(r.createdAt || ''),
       render: (r: EntityRecord) => String(r.createdAt || '').slice(0, 16).replace('T', ' ') || '—',
     },
-  ], [entity.fields]);
+  ], [entity.fields, entityKey]);
+
+  const savedDetailCols = useMemo<SheetCol<EntityRecord>[]>(() => entity.fields.map((field) => ({
+    key: field.key,
+    label: field.label,
+    text: (row) => String(row[field.key] ?? ''),
+    render: (row) => {
+      const value = String(row[field.key] ?? '').trim();
+      if (!value) return '—';
+      if (field.key === 'url') {
+        return <a href={value} target="_blank" rel="noreferrer" style={{ color: C.accent, fontWeight: 700 }}>원본 열기</a>;
+      }
+      if (entityKey === 'inbox' && /State$/.test(field.key)) {
+        const tone = /완료|분류됨|배정됨/.test(value) ? 'green' : /오류|중복/.test(value) ? 'red' : 'amber';
+        return <Badge tone={tone}>{value}</Badge>;
+      }
+      return value;
+    },
+  })), [entity.fields, entityKey]);
+
+  const savedDetailSections = useMemo(() => {
+    const byKeys = (keys: string[]) => savedDetailCols.filter((col) => keys.includes(col.key));
+    if (entityKey === 'inbox') return [
+      { title: '원본', open: true, cols: byKeys(['url', 'filename', 'kind', 'uploadedBy', 'uploadedAt', 'originalMime', 'originalSize']) },
+      { title: '처리상태', cols: byKeys(['processingState', 'classificationState', 'intakeState', 'assignmentState', 'assignee', 'dueDate', 'note']) },
+      { title: '분류·연결', cols: byKeys(['suggestedEntity', 'classificationConfidence', 'classificationReason', 'matchedEntity', 'matchedKey', 'plate']) },
+      { title: '원본 무결성', cols: byKeys(['originalHash', 'fingerprintAlgorithm', 'duplicateOf', 'duplicateDetectedAt', 'analysisWarnings']) },
+    ];
+    const primaryKeys = new Set(manualPrimaryFields.map((field) => field.key));
+    return [
+      { title: '기본정보', open: true, cols: savedDetailCols.filter((col) => primaryKeys.has(col.key)) },
+      { title: '추가 운영정보', cols: savedDetailCols.filter((col) => !primaryKeys.has(col.key)) },
+    ];
+  }, [entityKey, manualPrimaryFields, savedDetailCols]);
 
   const sheetBusy = (sheetView === '저장본' && savedLoading) || loading;
 
@@ -378,6 +459,20 @@ function IngestInner() {
           cols={savedCols}
           rows={savedRows}
           rowKey={(r, i) => String(r._key || r.id || i)}
+          selectedRowKey={selectedSaved ? String(selectedSaved._key || selectedSaved.id || '') : savedPickedKey}
+          onRow={(row) => {
+            setSavedPickedKey(String(row._key || row.id || ''));
+          }}
+          onRowDoubleClick={(row) => {
+            const key = String(row._key || row.id || '');
+            setSavedPickedKey(key);
+            setSelectedSaved((current) => {
+              const currentKey = current ? String(current._key || current.id || '') : '';
+              return currentKey === key ? null : row;
+            });
+            setPanelOpen(false);
+            setUniversalOpen(false);
+          }}
           fit
         />
       )}
@@ -391,9 +486,7 @@ function IngestInner() {
           <div className="ledger-record-panel__title">무엇이든 올리기</div>
           <div className="ledger-record-panel__subtitle">종류를 몰라도 먼저 등록 · 이후 분석과 분류를 이어서 처리</div>
         </div>
-        <button type="button" className="ledger-record-panel__close" onClick={() => setUniversalOpen(false)} aria-label="원본 투입패널 닫기">
-          <X size={14} />
-        </button>
+        <LedgerPanelCloseButton onClose={() => setUniversalOpen(false)} label="원본 투입패널 닫기" />
       </header>
       <div className="ledger-record-panel__body" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
         {isAllScope(companyId) && (
@@ -420,9 +513,7 @@ function IngestInner() {
             {tab === 'ocr' ? entity.source : tab === 'excel' ? 'xlsx · csv' : '폼 확정 → 대기'}
           </div>
         </div>
-        <button type="button" className="ledger-record-panel__close" onClick={() => setPanelOpen(false)} aria-label="투입패널 닫기">
-          <X size={14} />
-        </button>
+        <LedgerPanelCloseButton onClose={() => setPanelOpen(false)} label="투입패널 닫기" />
       </header>
 
       <div className="ledger-record-panel__body" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -495,6 +586,34 @@ function IngestInner() {
     </section>
   ) : null;
 
+  const savedDetailPanel = sheetView === '저장본' && selectedSaved ? (
+    <LedgerRecordPanel
+      title={String(selectedSaved.filename || selectedSaved[entity.fields[0]?.key] || entity.label)}
+      identity={entityKey === 'inbox'
+        ? `${String(selectedSaved.kind || '문서')} · ${String(selectedSaved.assignee || '미배정')}`
+        : entity.label}
+      statusBadge={entityKey === 'inbox'
+        ? <Badge tone={/완료/.test(String(selectedSaved.processingState || '')) ? 'green' : 'amber'}>{String(selectedSaved.processingState || '미분류')}</Badge>
+        : undefined}
+      row={selectedSaved}
+      cols={savedDetailCols}
+      sections={savedDetailSections}
+      onClose={() => setSelectedSaved(null)}
+      actions={entityKey === 'inbox' ? (
+        <>
+          {String(selectedSaved.status || '') !== '매칭' && String(selectedSaved.processingState || '') !== '처리완료' ? (
+            <Btn size="sm" href={`/inbox?open=${encodeURIComponent(String(selectedSaved._key || selectedSaved.inboxKey || selectedSaved.id || ''))}`}>
+              <FileText size={14} /> 확인·매칭
+            </Btn>
+          ) : null}
+          <Btn size="sm" variant="ghost" href={`/work?open=${encodeURIComponent(String(selectedSaved._key || selectedSaved.inboxKey || selectedSaved.id || ''))}`}>
+            업무에서 보기
+          </Btn>
+        </>
+      ) : undefined}
+    />
+  ) : null;
+
   return (
     <LedgerFrame
       title={DATA_CENTER_TITLE}
@@ -508,6 +627,7 @@ function IngestInner() {
             value={entityKey}
             onChange={(e) => {
               setEntityKey(e.target.value);
+              setSelectedSaved(null);
               resetQueue();
               setForm({});
               setSheetView('대기');
@@ -530,7 +650,14 @@ function IngestInner() {
       )}
       stats={(
         <span style={{ fontSize: 12.5, color: C.mute }}>
-          대기 <b style={{ color: records.length ? C.warn : C.ink }}>{records.length}</b>
+          {sheetView === '저장본' && inboxQueueSummary ? <>
+            확인필요 <b style={{ color: inboxQueueSummary.needsReview ? C.warn : C.ink }}>{inboxQueueSummary.needsReview}</b>
+            {' · '}미분류 <b style={{ color: inboxQueueSummary.unclassified ? C.warn : C.ink }}>{inboxQueueSummary.unclassified}</b>
+            {' · '}미배정 <b style={{ color: inboxQueueSummary.unassigned ? C.danger : C.ink }}>{inboxQueueSummary.unassigned}</b>
+            {inboxQueueSummary.errors ? <>{' · '}오류 <b style={{ color: C.danger }}>{inboxQueueSummary.errors}</b></> : null}
+          </> : <>
+            대기 <b style={{ color: records.length ? C.warn : C.ink }}>{records.length}</b>
+          </>}
           {companyId ? <> · {companyLabel(companyId)}</> : null}
         </span>
       )}
@@ -553,7 +680,8 @@ function IngestInner() {
             iconOnly
             tip={panelOpen || universalOpen ? '투입패널 숨기기' : '투입패널 표시하기'}
             onClick={() => {
-              if (universalOpen) setUniversalOpen(false);
+              if (selectedSaved) setSelectedSaved(null);
+              else if (universalOpen) setUniversalOpen(false);
               else setPanelOpen((o) => !o);
             }}
           >
@@ -584,7 +712,7 @@ function IngestInner() {
           <Btn
             size="sm"
             variant={records.length ? 'ghost' : 'solid'}
-            onClick={() => { setUniversalOpen(true); setPanelOpen(false); }}
+            onClick={() => { setUniversalOpen(true); setPanelOpen(false); setSelectedSaved(null); }}
           >
             <UploadCloud size={14} /> 무엇이든 올리기
           </Btn>
@@ -608,7 +736,7 @@ function IngestInner() {
         </>
       ) : parseNotice ? <Message variant="warning">{parseNotice}</Message> : undefined}
       body={sheetBody}
-      sidePanel={universalPanel || inputPanel}
+      sidePanel={savedDetailPanel || universalPanel || inputPanel}
     />
   );
 }

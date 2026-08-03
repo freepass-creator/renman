@@ -163,12 +163,15 @@ function Diff({ before, after }: { before?: Record<string, unknown> | null; afte
       {keys.map((k) => {
         const b = before?.[k], a = after?.[k];
         const changed = before && after && String(b ?? '') !== String(a ?? '');
+        const beforeShown = show(k, b);
+        const afterShown = show(k, a);
+        const maskedChange = changed && beforeShown === afterShown;
         return (
           <Fragment key={k}>
             <div style={{ color: C.faint, fontWeight: 600 }}>{k}</div>
             <div style={{ color: C.ink }}>
               {before && after
-                ? (changed ? <span><span style={{ color: C.mute, textDecoration: 'line-through' }}>{show(k, b)}</span> <span style={{ color: C.faint }}>→</span> <b>{show(k, a)}</b></span> : <span style={{ color: C.mute }}>{show(k, a)}</span>)
+                ? (changed ? <span><span style={{ color: C.mute, textDecoration: 'line-through' }}>{beforeShown}</span> <span style={{ color: C.faint }}>→</span> <b>{afterShown}</b>{maskedChange ? <> <Badge tone="amber">마스킹 영역 변경</Badge></> : null}</span> : <span style={{ color: C.mute }}>{afterShown}</span>)
                 : <span>{show(k, a ?? b)}</span>}
             </div>
           </Fragment>

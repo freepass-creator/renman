@@ -4,11 +4,15 @@
  */
 import { describe, it, expect } from 'vitest';
 import { rowWarnings, rowSeverity, type RowWarnCtx } from '@/lib/sheet-warnings';
+import type { CollectionInfo } from '@/lib/collection';
 
 const TODAY = '2026-07-24';
 const ctx = (over: Partial<RowWarnCtx> = {}): RowWarnCtx => ({
   held: true, active: false, contractRec: null, veh: null, util: '휴차', customer: '',
-  dday: null, rent: 0, overdueDays: 0, insEnd: '', inspectionTo: '', today: TODAY, ...over,
+  dday: null, rent: 0, overdueDays: 0, collectionInfo: null, insEnd: '', inspectionTo: '', today: TODAY, ...over,
+});
+const collection = (stage: CollectionInfo['stage'], overdueDays: number): CollectionInfo => ({
+  stage, overdueDays, tone: 'gray', nextAction: '',
 });
 const codes = (c: RowWarnCtx) => rowWarnings(c).map((w) => w.code);
 const find = (c: RowWarnCtx, code: string) => rowWarnings(c).find((w) => w.code === code);
@@ -36,11 +40,12 @@ describe('rowWarnings — 검사(veh.inspectionTo)', () => {
 });
 
 describe('rowWarnings — 미수 회수단계', () => {
-  it('연체 0 → 없음', () => { expect(codes(ctx({ overdueDays: 0 }))).not.toContain('collection'); });
-  it('연체 1(경고) → med', () => { expect(find(ctx({ overdueDays: 1 }), 'collection')?.sev).toBe('med'); });
-  it('연체 3(시동제어) → high', () => { expect(find(ctx({ overdueDays: 3 }), 'collection')?.sev).toBe('high'); });
+  it('계약별 조치정보 없음 → 연체일만으로 단계 추정 안 함', () => { expect(codes(ctx({ overdueDays: 30 }))).not.toContain('collection'); });
+  it('계약조건 확인 → 후속 등록을 위해 med', () => { expect(find(ctx({ overdueDays: 1, collectionInfo: collection('계약조건 확인', 1) }), 'collection')?.sev).toBe('med'); });
+  it('경고 → med', () => { expect(find(ctx({ overdueDays: 1, collectionInfo: collection('경고', 1) }), 'collection')?.sev).toBe('med'); });
+  it('시동제어 → high', () => { expect(find(ctx({ overdueDays: 3, collectionInfo: collection('시동제어', 3) }), 'collection')?.sev).toBe('high'); });
   it('연체 30(채권화) → high · 라벨', () => {
-    const w = find(ctx({ overdueDays: 30 }), 'collection');
+    const w = find(ctx({ overdueDays: 30, collectionInfo: collection('채권화', 30) }), 'collection');
     expect(w?.sev).toBe('high'); expect(w?.label).toBe('미수·채권화');
   });
 });

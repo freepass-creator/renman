@@ -4,7 +4,7 @@ import { ENTITIES, type EntityRecord } from '@/lib/intake/entities';
 import { callOcrExtract, mapOcrToEntity, type OcrResult, type OcrOriginal } from '@/lib/ocr-client';
 import { uploadDoc, docPath, storageReady } from '@/lib/storage';
 import type { DocVersion } from '@/lib/docs';
-import { KV, Btn, Badge, OcrCrosscheck, Select, Input, C, ctrlH, type KVRow } from '@/components/ui';
+import { KV, Btn, TextLink, Badge, OcrCrosscheck, Select, Input, C, ctrlH, type KVRow } from '@/components/ui';
 import { type CrosscheckResult } from '@/lib/ocr-crosscheck';
 import { useIsMobile } from '@/lib/use-mobile';
 import { ChevronDown, Check, FileText } from 'lucide-react';
@@ -51,7 +51,6 @@ type InfoDocProps = {
 const REASONS = ['재발급', '변경', '오류정정'];
 const fLab: React.CSSProperties = { display: 'flex', flexDirection: 'column', gap: 3, minWidth: 0 };
 const fLl: React.CSSProperties = { fontSize: 11, color: C.mute };
-const link: React.CSSProperties = { display: 'inline-flex', alignItems: 'center', gap: 5, border: 'none', background: 'none', cursor: 'pointer', padding: 0, fontSize: 11.5, color: C.mute, fontWeight: 600 };
 
 export function InfoDoc({
   id, order, title, desc, fields, editing, form, onChange, onEditToggle, onSave,
@@ -199,9 +198,9 @@ export function InfoDoc({
       {/* 서류 이력 (접힘) — 최신 먼저 */}
       {docs.length > 1 && (
         <div style={{ marginTop: 6 }}>
-          <button onClick={() => setHistOpen((o) => !o)} style={link}>
+          <TextLink onClick={() => setHistOpen((o) => !o)} tone="ink" style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11.5, color: C.mute, fontWeight: 600 }}>
             <ChevronDown size={13} color={C.sub} style={{ transform: histOpen ? 'none' : 'rotate(-90deg)', transition: 'transform .15s' }} /> 서류 이력 {docs.length}
-          </button>
+          </TextLink>
           {histOpen && (
             <div style={{ marginTop: 6, border: `1px solid ${C.line}`, borderRadius: 'var(--radius)', overflow: 'hidden', background: C.card }}>
               {docs.map((d, i) => (

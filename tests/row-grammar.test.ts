@@ -18,6 +18,7 @@ import { CASH_BASIC_COLS } from '@/lib/finance/cash-cols';
 import { ACCOUNT_BASIC_COLS } from '@/lib/finance/account-cols';
 import { AGENDA_BASIC_COLS } from '@/lib/agenda-cols';
 import { STAFF_COLS } from '@/lib/staff-cols';
+import { RECEIVABLE_BASIC_COLS } from '@/lib/receivables-cols';
 
 type Col = { key: string; label?: string };
 
@@ -34,6 +35,7 @@ const SCREENS: Array<{ name: string; cols: readonly Col[] }> = [
   { name: '계좌', cols: ACCOUNT_BASIC_COLS as readonly Col[] },
   { name: '일정', cols: AGENDA_BASIC_COLS as readonly Col[] },
   { name: '직원(경영관리)', cols: STAFF_COLS as readonly Col[] },
+  { name: '미수관리', cols: RECEIVABLE_BASIC_COLS as readonly Col[] },
 ];
 
 const labelsOf = (cols: readonly Col[]) => cols.map((c) => String(c.label ?? c.key));
@@ -102,6 +104,7 @@ describe('표에서는 2줄 셀(TwoLineCell)을 쓰지 않는다', () => {
       'lib/risk-cols.tsx', 'lib/work-cols.tsx', 'lib/sheet-cols.tsx', 'lib/agenda-cols.tsx',
       'lib/master-ledger-cols.tsx', 'lib/staff-cols.tsx',
       'lib/finance/cash-cols.tsx', 'lib/finance/account-cols.tsx',
+      'lib/receivables-cols.tsx',
     ];
     const offenders = files.filter((f) => readFileSync(f, 'utf8').includes('TwoLineCell'));
     expect({ 위반파일: offenders }).toMatchObject({ 위반파일: [] });

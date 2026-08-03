@@ -78,7 +78,7 @@ export type ChipCountTone = 'danger' | 'warn' | 'mute';
 
 // PillTabs — 룩=toggleStyle. 모바일=CTRL.md(40)+16px (ERP4). lg는 위저드 CTA만.
 export function PillTabs<T extends string>({ tabs, value, onChange, size = 'md' }: {
-  tabs: { key: T; label: React.ReactNode; title?: string; badge?: number; badgeTone?: ChipCountTone }[];
+  tabs: { key: T; label: React.ReactNode; title?: string; badge?: number; badgeTone?: ChipCountTone; disabled?: boolean }[];
   value: T;
   onChange: (k: T) => void;
   size?: 'sm' | 'md' | 'lg';
@@ -86,15 +86,15 @@ export function PillTabs<T extends string>({ tabs, value, onChange, size = 'md' 
   const mobile = useIsMobile();
   const s: 'sm' | 'md' | 'lg' = size === 'lg' ? 'lg' : (size === 'sm' ? 'sm' : 'md');
   return (
-    <div style={{ display: 'flex', flexWrap: 'wrap', gap: mobile ? 8 : 6 }}>
+    <div role="group" style={{ display: 'flex', flexWrap: 'wrap', gap: mobile ? 8 : 6 }}>
       {tabs.map((t) => {
         // 뱃지 = 그 탭에 «쌓여 있는 건수». 0이면 안 붙인다 — 0을 보여주면 없는 일도 있는 것처럼 읽힌다.
         const n = t.badge && t.badge > 0 ? t.badge : 0;
         const tone = t.badgeTone || 'mute';
         const badgeBg = tone === 'danger' ? C.danger : tone === 'warn' ? C.warn : 'var(--zinc-text)';
         return (
-          <button key={t.key} type="button" data-ui="toggle" aria-pressed={value === t.key} onClick={() => onChange(t.key)}
-            title={t.title} style={{ ...toggleStyle(value === t.key, s, mobile), position: 'relative', overflow: 'visible' }}>
+          <button key={t.key} type="button" data-ui="toggle" aria-pressed={value === t.key} disabled={t.disabled} onClick={() => { haptic.select(); onChange(t.key); }}
+            title={t.title} style={{ ...toggleStyle(value === t.key, s, mobile), position: 'relative', overflow: 'visible', ...(t.disabled ? { opacity: 0.45, cursor: 'not-allowed' } : null) }}>
             {t.label}
             {n > 0 && (
               <span aria-label={`${n}건`} style={{
@@ -130,7 +130,7 @@ export function IconSeg<T extends string>({ value, onChange, options, size = 'md
       {options.map((o, i) => {
         const on = value === o.key;
         return (
-          <button key={o.key} type="button" onClick={() => onChange(o.key)} title={o.label} aria-label={o.label} aria-pressed={on}
+          <button key={o.key} type="button" onClick={() => { haptic.select(); onChange(o.key); }} title={o.label} aria-label={o.label} aria-pressed={on}
             style={{
               height: h, width: showLabels ? 'auto' : h, minWidth: h, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: showLabels ? 6 : 0,
               cursor: 'pointer', border: 'none', borderLeft: i ? `1px solid ${C.line}` : 'none',
@@ -239,6 +239,7 @@ export function IconBtn({ children, onClick, title, active, disabled }: { childr
 export function Btn({
   children, onClick, variant = 'solid', size = 'md', disabled, href, block,
   tip, iconOnly = false, 'aria-pressed': ariaPressed,
+  'aria-haspopup': ariaHasPopup, 'aria-expanded': ariaExpanded, 'aria-controls': ariaControls,
 }: {
   children: React.ReactNode;
   onClick?: () => void;
@@ -252,6 +253,9 @@ export function Btn({
   /** 정사각 아이콘만 — tools/ghost 반복액션. tip으로 설명. */
   iconOnly?: boolean;
   'aria-pressed'?: boolean;
+  'aria-haspopup'?: React.AriaAttributes['aria-haspopup'];
+  'aria-expanded'?: boolean;
+  'aria-controls'?: string;
 }) {
   const mobile = useIsMobile();
   const lg = size === 'lg'; // 현장 위저드 푸터(터치 48) — ERP4엔 없고 renman 유지
@@ -287,6 +291,9 @@ export function Btn({
       title={label}
       aria-label={label}
       aria-pressed={ariaPressed}
+      aria-haspopup={ariaHasPopup}
+      aria-expanded={ariaExpanded}
+      aria-controls={ariaControls}
       onClick={onClick ? () => { haptic.tap(); onClick(); } : undefined}
       disabled={disabled}
       style={{ ...s, WebkitTapHighlightColor: 'transparent' }}
@@ -300,9 +307,69 @@ export function Input({ size = 'md', style, ...rest }: Omit<React.InputHTMLAttri
   const mobile = useIsMobile();
   return <input {...rest} style={{ ...fieldStyle(size === 'sm', mobile), ...style }} />;
 }
+/** 여러 줄 입력 SSOT — Input과 같은 보더·폰트·포커스, 높이만 내용형. */
+export function TextArea({ size = 'md', style, ...rest }: Omit<React.TextareaHTMLAttributes<HTMLTextAreaElement>, 'size'> & { size?: 'sm' | 'md' }) {
+  const mobile = useIsMobile();
+  return (
+    <textarea
+      {...rest}
+      style={{
+        ...fieldStyle(size === 'sm', mobile),
+        width: '100%',
+        height: 'auto',
+        minHeight: mobile ? 96 : 76,
+        padding: mobile ? '10px 12px' : size === 'sm' ? '7px 9px' : '8px 10px',
+        lineHeight: 1.5,
+        resize: 'vertical',
+        ...style,
+      }}
+    />
+  );
+}
 export function Select({ size = 'md', style, children, ...rest }: Omit<React.SelectHTMLAttributes<HTMLSelectElement>, 'size'> & { size?: 'sm' | 'md' }) {
   const mobile = useIsMobile();
   return <select {...rest} style={{ ...selectStyle(size === 'sm', mobile), ...style }}>{children}</select>;
+}
+
+/** 표·목록 행 선택 SSOT — 행 클릭과 중복 실행을 막고 모바일 44px 터치 영역을 보장한다. */
+export function Checkbox({
+  checked, onChange, label, ariaLabel, disabled = false, stop = true,
+}: {
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+  label?: React.ReactNode;
+  ariaLabel?: string;
+  disabled?: boolean;
+  /** 클릭 가능한 행 안에서 사용할 때 행 클릭 전파를 막는다. */
+  stop?: boolean;
+}) {
+  const mobile = useIsMobile();
+  return (
+    <label
+      data-ui="checkbox"
+      onClick={stop ? (e) => e.stopPropagation() : undefined}
+      style={{
+        display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: label ? 7 : 0,
+        minWidth: mobile ? 44 : 28, minHeight: mobile ? 44 : 28,
+        cursor: disabled ? 'not-allowed' : 'pointer', color: C.ink,
+        fontSize: mobile ? 14 : 12.5, fontWeight: 600,
+        opacity: disabled ? 0.5 : 1, WebkitTapHighlightColor: 'transparent',
+      }}
+    >
+      <input
+        type="checkbox"
+        checked={checked}
+        disabled={disabled}
+        aria-label={ariaLabel || (typeof label === 'string' ? label : undefined)}
+        onChange={(e) => { haptic.select(); onChange(e.target.checked); }}
+        style={{
+          width: mobile ? 18 : 16, height: mobile ? 18 : 16, margin: 0,
+          cursor: disabled ? 'not-allowed' : 'pointer', accentColor: C.brand, flexShrink: 0,
+        }}
+      />
+      {label != null ? <span>{label}</span> : null}
+    </label>
+  );
 }
 
 export function PeriodBar({ latest, initial = '월간', onRange, size = 'md' }: { latest?: string; initial?: Period; onRange: (r: { from: string; to: string }) => void; size?: 'sm' | 'md' }) {
@@ -369,7 +436,7 @@ export function TextLink({
       title={title}
       disabled={disabled}
       data-ui="action"
-      onClick={(e) => { if (stop) e.stopPropagation(); onClick?.(e); }}
+      onClick={(e) => { if (stop) e.stopPropagation(); haptic.tap(); onClick?.(e); }}
       style={{
         border: 'none', background: 'none', padding: 0, margin: 0,
         cursor: disabled ? 'default' : 'pointer',
@@ -391,6 +458,7 @@ export function Search({ size = 'md', style, wrapStyle, ...rest }: Omit<React.In
   const h = ctrlH(mobile, cs);
   const hasValue = rest.value != null && String(rest.value).length > 0;
   const clear = () => {
+    haptic.tap();
     const ev = { target: { value: '' }, currentTarget: { value: '' } } as React.ChangeEvent<HTMLInputElement>;
     rest.onChange?.(ev);
   };

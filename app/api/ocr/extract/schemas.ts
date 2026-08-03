@@ -212,6 +212,14 @@ export const RENTAL_CONTRACT_SCHEMA = {
     payment_account_holder: { type: Type.STRING, nullable: true, description: '입금계좌 예금주 (회사명)' },
     autopay_day: { type: Type.INTEGER, nullable: true, description: '자동이체일 (5/10/15/20/25 중 1, 체크된 거 우선)' },
 
+    // 연체 조치 조건 — 계약서에 명시된 숫자만 추출하며 관행·회사정책을 추정하지 않는다.
+    arrears_clause: { type: Type.STRING, nullable: true, description: '연체 시 경고·시동제어·계약해지·차량회수·법적조치를 정한 계약서 원문 조항. 없으면 null' },
+    warning_after_days: { type: Type.INTEGER, nullable: true, description: '연체 경고가 가능해지는 D+일. 계약서에 숫자가 명시된 경우만' },
+    engine_lock_after_days: { type: Type.INTEGER, nullable: true, description: '시동제어가 가능해지는 D+일. 계약서에 숫자가 명시된 경우만' },
+    repossession_after_days: { type: Type.INTEGER, nullable: true, description: '차량회수 또는 계약해지가 가능해지는 D+일. 계약서에 숫자가 명시된 경우만' },
+    legal_notice_after_days: { type: Type.INTEGER, nullable: true, description: '내용증명 등 공식 통지가 가능해지는 D+일. 계약서에 숫자가 명시된 경우만' },
+    debt_transfer_after_days: { type: Type.INTEGER, nullable: true, description: '법적조치·채권전환이 가능해지는 D+일. 계약서에 숫자가 명시된 경우만' },
+
     // 자동이체신청서 (CMS) — 보통 9페이지
     auto_debit_bank: { type: Type.STRING, nullable: true, description: '자동이체 출금은행 (CMS 신청서)' },
     auto_debit_account: { type: Type.STRING, nullable: true, description: '자동이체 출금계좌번호' },
@@ -249,6 +257,8 @@ export const RENTAL_CONTRACT_SCHEMA = {
     'monthly_amount', 'deposit_total', 'deposit_installments',
     'purchase_option_amount', 'payment_account_bank', 'payment_account_no',
     'payment_account_holder', 'autopay_day',
+    'arrears_clause', 'warning_after_days', 'engine_lock_after_days',
+    'repossession_after_days', 'legal_notice_after_days', 'debt_transfer_after_days',
     'auto_debit_bank', 'auto_debit_account', 'auto_debit_holder',
     'insurer', 'deductible_min', 'deductible_max', 'deductible_rate',
     'predecessor_name', 'predecessor_phone', 'succeeded_at',

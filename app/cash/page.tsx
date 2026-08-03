@@ -26,7 +26,6 @@ import { useCashLedgerLists } from '@/lib/use-cash-ledger-lists';
 import { useEntityList, useEntityLists } from '@/lib/use-entity-lists';
 import { textMatch } from '@/lib/search-match';
 import { notifySaved, openIngest, openCar, openPayments } from '@/lib/ui-bus';
-import { MigrateDataButton } from '@/components/MigrateDataButton';
 import { companyDisplay } from '@/lib/companies';
 import { TODAY } from '@/lib/dashboard-consts';
 import { periodRange } from '@/lib/finance/period';
@@ -42,7 +41,7 @@ import { toast } from '@/lib/toast';
 import { commitUpdate } from '@/lib/commit';
 import { safeRun } from '@/lib/safe-update';
 import {
-  LedgerActions, LedgerActiveFilters, LedgerCreatePanel, LedgerFilterButton, LedgerFilterFields, LedgerFilterPanel, LedgerFrame, LedgerPanelFooter, LedgerRecordPanel, Btn, Input, Select, Search, PillTabs, PeriodBar, Badge, Message, ListBox, ListRow,
+  LedgerActions, LedgerActiveFilters, LedgerCreatePanel, LedgerFilterButton, LedgerFilterFields, LedgerFilterPanel, LedgerFrame, LedgerPanelCloseButton, LedgerPanelFooter, LedgerRecordPanel, Btn, Input, TextArea, Select, Search, PillTabs, PeriodBar, Checkbox, Badge, Message, ListBox, ListRow,
   C, ContextMenu, type ContextMenuItem, useSheetExport, won, type LedgerColView, type LedgerFormSection,
 } from '@/components/ui';
 import { useIsMobile } from '@/lib/use-mobile';
@@ -93,7 +92,7 @@ function CashBulkInputPanel({ onClose }: { onClose: () => void }) {
           <div className="ledger-record-panel__eyebrow">일괄 수집</div>
           <div className="ledger-record-panel__title">대량 입력</div>
         </div>
-        <button type="button" className="ledger-record-panel__close" onClick={onClose} aria-label="대량 입력 패널 닫기"><X size={16} /></button>
+        <LedgerPanelCloseButton onClose={onClose} label="대량 입력 패널 닫기" />
       </header>
       <div className="ledger-create-panel__body">
         <div>
@@ -126,11 +125,11 @@ function CashBulkInputPanel({ onClose }: { onClose: () => void }) {
           ) : (
             <label className="ledger-create-panel__field">
               <span>원문 붙여넣기</span>
-              <textarea
+              <TextArea
                 value={text}
                 onChange={(event) => setText(event.target.value)}
                 placeholder="표·문자·거래내역을 그대로 붙여넣으세요"
-                style={{ minHeight: 180, resize: 'vertical', padding: 10, border: `1px solid ${C.line}`, borderRadius: 6, font: 'inherit' }}
+                style={{ minHeight: 180 }}
               />
             </label>
           )}
@@ -270,7 +269,7 @@ function CmsMatchPanel({
               right={
                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
                   <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, color: C.ok }}>{amt(Number(b.amount) || 0)}</span>
-                  <input type="checkbox" checked={on} onChange={() => toggle(k)} onClick={(e) => e.stopPropagation()} />
+                  <Checkbox checked={on} onChange={() => toggle(k)} ariaLabel={`${String(b.counterparty || '적요 없음')} 선택`} />
                 </span>
               }
               onClick={() => toggle(k)}
@@ -339,7 +338,7 @@ function CashClassificationPanel({ row, companyId, actor, onClose, onDone }: {
           <div className="ledger-record-panel__title">{row.date || '일자 없음'} · {flow} {won(row.inAmt || row.outAmt)}</div>
           <div className="ledger-record-panel__identity">{row.accountName || row.account || LEDGER_EMPTY.unassigned}</div>
         </div>
-        <button type="button" className="ledger-record-panel__close" onClick={onClose} aria-label="1차 분류 패널 닫기"><X size={16} /></button>
+        <LedgerPanelCloseButton onClose={onClose} label="1차 분류 패널 닫기" />
       </header>
       <div className="ledger-create-panel__body">
         <Message variant="info">거래일·금액·계좌 원본은 유지합니다. 지금 아는 정보만 저장할 수 있고 미분류는 후속 업무로 계속 남습니다.</Message>
@@ -454,7 +453,7 @@ function CashBundlePanel({ row, companyId, actor, contracts, onClose, onDone }: 
           <div className="ledger-record-panel__title">묶음 입출금 분해</div>
           <div className="ledger-record-panel__identity">{row.date} · {row.party || row.accountName || '거래'} · {flow} {won(actualAmount)}</div>
         </div>
-        <button type="button" className="ledger-record-panel__close" onClick={onClose} aria-label="묶음 분해 패널 닫기"><X size={16} /></button>
+        <LedgerPanelCloseButton onClose={onClose} label="묶음 분해 패널 닫기" />
       </header>
       <div className="ledger-create-panel__body">
         <Message variant="info">실제 계좌 거래는 한 번만 반영하고, 여기서는 구성내역과 수수료를 분해합니다. 덜 채운 상태도 미완료로 저장해 이어서 작업할 수 있습니다.</Message>
@@ -1020,6 +1019,19 @@ export default function CashLedgerPage() {
         rows={accountRows}
         rowKey={(row) => row.id}
         selectedRowKey={selectedAccount?.id}
+        mobileCard={(row) => ({
+          co: isOperator ? row.companyId : undefined,
+          badge: row.status || '미지정',
+          badgeTone: row.status === '사용중' ? 'green' : 'gray',
+          name: row.accountAlias || row.bankName || '계좌',
+          carType: row.accountNumber || undefined,
+          fields: [
+            ['예금주', row.accountHolder || LEDGER_EMPTY.dash],
+            ['최근거래', row.lastTxDate || LEDGER_EMPTY.dash],
+            ['거래', `${row.transactionCount}건`],
+          ],
+          right: won(row.currentBalance),
+        })}
         onView={xlAcct.onView}
         onRowContextMenu={openCtx}
         onRowDoubleClick={(row) => {
@@ -1093,9 +1105,6 @@ export default function CashLedgerPage() {
         : ledgerKind === '법인카드 원천내역'
           ? '표시할 법인카드 원천내역이 없습니다. 기간을 바꾸거나 대량 입력에서 법인카드 자료를 등록하세요.'
           : '표시할 계좌 입출금이 없습니다. 기간을 바꾸거나 단건·대량 입력에서 등록하세요.'}
-      <div style={{ marginTop: 14, display: 'flex', justifyContent: 'center' }}>
-        <MigrateDataButton size="sm" />
-      </div>
     </>
   );
 
@@ -1146,6 +1155,24 @@ export default function CashLedgerPage() {
       rows={displayRows}
       rowKey={(r) => r.id}
       selectedRowKey={selected?.id}
+      mobileCard={(row) => {
+        const status = cashMoneyStatus(row);
+        return {
+          co: isOperator ? row.companyId : undefined,
+          badge: status,
+          badgeTone: status === '미분류' ? 'red' as const
+            : status === '집금대기' || status === '미매칭' ? 'amber' as const
+              : status === '제안있음' ? 'blue' as const
+                : status === '매칭완료' ? 'green' as const : 'gray' as const,
+          name: row.party || row.memo || '상대방 미입력',
+          carType: `${row.date || '일자 없음'} · ${row.accountName || row.source}`,
+          fields: [
+            ['계정', row.category || '미분류'],
+            ...(row.memo && row.memo !== row.party ? [['내용', row.memo] as [string, string]] : []),
+          ],
+          right: row.inAmt > 0 ? `+${won(row.inAmt)}` : row.outAmt > 0 ? `-${won(row.outAmt)}` : won(0),
+        };
+      }}
       onView={xlTx.onView}
       onRowContextMenu={openCtx}
       onRowDoubleClick={(row) => {
