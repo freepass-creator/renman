@@ -6,6 +6,7 @@ import { MHead } from '@/components/m/MHead';
 import { C, EmptyState, ErrorState, ObjRow, PageLoading, Rows, Search } from '@/components/ui';
 import { useEntityLists } from '@/lib/use-entity-lists';
 import { matchContracts, matchVehicles, matchWorkItems } from '@/lib/search-match';
+import { mobileVehicleHref } from '@/lib/mobile-routes';
 
 function MSearchInner() {
   const params = useSearchParams();
@@ -46,7 +47,7 @@ function MSearchInner() {
                       plate={hit.plate}
                       meta={String(hit.veh.carName || hit.veh.model || '')}
                       sub={hit.sub}
-                      onClick={() => router.push(`/m/vehicle/${encodeURIComponent(hit.plate)}`)}
+                      onClick={() => router.push(mobileVehicleHref(hit.plate, hit.companyId))}
                     />
                   ))}
                 </Rows>
@@ -61,7 +62,7 @@ function MSearchInner() {
                       name={hit.plate ? undefined : (hit.contractNo || hit.customer || '계약')}
                       meta={hit.customer}
                       fields={[["계약번호", hit.contractNo || '미지정'], ["상태", String(hit.rec.status || '미지정')]]}
-                      onClick={hit.plate ? () => router.push(`/m/vehicle/${encodeURIComponent(hit.plate)}`) : undefined}
+                      onClick={hit.plate ? () => router.push(mobileVehicleHref(hit.plate, hit.companyId)) : undefined}
                     />
                   ))}
                 </Rows>

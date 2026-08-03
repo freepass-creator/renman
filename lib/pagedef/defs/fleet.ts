@@ -10,6 +10,7 @@ import { FLEET_BASIC_COLS, FLEET_EXPANDED_COLS, FLEET_REVEAL_COLS } from '@/lib/
 import { useEntityLists } from '@/lib/use-entity-lists';
 import { openCar } from '@/lib/ui-bus';
 import { won } from '@/components/ui';
+import { mobileVehicleHref } from '@/lib/mobile-routes';
 import type { PageDef } from '@/lib/pagedef/types';
 
 const OWN = ['보유', '전체', '매각'];
@@ -22,7 +23,7 @@ export const FLEET_DEF: PageDef<FleetRow> = {
   title: '운영원장',
   rowKey: (r) => r.plate,
   drill: (r) => openCar(r.plate),
-  mDrill: (r) => `/m/vehicle/${encodeURIComponent(r.plate)}`,
+  mDrill: (r) => mobileVehicleHref(r.plate, r.companyId),
 
   // 모바일 리스트 — 상태 레일 + 차번 + 차종/고객 + 우측 미수(danger). 상태별 그룹.
   row: (r) => ({
@@ -44,10 +45,10 @@ export const FLEET_DEF: PageDef<FleetRow> = {
   ],
 
   useData() {
-    const { data: [vs = [], cs = [], ins = [], hs = []], loading } = useEntityLists(['vehicle', 'contract', 'insurance', 'history']);
+    const { data: [vs = [], cs = [], ins = [], hs = []], loading, error, reload } = useEntityLists(['vehicle', 'contract', 'insurance', 'history']);
     const fleet = useMemo(() => linkFleet(vs, cs, TODAY), [vs, cs]);
     const rows = useMemo(() => buildFleetRows(fleet.vehicles, ins, fleet.contracts, hs, TODAY), [fleet, ins, hs]);
-    return { rows, loading };
+    return { rows, loading, error, reload };
   },
 
   colSets: [
