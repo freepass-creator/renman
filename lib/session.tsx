@@ -189,8 +189,12 @@ function LoginForm({ onSignup, onReset }: { onSignup: () => void; onReset: () =>
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);
   async function submit(e: FormEvent) {
-    e.preventDefault(); setErr(''); setBusy(true);
-    try { await signInEmail(email, password); }
+    e.preventDefault();
+    const form = new FormData(e.currentTarget as HTMLFormElement);
+    const submittedEmail = String(form.get('email') || email);
+    const submittedPassword = String(form.get('password') || password);
+    setErr(''); setBusy(true);
+    try { await signInEmail(submittedEmail, submittedPassword); }
     catch (ex) {
       const m = String((ex as Error)?.message || '');
       setErr(m.includes('too-many') ? '시도가 너무 많습니다. 잠시 후 다시 시도하세요'
@@ -208,12 +212,12 @@ function LoginForm({ onSignup, onReset }: { onSignup: () => void; onReset: () =>
       <div className="login-form">
         <div className="login-field">
           <label htmlFor="login-email">이메일</label>
-          <input id="login-email" type="email" autoComplete="username" placeholder="name@company.com" required
+          <input id="login-email" name="email" type="email" autoComplete="username" placeholder="name@company.com" required
             value={email} onChange={(e) => setEmail(e.target.value)} />
         </div>
         <div className="login-field">
           <label htmlFor="login-password">비밀번호</label>
-          <input id="login-password" type="password" autoComplete="current-password" placeholder="비밀번호 입력" required
+          <input id="login-password" name="password" type="password" autoComplete="current-password" placeholder="비밀번호 입력" required
             value={password} onChange={(e) => setPassword(e.target.value)} />
         </div>
         <button type="submit" className="login-submit" disabled={busy}>로그인</button>
