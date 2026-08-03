@@ -19,7 +19,7 @@ import { findCmsMatchCandidates, buildSettlementPatches, type CmsMatchCandidate 
 import { toast } from '@/lib/toast';
 import type { BankTransaction } from '@/lib/payments/types';
 import { lockReason } from '@/lib/finance/period-lock';
-import { safeUpdate } from '@/lib/safe-update';
+import { safeRun } from '@/lib/safe-update';
 import { useBusyAction } from '@/lib/use-busy-action';
 import { resolveWriteCompany, NEED_COMPANY } from '@/lib/scope';
 import { commitUpdate, commitAll } from '@/lib/commit';
@@ -193,10 +193,10 @@ export default function PaymentsPage() {
           const trec = txByKey.get(cand.companyCode + ':' + id);
           if (!trec || trec.settlementId) { okAll = false; break; }
           if (!resolveWriteCompany(companyId, trec)) { okAll = false; break; }
-          const ok = await safeUpdate(async () => {
+          const ok = await safeRun(async () => {
             await commitUpdate({ entity: 'bank_tx', sessionCompanyId: companyId, rec: trec, key: String(trec._key), patch });
           });
-          if (ok == null) { okAll = false; break; }
+          if (!ok) { okAll = false; break; }
         }
         if (okAll) applied++; else skipped++;
       }
@@ -243,7 +243,7 @@ export default function PaymentsPage() {
         //   commitAll은 트랜잭션이 아니다(lib/commit.ts) → 부분 실패가 반드시 «복구 가능한» 쪽으로 끝나야 한다.
         //   · 계약 먼저였을 때: 수납은 들어갔는데 입금은 미매칭 → 화면에 «해제» 버튼이 없어 영구 고아(미수도 잘못 깎임)
         //   · bank_tx 먼저: 입금은 매칭 표시·수납 미기록 → 미수는 정상(안 깎임) + «해제»로 되돌릴 수 있음
-        const ok = await safeUpdate(async () => {
+        const ok = await safeRun(async () => {
           await commitAll([
             {
               entity: 'bank_tx', sessionCompanyId: companyId, rec: trec, key: String(trec._key),
@@ -255,7 +255,7 @@ export default function PaymentsPage() {
             { entity: 'contract', sessionCompanyId: companyId, rec: crec, key: ckey, patch: { _payments: newPayments } },
           ]);
         });
-        if (ok != null) { applied++; appliedPayments.set(ckey, newPayments); } else skipped++;
+        if (ok) { applied++; appliedPayments.set(ckey, newPayments); } else skipped++;
       }
       setApplying(false);
       const lockNote = locked ? ` · 마감월 ${locked}` : '';
@@ -275,16 +275,16 @@ export default function PaymentsPage() {
        commitAll은 트랜잭션이 아니라 앞선 쓰기가 남는다. 계약을 먼저 쓰면 부분 실패 시
        «수납은 지워졌는데 입금은 여전히 매칭 상태» = 미수가 잘못 늘고 되돌릴 버튼도 없다.
        bank_tx를 먼저 풀면 부분 실패해도 «해제 표시 + 수납 잔존»이라 다시 해제/연결로 복구된다. */
-    const ok = await safeUpdate(async () => {
+    const ok = await safeRun(async () => {
       const ops = [];
-      if (!resolveWriteCompany(companyId, trec)) { toast(NEED_COMPANY, 'error'); return; }
+      if (!resolveWriteCompany(companyId, trec)) { toast(NEED_COMPANY, 'error'); return false; }
       ops.push({
         entity: 'bank_tx', sessionCompanyId: companyId, rec: trec, key: String(trec._key),
         patch: { matchedContractId: '', matchedScheduleSeq: '', matchedAt: '', subject: '', category: '' },
       });
       if (crec) {
         const existing = Array.isArray(crec._payments) ? (crec._payments as Array<Record<string, unknown>>) : [];
-        if (!resolveWriteCompany(companyId, crec)) { toast(NEED_COMPANY, 'error'); return; }
+        if (!resolveWriteCompany(companyId, crec)) { toast(NEED_COMPANY, 'error'); return false; }
         ops.push({
           entity: 'contract', sessionCompanyId: companyId, rec: crec, key: String(crec._key),
           patch: { _payments: existing.filter((p) => p.txId !== t.id) },
@@ -293,7 +293,7 @@ export default function PaymentsPage() {
       await commitAll(ops);
     });
     // ★실패했는데 «해제됨»이라고 말하면 안 된다(서버 마감·권한 거부가 조용히 삼켜졌다).
-    if (ok == null) { reload(); return; }
+    if (!ok) { reload(); return; }
     toast('매칭 해제 — 미수 원복', 'info'); reload();
   }
 
@@ -355,7 +355,7 @@ export default function PaymentsPage() {
     if (lr) { toast(lr, 'error'); return; }
     if (!category) return;
     if (!resolveWriteCompany(companyId, row.raw)) { toast(NEED_COMPANY, 'error'); return; }
-    const ok = await safeUpdate(async () => {
+    const ok = await safeRun(async () => {
       await commitUpdate({
         entity: row.entity,
         sessionCompanyId: companyId,
@@ -364,7 +364,7 @@ export default function PaymentsPage() {
         patch: { category, subject: category, classifiedAt: new Date().toISOString(), classifiedBy: user.email },
       });
     });
-    if (ok == null) return;
+    if (!ok) return;
     toast(`${row.party || '거래'} · ${category} 분류 완료`, 'success');
     reload();
   }
@@ -372,7 +372,7 @@ export default function PaymentsPage() {
   async function attachDailyEvidence(row: (typeof cashRows)[number], result: DocUploadResult) {
     if (!result.url) return;
     if (!resolveWriteCompany(companyId, row.raw)) { toast(NEED_COMPANY, 'error'); return; }
-    const ok = await safeUpdate(async () => {
+    const ok = await safeRun(async () => {
       await commitUpdate({
         entity: row.entity,
         sessionCompanyId: companyId,
@@ -386,7 +386,7 @@ export default function PaymentsPage() {
         },
       });
     });
-    if (ok == null) return;
+    if (!ok) return;
     setEvidenceRowId('');
     toast(`${row.party || '거래'} · 증빙 연결 완료`, 'success');
     reload();
