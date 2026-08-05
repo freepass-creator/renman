@@ -3,6 +3,7 @@ import { getFirestore, type Firestore } from 'firebase-admin/firestore';
 import { requireAuth, getAdminApp } from '@/lib/api-auth';
 import { ENTITIES } from '@/lib/intake/entities';
 import { enforceApiRateLimit } from '@/lib/api-rate-limit';
+import { MONEY_ENTITIES, findCreateOnlyConflicts, moneyConflictMessage } from '@/lib/finance/immutable-money';
 
 export const runtime = 'nodejs';
 
@@ -33,8 +34,9 @@ function docIdBelongsTo(id: string, companyId: string): boolean {
  *   규칙이 발동하지 않는다 → 마감한 달에 거래를 새로 밀어넣어 결산을 사후에 바꿀 수 있었다.
  *   마감의 의미는 «그 달의 숫자가 더 이상 변하지 않는다»이므로 유입도 막아야 한다.
  * 막힐 때는 어느 달이 막혔는지 알려준다 — 실무자가 «마감 해제 후 재투입»을 선택할 수 있게.
+ *
+ * 대상 엔티티(MONEY_ENTITIES)는 create-only 경계와 같은 축이라 `lib/finance/immutable-money`가 SSOT.
  */
-const MONEY_ENTITIES = new Set(['bank_tx', 'card_tx']);
 
 async function closedMonthsOf(db: Firestore, companyId: string): Promise<Set<string>> {
   try {
@@ -110,8 +112,10 @@ export async function POST(req: Request, ctx: { params: Promise<{ entity: string
       return NextResponse.json({ error: '회계마감 정보를 읽을 수 없어 자금거래를 저장하지 않았습니다 — 잠시 후 다시 시도하세요' }, { status: 503 });
     }
   }
+  const money = MONEY_ENTITIES.has(entity);
+  const col = db.collection(entity);
   const blockedMonths = new Set<string>();
-  const batch = db.batch();
+  const writes: { id: string; data: Record<string, unknown> }[] = [];
   for (const item of docs) {
     const id = String(item.id || '');
     const data = item.data && typeof item.data === 'object' ? item.data : null;
@@ -124,17 +128,11 @@ export async function POST(req: Request, ctx: { params: Promise<{ entity: string
     }
     if (closed.size > 0) {
       const ym = String(data.txDate || '').slice(0, 7);
+      /* 기존 문서의 월까지 보던 검사는 아래 create-only 가 흡수했다 — 자금 원자는 이 경로로
+         덮어쓸 수 없으므로(존재하면 409) «마감월 거래의 txDate를 열린 달로 바꿔 빼내는» 길이 없다. */
       if (ym && closed.has(ym)) { blockedMonths.add(ym); continue; }
-      /* ★기존 문서의 월도 봐야 한다 — 이 라우트의 set은 덮어쓰기이므로, 마감월 거래의 txDate를
-         열린 달로 바꿔 «마감월에서 빼내는» 것이 신 데이터만 검사하면 통과한다.
-         비용은 갱신 건에만 발생(신규는 존재하지 않으므로 exists=false). */
-      const prev = await db.collection(entity).doc(id).get();
-      if (prev.exists) {
-        const prevYm = String((prev.data() as { txDate?: string }).txDate || '').slice(0, 7);
-        if (prevYm && closed.has(prevYm)) { blockedMonths.add(prevYm); continue; }
-      }
     }
-    batch.set(db.collection(entity).doc(id), data);
+    writes.push({ id, data });
   }
   // ★일부만 저장하고 성공을 돌려주면 «넣었는데 없다»가 된다 → 마감월이 섞여 있으면 전량 거부.
   if (blockedMonths.size > 0) {
@@ -144,6 +142,39 @@ export async function POST(req: Request, ctx: { params: Promise<{ entity: string
       blockedMonths: [...blockedMonths].sort(),
     }, { status: 409 });
   }
-  await batch.commit();
-  return NextResponse.json({ saved: docs.length });
+
+  /* ★자금 원자 create-only (`lib/finance/immutable-money`) — 이 라우트는 클라 dedup 뒤의
+     «생성/임포트» 경로다(lib/store.ts save는 기존 문서를 다시 보내지 않는다). 그런데도 set이면
+     같은 ID를 만들어 보내는 것만으로 통장 거래의 금액·일자를 갈아엎을 수 있었다 → 존재하면 거부.
+     어느 거래가 걸렸는지 돌려줘 실무자가 «재투입인지 새 건인지»를 판단할 수 있게 한다. */
+  if (money && writes.length > 0) {
+    const ids = writes.map((w) => w.id);
+    const snaps = await db.getAll(...[...new Set(ids)].map((id) => col.doc(id)));
+    const conflicts = findCreateOnlyConflicts(ids, snaps.filter((s) => s.exists).map((s) => s.id));
+    if (conflicts.length > 0) {
+      return NextResponse.json({ error: moneyConflictMessage(conflicts), conflictIds: conflicts }, { status: 409 });
+    }
+  }
+
+  const batch = db.batch();
+  for (const { id, data } of writes) {
+    const ref = col.doc(id);
+    // 자금만 create — 선검사와 커밋 사이의 경합(같은 파일 동시 투입)까지 커밋 단계에서 막는 이중 방어.
+    if (money) batch.create(ref, data);
+    else batch.set(ref, data);
+  }
+  try {
+    await batch.commit();
+  } catch (error) {
+    // ALREADY_EXISTS = 선검사 통과 후 누가 먼저 만든 것 → 서버 오류가 아니라 정당한 거부.
+    const code = (error as { code?: unknown }).code;
+    if (money && (code === 6 || code === 'already-exists')) {
+      return NextResponse.json({
+        error: '저장 직전에 같은 자금거래가 먼저 저장되어 취소했습니다 — 목록을 새로 고친 뒤 남은 건만 투입하세요',
+        conflictIds: [],
+      }, { status: 409 });
+    }
+    throw error;
+  }
+  return NextResponse.json({ saved: writes.length });
 }

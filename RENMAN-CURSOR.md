@@ -67,9 +67,12 @@ curl -s -o /dev/null -w "%{http_code}" http://localhost:6006/<route>   # 200
 > 1. **스위치플랜 실데이터** = `C:\dev\jpkerp6-마이그레이션\switchplan_스위치플랜\` (리포 밖·PII라 gitignore). 없으면 `MIGRATE_MODE=auto`가 frozen/demo로 폴백. 파일 2개(`[스위치플랜] 사업현황.xlsx`·`26년_스위치플랜_자금일보.xlsx`)를 그 경로에 복사해야 실데이터 반영됨. 경로 바꾸려면 `MIGRATE_ROOT` env.
 > 2. **`.env.local`** = gitignore. 이번에 `NEXT_PUBLIC_MIGRATE_MODE=frozen`→**`auto`**로 바꿈. 새 PC에선 `.env.local.example` 참고해 다시 만들 것(Firebase 키·`auto` 모드).
 > 얼린 시드 재생성 도구: `npx tsx tools/rebuild-switchplan-frozen.ts <사업현황.xlsx>` (드라이런 기본, `--write`로 반영).
+>
+> **2026-08-06 윈도우 재설치 후 현재 상태:** 위 2개 **둘 다 없음**(C:·D: 모두 초기화). 실데이터 xlsx 2개·`.env.local` 재확보 전까지는 frozen 시드 + localStorage 미리보기로만 돈다.
 
 | 날짜 | 작업자 | 내용 | 상태 |
 |---|---|---|---|
+| 2026-08-06 | Claude | **P0-2 자금 원자 create-only**: `lib/finance/immutable-money`(SSOT·순수판정) · 엔티티 POST=자금만 `getAll` 선검사 409(`conflictIds`)+`batch.create` · 마감월 기존문서 재검사 제거(덮어쓰기 불가로 흡수) · ALREADY_EXISTS→409 | tsc0 · vitest 63파일 510건 |
 | 2026-07-31 | Cursor | 오더4 자산공백: 자동차세필드·agenda/홈 · 매각입력·VEHICLE_OUT·재무처분손익 · rowKey=_key (②B store스탬프·③발번은 Claude점유 skip) | tsc0 · vitest48게이트 · curl200 |
 | 2026-07-31 | Cursor | 오더3 회차원장: schedule-ledger·계약「회차」탭·notify recipients·리스크만기문자 · tests+6 | tsc0 · vitest170 · rules36 · curl200 |
 | 2026-07-31 | Cursor | 오더2 엑셀내보내기: onView·useMemo cols · sheet-export·useSheetExport · PII_MASKERS · 6원장 우클릭메뉴 | tsc0 · vitest+8 · curl200 |
