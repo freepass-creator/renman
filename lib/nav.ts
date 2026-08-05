@@ -124,16 +124,25 @@ export const ERP_MENU_TREE: ErpMenuNode[] = [
     icon: LayoutDashboard,
     children: [
       { id: 'home', label: '대시보드', href: '/', icon: LayoutDashboard },
+    ],
+  },
+  // ★2026-08-05 사장님 지시: «운영현황+리스크관리» 한 세트 · «업무관리+자금일보+데이터센터» 한 세트.
+  {
+    id: 'monitor',
+    label: '현황',
+    href: '/status',
+    icon: LayoutDashboard,
+    children: [
       { id: 'status', label: '운영현황', href: '/status', icon: LayoutDashboard },
+      { id: 'risk', label: '리스크관리', href: '/risk', icon: TriangleAlert },
     ],
   },
   {
     id: 'process',
     label: '처리',
-    href: '/risk',
-    icon: TriangleAlert,
+    href: '/work',
+    icon: ListTodo,
     children: [
-      { id: 'risk', label: '리스크관리', href: '/risk', icon: TriangleAlert },
       { id: 'work', label: '업무관리', href: '/work', icon: ListTodo },
       { id: 'payments', label: '자금일보', href: '/payments', icon: ArrowLeftRight },
       { id: 'ingest', label: DATA_CENTER_TITLE, href: '/ingest', icon: Upload },
@@ -167,10 +176,13 @@ export const ERP_MENU_TREE: ErpMenuNode[] = [
 export const NAV_GROUPS: NavGroup[] = [
   { title: '', items: [
     { href: '/', label: '대시보드', icon: LayoutDashboard, tier: '라이트' },
+  ] },
+  // ★2026-08-05 사장님 지시: 운영현황+리스크 한 세트 / 업무+자금일보+데이터센터 한 세트.
+  { title: '현황', items: [
     { href: '/status', label: '운영현황', icon: LayoutDashboard, tier: '라이트' },
+    { href: '/risk', label: '리스크관리', icon: TriangleAlert, tier: '라이트' },
   ] },
   { title: '처리', items: [
-    { href: '/risk', label: '리스크관리', icon: TriangleAlert, tier: '라이트' },
     { href: '/work', label: '업무관리', icon: ListTodo, tier: '라이트' },
     { href: '/payments', label: '자금일보', icon: ArrowLeftRight, tier: '라이트' },
     { href: '/ingest', label: DATA_CENTER_TITLE, icon: Upload, tier: '라이트' },
