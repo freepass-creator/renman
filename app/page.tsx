@@ -1,24 +1,24 @@
 'use client';
 /**
- * 대시보드(/) — 메인=관제 KPI·법인별·손익추이, 우측 패널=«할 일·미점검» 시점별.
+ * 대시보드(/) — 메인=관제 KPI·일정 달력·예상 현금흐름, 우측 패널=«할 일·미점검» 시점별.
+ *   (2026-08-05 사장님 지시: 법인별 요약·손익추이 자리 → 일정 달력. 현금흐름 예측 신설.)
  *   셸=LedgerFrame(body+sidePanel — 원장과 동일 2분할 규격) · Sec 접기 없음 · 색=C.* 토큰.
- *   데이터=computeKPI · selectTodayPanel · operatingProfit* SSOT만.
+ *   데이터=computeKPI · selectTodayPanel · operatingProfit · buildAgenda · buildCashPlan SSOT만.
  *   지시 노출 = 우측 패널(경과→오늘→이번 주→이번 달→상시 미점검, 클릭=딥링크). 접기·닫기 없음.
  */
-import { useMemo, type CSSProperties, type ReactNode } from 'react';
+import { useMemo, useState, type CSSProperties, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import { ChevronRight } from 'lucide-react';
 import {
-  LedgerFrame, EmptyState, ErrorState, ExcelSheet, Badge, PageLoading, won, C, R, NUM,
-  type SheetCol,
+  LedgerFrame, EmptyState, ErrorState, ExcelSheet, Badge, PageLoading, MonthCalendar, won, C, R, NUM,
+  type SheetCol, type CalendarItem,
 } from '@/components/ui';
 import { TODAY } from '@/lib/dashboard-consts';
-import { computeKPI, kpiByCompany, type KPI } from '@/lib/kpi';
-import { COMPANIES, companyShort } from '@/lib/companies';
+import { computeKPI } from '@/lib/kpi';
+import { buildAgenda, agendaByDate, type AgendaKind } from '@/lib/agenda';
 import { buildCashLedger } from '@/lib/finance/cash-ledger';
-import {
-  operatingProfit, operatingProfitByCompany, operatingProfitTrend,
-} from '@/lib/finance/operating-profit';
+import { buildCashPlan, summarizeCashPlanMonths, type CashPlanMonth, type CashPlanSource } from '@/lib/finance/cash-plan';
+import { operatingProfit } from '@/lib/finance/operating-profit';
 import { useDashboardData } from '@/lib/use-dashboard-data';
 import { useEntityLists } from '@/lib/use-entity-lists';
 import { selectTodayPanel } from '@/lib/snapshot/selectors';
@@ -98,7 +98,27 @@ function Panel({ title, desc, children }: { title: string; desc: string; childre
   );
 }
 
-type CoRow = KPI & { company: string; profit: number };
+/* ── 일정 달력 — 어젠다 SSOT를 달력 항목으로 (여기선 표기만) ── */
+
+const AGENDA_SHORT: Record<AgendaKind, string> = {
+  '반납·만기': '만기', 검사만기: '검사', 보험만기: '보험', '과태료 기한': '과태료', '세금 만기': '세금',
+};
+
+/* ── 예상 현금흐름 — 월 버킷 행 (엔진=cash-plan SSOT, 여기선 표기만) ── */
+
+type OutlookRow = CashPlanMonth & { label: string };
+
+const OUTLOOK_SOURCE_SHORT: Array<[CashPlanSource, string]> = [
+  ['계약대여료', '대여료'], ['할부', '할부'], ['보험료', '보험'],
+  ['임차료', '임차'], ['과태료', '과태료'], ['보증금반환', '보증금'], ['자금업무', '자금업무'],
+];
+
+function outlookDetail(m: CashPlanMonth): string {
+  const parts = OUTLOOK_SOURCE_SHORT
+    .filter(([key]) => (m.bySource[key] || 0) > 0)
+    .map(([key, label]) => `${label} ${won(m.bySource[key] || 0)}`);
+  return parts.join(' · ') || '—';
+}
 
 /* ── 우측 «할 일·미점검» 패널 — 시점별 버킷. 원장 상세패널과 같은 클래스·위계. ── */
 
@@ -154,44 +174,76 @@ export default function DashboardPage() {
   const router = useRouter();
   const mobile = useIsMobile();
   const { D, contracts, vehicles, bankTx, loading, error: loadError } = useDashboardData();
-  const { data: [cardTx = []] } = useEntityLists(['card_tx']);
+  const {
+    data: [cardTx = [], planWork = [], planInsurances = [], planPenalties = [], planLeases = []],
+    loading: planLoading,
+  } = useEntityLists(['card_tx', 'work_item', 'insurance', 'penalty', 'lease']);
 
   const kpi = useMemo(() => computeKPI(contracts, vehicles, TODAY), [contracts, vehicles]);
-  const byCo = useMemo(() => kpiByCompany(contracts, vehicles, TODAY, COMPANIES), [contracts, vehicles]);
 
   const cash = useMemo(() => buildCashLedger(bankTx, cardTx), [bankTx, cardTx]);
   const opProfit = useMemo(() => operatingProfit(cash), [cash]);
-  const profitByCo = useMemo(() => operatingProfitByCompany(cash), [cash]);
-  const trend = useMemo(() => operatingProfitTrend(cash, 6, TODAY), [cash]);
   const todayPanel = useMemo(() => selectTodayPanel(D), [D]);
 
-  const coRows: CoRow[] = useMemo(() => byCo.map((k) => ({
-    ...k,
-    company: companyShort(k.companyId),
-    profit: profitByCo.get(k.companyId) || 0,
-  })), [byCo, profitByCo]);
+  const [calYm, setCalYm] = useState(() => TODAY.slice(0, 7));
 
-  const coCols: SheetCol<CoRow>[] = useMemo(() => [
-    { key: 'company', label: '법인', pin: true, render: (r) => r.company, text: (r) => r.company },
-    { key: 'veh', label: '보유', align: 'r', render: (r) => r.totalVehicles, text: (r) => r.totalVehicles },
-    { key: 'util', label: '가동률', align: 'r', render: (r) => `${r.util}%`, text: (r) => r.util },
-    { key: 'run', label: '운행', align: 'r', render: (r) => r.running, text: (r) => r.running },
-    { key: 'idle', label: '휴차', align: 'r', render: (r) => r.idle, text: (r) => r.idle },
+  // 예상 현금흐름 — 자금계획 SSOT(buildCashPlan)를 당월~+2개월 버킷으로. horizon = 마지막 달 말일까지.
+  const cashOutlook = useMemo(() => {
+    const [y, m, d] = TODAY.split('-').map(Number);
+    const lastDay = Date.UTC(y, m - 1 + 3, 0); // +2개월의 말일
+    const horizonDays = Math.round((lastDay - Date.UTC(y, m - 1, d)) / 86400000);
+    const { rows } = buildCashPlan({
+      contracts, vehicles, workItems: planWork, insurances: planInsurances,
+      penalties: planPenalties, leases: planLeases, today: TODAY, horizonDays,
+    });
+    return summarizeCashPlanMonths(rows, TODAY, 3);
+  }, [contracts, vehicles, planWork, planInsurances, planPenalties, planLeases]);
+
+  const outlookRows: OutlookRow[] = useMemo(() => cashOutlook.months.map((m, i) => ({
+    ...m, label: i === 0 ? `이번달 (${Number(m.ym.slice(5))}월)` : `${Number(m.ym.slice(5))}월`,
+  })), [cashOutlook]);
+
+  const outlookCols: SheetCol<OutlookRow>[] = useMemo(() => [
+    { key: 'label', label: '월', pin: true, render: (r) => r.label, text: (r) => r.label },
+    { key: 'inflow', label: '들어올 돈', align: 'r', render: (r) => won(r.inflow), text: (r) => r.inflow },
+    { key: 'outflow', label: '나갈 돈', align: 'r', render: (r) => won(r.outflow), text: (r) => r.outflow },
     {
-      key: 'misu', label: '유지계약 미수', align: 'r',
-      render: (r) => r.misuActive ? <span style={{ color: C.danger, fontWeight: 700 }}>{won(r.misuActive)}</span> : '—',
-      text: (r) => r.misuActive,
+      key: 'net', label: '순현금흐름', align: 'r',
+      render: (r) => (
+        <span style={{ color: r.net >= 0 ? C.ok : C.danger, fontWeight: 800 }}>{won(r.net)}</span>
+      ),
+      text: (r) => r.net,
     },
     {
-      key: 'profit', label: '영업손익', align: 'r',
-      render: (r) => (
-        <span style={{ color: r.profit >= 0 ? C.ok : C.danger, fontWeight: 700 }}>{won(r.profit)}</span>
-      ),
-      text: (r) => r.profit,
+      key: 'detail', label: '구성',
+      render: (r) => <span style={{ color: C.mute, fontSize: 11 }}>{outlookDetail(r)}</span>,
+      text: (r) => outlookDetail(r),
     },
   ], []);
 
+  const outlookNotes = useMemo(() => [
+    cashOutlook.overdueInflow > 0 ? `기한경과 입금 ${won(cashOutlook.overdueInflow)}` : '',
+    cashOutlook.overdueOutflow > 0 ? `기한경과 출금 ${won(cashOutlook.overdueOutflow)}` : '',
+    cashOutlook.unscheduledCount > 0 ? `일정 미확정 ${cashOutlook.unscheduledCount}건` : '',
+  ].filter(Boolean).join(' · '), [cashOutlook]);
+
   const go = (href: string) => router.push(href);
+
+  // 일정 달력 — 어젠다 SSOT(buildAgenda)를 날짜별 항목으로. 과태료만 업무 딥링크, 나머지=리스크.
+  const calendarItems = useMemo(() => {
+    const byDate = agendaByDate(buildAgenda(contracts, vehicles, planInsurances, planPenalties));
+    const out = new Map<string, CalendarItem[]>();
+    for (const [date, list] of byDate) {
+      out.set(date, list.map((it) => ({
+        key: it.key,
+        label: `${AGENDA_SHORT[it.kind]} ${it.plate || it.title}`,
+        tone: it.tone,
+        onClick: () => go(it.kind === '과태료 기한' ? '/work?group=과태료' : '/risk'),
+      })));
+    }
+    return out;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [contracts, vehicles, planInsurances, planPenalties]);
 
   return (
     <LedgerFrame
@@ -297,47 +349,31 @@ export default function DashboardPage() {
             />
           </div>
 
+          {/* 2026-08-05 사장님 지시: 법인별 요약·손익추이 자리 → 일정 달력 + 예상 현금흐름 */}
           <div style={{
             display: 'grid',
-            // 3:2 = KPI 타일 5열의 3번째/4번째 경계와 정렬(gap 12 동일)
-            gridTemplateColumns: mobile ? '1fr' : 'minmax(0, 3fr) minmax(240px, 2fr)',
+            gridTemplateColumns: mobile ? '1fr' : 'minmax(0, 3fr) minmax(280px, 2fr)',
             gap: 12,
           }}>
-            <Panel title="법인별 요약" desc="보유·가동·미수·영업손익 — 같은 KPI SSOT.">
-              {loading ? (
+            <Panel title="일정 달력" desc="반납·만기 · 검사 · 보험 · 세금 · 과태료 — 어젠다 SSOT · 항목 클릭=해당 원장">
+              {loading || planLoading ? (
                 <PageLoading />
-              ) : coRows.length === 0 ? (
-                <EmptyState variant="sec">표시할 법인이 없습니다</EmptyState>
               ) : (
-                <ExcelSheet cols={coCols} rows={coRows} rowKey={(r) => r.companyId} />
+                <MonthCalendar ym={calYm} onYm={setCalYm} today={TODAY} items={calendarItems} />
               )}
             </Panel>
 
-            <Panel title="영업손익 추이" desc="최근 6개월 · 현금 기준.">
-              {loading ? (
+            <Panel title="예상 현금흐름" desc="기계약 회차 대여료 등 들어올 돈 − 할부·보험·임차료 등 나갈 돈 · 자금계획 SSOT">
+              {loading || planLoading ? (
                 <PageLoading />
               ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: '4px 2px' }}>
-                  {trend.list.map((x) => {
-                    const pct = Math.round((Math.abs(x.profit) / trend.maxAbs) * 100);
-                    return (
-                      <div key={x.m} style={{ display: 'grid', gridTemplateColumns: '52px 1fr 72px', gap: 8, alignItems: 'center' }}>
-                        <span style={{ fontSize: 11, color: C.mute, fontFamily: NUM }}>{x.m.slice(5)}</span>
-                        <div style={{ height: 8, borderRadius: 4, background: 'var(--bg-stripe)', overflow: 'hidden' }}>
-                          <div style={{
-                            width: `${pct}%`, height: '100%',
-                            background: x.profit >= 0 ? C.ok : C.danger,
-                          }} />
-                        </div>
-                        <span style={{
-                          fontSize: 11, fontWeight: 700, textAlign: 'right', fontFamily: NUM,
-                          color: x.profit >= 0 ? C.ink : C.danger,
-                        }}>
-                          {won(x.profit)}
-                        </span>
-                      </div>
-                    );
-                  })}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  <ExcelSheet cols={outlookCols} rows={outlookRows} rowKey={(r) => r.ym} onRow={() => go('/cash')} />
+                  {outlookNotes ? (
+                    <div style={{ fontSize: 11, color: C.mute }}>
+                      {outlookNotes} — 자금관리 › 자금계획에서 확인
+                    </div>
+                  ) : null}
                 </div>
               )}
             </Panel>
