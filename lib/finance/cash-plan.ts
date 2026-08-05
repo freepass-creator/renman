@@ -1,12 +1,13 @@
 import type { EntityRecord } from '@/lib/intake/entities';
 import { buildScheduleLedger } from '@/lib/contracts/schedule-ledger';
+import { loanSchedule } from '@/lib/finance/loan-schedule';
 import { isContractEndedStatus } from '@/lib/domain/status';
 import { companyShort } from '@/lib/companies';
 
 export type CashPlanDirection = '입금' | '출금' | '미정';
 export type CashPlanStatus = '예정' | '기한경과' | '분류필요' | '일정확인';
 export type CashPlanCertainty = '확정' | '예상' | '확인필요';
-export type CashPlanSource = '계약대여료' | '자금업무' | '보험료' | '과태료' | '임차료' | '보증금반환';
+export type CashPlanSource = '계약대여료' | '자금업무' | '보험료' | '과태료' | '임차료' | '할부' | '보증금반환';
 
 export type CashPlanRow = {
   id: string;
@@ -33,6 +34,7 @@ export type CashPlanInput = {
   insurances?: EntityRecord[];
   penalties?: EntityRecord[];
   leases?: EntityRecord[];
+  vehicles?: EntityRecord[];
   today: string;
   horizonDays?: number;
   openingBalance?: number;
@@ -105,7 +107,7 @@ function installmentRows(rec: EntityRecord): Array<{ cycle: number; dueDate: str
 
 export function buildCashPlan(input: CashPlanInput): { rows: CashPlanRow[]; summary: CashPlanSummary } {
   const {
-    contracts = [], workItems = [], insurances = [], penalties = [], leases = [], today,
+    contracts = [], workItems = [], insurances = [], penalties = [], leases = [], vehicles = [], today,
     horizonDays = 90, openingBalance = 0, openingBalanceKnown = false,
   } = input;
   const horizonEnd = addDays(today, horizonDays);
@@ -229,6 +231,28 @@ export function buildCashPlan(input: CashPlanInput): { rows: CashPlanRow[]; summ
     }
   }
 
+  for (const rec of vehicles) {
+    // 매각차 할부는 매각 정산에서 청산되는 관례 — 미래 지출로 세우지 않는다.
+    if (rec.deletedAt || String(rec.status || '') === '매각') continue;
+    const schedule = loanSchedule(rec); // 현금구매·데이터 미비면 []
+    if (!schedule.length) continue;
+    const startDay = Number(String(rec.loanStartDate || '').slice(8, 10)) || 1;
+    const plate = String(rec.plate || '');
+    for (const row of schedule) {
+      const [y, m] = row.ym.split('-').map(Number);
+      const dueDate = monthDate(y, m - 1, startDay);
+      if (dueDate < today) continue;
+      push({
+        id: `loan:${String(rec._key || plate)}:${row.seq}`,
+        ...companyOf(rec), dueDate, direction: '출금', source: '할부',
+        title: `${plate || String(rec.carName || '차량')} · 할부 ${row.seq}/${schedule.length}회차`,
+        counterparty: String(rec.loanCompany || ''), amount: row.payment,
+        status: '예정', certainty: '확정',
+        reference: plate, memo: String(rec.carName || ''), raw: rec,
+      });
+    }
+  }
+
   for (const rec of contracts) {
     if (rec.deletedAt || !isContractEndedStatus(rec.status) || rec.depositSettledDate) continue;
     const amount = Number(rec.depositReceived);
@@ -268,4 +292,55 @@ export function buildCashPlan(input: CashPlanInput): { rows: CashPlanRow[]; summ
       minimumBalance, minimumBalanceDate, needsReview,
     },
   };
+}
+
+/* ── 월 버킷 요약 — 대시보드 «예상 현금흐름» 용 ── */
+
+export type CashPlanMonth = {
+  ym: string; // 'YYYY-MM'
+  inflow: number;
+  outflow: number;
+  net: number;
+  bySource: Partial<Record<CashPlanSource, number>>;
+};
+
+export type CashPlanMonthOutlook = {
+  months: CashPlanMonth[];
+  /** 기준일 이전 도래분 — 예정이 아니라 «벌써 밀린 돈»이라 월 버킷과 섞지 않는다. */
+  overdueInflow: number;
+  overdueOutflow: number;
+  /** 일정·방향 미확정이라 버킷에 못 넣은 행 수 — 자금계획 원장에서 후속 분류. */
+  unscheduledCount: number;
+};
+
+const ymAdd = (ym: string, delta: number): string => {
+  const [y, m] = ym.split('-').map(Number);
+  const d = new Date(Date.UTC(y, m - 1 + delta, 1));
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
+};
+
+/** buildCashPlan 행 → 당월부터 monthCount개월 버킷. horizonDays가 마지막 달 말일을 덮어야 온전하다. */
+export function summarizeCashPlanMonths(rows: CashPlanRow[], today: string, monthCount = 3): CashPlanMonthOutlook {
+  const startYm = today.slice(0, 7);
+  const months: CashPlanMonth[] = Array.from({ length: monthCount }, (_, i) => ({
+    ym: ymAdd(startYm, i), inflow: 0, outflow: 0, net: 0, bySource: {},
+  }));
+  const byYm = new Map(months.map((m) => [m.ym, m]));
+  let overdueInflow = 0, overdueOutflow = 0, unscheduledCount = 0;
+  for (const row of rows) {
+    const calculable = Boolean(row.dueDate) && row.amount > 0 && row.direction !== '미정';
+    if (!calculable) { unscheduledCount += 1; continue; }
+    if (row.dueDate < today) {
+      if (row.direction === '입금') overdueInflow += row.amount;
+      else overdueOutflow += row.amount;
+      continue;
+    }
+    const bucket = byYm.get(row.dueDate.slice(0, 7));
+    if (!bucket) continue;
+    if (row.direction === '입금') bucket.inflow += row.amount;
+    else bucket.outflow += row.amount;
+    bucket.bySource[row.source] = (bucket.bySource[row.source] || 0) + row.amount;
+  }
+  for (const m of months) m.net = m.inflow - m.outflow;
+  return { months, overdueInflow, overdueOutflow, unscheduledCount };
 }

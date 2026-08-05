@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildCashPlan } from '@/lib/finance/cash-plan';
+import { buildCashPlan, summarizeCashPlanMonths } from '@/lib/finance/cash-plan';
 import type { EntityRecord } from '@/lib/intake/entities';
 
 const TODAY = '2026-08-03';
@@ -94,6 +94,53 @@ describe('buildCashPlan', () => {
     expect(result.summary.outflow).toBe(500_000);
     expect(result.summary.closingBalance).toBe(1_500_000);
     expect(result.summary.needsReview).toBe(1);
+  });
+
+  it('차량 할부를 출금 예정으로 전개하고 매각차·현금구매는 제외한다', () => {
+    const loan = {
+      loanCompany: '캐피탈', loanPrincipal: 12_000_000, loanMonths: 12,
+      loanRate: 0, loanStartDate: '2026-06-15',
+    };
+    const result = buildCashPlan({
+      today: TODAY, // 2026-08-03 · horizon 90일 → 2026-11-01
+      openingBalance: 5_000_000,
+      vehicles: [
+        rec({ _key: 'v1', plate: '12가3456', carName: '아반떼', ...loan }),
+        rec({ _key: 'sold', plate: '34나5678', status: '매각', ...loan }),
+        rec({ _key: 'cash', plate: '56다7890', loanCashOnly: '예', ...loan }),
+      ],
+    });
+
+    // 6·7월 회차는 경과라 제외, 11/15은 horizon 밖 → 8·9·10월 3회차만
+    expect(result.rows.map((row) => row.dueDate)).toEqual(['2026-08-15', '2026-09-15', '2026-10-15']);
+    expect(result.rows.every((row) => row.source === '할부' && row.direction === '출금' && row.amount === 1_000_000)).toBe(true);
+    expect(result.rows[0].counterparty).toBe('캐피탈');
+    expect(result.summary.outflow).toBe(3_000_000);
+    expect(result.summary.closingBalance).toBe(2_000_000);
+  });
+
+  it('summarizeCashPlanMonths — 월 버킷·기한경과 분리·미확정 카운트', () => {
+    const { rows } = buildCashPlan({
+      today: TODAY,
+      workItems: [
+        rec({ _key: 'in', category: '자금', title: '지원금', cashFlow: '입금예정', expectedAmount: 500_000, dueDate: '2026-08-20' }),
+        rec({ _key: 'out', category: '자금', title: '용역비', cashFlow: '출금예정', expectedAmount: 200_000, dueDate: '2026-09-10' }),
+        rec({ _key: 'late', category: '자금', title: '늦은 입금', cashFlow: '입금예정', expectedAmount: 300_000, dueDate: '2026-08-01' }),
+        rec({ _key: 'unknown', targetType: '자금', title: '용도 확인', expectedAmount: 900_000 }),
+      ],
+      vehicles: [rec({
+        _key: 'v1', plate: '12가3456', loanCompany: '캐피탈',
+        loanPrincipal: 12_000_000, loanMonths: 12, loanRate: 0, loanStartDate: '2026-06-15',
+      })],
+    });
+    const outlook = summarizeCashPlanMonths(rows, TODAY, 3);
+
+    expect(outlook.months.map((m) => m.ym)).toEqual(['2026-08', '2026-09', '2026-10']);
+    expect(outlook.months[0]).toMatchObject({ inflow: 500_000, outflow: 1_000_000, net: -500_000 });
+    expect(outlook.months[1]).toMatchObject({ inflow: 0, outflow: 1_200_000, net: -1_200_000 });
+    expect(outlook.months[1].bySource).toEqual({ 자금업무: 200_000, 할부: 1_000_000 });
+    expect(outlook.overdueInflow).toBe(300_000); // 8/1 도래분은 «밀린 돈»으로 분리
+    expect(outlook.unscheduledCount).toBe(1);
   });
 
   it('활성 계약의 예정을 입금으로 가져오고 종료 계약은 제외한다', () => {
