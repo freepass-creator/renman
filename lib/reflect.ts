@@ -5,10 +5,14 @@ import { getStore } from './store';
 import { wipeCompany } from './reset';
 import { computeDashboard, type OperatingSummary } from './operating-snapshot';
 import { TODAY } from './dashboard-consts';
+import { auditReceiptIntegrity, assertReceiptIntegrity, type ReceiptIntegrityReport } from './payments/receipt-integrity';
+import { baselineDateOf } from './migrate/acceptance-normalization';
 
 export type ReflectResult = {
   loaded: { total: number; perEntity: Record<string, number> };
   summary: OperatingSummary;
+  /** 수납이력 대조 결과 — 실패하면 여기까지 오지 않는다(반영 자체가 던진다). */
+  receipts: ReceiptIntegrityReport;
 };
 
 /** 회사 실데이터 반영 — 기존 비우고 최신 적재 → 적재본으로 운영 스냅샷 산출. clean=false면 비우지 않고 추가만. */
@@ -22,6 +26,13 @@ export async function reflectCompany(companyId: string, opts: { clean?: boolean 
     store.list('contract', companyId), store.list('vehicle', companyId), store.list('insurance', companyId),
     store.list('penalty', companyId), store.list('bank_tx', companyId),
   ]);
+  /* ★승인 게이트(fail-closed) — 「반영 완료」 토스트를 띄우기 전에 넣은 것과 들어간 것을 대조한다.
+     저장은 자연키 dedup 이라 동일내용 거래가 조용히 접힐 수 있고, 그렇게 사라진 수납은
+     화면 어디에도 «없어졌다»고 표시되지 않는다. 대조에 실패하면 성공을 반환하지 않는다. */
+  const source = loaded.pack.bank_tx || [];
+  const receipts = auditReceiptIntegrity({ source, loaded: bankTx, baselineDate: baselineDateOf(source) });
+  assertReceiptIntegrity(receipts);
+
   const D = computeDashboard({ contracts, vehicles, insurances, penalties, bankTx }, TODAY);
-  return { loaded, summary: D.summary };
+  return { loaded, summary: D.summary, receipts };
 }

@@ -72,6 +72,7 @@ curl -s -o /dev/null -w "%{http_code}" http://localhost:6006/<route>   # 200
 
 | 날짜 | 작업자 | 내용 | 상태 |
 |---|---|---|---|
+| 2026-08-06 | Claude | **P0-3 수납이력 정합성**: `acceptance-normalization`(txKey 부여+기준일 이전 계약성 입금 `matchedKind:'history'`) · `receipt-integrity`(유실/이력/매칭대기 3분 + fail-closed) · pack 단일지점 정규화 · reflect 반영 후 대조 · money-status history=해당없음 → **할 일 1,948→0 · 유실 1→0** | tsc0 · vitest 64파일 526건 · curl200 |
 | 2026-08-06 | Claude | **P0-2 자금 원자 create-only**: `lib/finance/immutable-money`(SSOT·순수판정) · 엔티티 POST=자금만 `getAll` 선검사 409(`conflictIds`)+`batch.create` · 마감월 기존문서 재검사 제거(덮어쓰기 불가로 흡수) · ALREADY_EXISTS→409 | tsc0 · vitest 63파일 510건 |
 | 2026-07-31 | Cursor | 오더4 자산공백: 자동차세필드·agenda/홈 · 매각입력·VEHICLE_OUT·재무처분손익 · rowKey=_key (②B store스탬프·③발번은 Claude점유 skip) | tsc0 · vitest48게이트 · curl200 |
 | 2026-07-31 | Cursor | 오더3 회차원장: schedule-ledger·계약「회차」탭·notify recipients·리스크만기문자 · tests+6 | tsc0 · vitest170 · rules36 · curl200 |

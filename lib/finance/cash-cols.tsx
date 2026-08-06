@@ -33,6 +33,7 @@ export const cashMoneyStatus = (r: CashRow): MoneyStatus => moneyStatusOf({
   outAmount: r.outAmt,
   matchedContractId: r.raw.matchedContractId,
   matchedScheduleSeq: r.raw.matchedScheduleSeq,
+  matchedKind: r.raw.matchedKind,
   isCmsItem: r.nest === 'cms-item' || r.nest === 'cms-pending',
   isCmsDeposit: r.nest === 'cms-dep' || r.nest === 'card-dep',
   cmsSettled: String(r.raw.settlementRole || '') === 'deposit',

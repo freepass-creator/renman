@@ -14,6 +14,7 @@ import { ensureCatalog } from '@/lib/domain/vehicle-master';
 import { buildDemoPack } from '@/lib/seed-demo';
 import switchplanInsurance from '@/lib/migrate/switchplan-insurance.json';
 import switchplanRegistration from '@/lib/migrate/switchplan-registration.json';
+import { normalizeMigratedBankTx } from '@/lib/migrate/acceptance-normalization';
 
 export type MigrateMode = 'auto' | 'live' | 'frozen' | 'demo';
 export type SwitchplanEntityPack = Record<string, EntityRecord[]>;
@@ -31,6 +32,18 @@ for (const r of SWITCHPLAN_INSURANCE) {
 
 function packHasRows(pack: SwitchplanEntityPack): boolean {
   return Object.values(pack).some((a) => Array.isArray(a) && a.length > 0);
+}
+
+/**
+ * 적재 전 정규화 — live·frozen 어느 경로로 왔든 여기 한 곳을 지난다.
+ * ① txKey 부여(동일내용 거래가 저장에서 접혀 사라지는 것 차단)
+ * ② 기준일 이전 계약성 입금에 이력 표식(`matchedKind:'history'`)
+ * 상세 근거 → `lib/migrate/acceptance-normalization`.
+ */
+function normalizePack(pack: SwitchplanEntityPack): SwitchplanEntityPack {
+  if (!Array.isArray(pack.bank_tx) || pack.bank_tx.length === 0) return pack;
+  pack.bank_tx = normalizeMigratedBankTx(pack.bank_tx).rows;
+  return pack;
 }
 
 function enrichVehicles(pack: SwitchplanEntityPack): SwitchplanEntityPack {
@@ -55,7 +68,7 @@ function enrichVehicles(pack: SwitchplanEntityPack): SwitchplanEntityPack {
 
 function withInsurance(pack: SwitchplanEntityPack): SwitchplanEntityPack {
   pack.insurance = SWITCHPLAN_INSURANCE;
-  return enrichVehicles(pack);
+  return normalizePack(enrichVehicles(pack));
 }
 
 const b64ToBuf = (b64: string): ArrayBuffer => Uint8Array.from(atob(b64), (c) => c.charCodeAt(0)).buffer;

@@ -11,7 +11,7 @@ import { buildDemoPack } from './seed-demo';
 
 type Pack = Record<string, EntityRecord[]>;
 
-export async function seedSampleData(companyId: string): Promise<{ total: number; perEntity: Record<string, number> }> {
+export async function seedSampleData(companyId: string): Promise<{ total: number; perEntity: Record<string, number>; pack: Pack }> {
   const store = getStore();
   const pack = await buildCompanyPack(companyId);
   const perEntity: Record<string, number> = {};
@@ -19,7 +19,8 @@ export async function seedSampleData(companyId: string): Promise<{ total: number
   const jobs = ENTITY_LIST.map((e) => ({ key: e.key, recs: pack[e.key] || [] })).filter((j) => j.recs.length);
   const results = await Promise.all(jobs.map((j) => store.save(j.key, companyId, j.recs).then((r) => ({ key: j.key, saved: r.saved }))));
   for (const r of results) { perEntity[r.key] = r.saved; total += r.saved; }
-  return { total, perEntity };
+  // 넣은 원천을 그대로 돌려준다 — 반영 직후 «넣은 것 ↔ 들어간 것» 대조(수납이력 정합성)에 쓰인다.
+  return { total, perEntity, pack };
 }
 
 /** 데모만 빠르게 넣기 — 실데이터 없이 UI 채울 때. */

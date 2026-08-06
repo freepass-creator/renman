@@ -66,12 +66,15 @@ export type MoneyStatusInput = {
   cmsSettled?: boolean;
   /** 자동매칭 제안이 걸려 있는가 — 화면이 계산해 넘긴다. */
   hasProposal?: boolean;
+  /** 계약 귀속 종류. `history` = 마이그레이션 기준일 이전 수납(계약 순미수에 이미 반영). */
+  matchedKind?: unknown;
 };
 
 /**
  * 자금상태 판정 — 단일 정의처.
  *
  * 판정 순서에 의미가 있다: «먼저 해야 할 일»이 앞에 온다.
+ *   ⓪ 마이그레이션 이력은 어느 축보다 먼저다 — 손댈 일이 없는 돈이다.
  *   ① CMS 짝짓기(집금대기)는 계정과목보다 먼저다 — 짝이 맞아야 금액이 확정된다.
  *   ② 계정과목이 없으면 미분류(무슨 돈인지 모르면 매칭도 무의미).
  *   ③ 입금이 아니면(지출·이체) 계약에 붙을 수납이 아니다 → 해당없음.
@@ -79,6 +82,11 @@ export type MoneyStatusInput = {
  */
 export function moneyStatusOf(input: MoneyStatusInput): MoneyStatus {
   const matched = !!input.matchedContractId || !!input.matchedScheduleSeq;
+
+  /* ★마이그레이션 기준일 이전 수납 — 계약 순미수(carry)에 이미 반영돼 있다.
+     이걸 «미매칭»으로 두면 이관 직후 할 일이 1,948건으로 뜨고(실측), 진짜 할 일이 그 안에 묻힌다.
+     회차에 다시 붙이면 carry 이중차감이므로 «붙일 것 없음» = 해당없음이 정확한 상태다. */
+  if (!matched && String(input.matchedKind || '') === 'history') return '해당없음';
 
   // CMS — 명세와 통장 집금이 짝지어졌는지가 먼저.
   if (input.isCmsItem) return matched ? '매칭완료' : '집금대기';
