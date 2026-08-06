@@ -56,6 +56,12 @@ export const WORK_SECTIONS_BY_KIND: Record<WorkCreateKind, WorkFormSection[]> = 
     title: '반납 준비', open: true,
     fields: ['dueDate', 'location', 'vendor', 'mileage', 'assigneeName', 'description'],
   }),
+  /* 증차·감차 — 대상이 법인이라 차량 피커가 비어 있는 게 정상이다(TARGET 섹션은 그대로 두되 강제하지 않음).
+     상태는 업무 상태가 담는다: 준비=대기 · 접수=진행 · 승인/반려=완료(결과는 regResult). */
+  '증차·감차': secs({
+    title: '증차·감차 신청', open: true,
+    fields: ['regKind', 'regCount', 'regOffice', 'dueDate', 'regResult', 'regResultDate', 'assigneeName', 'description'],
+  }),
   '연락기록': secs({
     title: '연락기록', open: true,
     fields: ['callChannel', 'callDirection', 'callResult', 'nextActionDate', 'assigneeName', 'description'],

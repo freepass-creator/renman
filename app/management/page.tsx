@@ -10,7 +10,8 @@
  */
 import { useEffect, useMemo, useState } from 'react';
 import {
-  Badge, Btn, C, DetailEmpty, ExcelSheet, KV, LedgerActions, LedgerFrame, LedgerRecordPanel, Search, won,
+  Badge, Btn, C, DetailEmpty, ExcelSheet, Input, KV, LedgerActions, LedgerFrame, LedgerRecordPanel, Search, Select, won,
+  th, thR, td, tdR,
   type LedgerRecordSection,
   type SheetCol,
 } from '@/components/ui';
@@ -19,7 +20,9 @@ import { toast, toastError } from '@/lib/toast';
 import { getStore } from '@/lib/store';
 import type { EntityRecord } from '@/lib/intake/entities';
 import { COMPANY_DEFS, companyLabel, createManagedCompany, updateManagedCompany, type CompanyMasterInput } from '@/lib/companies';
-import { loadMaster, MODULE_CATALOG, type CompanyMaster, type CompanyDoc } from '@/lib/company-master';
+import { loadMaster, saveMaster, MODULE_CATALOG, type CompanyMaster, type CompanyDoc } from '@/lib/company-master';
+import { REG_APP_CATEGORY, regAppsToWorkItems, selectRegAppWorks } from '@/lib/company-reg-apps';
+import { commitSave } from '@/lib/commit';
 import { uploadDoc, docPath } from '@/lib/storage';
 import { routeDocument } from '@/lib/document-router';
 import { callOcrExtract } from '@/lib/ocr-client';
@@ -157,6 +160,68 @@ export default function ManagementPage() {
   const { rows: bankTxRecords } = useEntityList('bank_tx');
   const { rows: vehicleRecords } = useEntityList('vehicle');
   const { rows: contractRecords } = useEntityList('contract');
+  /* 증차·감차 신청은 **업무**다(사장님 확정 2026-08-07 · AUDIT §6-3) — 법인 마스터 배열이 아니라 work_item.
+     여기서는 «이 법인 건»만 읽기 표로 비춘다. 실체는 업무관리에 있다. */
+  const { rows: workRecords, reload: reloadWorks } = useEntityList('work_item');
+  const [regBusy, setRegBusy] = useState(false);
+  const [regForm, setRegForm] = useState<Record<string, string>>({ kind: '증차', count: '', office: '', date: '' });
+  const regApps = useMemo(
+    () => (selectedCo ? selectRegAppWorks(workRecords, selectedCo.id) : []),
+    [workRecords, selectedCo],
+  );
+  /** 옛 마스터 배열에 남아 있는 신청 — 이관 전까지 두 벌이다. */
+  const legacyRegApps = selectedCo?.master.regApplications ?? [];
+
+  /** 신청을 그 자리에서 등록한다 — 업무관리로 나갔다 오지 않는다(자산 등록과 같은 규격). */
+  const addRegApp = async () => {
+    if (!selectedCo || regBusy) return;
+    const kind = regForm.kind === '감차' ? '감차' : '증차';
+    const count = Number(regForm.count) || 0;
+    setRegBusy(true);
+    try {
+      const rec: EntityRecord = {
+        companyId: selectedCo.id,
+        date: regForm.date || TODAY,
+        category: REG_APP_CATEGORY,
+        targetType: '회사',
+        status: '대기',
+        priority: '보통',
+        title: `${kind} 신청${count ? ` ${count}대` : ''}${regForm.office ? ` · ${regForm.office}` : ''}`,
+        regKind: kind,
+        ...(count ? { regCount: count } : {}),
+        ...(regForm.office ? { regOffice: regForm.office } : {}),
+      };
+      await commitSave({ entity: 'work_item', sessionCompanyId: selectedCo.id, rec, records: [rec] });
+      setRegForm({ kind: '증차', count: '', office: '', date: '' });
+      reloadWorks();
+      toast('증차·감차 신청 등록 — 업무관리에서 진행합니다', 'success');
+    } catch (e) {
+      toastError((e as Error).message || '저장 실패');
+    } finally {
+      setRegBusy(false);
+    }
+  };
+
+  /** 옛 마스터 배열 → 업무 1회 이관. `workId`가 신청 id라 두 번 눌러도 문서는 하나다. */
+  const migrateRegApps = async () => {
+    if (!selectedCo || regBusy || !legacyRegApps.length) return;
+    setRegBusy(true);
+    try {
+      const records = regAppsToWorkItems(legacyRegApps, selectedCo.id);
+      await commitSave({ entity: 'work_item', sessionCompanyId: selectedCo.id, rec: records[0], records });
+      // 옮긴 뒤에야 원본을 비운다 — 실패하면 그대로 남아 다시 시도할 수 있다.
+      const base = loadMaster(selectedCo.id);
+      const r = await saveMaster(selectedCo.id, { ...base, regApplications: [] });
+      if (!r.ok) { toast(r.message || '이관은 됐지만 옛 목록을 비우지 못했습니다', 'error'); return; }
+      setMasterTick((n) => n + 1);
+      reloadWorks();
+      toast(`${records.length}건을 업무로 옮겼습니다`, 'success');
+    } catch (e) {
+      toastError((e as Error).message || '이관 실패');
+    } finally {
+      setRegBusy(false);
+    }
+  };
 
   useEffect(() => {
     const on = () => setMasterTick((n) => n + 1);
@@ -547,20 +612,71 @@ export default function ManagementPage() {
                  은행·계좌번호·예금주는 신원이라 거래가 붙은 뒤 바꾸면 과거 귀속이 흔들린다.
                  약칭·용도·메모는 라벨이라 언제나 열어둔다(자금거래 불변 규칙과 같은 논리). */
               /* ★등록대수 — 관청 등록 대수 vs 실제 보유. 어긋나면 증차·감차 신청 대상이다.
-                 신청 «이력»(RegApplication)은 상태전이가 있는 워크플로라 여기 안 넣는다(AUDIT §6-3). */
-              module: 'vehicleReg', title: '등록대수', cols: [],
+                 신청은 **업무**다(사장님 확정 2026-08-07 · AUDIT §6-3) — 「신청→접수→승인/반려」로
+                 담당자·기한·상태가 붙는 워크플로다. 여기 표는 «이 법인 건»을 비추는 창일 뿐,
+                 실체는 `work_item` 에 있다. 두 벌로 만들지 말 것. */
+              module: 'vehicleReg', title: '등록대수 · 증차신청', cols: [], count: regApps.length,
               body: (
-                <KV editing={editing} form={form} onChange={set} rows={[
-                  ['관청 등록', 'registeredCount', selectedCo.master.registeredCount != null ? `${selectedCo.master.registeredCount}대` : ''],
-                  ['실제 보유', null, coKpi ? `${coKpi.totalVehicles}대` : LEDGER_EMPTY.dash],
-                  ['차이', null, (() => {
-                    const reg = Number(selectedCo.master.registeredCount);
-                    if (!Number.isFinite(reg) || !coKpi) return LEDGER_EMPTY.dash;
-                    const gap = coKpi.totalVehicles - reg;
-                    if (gap === 0) return <span style={{ color: C.mute }}>일치</span>;
-                    return <span style={{ color: C.warn }}>{gap > 0 ? `보유 초과 ${gap}대 — 증차 필요` : `등록 여유 ${-gap}대`}</span>;
-                  })()],
-                ]} />
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  <KV editing={editing} form={form} onChange={set} rows={[
+                    ['관청 등록', 'registeredCount', selectedCo.master.registeredCount != null ? `${selectedCo.master.registeredCount}대` : ''],
+                    ['실제 보유', null, coKpi ? `${coKpi.totalVehicles}대` : LEDGER_EMPTY.dash],
+                    ['차이', null, (() => {
+                      const reg = Number(selectedCo.master.registeredCount);
+                      if (!Number.isFinite(reg) || !coKpi) return LEDGER_EMPTY.dash;
+                      const gap = coKpi.totalVehicles - reg;
+                      if (gap === 0) return <span style={{ color: C.mute }}>일치</span>;
+                      return <span style={{ color: C.warn }}>{gap > 0 ? `보유 초과 ${gap}대 — 증차 필요` : `등록 여유 ${-gap}대`}</span>;
+                    })()],
+                  ]} />
+
+                  {legacyRegApps.length ? (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', fontSize: 12, color: C.warn }}>
+                      <span>옛 법인정보에 신청 {legacyRegApps.length}건이 남아 있습니다 — 신청은 이제 업무로 관리합니다.</span>
+                      <Btn size="sm" variant="ghost" disabled={regBusy} onClick={() => { void migrateRegApps(); }}>업무로 옮기기</Btn>
+                    </div>
+                  ) : null}
+
+                  <div style={{ overflowX: 'auto' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', whiteSpace: 'nowrap' }}>
+                      <thead><tr>
+                        <th style={th}>신청일</th><th style={th}>구분</th><th style={thR}>대수</th>
+                        <th style={th}>관할관청</th><th style={th}>상태</th><th style={th}>결과</th>
+                      </tr></thead>
+                      <tbody>
+                        {regApps.length ? regApps.map((w) => (
+                          <tr
+                            key={String(w._key || w.id)}
+                            style={{ cursor: 'pointer' }}
+                            onClick={() => { window.location.href = `/work?open=${encodeURIComponent(String(w._key || w.id || ''))}`; }}
+                          >
+                            <td style={td}>{String(w.date || '') || LEDGER_EMPTY.dash}</td>
+                            <td style={td}>{String(w.regKind || '') || LEDGER_EMPTY.dash}</td>
+                            <td style={tdR}>{w.regCount ? `${w.regCount}대` : LEDGER_EMPTY.dash}</td>
+                            <td style={td}>{String(w.regOffice || '') || LEDGER_EMPTY.dash}</td>
+                            <td style={td}>{String(w.status || '') || LEDGER_EMPTY.dash}</td>
+                            <td style={td}>{w.regResult
+                              ? <span style={{ color: w.regResult === '반려' ? C.danger : undefined, fontWeight: 700 }}>{String(w.regResult)}</span>
+                              : LEDGER_EMPTY.dash}</td>
+                          </tr>
+                        )) : (
+                          <tr><td colSpan={6} style={{ ...td, color: C.faint }}>신청 없음</td></tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* 등록은 그 자리에서. 진행(접수·승인·반려)은 업무관리가 담당한다 — 경로를 둘로 만들지 않는다. */}
+                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+                    <Select value={regForm.kind} onChange={(e) => setRegForm((f) => ({ ...f, kind: e.target.value }))} style={{ width: 84 }}>
+                      <option value="증차">증차</option><option value="감차">감차</option>
+                    </Select>
+                    <Input type="number" value={regForm.count} onChange={(e) => setRegForm((f) => ({ ...f, count: e.target.value }))} placeholder="대수" style={{ width: 78 }} />
+                    <Input value={regForm.office} onChange={(e) => setRegForm((f) => ({ ...f, office: e.target.value }))} placeholder="관할관청" style={{ flex: 1, minWidth: 130 }} />
+                    <Input type="date" value={regForm.date} onChange={(e) => setRegForm((f) => ({ ...f, date: e.target.value }))} style={{ width: 140 }} />
+                    <Btn size="sm" disabled={regBusy} onClick={() => { void addRegApp(); }}>+ 신청 등록</Btn>
+                  </div>
+                </div>
               ),
             },
             {

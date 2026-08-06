@@ -206,6 +206,12 @@ const WORK_KIND_DETAIL_COLS: SheetCol<WorkLedgerRow>[] = [
   detailStr('insuranceExpiryDate', '보험만기일'),
   detailStr('partName', '부품명'),
   detailNum('partQty', '수량'),
+  // 증차·감차 신청 — 대상이 법인이라 차량 열이 비는 게 정상이다
+  detailStr('regKind', '신청구분'),
+  detailNum('regCount', '신청 대수', '대'),
+  detailStr('regOffice', '관할관청'),
+  detailStr('regResult', '처리결과'),
+  detailStr('regResultDate', '결과일'),
   // 계약·고객 업무
   detailStr('paymentIssueType', '수납이슈유형'),
   detailMoney('expectedAmount', '예정금액'),
@@ -353,6 +359,7 @@ const WORK_KIND_DETAIL_DEFS: Record<WorkLedgerRow['group'], DetailSectionDef[]> 
   클레임: [{ title: '클레임', keys: ['claimType', 'callChannel', 'nextActionDate'] }],
   // 반납 준비 — 회수 장소·탁송사·인수 주행거리. 정산 금액은 계약(반납정산)이 계산한다(여기서 손롤 금지).
   '반납·정산': [{ title: '반납 준비', keys: ['location', 'vendor', 'mileage'] }],
+  '증차·감차': [{ title: '증차·감차 신청', keys: ['regKind', 'regCount', 'regOffice', 'regResult', 'regResultDate'] }],
   입출고: [{ title: '입출고', keys: ['location', 'vendor', 'mileage'] }],
   '매각·처분': [{ title: '매각·처분', keys: ['counterparty', 'vendor', 'mileage'] }],
   문서: [{ title: '문서', keys: ['docKind', 'docStatus'] }],

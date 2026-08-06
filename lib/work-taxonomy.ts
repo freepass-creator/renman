@@ -24,6 +24,10 @@ export const WORK_CATEGORIES = [
   // 계약 축에 없었다(활성 세부가 「고객상담」 하나뿐). lib/directives.ts 의 '반납·만기' 매핑 대상.
   // ⚠ 실제 반납 전이(상태 변경)는 계약화면 버튼이 담당한다 — 업무는 예정·준비까지다(경로 이중화 금지).
   '반납·정산',
+  // 2026-08-07 사장님 확정(AUDIT §6-3) — 증차·감차 신청은 **업무로 본다**.
+  // 「신청→접수→승인/반려」로 도는 워크플로라 담당자·기한·상태가 붙는다.
+  // ⚠ 공문 대장은 여기 넣지 않는다 — 그건 «할 일»이 아니라 «기록»이라 법인 속성으로 남는다.
+  '증차·감차',
 ] as const;
 
 export type WorkCategory = (typeof WORK_CATEGORIES)[number];
@@ -68,7 +72,7 @@ export type WorkDivision = (typeof WORK_DIVISIONS)[number];
  * 옛 값(세차·부품교체·연락기록·클레임·분쟁)도 여기 남는다 — 매핑이 사라지면 과거 업무가 「기타」로 떨어진다.
  */
 export const WORK_DIVISION_CATEGORIES: Record<WorkDivision, readonly WorkCategory[]> = {
-  자산: ['정비·수선', '사고', '검사', '보험', '입출고', '매각·처분', '세차', '부품교체'],
+  자산: ['정비·수선', '사고', '검사', '보험', '입출고', '매각·처분', '세차', '부품교체', '증차·감차'],
   계약: ['고객상담', '연락기록', '분쟁', '클레임', '반납·정산'],
   자금: ['수납이슈', '자금'],
   과태료: ['과태료'],
@@ -94,6 +98,7 @@ export const WORK_CATEGORIES_ACTIVE = [
      '상품화세차'(반납 후 재상품화 = 차 못 나감)와 일반세차의 구분도 여기서만 표현된다. */
   '세차',
   '입출고', '매각·처분',                  // 자산 — 실행(배차·처분). 담당·기한·진행이 붙는다
+  '증차·감차',                           // 자산 — 관청 신청 워크플로(대상은 법인이라 차량번호를 강제하지 않는다)
   '고객상담',                            // 계약 — 상담·연락·클레임·분쟁을 하나로 받는다
   '반납·정산',                           // 계약 — 반납 만기가 낳는 회수·정산 준비(자동생성의 착지점)
   '수납이슈', '자금',                     // 자금
@@ -127,6 +132,17 @@ export const WORK_DIVISION_REQUIRED: Record<WorkDivision, readonly string[]> = {
   기타: [],   // 사내 일정·문서·메모 — 대상이 없는 자유기록이라 강제하지 않는다
 };
 
+/**
+ * 세부 단위 예외 — 대분류 필수값이 그 세부에는 맞지 않는 경우.
+ *
+ * 「증차·감차」는 자산 축이지만 대상이 **법인**이다. 아직 사지도 않은 차를 관청에 신청하는 일이라
+ * 차량번호가 있을 수 없다. 축을 「기타」로 옮기면 자산 실무에서 사라지므로, 축은 자산에 두고
+ * 필수값만 면제한다.
+ */
+const CATEGORY_REQUIRED_OVERRIDE: Partial<Record<WorkCategory, readonly string[]>> = {
+  '증차·감차': [],
+};
+
 const REQUIRED_LABEL: Record<string, string> = {
   plate: '차량번호', contractKey: '계약(계약자)', amount: '금액', dueDate: '기한',
 };
@@ -137,7 +153,9 @@ export function missingWorkRequirements(
   record: Record<string, unknown> | null | undefined,
 ): string[] {
   if (!record) return [];
-  return WORK_DIVISION_REQUIRED[workDivisionOf(category)]
+  const cat = String(category || '') as WorkCategory;
+  const required = CATEGORY_REQUIRED_OVERRIDE[cat] ?? WORK_DIVISION_REQUIRED[workDivisionOf(category)];
+  return required
     .filter((key) => {
       const v = record[key];
       if (key === 'amount') return !(Number(v) > 0);

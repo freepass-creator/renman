@@ -196,6 +196,13 @@ export const ENTITIES: Record<string, Entity> = {
       { key: 'insuranceExpiryDate', label: '보험만기일', type: 'date', manual: true },
       { key: 'partName', label: '부품명', type: 'text', manual: true },
       { key: 'partQty', label: '수량', type: 'number', manual: true },
+      // ── 증차·감차 신청(AUDIT §6-3 · 사장님 확정 2026-08-07) — 대상은 차가 아니라 법인이다 ──
+      // 진행은 업무 상태가 담는다(준비=대기 · 접수=진행 · 승인/반려=완료). 결과는 아래 필드가 가른다.
+      { key: 'regKind', label: '신청구분', type: 'select', options: ['증차', '감차'], manual: true },
+      { key: 'regCount', label: '신청 대수', type: 'number', manual: true },
+      { key: 'regOffice', label: '관할관청', type: 'text', manual: true },
+      { key: 'regResult', label: '처리결과', type: 'select', options: ['승인', '반려'], manual: true, note: '반려도 «끝난» 것이다 — 상태는 완료, 결과만 반려' },
+      { key: 'regResultDate', label: '결과일', type: 'date', manual: true },
       // ── 계약·고객 업무 ──
       { key: 'paymentIssueType', label: '수납이슈유형', type: 'select', options: ['미납', '부분수납', '과수납', '오입금', '환불', '기타'], manual: true },
       { key: 'expectedAmount', label: '예정금액(원)', type: 'number', manual: true },
