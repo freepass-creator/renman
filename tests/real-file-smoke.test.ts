@@ -42,6 +42,17 @@ describe.skipIf(!available.length)('실파일 파서 연기 테스트', () => {
     expect(r.records[0]).toHaveProperty('txDate');
   });
 
+  it.skipIf(!find('자금일보'))('★손으로 채운 3열(계정과목·차량번호·임차인)이 살아남는다', async () => {
+    const r = await parseTxFileReport(fileOf(find('자금일보')!));
+    const withCat = r.records.filter((x) => String((x as Record<string, unknown>).category ?? '').trim());
+    const withPlate = r.records.filter((x) => String((x as Record<string, unknown>).plate ?? '').trim());
+    const withTenant = r.records.filter((x) => String((x as Record<string, unknown>).tenant ?? '').trim());
+    // 실측: 분류 1,793 · 차량번호 847 · 임차인 523. 버려지면 실무자가 매번 다시 채워야 한다.
+    expect(withCat.length, '계정과목').toBeGreaterThan(1500);
+    expect(withPlate.length, '차량번호').toBeGreaterThan(700);
+    expect(withTenant.length, '임차인').toBeGreaterThan(400);
+  });
+
   it('읽은 거래는 자연키가 붙는다 — 중복 재업로드가 쌓이지 않게', async () => {
     const f = find('자금일보') || find('운영계좌');
     if (!f) return;

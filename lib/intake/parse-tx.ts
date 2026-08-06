@@ -148,6 +148,17 @@ export function parseBankRow(row: Record<string, unknown>, fileName: string, ban
   const txTime = extractTxTime(get(row, '거래일시', '거래시각', '거래시간', '처리일시'));
   if (txTime) rec.txTime = txTime;
   const contractNo = get(row, '계약번호', '약정번호'); if (contractNo) rec.contractNo = contractNo;
+
+  /* ★자금일보의 «계정과목 · 차량번호 · 임차인»을 그대로 받는다(docs/UPLOAD-FORMATS.md §3-4).
+     은행이 준 건 앞 8열까지고 이 3열은 **실무자가 손으로 채운 값**이다.
+     버리면 매번 다시 채워야 하고, 자동분류가 이걸 덮으면 그 노동이 사라진다
+     (classify-tx.resolveCategory 가 «사람이 넣은 값이 이긴다»로 보호한다). */
+  const category = get(row, '계정과목', '계정', '과목');
+  if (category) rec.category = category;
+  const plate = get(row, '차량번호', '차번', '관련 차량번호');
+  if (plate) rec.plate = plate;
+  const tenant = get(row, '임차인', '계약자', '고객명');
+  if (tenant) rec.tenant = tenant;
   return rec;
 }
 

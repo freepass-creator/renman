@@ -383,6 +383,9 @@ export const ENTITIES: Record<string, Entity> = {
       { key: 'method', label: '수단', type: 'text', note: '계좌/CMS/카드/현금' },
       { key: 'category', label: '계정과목', type: 'select', options: LEDGER_SUBJECTS.map((subject) => subject.label), manual: true },
       { key: 'plate', label: '관련 차량번호', type: 'text', manual: true },
+      // 자금일보가 «계정과목·차량번호·임차인» 3열을 손으로 채워 온다(docs/UPLOAD-FORMATS.md §3-4).
+      // 그 노동이 산출물의 본체이므로 업로드 때 버리지 않고 그대로 받는다.
+      { key: 'tenant', label: '임차인', type: 'text', manual: true },
       { key: 'referenceId', label: '계약·문서 근거', type: 'text', manual: true },
       { key: 'matchProposalState', label: '연결후보상태', type: 'select', options: ['자동후보', '복수후보', '검토후보', '미매칭', '해당없음'] },
       { key: 'matchProposalCount', label: '후보수', type: 'number' },
