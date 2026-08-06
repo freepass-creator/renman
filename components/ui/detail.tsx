@@ -91,27 +91,28 @@ export function Disclosure({ title, defaultOpen = false, open: openProp, onOpenC
 export type KVRow = [label: string, key: string | null, value: React.ReactNode];
 export function KV({ rows, editing, form, onChange }: { rows: KVRow[]; editing?: boolean; form?: EntityRecord; onChange?: (k: string, v: string) => void }) {
   const mobile = useIsMobile();
+  /* ★상세 규격 = 원장 우측 상세패널의 필드 표 하나(사장님 확정 2026-08-06).
+     라벨|값 표가 두 벌(손롤 KV / `ledger-record-panel__fields`)일 이유가 없어 여기로 통일한다.
+     ─ 마크업·클래스를 패널과 같게 쓰므로 라벨 폭·행 구분선·스트라이프가 저절로 같아진다.
+     ─ 바깥 박스(테두리·그림자)는 없앤다: 섹션이 이미 박스다(박스 안 박스 = 금지 데코).
+       편집 중 신호만 왼쪽 강조선으로 남긴다. */
   return (
-    <div style={{ border: `1px solid ${editing ? C.accent : C.line}`, borderRadius: 'var(--radius)', background: C.card, boxShadow: editing ? '0 0 0 3px var(--focus-ring)' : SH.rest, transition: 'box-shadow .15s, border-color .15s' }}>
+    <dl
+      className="ledger-record-panel__fields"
+      style={editing ? { boxShadow: `inset 2px 0 0 ${C.accent}` } : undefined}
+    >
       {rows.map(([k, key, val], i) => (
-        <div key={i} style={{
-          display: 'flex', flexDirection: mobile ? 'column' : 'row',
-          alignItems: mobile ? 'stretch' : 'center',
-          justifyContent: mobile ? undefined : undefined,
-          minHeight: mobile ? undefined : 34,
-          padding: mobile ? '9px 12px' : '0 12px',
-          gap: mobile ? 4 : 0,
-          fontSize: mobile ? 13.5 : 12.5,
-          borderTop: i ? `1px solid var(--border-soft)` : 'none',
-        }}>
-          <span style={{ width: mobile ? 'auto' : 96, flex: mobile ? undefined : '0 0 96px', color: C.mute, fontSize: mobile ? 11 : undefined, fontWeight: mobile ? 600 : undefined }}>{k}</span>
-          {editing && key
-            ? <input value={String(form?.[key] ?? '')} onChange={(e) => onChange?.(key, e.target.value)}
-                style={{ flex: 1, minWidth: 0, width: '100%', height: ctrlH(mobile), boxSizing: 'border-box', padding: mobile ? '0 12px' : '0 7px', border: `1px solid ${C.line}`, borderRadius: R, fontSize: ctrlInputFs(mobile), background: C.card, color: C.ink, fontFamily: 'inherit' }} />
-            : <span style={{ minWidth: 0, fontVariantNumeric: 'tabular-nums', fontWeight: mobile ? 600 : undefined }}>{(val === '' || val == null) ? <span style={{ color: C.lineStrong }}>—</span> : val}</span>}
+        <div className="ledger-record-panel__field" key={i}>
+          <dt>{k}</dt>
+          <dd>
+            {editing && key
+              ? <input value={String(form?.[key] ?? '')} onChange={(e) => onChange?.(key, e.target.value)}
+                  style={{ width: '100%', height: ctrlH(mobile), boxSizing: 'border-box', padding: mobile ? '0 12px' : '0 7px', border: `1px solid ${C.line}`, borderRadius: R, fontSize: ctrlInputFs(mobile), background: C.card, color: C.ink, fontFamily: 'inherit' }} />
+              : ((val === '' || val == null) ? <span style={{ color: C.faint }}>—</span> : val)}
+          </dd>
         </div>
       ))}
-    </div>
+    </dl>
   );
 }
 
