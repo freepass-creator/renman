@@ -6,6 +6,7 @@
  */
 import * as XLSX from 'xlsx';
 import type { EntityRecord } from './entities';
+import { toLedgerSubject } from '../finance/account-categories';
 
 /* ── 날짜 정규화 (v5 parsers/date 이식) ── */
 export function normalizeKoreanDate(s: unknown): string {
@@ -154,7 +155,11 @@ export function parseBankRow(row: Record<string, unknown>, fileName: string, ban
      버리면 매번 다시 채워야 하고, 자동분류가 이걸 덮으면 그 노동이 사라진다
      (classify-tx.resolveCategory 가 «사람이 넣은 값이 이긴다»로 보호한다). */
   const category = get(row, '계정과목', '계정', '과목');
-  if (category) rec.category = category;
+  // 실무 표기(«자금이동»)를 앱 정규 과목(«계좌간이체»)으로 옮긴다 — 안 그러면 선택지에 없는 값이 심긴다.
+  if (category) {
+    rec.category = toLedgerSubject(category);
+    if (rec.category !== category) rec.categoryRaw = category; // 원문 보존 — 대사할 때 근거가 된다
+  }
   const plate = get(row, '차량번호', '차번', '관련 차량번호');
   if (plate) rec.plate = plate;
   const tenant = get(row, '임차인', '계약자', '고객명');

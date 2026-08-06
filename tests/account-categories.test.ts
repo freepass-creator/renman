@@ -53,3 +53,39 @@ describe('계정과목 SSOT', () => {
     expect(new Set(names).size).toBe(names.length);
   });
 });
+
+import { toLedgerSubject, SUBJECT_ALIAS } from '@/lib/finance/account-categories';
+import { isLedgerSubject, kindOfLabel } from '@/lib/payments/ledger-subjects';
+
+/**
+ * 실무 표기 → 앱 정규 과목. 이 다리가 없으면 업로드가 «선택지에 없는 값»을 심는다.
+ * (앱 정규 SSOT = lib/payments/ledger-subjects.ts)
+ */
+describe('SUBJECT_ALIAS — 파일의 말 → 앱의 말', () => {
+  it('별칭이 가리키는 값은 전부 앱 정규 과목에 실재한다', () => {
+    for (const [raw, mapped] of Object.entries(SUBJECT_ALIAS)) {
+      expect(isLedgerSubject(mapped), `${raw} → ${mapped} 가 LEDGER_SUBJECTS 에 없다`).toBe(true);
+    }
+  });
+
+  it('★자금이동은 계좌간이체로 옮겨지고 «이체»로 잡힌다 — 손익에서 빠져야 한다', () => {
+    expect(toLedgerSubject('자금이동')).toBe('계좌간이체');
+    expect(kindOfLabel('계좌간이체')).toBe('이체');
+  });
+
+  it('대여료는 대여료수입(수입)으로', () => {
+    expect(toLedgerSubject('대여료')).toBe('대여료수입');
+    expect(kindOfLabel('대여료수입')).toBe('수입');
+  });
+
+  it('할부금은 할부원금상환(이체) — 원금은 손익이 아니다', () => {
+    expect(toLedgerSubject('할부금')).toBe('할부원금상환');
+    expect(kindOfLabel('할부원금상환')).toBe('이체');
+  });
+
+  it('대응이 없으면 원문 그대로 — 억지로 «기타»에 몰지 않는다', () => {
+    expect(toLedgerSubject('차입금')).toBe('차입금');
+    expect(toLedgerSubject('출자금')).toBe('출자금');
+    expect(toLedgerSubject('')).toBe('');
+  });
+});
