@@ -116,7 +116,10 @@ export function InfoDoc({
       // 스칼라 숨은 필드는 사용자 확인 없이 덮지 않고, 배열 구조만 이 경로에서 추가한다.
       for (const [k, val] of Object.entries(pending.mapped || {})) if (Array.isArray(val)) merged[k] = val;
       await onReplaceDoc({ url: pending.url, ocr: pending.ocr, ocrOriginal: pending.ocrOriginal, fields: merged, reason });
-      resetReplace();
+      /* ★저장해도 이 블록을 닫지 않는다. 닫아 버리면 방금 올린 게 서류 목록에 뜨는 걸 못 본다
+         — 「올렸는데 들어갔나?」가 남는다. 확인창(pending)만 치우고 자리는 그대로 둔다.
+         닫는 건 사용자가 「닫기」를 누를 때만. */
+      setPending(null); setConfirm({}); setBusy(false);
     } finally { setSaving(false); }
   }
 

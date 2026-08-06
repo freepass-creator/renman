@@ -23,7 +23,12 @@ import { enforceApiRateLimit } from '@/lib/api-rate-limit';
 export const runtime = 'nodejs';
 export const maxDuration = 120;
 
-const MODEL = 'gemini-2.5-flash';
+/**
+ * ★별칭(`-latest`)을 쓴다. 고정 버전(`gemini-2.5-flash`)은 어느 날 «신규 사용자에게 더 이상 제공되지
+ * 않음» 404 로 죽는다 — 2026-08-06 실제로 그렇게 멈췄다. 별칭은 구글이 최신으로 계속 이어준다.
+ * 환경변수로 덮을 수 있게 둔다(특정 버전에 고정해야 할 때).
+ */
+const MODEL = process.env.GEMINI_MODEL?.trim() || 'gemini-flash-latest';
 
 export async function POST(req: NextRequest) {
   // 인증 — Authorization: Bearer <Firebase ID token> (직원만)
