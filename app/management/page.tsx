@@ -17,7 +17,7 @@ import { usePrompt } from '@/components/ui/confirm';
 import { toast, toastError } from '@/lib/toast';
 import { getStore } from '@/lib/store';
 import type { EntityRecord } from '@/lib/intake/entities';
-import { COMPANY_DEFS, companyLabel, createManagedCompany, updateManagedCompany } from '@/lib/companies';
+import { COMPANY_DEFS, companyLabel, createManagedCompany, updateManagedCompany, type CompanyMasterInput } from '@/lib/companies';
 import { loadMaster, type CompanyMaster } from '@/lib/company-master';
 import { useEntityList } from '@/lib/use-entity-lists';
 import { buildBankAccountLedger, type BankAccountRow } from '@/lib/finance/cash-ledger';
@@ -76,6 +76,37 @@ const LEASE_COLS: SheetCol<LeaseRow>[] = [
     text: (r) => r.status,
   },
 ];
+
+/** 자금 채널 섹션 — 계좌 외 3종(법인카드·CMS·단말기). 편집 중에만 +행/삭제가 뜬다. */
+type ChanCol = { key: string; label: string; hint?: string };
+function ChannelSec({ rows, cols, editing, matchKey, onAdd, onSet, onDel }: {
+  rows: Record<string, string>[]; cols: ChanCol[]; editing: boolean; matchKey: string;
+  onAdd: () => void; onSet: (i: number, k: string, v: string) => void; onDel: (i: number) => void;
+}) {
+  if (!rows.length && !editing) {
+    return <DetailEmpty>없음 — [수정]에서 추가하세요. 없으면 이 채널의 거래는 회사가 안 붙습니다.</DetailEmpty>;
+  }
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+      {rows.map((r, i) => (
+        <div key={i}>
+          {editing && (
+            <div style={{ display: 'flex', justifyContent: 'flex-end', padding: '0 0 4px' }}>
+              <Btn size="sm" variant="ghost" onClick={() => onDel(i)}>삭제</Btn>
+            </div>
+          )}
+          <KV editing={editing} form={r} onChange={(k, v) => onSet(i, k, v)}
+            rows={cols.map((c) => [
+              c.key === matchKey ? `${c.label} ★` : c.label,
+              editing ? c.key : null,
+              r[c.key] || '',
+            ])} />
+        </div>
+      ))}
+      {editing && <div><Btn size="sm" variant="ghost" onClick={onAdd}>+ 행 추가</Btn></div>}
+    </div>
+  );
+}
 
 function leaseStatus(end: string): string {
   const d = dday(end);
@@ -178,6 +209,18 @@ export default function ManagementPage() {
      `LedgerEditPanel`은 `getStore().update` 전용이라 여기 못 쓴다. */
   const set = (k: string, v: string) => setForm((f) => ({ ...f, [k]: v }));
 
+  /* 자금 채널(법인카드·CMS·단말기) — CompanyMaster 배열이라 폼과 별도로 들고 저장 때 함께 넘긴다.
+     ★이게 비어 있으면 그 채널로 들어온 자금은 회사가 안 붙어 미배정으로 쌓인다(jpkerp5 모델). */
+  const [chan, setChan] = useState<Record<string, Record<string, string>[]>>({});
+  const chanRows = (k: string) => chan[k] ?? [];
+  const chanAdd = (k: string) => setChan((c) => ({ ...c, [k]: [...(c[k] ?? []), { id: `${k}_${Object.keys(c).length}_${(c[k] ?? []).length}` }] }));
+  const chanSet = (k: string, i: number, f: string, v: string) => setChan((c) => {
+    const rows = [...(c[k] ?? [])]; rows[i] = { ...rows[i], [f]: v }; return { ...c, [k]: rows };
+  });
+  const chanDel = (k: string, i: number) => setChan((c) => {
+    const rows = [...(c[k] ?? [])]; rows.splice(i, 1); return { ...c, [k]: rows };
+  });
+
   function startEdit() {
     if (!selectedCo) return;
     const m = selectedCo.master;
@@ -192,6 +235,14 @@ export default function ManagementPage() {
         [`acct:${a.id}:accountNumber`, a.accountNumber], [`acct:${a.id}:accountHolder`, a.accountHolder],
         [`acct:${a.id}:accountType`, a.accountType],
       ])),
+    });
+    const asRows = (v: unknown) => (Array.isArray(v) ? v : []).map((x) => {
+      const o: Record<string, string> = {};
+      for (const [k, val] of Object.entries(x as Record<string, unknown>)) o[k] = String(val ?? '');
+      return o;
+    });
+    setChan({
+      cards: asRows(m.cards), autoTransfers: asRows(m.autoTransfers), cardTerminals: asRows(m.cardTerminals),
     });
     setEditing(true);
   }
@@ -213,7 +264,14 @@ export default function ManagementPage() {
         cur[m[2]] = v;
         acctPatch.set(m[1], cur);
       }
-      await updateManagedCompany(selectedCo.id, { label }, master);
+      // 채널은 마스터 배열 — 빈 행(매칭 키 없는 행)은 버린다. 남으면 영영 안 맞는 채널이 쌓인다.
+      const keep = (k: string, req: string) => chanRows(k).filter((r) => String(r[req] || '').trim());
+      await updateManagedCompany(selectedCo.id, { label }, {
+        ...master,
+        cards: keep('cards', 'cardLast4'),
+        autoTransfers: keep('autoTransfers', 'cmsId'),
+        cardTerminals: keep('cardTerminals', 'terminalId'),
+      } as CompanyMasterInput);
       for (const [id, patch] of acctPatch) {
         const before = coAccounts.find((a) => a.id === id);
         // 안 바뀐 계좌까지 쓰지 않는다 — 감사 트레일에 빈 변경이 쌓인다.
@@ -362,6 +420,39 @@ export default function ManagementPage() {
                       })}
                     </div>
                   : <ExcelSheet rows={coAccounts} cols={ACCOUNT_BASIC_COLS} rowKey={(r) => r.id} />,
+            },
+            {
+              /* ★계좌 말고도 «돈이 들어오고 나가는 통로»가 셋 더 있다(jpkerp5 모델).
+                 각 채널의 ★ 표시 필드가 업로드 거래를 이 회사로 붙이는 매칭 키다. */
+              title: '법인카드 (지출)', cols: [], count: chanRows('cards').length || (selectedCo.master.cards?.length ?? 0),
+              body: <ChannelSec editing={editing} matchKey="cardLast4"
+                rows={editing ? chanRows('cards') : ((selectedCo.master.cards ?? []) as unknown as Record<string, string>[])}
+                cols={[
+                  { key: 'cardName', label: '카드명' }, { key: 'cardCompany', label: '카드사' },
+                  { key: 'cardLast4', label: '끝 4자리' }, { key: 'holder', label: '명의자' },
+                  { key: 'purpose', label: '용도' },
+                ]}
+                onAdd={() => chanAdd('cards')} onSet={(i, k, v) => chanSet('cards', i, k, v)} onDel={(i) => chanDel('cards', i)} />,
+            },
+            {
+              title: '자동이체 CMS (수입)', cols: [], count: chanRows('autoTransfers').length || (selectedCo.master.autoTransfers?.length ?? 0),
+              body: <ChannelSec editing={editing} matchKey="cmsId"
+                rows={editing ? chanRows('autoTransfers') : ((selectedCo.master.autoTransfers ?? []) as unknown as Record<string, string>[])}
+                cols={[
+                  { key: 'providerName', label: 'CMS 사업자' }, { key: 'cmsId', label: 'CMS ID' },
+                  { key: 'alias', label: '별명' }, { key: 'purpose', label: '용도' },
+                ]}
+                onAdd={() => chanAdd('autoTransfers')} onSet={(i, k, v) => chanSet('autoTransfers', i, k, v)} onDel={(i) => chanDel('autoTransfers', i)} />,
+            },
+            {
+              title: '카드매출 단말기 (수입)', cols: [], count: chanRows('cardTerminals').length || (selectedCo.master.cardTerminals?.length ?? 0),
+              body: <ChannelSec editing={editing} matchKey="terminalId"
+                rows={editing ? chanRows('cardTerminals') : ((selectedCo.master.cardTerminals ?? []) as unknown as Record<string, string>[])}
+                cols={[
+                  { key: 'vanProvider', label: 'VAN사' }, { key: 'terminalId', label: '단말기 ID' },
+                  { key: 'merchantNo', label: '가맹점번호' }, { key: 'alias', label: '별명' },
+                ]}
+                onAdd={() => chanAdd('cardTerminals')} onSet={(i, k, v) => chanSet('cardTerminals', i, k, v)} onDel={(i) => chanDel('cardTerminals', i)} />,
             },
             {
               title: '임대차', cols: [], count: coLeases.length,

@@ -20,6 +20,22 @@ export type OfficialDoc = {
   id: string; date?: string; direction: '발신' | '수신'; title?: string; counterpart?: string; docNo?: string; note?: string;
 };
 
+/** 법인카드 — 지출. `cardLast4` 가 card_tx 매칭 키(무엇을 채워야 매칭되는지 명확히). */
+export type CorporateCard = {
+  id: string; cardName?: string; cardCompany?: string; cardLast4?: string;
+  holder?: string; purpose?: string;
+  /** @deprecated 구 스키마(`{no, alias}`) 호환. 읽기만 하고 새로 쓰지 말 것. */
+  no?: string; alias?: string;
+};
+/** 자동이체 CMS — 수입. `cmsId` 가 입금거래 매칭 키. */
+export type AutoTransfer = {
+  id: string; providerName?: string; cmsId?: string; alias?: string; purpose?: string;
+};
+/** 카드매출 단말기 — 수입. `terminalId` 가 매칭 키. */
+export type CardTerminal = {
+  id: string; vanProvider?: string; terminalId?: string; merchantNo?: string; alias?: string;
+};
+
 export type CompanyMaster = {
   registeredNameRaw?: string; // 사업자등록증 상호 원문(표시는 법인격만 제거)
   bizNo?: string;        // 사업자등록번호
@@ -38,7 +54,12 @@ export type CompanyMaster = {
   phone?: string;        // 대표 전화
   garages?: Garage[];    // 차고지(들) — 주소 + 수용대수
   parking?: string[];    // 사무실 주차장(들)
-  cards?: { no: string; alias?: string }[]; // 법인카드
+  /* ★자금 채널 — 단순 마스터가 아니라 «업로드한 거래를 어느 회사로 귀속시킬지» 정하는 매칭 키다.
+     이게 없으면 자금을 올려도 회사가 안 붙어 미배정으로 쌓인다(jpkerp5 모델 이식).
+     계좌는 renman에 `bank_account` 엔티티가 이미 SSOT라 여기 두지 않는다 — 두 벌 금지. */
+  cards?: CorporateCard[];          // 법인카드(지출) — card_tx 의 cardLast4 로 매칭
+  autoTransfers?: AutoTransfer[];   // 자동이체 CMS(수입) — 입금거래의 cmsId 로 매칭
+  cardTerminals?: CardTerminal[];   // 카드매출 단말기(수입) — terminalId 로 매칭
   registeredCount?: number;          // 관청 등록 대수
   regApplications?: RegApplication[]; // 증차·감차 신청 이력
   officialDocs?: OfficialDoc[];       // 공문 대장(발신·수신)

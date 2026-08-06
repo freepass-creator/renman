@@ -272,7 +272,8 @@ function CardModule({ m, set }: MP) {
           <Btn size="sm" variant="ghost" iconOnly tip={`${c.alias || c.no || `${i + 1}번`} 법인카드 삭제`} onClick={() => set({ cards: list.filter((_, j) => j !== i) })}><Trash2 size={15} /></Btn>
         </div>
       ))}
-      <div><Btn size="sm" variant="ghost" onClick={() => set({ cards: [...list, { no: '' }] })}><Plus size={13} /> 카드 추가</Btn></div>
+      {/* 구 카드 편집기 — 경영관리 법인 패널의 「법인카드」 섹션이 정식(매칭 키 cardLast4까지 받는다). */}
+      <div><Btn size="sm" variant="ghost" onClick={() => set({ cards: [...list, { id: `card_${list.length + 1}_${Date.now()}`, no: '' }] })}><Plus size={13} /> 카드 추가</Btn></div>
     </div>
   );
 }
