@@ -41,7 +41,7 @@ function validISO(y: string, mo: string, d: string): string {
 const HEADER_KEYWORDS: Record<string, string[]> = {
   'bank-tx': ['거래일', '거래일자', '거래일시', '거래시각', '입금일', '출금일', '입금', '입금액', '받은금액', '출금', '출금액', '인출액', '지급액', '적요', '메모', '내용', '거래내용', '거래메모', '용도', '상대계좌', '상대', '예금주', '입금자', '입금자명', '송금인', '보낸이', '받는분', '수취인', '계좌번호', '잔액', '이체'],
   'auto-debit': ['회원명', '회원번호', '납부자', '납부자명', '납부자 휴대전화', '수납금액', '청구금액', '청구월', '최초청구월', '청구완납일자', '결제일(납부기간)', '결제수단', '결제방식', '결제상태', '수납상태', '미수처리상태', 'CMS', '자동이체', '이체출금', '집금'],
-  'card-tx': ['승인번호', '승인일', '카드번호', '카드', '매입금액', '카드사', '가맹점'],
+  'card-tx': ['승인번호', '승인일', '카드번호', '카드', '매입금액', '카드사', '가맹점', '이용일시', '이용카드', '이용금액', '이용자명', '가맹점명'],
 };
 type Kind = 'bank-tx' | 'auto-debit' | 'card-tx' | 'unknown';
 function classifyByHeaders(headers: string[]): { kind: Kind; confidence: number } | null {
@@ -151,6 +151,39 @@ export function parseBankRow(row: Record<string, unknown>, fileName: string, ban
   return rec;
 }
 
+/**
+ * 법인카드 이용내역 행 → `card_tx`.
+ *
+ * ★`card-tx` 종류가 **선언만 되고 파싱 분기가 없어** 카드 파일이 은행 파서로 흘렀고,
+ *   「거래일을 판독할 수 없음」으로 **전건 거부**됐다(신한 25년 파일 1,983건 전멸).
+ *
+ * ⚠ 카드번호는 **마스킹 원문 그대로** 담는다 — 카드사마다 가리는 자리가 다르다
+ *   (신한: `9410-64**-****-9901`). 끝 4자리를 억지로 뽑으면 다른 카드사에서 어긋난다.
+ *   회사 귀속은 `cardMaskMatches`(lib/company-master)로 판정한다.
+ */
+export function parseCardRow(row: Record<string, unknown>, _fileName: string): EntityRecord | null {
+  const txDate = getDate(row, '이용일시', '승인일시', '승인일', '거래일시', '거래일자', '거래일', '매출일');
+  if (!txDate) return null;
+  const amount = toNum(get(row, '이용금액', '승인금액', '매입금액', '금액', '결제금액'));
+  if (amount <= 0) return null;
+  const cardMask = get(row, '이용카드', '카드번호', '카드');
+  const rec: EntityRecord = {
+    txDate,
+    amount,
+    merchant: get(row, '가맹점명', '가맹점', '이용가맹점') || '(미상)',
+    approvalNo: get(row, '승인번호', '거래번호'),
+    // 마스킹 원문 — 매칭 키. 끝 4자리는 «자릿수가 다 보일 때만» 부수적으로 담는다.
+    cardNo: cardMask,
+    holder: get(row, '이용자명', '이용자', '명의자', '사용자'),
+  };
+  const digits = cardMask.replace(/[^0-9*]/g, '');
+  const tail = digits.slice(-4);
+  if (tail.length === 4 && !tail.includes('*')) rec.cardLast4 = tail;
+  const txTime = extractTxTime(get(row, '이용일시', '승인일시', '거래일시'));
+  if (txTime) rec.txTime = txTime;
+  return rec;
+}
+
 /* ── CMS 결제내역 행 → bank_tx (v5 parsers/cms.parseCmsTxRow 이식) ── */
 export function parseCmsRow(row: Record<string, unknown>, _fileName: string): EntityRecord | null {
   const customerName = get(row, '회원명', '고객명', '납부자', '납부자명');
@@ -246,13 +279,14 @@ export async function parseTxFileReport(file: File): Promise<TxParseReport> {
     rawHeaders.forEach((h, i) => { if (CHECKBOX_RE.test(h)) dropIdx.add(i); });
     const headers = rawHeaders.filter((_, i) => !dropIdx.has(i));
     const isCms = det.kind === 'auto-debit';
+    const isCard = det.kind === 'card-tx';
     for (const [offset, r] of aoa.slice(det.headerRow + 1).entries()) {
       if (!r.some((v) => v != null && String(v).trim() !== '')) continue;
       if (FOOTER_RE.test(String(r[0] ?? '').trim()) || FOOTER_RE.test(String(r[1] ?? '').trim())) continue;
       const filtered = dropIdx.size === 0 ? r : r.filter((_, i) => !dropIdx.has(i));
       const obj: Record<string, unknown> = {};
       headers.forEach((h, i) => { obj[h] = filtered[i] ?? null; });
-      const rec = isCms ? parseCmsRow(obj, file.name) : parseBankRow(obj, file.name, bankHint);
+      const rec = isCms ? parseCmsRow(obj, file.name) : isCard ? parseCardRow(obj, file.name) : parseBankRow(obj, file.name, bankHint);
       if (rec) out.push(rec);
       else rejected.push({ sheet: sheetName, row: det.headerRow + offset + 2, reason: bankRejectReason(obj, isCms), values: obj });
     }
