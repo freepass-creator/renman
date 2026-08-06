@@ -51,7 +51,7 @@ function detailStr(key: string, label: string): SheetCol<WorkLedgerRow> {
 }
 function detailMoney(key: string, label: string): SheetCol<WorkLedgerRow> {
   return {
-    key, label, align: 'r',
+    key, label, align: 'r', sortNum: true, xf: 'money',
     render: (r) => {
       const n = rawNum(r, key);
       return n == null || n === 0 ? LEDGER_EMPTY.dash : money(n);
@@ -61,7 +61,7 @@ function detailMoney(key: string, label: string): SheetCol<WorkLedgerRow> {
 }
 function detailNum(key: string, label: string, suffix = ''): SheetCol<WorkLedgerRow> {
   return {
-    key, label, align: 'r',
+    key, label, align: 'r', sortNum: true, xf: suffix === '%' ? 'rate' : 'int',
     render: (r) => {
       const n = rawNum(r, key);
       return n == null ? LEDGER_EMPTY.dash : `${n.toLocaleString('ko-KR')}${suffix}`;
@@ -151,7 +151,7 @@ const WORK_COL_CATALOG: SheetCol<WorkLedgerRow>[] = [
     },
     text: (r) => r.dueDate,
   },
-  { key: 'amount', label: '금액', align: 'r', render: (r) => (r.amount ? money(r.amount) : LEDGER_EMPTY.dash), text: (r) => r.amount || '' },
+  { key: 'amount', label: '금액', align: 'r', sortNum: true, xf: 'money', render: (r) => (r.amount ? money(r.amount) : LEDGER_EMPTY.dash), text: (r) => r.amount || '' },
   { key: 'source', label: '원천', render: (r) => WORK_SOURCE_LABEL[r.source], text: (r) => r.source },
 ];
 
@@ -265,7 +265,7 @@ const PENALTY_COL_CATALOG: SheetCol<WorkLedgerRow>[] = [
   { key: 'violationDate', label: '위반일', pin: true, priority: 1, render: (r) => r.violationDate || LEDGER_EMPTY.dash, text: (r) => r.violationDate || '' },
   { key: 'plate', label: '차량번호', pin: true, priority: 1, render: (r) => r.plate || LEDGER_EMPTY.dash, text: (r) => r.plate || '' },
   {
-    key: 'amount', label: '금액', align: 'r', priority: 1,
+    key: 'amount', label: '금액', align: 'r', priority: 1, sortNum: true, xf: 'money',
     render: (r) => (r.amount ? <span style={{ color: C.warn, fontWeight: 700 }}>{money(r.amount)}</span> : LEDGER_EMPTY.dash),
     text: (r) => r.amount || '',
   },

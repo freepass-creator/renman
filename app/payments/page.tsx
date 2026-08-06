@@ -16,6 +16,7 @@
  * (bank_tx → contract)는 부분 실패가 복구 가능한 쪽으로 끝나게 하는 규칙이라 바꾸지 않았다.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useSession } from '@/lib/session';
 import { openCar, openCustomer, openFinance, openReceivables } from '@/lib/ui-bus';
 import { customerKey } from '@/lib/customers';
@@ -685,13 +686,17 @@ export default function PaymentsPage() {
 
   const dateStep = (
     <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-      <Btn size="sm" variant="ghost" iconOnly tip="이전일" onClick={() => setJournalDate((d) => moveDate(d, -1))}>‹</Btn>
+      <Btn size="sm" variant="ghost" iconOnly tip="이전일" onClick={() => setJournalDate((d) => moveDate(d, -1))}>
+        <ChevronLeft size={16} strokeWidth={2.2} aria-hidden />
+      </Btn>
       <Input
         type="date" value={journalDate}
         onChange={(e) => setJournalDate(e.target.value || TODAY)}
         style={{ width: 142, height: 28 }}
       />
-      <Btn size="sm" variant="ghost" iconOnly tip="다음일" onClick={() => setJournalDate((d) => moveDate(d, 1))}>›</Btn>
+      <Btn size="sm" variant="ghost" iconOnly tip="다음일" onClick={() => setJournalDate((d) => moveDate(d, 1))}>
+        <ChevronRight size={16} strokeWidth={2.2} aria-hidden />
+      </Btn>
       {latestTxDate && latestTxDate !== journalDate
         ? <Btn size="sm" variant="ghost" onClick={() => setJournalDate(latestTxDate)}>최근 거래일</Btn>
         : null}

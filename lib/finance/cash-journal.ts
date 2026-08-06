@@ -85,9 +85,14 @@ export function buildCashJournal(
     }
   }
 
-  // 실거래(통장에 찍힌 행)만 스파인으로. 구성건·미연결 CMS는 여기서 전개하거나 매칭대기로 뺀다.
+  /* 스파인 = 그날 자금 전부. 통장에 찍힌 실거래 + **아직 집금과 연결 안 된 CMS 명세**.
+     ★`cms-item`(집금에 이미 묶인 성공분)만 뺀다 — 그건 부모 집금행 밑에 구성건으로 전개되므로
+       여기서도 세면 이중계상이다.
+     ★`cms-pending`은 뺄 수 없다(2026-08-06 사장님 확정: 「자금일보에는 입력된 모든 자금 정보가
+       다 있어야 한다」). 통장 집금을 아직 못 찾은 CMS 명세야말로 일보에서 손대야 할 돈인데,
+       빼 버리면 실무자 눈에는 «올렸는데 사라진 돈»이 된다. */
   const inDay = cashRows.filter(
-    (r) => r.date.slice(0, 10) === day && r.nest !== 'cms-item' && r.nest !== 'cms-pending',
+    (r) => r.date.slice(0, 10) === day && r.nest !== 'cms-item',
   );
 
   const accounts = new Map<string, CashJournalAccount>();

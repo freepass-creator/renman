@@ -60,6 +60,7 @@ const A = {
 const ax = (key: keyof AssetMasterRow, label: string, opts?: { date?: boolean; money?: boolean; num?: string; align?: 'l' | 'c' | 'r'; priority?: 1 | 2 | 3 | 4 }): SheetCol<AssetMasterRow> => ({
   key: String(key), label, align: opts?.align, priority: opts?.priority,
   xf: opts?.money ? 'money' : opts?.num === '%' ? 'rate' : opts?.num != null ? 'int' : opts?.date ? 'date' : undefined,
+  sortNum: !!(opts?.money || opts?.num != null),
   render: (r) => opts?.date ? date(String(r[key] || '')) : opts?.money ? moneyCell(Number(r[key]) || 0) : opts?.num != null ? number(Number(r[key]) || 0, opts.num) : dash(r[key]),
   text: (r) => r[key] as string | number,
 });
@@ -274,7 +275,7 @@ const C0 = {
   monthlyRent: { key: 'monthlyRent', label: '월대여료', align: 'r', priority: 1, xf: 'money', render: (r) => moneyCell(r.monthlyRent), text: (r) => r.monthlyRent },
   deposit: { key: 'deposit', label: '계약보증금', align: 'r', priority: 2, xf: 'money', render: (r) => moneyCell(r.deposit), text: (r) => r.deposit },
   paymentDay: {
-    key: 'paymentDay', label: '결제일', align: 'c', priority: 2,
+    key: 'paymentDay', label: '결제일', align: 'c', priority: 2, sortNum: true, xf: 'int',
     render: (r) => (r.paymentDay ? `${r.paymentDay}일` : LEDGER_EMPTY.dash),
     text: (r) => r.paymentDay || '',
   },
@@ -299,6 +300,7 @@ const C0 = {
 const cx = (key: keyof ContractMasterRow, label: string, opts?: { date?: boolean; money?: boolean; num?: string; align?: 'l' | 'c' | 'r'; priority?: 1 | 2 | 3 | 4 }): SheetCol<ContractMasterRow> => ({
   key: String(key), label, align: opts?.align, priority: opts?.priority,
   xf: opts?.money ? 'money' : opts?.num === '%' ? 'rate' : opts?.num != null ? 'int' : opts?.date ? 'date' : undefined,
+  sortNum: !!(opts?.money || opts?.num != null),
   render: (r) => opts?.date ? date(String(r[key] || '')) : opts?.money ? moneyCell(Number(r[key]) || 0) : opts?.num != null ? number(Number(r[key]) || 0, opts.num) : dash(r[key]),
   text: (r) => r[key] as string | number,
 });

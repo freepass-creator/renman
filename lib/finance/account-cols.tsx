@@ -25,17 +25,17 @@ const ACCOUNT_COL_CATALOG: SheetCol<BankAccountRow>[] = [
     text: (r) => r.status,
   },
   {
-    key: 'totalIn', label: '누적입금', priority: 1, align: 'r',
+    key: 'totalIn', label: '누적입금', priority: 1, align: 'r', sortNum: true, xf: 'money',
     render: (r) => (r.totalIn ? <b style={{ color: C.ok }}>{money(r.totalIn)}</b> : LEDGER_EMPTY.dash),
     text: (r) => r.totalIn,
   },
   {
-    key: 'totalOut', label: '누적출금', priority: 1, align: 'r',
+    key: 'totalOut', label: '누적출금', priority: 1, align: 'r', sortNum: true, xf: 'money',
     render: (r) => (r.totalOut ? <b>{money(r.totalOut)}</b> : LEDGER_EMPTY.dash),
     text: (r) => r.totalOut,
   },
   {
-    key: 'currentBalance', label: '최종잔액', priority: 1, align: 'r',
+    key: 'currentBalance', label: '최종잔액', priority: 1, align: 'r', sortNum: true, xf: 'money',
     render: (r) => money(r.currentBalance),
     text: (r) => r.currentBalance,
   },
@@ -52,7 +52,7 @@ const ACCOUNT_COL_CATALOG: SheetCol<BankAccountRow>[] = [
   { key: 'opened', label: '개설일', render: (r) => r.openedDate || LEDGER_EMPTY.dash, text: (r) => r.openedDate },
   { key: 'closed', label: '해지일', render: (r) => r.closedDate || LEDGER_EMPTY.dash, text: (r) => r.closedDate },
   {
-    key: 'balance', label: '등록시점 잔액', align: 'r',
+    key: 'balance', label: '등록시점 잔액', align: 'r', sortNum: true, xf: 'money',
     render: (r) => (r.openingBalance ? money(r.openingBalance) : LEDGER_EMPTY.dash),
     text: (r) => r.openingBalance,
   },

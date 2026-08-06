@@ -66,7 +66,7 @@ const FL = {
   loanRate: { key: 'loanRate', label: '이율', align: 'r', sortNum: true, xf: 'rate' as const, render: (r) => r.loanRate ? `${(r.loanRate * 100).toFixed(1)}%` : LEDGER_EMPTY.dash, text: (r) => r.loanRate },
   loanMon: { key: 'loanMon', label: '할부개월', align: 'r', sortNum: true, xf: 'int' as const, render: (r) => r.loanMonths || LEDGER_EMPTY.dash, text: (r) => r.loanMonths },
   cust: { key: 'cust', label: '사용처', priority: 1 as const, render: (r) => r.customer || LEDGER_EMPTY.none, text: (r) => r.customer },
-  term: { key: 'term', label: '계약기간', align: 'r', render: (r) => r.termMonths ? `${r.termMonths}개월` : LEDGER_EMPTY.dash, text: (r) => r.termMonths },
+  term: { key: 'term', label: '계약기간', align: 'r', sortNum: true, xf: 'int' as const, render: (r) => r.termMonths ? `${r.termMonths}개월` : LEDGER_EMPTY.dash, text: (r) => r.termMonths },
   phone: { key: 'phone', label: '연락처', priority: 2 as const, render: (r) => r.phone || LEDGER_EMPTY.dash, text: (r) => r.phone },
   rent: { key: 'rent', label: '대여료', align: 'r', priority: 2 as const, sortNum: true, xf: 'money' as const, render: (r) => money0(r.rent), text: (r) => r.rent },
   dep: { key: 'dep', label: '보증금', align: 'r', priority: 3 as const, sortNum: true, xf: 'money' as const, render: (r) => money0(r.deposit), text: (r) => r.deposit },
@@ -173,7 +173,7 @@ const FL = {
     text: (r) => r.rentalType,
   },
   mileage: {
-    key: 'mileage', label: '주행거리', align: 'r', priority: 4 as const,
+    key: 'mileage', label: '주행거리', align: 'r', priority: 4 as const, sortNum: true, xf: 'int' as const,
     render: (r) => (r.mileage ? `${r.mileage.toLocaleString('ko-KR')}km` : LEDGER_EMPTY.dash),
     text: (r) => r.mileage,
   },

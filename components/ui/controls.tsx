@@ -404,9 +404,9 @@ export function PeriodBar({ latest, initial = '월간', onRange, size = 'md' }: 
         <span style={{ fontSize: ctrlFs(mobile, size), fontWeight: 700, color: C.ink }}>전체 기간</span>
       ) : (
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
-          <button style={nav} onClick={() => canNav && setRef(shiftPeriod(refDate, period, -1))} aria-label="이전 기간"><ChevronLeft size={mobile ? 18 : 16} /></button>
+          <button style={nav} onClick={() => canNav && setRef(shiftPeriod(refDate, period, -1))} aria-label="이전 기간"><ChevronLeft size={mobile ? 18 : 16} strokeWidth={2.2} /></button>
           <span style={{ fontSize: ctrlFs(mobile, size), fontWeight: 700, color: C.ink, minWidth: 104, textAlign: 'center', fontVariantNumeric: 'tabular-nums' }}>{periodTitle(refDate, period)}</span>
-          <button style={nav} onClick={() => canNav && setRef(shiftPeriod(refDate, period, 1))} aria-label="다음 기간"><ChevronRight size={mobile ? 18 : 16} /></button>
+          <button style={nav} onClick={() => canNav && setRef(shiftPeriod(refDate, period, 1))} aria-label="다음 기간"><ChevronRight size={mobile ? 18 : 16} strokeWidth={2.2} /></button>
           <button type="button" onClick={() => setRef(today)} title="오늘이 포함된 기간으로" style={{ height: nh, boxSizing: 'border-box', padding: '0 11px', marginLeft: 5, border: `1px solid ${C.line}`, borderRadius: R, background: C.taupeBg, cursor: 'pointer', color: C.mute, fontSize: mobile ? 14 : (size === 'sm' ? 12 : 12), fontWeight: 700, flexShrink: 0 }}>오늘</button>
         </span>
       )}

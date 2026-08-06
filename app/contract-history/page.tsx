@@ -54,9 +54,9 @@ export default function ContractHistoryPage() {
     ...(plate ? [] : [{ key: 'plate', label: '차량', render: (c: EntityRecord) => <TextLink mono onClick={() => openCar(String(c.plate || ''))}>{String(c.plate || '—')}</TextLink>, text: (c: EntityRecord) => String(c.plate || '') }]),
     { key: 'name', label: '계약자', render: (c) => String(c.contractorName || c.contractNo || '—'), text: (c) => String(c.contractorName || c.contractNo || '') },
     { key: 'period', label: '기간', render: (c) => `${yy(c.startDate)} ~ ${yy(c.returnedDate || c.endDate)}`, text: (c) => `${c.startDate}~${c.returnedDate || c.endDate}` },
-    { key: 'rent', label: '월대여료', align: 'r', sortNum: true, render: (c) => (c.monthlyRent ? won(c.monthlyRent) : '—'), text: (c) => Number(c.monthlyRent) || 0 },
-    { key: 'months', label: '개월', align: 'r', sortNum: true, render: (c) => (c.rentalMonths ? `${c.rentalMonths}` : '—'), text: (c) => Number(c.rentalMonths) || 0 },
-    { key: 'end', label: '반납일', align: 'r', render: (c) => yy(c.returnedDate), text: (c) => String(c.returnedDate || '') },
+    { key: 'rent', label: '월대여료', align: 'r', sortNum: true, xf: 'money', render: (c) => (c.monthlyRent ? won(c.monthlyRent) : '—'), text: (c) => Number(c.monthlyRent) || 0 },
+    { key: 'months', label: '개월', align: 'r', sortNum: true, xf: 'int', render: (c) => (c.rentalMonths ? `${c.rentalMonths}` : '—'), text: (c) => Number(c.rentalMonths) || 0 },
+    { key: 'end', label: '반납일', align: 'r', xf: 'date', render: (c) => yy(c.returnedDate), text: (c) => String(c.returnedDate || '') },
     { key: 'reason', label: '종료사유', render: (c) => <Badge tone={String(c.endReason) === '중도해지' ? 'amber' : 'gray'}>{String(c.endReason || c.status || '종료')}</Badge>, text: (c) => String(c.endReason || c.status || '종료') },
   ];
 

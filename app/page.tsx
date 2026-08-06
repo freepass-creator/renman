@@ -206,10 +206,10 @@ export default function DashboardPage() {
 
   const outlookCols: SheetCol<OutlookRow>[] = useMemo(() => [
     { key: 'label', label: '월', pin: true, render: (r) => r.label, text: (r) => r.label },
-    { key: 'inflow', label: '들어올 돈', align: 'r', render: (r) => won(r.inflow), text: (r) => r.inflow },
-    { key: 'outflow', label: '나갈 돈', align: 'r', render: (r) => won(r.outflow), text: (r) => r.outflow },
+    { key: 'inflow', label: '들어올 돈', align: 'r', sortNum: true, xf: 'money', render: (r) => won(r.inflow), text: (r) => r.inflow },
+    { key: 'outflow', label: '나갈 돈', align: 'r', sortNum: true, xf: 'money', render: (r) => won(r.outflow), text: (r) => r.outflow },
     {
-      key: 'net', label: '순현금흐름', align: 'r',
+      key: 'net', label: '순현금흐름', align: 'r', sortNum: true, xf: 'money',
       render: (r) => (
         <span style={{ color: r.net >= 0 ? C.ok : C.danger, fontWeight: 800 }}>{won(r.net)}</span>
       ),

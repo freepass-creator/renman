@@ -15,9 +15,9 @@ const statusTone = (s: AgendaItem['status']): 'red' | 'amber' | 'green' =>
 
 const AGENDA_COL_CATALOG: SheetCol<AgendaItem>[] = [
   { key: 'company', label: '회사명', pin: true, align: 'c', render: (r) => r.company || LEDGER_EMPTY.dash, text: (r) => r.company },
-  { key: 'date', label: '기한일', align: 'c', render: (r) => r.date, text: (r) => r.date },
+  { key: 'date', label: '기한일', align: 'c', xf: 'date', render: (r) => r.date, text: (r) => r.date },
   {
-    key: 'dday', label: 'D-day', align: 'c',
+    key: 'dday', label: 'D-day', align: 'c', sortNum: true, xf: 'int',
     render: (r) => (
       <span style={{ fontWeight: 700, color: r.dday < 0 ? C.danger : r.dday <= 7 ? C.warn : C.ink }}>
         {r.dday < 0 ? `${-r.dday}일 지남` : r.dday === 0 ? '오늘' : `D-${r.dday}`}

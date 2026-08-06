@@ -58,19 +58,33 @@ const cellValues = <T,>(c: SheetCol<T>, r: T): string[] => {
 };
 
 const PURE_NUM = /^-?\d+(\.\d+)?$/;
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}/;
 const isNumKey = (v: string) => v !== '(없음)' && PURE_NUM.test(v);
+const isDateKey = (v: string) => v !== '(없음)' && ISO_DATE.test(v);
 const colIsNumeric = <T,>(c: SheetCol<T>, keys: string[]): boolean => {
   if (c.sortNum || c.xf === 'money' || c.xf === 'int' || c.xf === 'rate') return true;
   const vals = keys.filter((k) => k !== '(없음)');
   return vals.length > 0 && vals.every(isNumKey);
 };
-/** 필터 체크리스트 표시 — 매칭 키(text)는 그대로 두고, 금액·숫자는 셀과 같이 콤마. */
+const colIsDate = <T,>(c: SheetCol<T>, keys: string[]): boolean => {
+  if (c.xf === 'date') return true;
+  const vals = keys.filter((k) => k !== '(없음)');
+  return vals.length > 0 && vals.every(isDateKey);
+};
+/** 필터 체크리스트 표시 — 매칭 키(text)는 그대로 두고, 화면은 셀과 같은 말. */
 const formatFilterLabel = <T,>(c: SheetCol<T>, v: string): string => {
-  if (v === '(없음)') return '(없음)';
+  if (v === '(없음)') return '—';
   if (c.xf === 'money') return money(v);
-  if ((c.xf === 'int' || c.xf === 'rate' || c.sortNum || PURE_NUM.test(v)) && isNumKey(v)) {
+  if (c.xf === 'rate' && isNumKey(v)) {
+    const n = Number(v);
+    // 원장 이율은 보통 0~1 소수(0.049 → 4.9%). 이미 % 단위(4.9)면 그대로.
+    if (Math.abs(n) <= 1) return `${(n * 100).toFixed(1)}%`;
+    return `${n.toLocaleString('ko-KR')}%`;
+  }
+  if ((c.xf === 'int' || c.sortNum || PURE_NUM.test(v)) && isNumKey(v)) {
     return Number(v).toLocaleString('ko-KR');
   }
+  if (isDateKey(v)) return v.slice(0, 10);
   return v;
 };
 const sortVal = <T,>(c: SheetCol<T>, r: T): number | string => {
@@ -78,6 +92,7 @@ const sortVal = <T,>(c: SheetCol<T>, r: T): number | string => {
   if (c.sortNum || c.xf === 'money' || c.xf === 'int' || c.xf === 'rate') {
     return Number(raw.replace(/[^\d.-]/g, '')) || 0;
   }
+  if (c.xf === 'date' || ISO_DATE.test(raw)) return raw.slice(0, 10);
   if (PURE_NUM.test(raw)) return Number(raw);
   return cellText(c, r);
 };
@@ -105,12 +120,17 @@ function FilterPop<T>({ col, x, y, rows, sel, onSel, sort, onSort, onClose }: {
     const m = new Map<string, number>();
     for (const r of rows) for (const v of cellValues(col, r)) m.set(v, (m.get(v) || 0) + 1);
     const list = [...m.entries()];
-    const numeric = colIsNumeric(col, list.map(([k]) => k));
+    const keys = list.map(([k]) => k);
+    const numeric = colIsNumeric(col, keys);
+    const dates = !numeric && colIsDate(col, keys);
     list.sort((a, b) => {
+      if (a[0] === '(없음)') return -1;
+      if (b[0] === '(없음)') return 1;
       if (numeric) {
-        const na = a[0] === '(없음)' ? Number.NEGATIVE_INFINITY : Number(a[0]);
-        const nb = b[0] === '(없음)' ? Number.NEGATIVE_INFINITY : Number(b[0]);
-        return na - nb || b[1] - a[1];
+        return Number(a[0]) - Number(b[0]) || b[1] - a[1];
+      }
+      if (dates) {
+        return a[0].slice(0, 10).localeCompare(b[0].slice(0, 10)) || b[1] - a[1];
       }
       return b[1] - a[1] || a[0].localeCompare(b[0], 'ko');
     });
@@ -125,7 +145,9 @@ function FilterPop<T>({ col, x, y, rows, sel, onSel, sort, onSort, onClose }: {
       || label.toLowerCase().includes(q.toLowerCase())
       || label.replace(/,/g, '').toLowerCase().includes(qNorm);
   });
-  const numericList = colIsNumeric(col, entries.map(([k]) => k));
+  const keys = entries.map(([k]) => k);
+  const numericList = colIsNumeric(col, keys);
+  const dateList = !numericList && colIsDate(col, keys);
   const toggle = (v: string) => { haptic.select(); const n = new Set(sel); if (n.has(v)) n.delete(v); else n.add(v); onSel(n); };
   const isS = (dir: 'asc' | 'desc') => !!sort && sort.key === col.key && sort.dir === dir;
   const setDir = (dir: 'asc' | 'desc') => { haptic.select(); onSort(isS(dir) ? null : { key: col.key, dir }); };
@@ -167,7 +189,7 @@ function FilterPop<T>({ col, x, y, rows, sel, onSel, sort, onSort, onClose }: {
                   <span style={{ width: 12, color: on ? C.brand : C.line2, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>{on ? <Check size={12} strokeWidth={2.6} aria-hidden /> : null}</span>
                   <span style={{
                     flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                    fontFamily: numericList && isNumKey(v) ? NUM : undefined,
+                    fontFamily: (numericList && isNumKey(v)) || (dateList && isDateKey(v)) ? NUM : undefined,
                     fontVariantNumeric: numericList && isNumKey(v) ? 'tabular-nums' : undefined,
                     textAlign: numericList && isNumKey(v) ? 'right' : 'left',
                   }}>{label}</span>

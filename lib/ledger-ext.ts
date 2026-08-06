@@ -45,6 +45,13 @@ export type DetailSectionDef = {
   keys: readonly string[];
 };
 
+/** money/int/rate 열은 숫자 정렬이 기본 — 카탈로그마다 sortNum을 빠뜨려도 필터·오름/내림이 어긋나지 않게. */
+function withNumericSortDefaults<T>(col: SheetCol<T>): SheetCol<T> {
+  if (col.sortNum) return col;
+  if (col.xf === 'money' || col.xf === 'int' || col.xf === 'rate') return { ...col, sortNum: true };
+  return col;
+}
+
 export function pickCols<T>(catalog: SheetCol<T>[], keys: readonly string[]): SheetCol<T>[] {
   const map = new Map(catalog.map((col) => [col.key, col]));
   if (process.env.NODE_ENV !== 'production') {
@@ -54,7 +61,10 @@ export function pickCols<T>(catalog: SheetCol<T>[], keys: readonly string[]): Sh
       }
     }
   }
-  return keys.map((key) => map.get(key)).filter((col): col is SheetCol<T> => !!col);
+  return keys
+    .map((key) => map.get(key))
+    .filter((col): col is SheetCol<T> => !!col)
+    .map(withNumericSortDefaults);
 }
 
 /** 상세 섹션이 참조하는 키가 카탈로그에 있는지 검증. 누락 키 목록 반환(빈=OK). */

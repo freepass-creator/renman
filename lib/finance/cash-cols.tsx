@@ -116,7 +116,7 @@ const CASH_COL_CATALOG: SheetCol<CashRow>[] = [
   },
   { key: 'date', label: '일자', align: 'c', priority: 1, xf: 'date', render: (r) => r.date || LEDGER_EMPTY.dash, text: (r) => r.date },
   {
-    key: 'in', label: '입금', align: 'r', priority: 1, xf: 'money',
+    key: 'in', label: '입금', align: 'r', priority: 1, xf: 'money', sortNum: true,
     render: (r) => (r.inAmt
       ? <span style={{
           color: (r.nest === 'cms-item' || r.nest === 'cms-pending') ? C.brand : C.ok,
@@ -126,12 +126,12 @@ const CASH_COL_CATALOG: SheetCol<CashRow>[] = [
     text: (r) => r.inAmt,
   },
   {
-    key: 'out', label: '출금', align: 'r', priority: 1, xf: 'money',
+    key: 'out', label: '출금', align: 'r', priority: 1, xf: 'money', sortNum: true,
     render: (r) => (r.outAmt ? <span style={{ fontWeight: 700 }}>{money(r.outAmt)}</span> : LEDGER_EMPTY.dash),
     text: (r) => r.outAmt,
   },
   {
-    key: 'balance', label: '잔액', align: 'r', priority: 1, xf: 'money',
+    key: 'balance', label: '잔액', align: 'r', priority: 1, xf: 'money', sortNum: true,
     render: (r) => {
       const bal = r.raw.balance;
       if (bal === '' || bal == null) return LEDGER_EMPTY.dash;
@@ -224,12 +224,12 @@ const CASH_TX_DETAIL_CATALOG: SheetCol<CashRow>[] = [
     text: (r) => String(r.raw.method || '').trim(),
   },
   {
-    key: 'settlementGross', label: '구성 합계', align: 'r', xf: 'money',
+    key: 'settlementGross', label: '구성 합계', align: 'r', xf: 'money', sortNum: true,
     render: (r) => Number(r.raw.bundleItemSum ?? r.raw.settlementGrossAmount) ? money(Number(r.raw.bundleItemSum ?? r.raw.settlementGrossAmount)) : LEDGER_EMPTY.dash,
     text: (r) => Number(r.raw.bundleItemSum ?? r.raw.settlementGrossAmount) || 0,
   },
   {
-    key: 'settlementFee', label: '수수료·차액', align: 'r', xf: 'money',
+    key: 'settlementFee', label: '수수료·차액', align: 'r', xf: 'money', sortNum: true,
     render: (r) => Number(r.raw.bundleFeeAmount ?? r.raw.settlementFeeAmount) ? money(Number(r.raw.bundleFeeAmount ?? r.raw.settlementFeeAmount)) : LEDGER_EMPTY.dash,
     text: (r) => Number(r.raw.bundleFeeAmount ?? r.raw.settlementFeeAmount) || 0,
   },
@@ -276,7 +276,7 @@ const CARD_DETAIL_CATALOG: SheetCol<CashRow>[] = [
   { key: 'merchant', label: '가맹점', render: (r) => String(r.raw.merchant || r.party || LEDGER_EMPTY.dash), text: (r) => String(r.raw.merchant || r.party || '') },
   { key: 'approvalNo', label: '승인번호', render: (r) => String(r.raw.approvalNo || LEDGER_EMPTY.dash), text: (r) => String(r.raw.approvalNo || '') },
   {
-    key: 'cardAmount', label: '승인금액', align: 'r', xf: 'money',
+    key: 'cardAmount', label: '승인금액', align: 'r', xf: 'money', sortNum: true,
     render: (r) => money(Number(r.raw.amount) || r.outAmt),
     text: (r) => Number(r.raw.amount) || r.outAmt || 0,
   },

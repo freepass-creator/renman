@@ -87,6 +87,7 @@ curl -s -o /dev/null -w "%{http_code}" http://localhost:6006/<route>   # 200
 
 | 날짜 | 작업자 | 내용 | 상태 |
 |---|---|---|---|
+| 2026-08-06 | Cursor | **열필터 전수**: FilterPop 금액·날짜·이율·빈값(—) · `pickCols` money/int/rate→sortNum 자동 · 계좌/업무/운영/일정/손익/홈outlook·cash xf·sortNum 보강 | tsc0 · curl200 |
 | 2026-08-06 | Cursor | **엑셀 열필터 다듬기**: 금액·숫자 콤마 표기·숫자순 정렬·검색(콤마무시) · 운영 money열 `xf`/`sortNum` | tsc0 · curl200 |
 | 2026-08-06 | Cursor | **모바일·용어 정리**: m/work·vehicle 빈제목 `LEDGER_EMPTY` · ObjRow danger 행틴트 제거(배지만) · 계약/미수/모바일 Metric `계약유지·계약종료 미수` 통일 | tsc0 · curl200 |
 | 2026-08-06 | Cursor | **보이는 카피·열 정리**: `/status` 계약종료 미수 열·통계·리스크칩 제거(유지미수만) · 홈 KPI meta 종료분 제거 · `/work` meta 대분류6축 · meta/모바일제목 `운영현황` · 설정 `정합성` | tsc0 · vitest97 · curl200 |

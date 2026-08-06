@@ -61,12 +61,12 @@ const CATALOG: SheetCol<ReceivableRow>[] = [
     text: (r) => r.v.net,
   },
   {
-    key: 'overdueDays', label: '연체일', priority: 1, align: 'r', sortNum: true,
+    key: 'overdueDays', label: '연체일', priority: 1, align: 'r', sortNum: true, xf: 'int',
     render: (r) => <span style={{ color: r.v.overdueDays >= 30 ? C.danger : C.warn, fontWeight: 700 }}>{r.v.overdueDays}일</span>,
     text: (r) => r.v.overdueDays,
   },
   {
-    key: 'unpaidCount', label: '미납회차', priority: 1, align: 'r', sortNum: true,
+    key: 'unpaidCount', label: '미납회차', priority: 1, align: 'r', sortNum: true, xf: 'int',
     render: (r) => `${r.v.count}회`,
     text: (r) => r.v.count,
   },

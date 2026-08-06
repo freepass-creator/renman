@@ -40,11 +40,11 @@ export default function PnlPage() {
 
   const cols = (base: number): SheetCol<SubjectAgg>[] => [
     { key: 'label', label: '계정과목', render: (s) => <b>{s.label}</b>, text: (s) => s.label },
-    { key: 'count', label: '건수', align: 'r', render: (s) => `${s.count}건`, text: (s) => s.count, sortNum: true },
-    { key: 'amt', label: '금액', align: 'r', sortNum: true,
+    { key: 'count', label: '건수', align: 'r', sortNum: true, xf: 'int', render: (s) => `${s.count}건`, text: (s) => s.count },
+    { key: 'amt', label: '금액', align: 'r', sortNum: true, xf: 'money',
       render: (s) => <b style={{ color: s.kind === '수입' ? 'var(--green-text)' : s.kind === '지출' ? C.danger : C.mute }}>{won(s.kind === '수입' ? s.inAmt : s.outAmt)}</b>,
       text: (s) => (s.kind === '수입' ? s.inAmt : s.outAmt) },
-    { key: 'pct', label: '비중', align: 'r', sortNum: true,
+    { key: 'pct', label: '비중', align: 'r', sortNum: true, xf: 'int',
       render: (s) => { const amt = s.kind === '수입' ? s.inAmt : s.outAmt; return base ? `${Math.round((amt / base) * 100)}%` : '—'; },
       text: (s) => { const amt = s.kind === '수입' ? s.inAmt : s.outAmt; return base ? Math.round((amt / base) * 100) : 0; } },
   ];
