@@ -172,6 +172,11 @@ curl -s -o /dev/null -w "%{http_code}" http://localhost:6006/<route>   # 200
 | **문서** | 표 | 종류 무관 N장 — `lib/doc-kinds.ts` **재사용** | §4-9 pages[] 와 같은 목록 |
 | 보유 자산 | KV | 등록대수·운영중·유휴 → `/status` 딥링크 | 집계 |
 
+**생성 = 원장 쓰기 버튼.** 「+ 법인 등록」을 원장 헤더 **쓰기 zone**에 둔다(자산등록과 같은 자리).
+누르면 `createManagedCompany` 로 **바로 만들고 그 법인의 상세패널이 열린다** — 빈 껍데기에서
+사업자등록증 올리면 OCR이 상호·사업자번호·대표·주소를 채운다. 별도 등록 화면·모달 만들지 말 것.
+(지금은 `/admin` 으로 나갔다 와야 한다 — 그게 문제다.)
+
 - 하단 고정 액션바: **상호 수정** · **관리목록에서 제외**(`archiveManagedCompany`)
 - **`/admin` 은 없앤다.** `CompanyRegistry` 는 「사업자」 섹션으로 흡수, `AccountAliases` 는
   「법인계좌」 섹션으로 흡수. 설정 메뉴의 `/admin` 링크 3곳도 정리(`app/settings/page.tsx:32`,
