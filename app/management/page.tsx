@@ -18,11 +18,15 @@ import { toast, toastError } from '@/lib/toast';
 import { getStore } from '@/lib/store';
 import type { EntityRecord } from '@/lib/intake/entities';
 import { COMPANY_DEFS, companyLabel, createManagedCompany, updateManagedCompany, type CompanyMasterInput } from '@/lib/companies';
-import { loadMaster, type CompanyMaster } from '@/lib/company-master';
+import { loadMaster, type CompanyMaster, type CompanyDoc } from '@/lib/company-master';
+import { uploadDoc, docPath } from '@/lib/storage';
+import { routeDocument } from '@/lib/document-router';
+import FileDrop from '@/components/FileDrop';
 import { useEntityList } from '@/lib/use-entity-lists';
 import { buildBankAccountLedger, type BankAccountRow } from '@/lib/finance/cash-ledger';
 import { ACCOUNT_BASIC_COLS } from '@/lib/finance/account-cols';
 import { dday, TODAY } from '@/lib/dashboard-consts';
+import { computeKPI } from '@/lib/kpi';
 import { LEDGER_EMPTY } from '@/lib/ledger-empty';
 import { textMatch } from '@/lib/search-match';
 import { useIsMobile } from '@/lib/use-mobile';
@@ -108,6 +112,18 @@ function ChannelSec({ rows, cols, editing, matchKey, onAdd, onSet, onDel }: {
   );
 }
 
+const DOC_COLS: SheetCol<CompanyDoc>[] = [
+  { key: 'kind', label: '종류', priority: 1, render: (r) => r.kind || '기타', text: (r) => r.kind || '' },
+  { key: 'fileName', label: '파일명', priority: 1, render: (r) => r.fileName || LEDGER_EMPTY.dash, text: (r) => r.fileName || '' },
+  { key: 'uploadedAt', label: '올린날', priority: 2, render: (r) => (r.uploadedAt || '').slice(0, 10) || LEDGER_EMPTY.dash, text: (r) => r.uploadedAt || '' },
+  {
+    key: 'url', label: '열기', priority: 1, text: () => '',
+    render: (r) => (r.url
+      ? <a href={r.url} target="_blank" rel="noreferrer" style={{ color: C.accent, fontWeight: 700 }}>열기</a>
+      : LEDGER_EMPTY.dash),
+  },
+];
+
 function leaseStatus(end: string): string {
   const d = dday(end);
   if (d == null) return '—';
@@ -119,7 +135,7 @@ function leaseStatus(end: string): string {
 
 export default function ManagementPage() {
   const mobile = useIsMobile();
-  const { isOperator } = useSession();
+  const { isOperator, user } = useSession();
   const prompt = usePrompt();
   const [q, setQ] = useState('');
   const [selectedCo, setSelectedCo] = useState<CompanyRow | null>(null);
@@ -128,11 +144,14 @@ export default function ManagementPage() {
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState<Record<string, string>>({});
+  const [docBusy, setDocBusy] = useState(false);
   const [masterTick, setMasterTick] = useState(0);
 
   const { rows: accountRecords, loading: acctLoading, error: acctError } = useEntityList('bank_account');
   const { rows: leaseRecords, loading: leaseLoading, error: leaseError } = useEntityList('lease');
   const { rows: bankTxRecords } = useEntityList('bank_tx');
+  const { rows: vehicleRecords } = useEntityList('vehicle');
+  const { rows: contractRecords } = useEntityList('contract');
 
   useEffect(() => {
     const on = () => setMasterTick((n) => n + 1);
@@ -198,6 +217,57 @@ export default function ManagementPage() {
       bankTxRecords, [], [],
     );
   }, [accountRecords, bankTxRecords, selectedCo]);
+
+  /* ★회사 현황 — jpkerp5는 KPI 카드로 뒀는데 우리 규격은 카드·지표 금지(VEHICLE360-SPEC §1).
+     내용만 가져오고 형태는 KV 표로 맞춘다. 숫자는 `computeKPI`가 SSOT라 여기서 다시 안 센다. */
+  const coKpi = useMemo(() => {
+    if (!selectedCo) return null;
+    return computeKPI(
+      contractRecords.filter((c) => String(c.companyId || '') === selectedCo.id),
+      vehicleRecords.filter((v) => String(v.companyId || '') === selectedCo.id),
+      TODAY, selectedCo.id,
+    );
+  }, [contractRecords, vehicleRecords, selectedCo]);
+
+  /* 문서 — 마스터 배열 + 구 `businessRegistration` 슬롯을 한 목록으로 합친다(§3-1). */
+  const coDocs = useMemo<CompanyDoc[]>(() => {
+    if (!selectedCo) return [];
+    const m = selectedCo.master;
+    const legacy = m.businessRegistration?.url
+      ? [{ id: 'legacy_bizreg', kind: '사업자등록증', fileName: m.businessRegistration.fileName,
+           url: m.businessRegistration.url, uploadedAt: m.businessRegistration.uploadedAt }]
+      : [];
+    return [...legacy, ...(m.documents ?? [])];
+  }, [selectedCo]);
+
+  async function uploadDocs(files: File[]) {
+    if (!selectedCo || !files.length) return;
+    setDocBusy(true);
+    try {
+      const added: CompanyDoc[] = [];
+      for (const f of files) {
+        const url = await uploadDoc(f, docPath(selectedCo.id, 'company', selectedCo.id, f.name));
+        if (!url) { toastError(`${f.name} — 업로드 실패`); continue; }
+        // 종류는 파일명으로 1차 추정. 틀리면 목록에서 고친다 — 종류를 몰라서 못 올리는 일은 없게(§3-2).
+        added.push({
+          id: `doc_${selectedCo.id}_${added.length}_${f.name}`,
+          kind: routeDocument({ filename: f.name, mime: f.type }).kind || '기타',
+          fileName: f.name, url, uploadedAt: new Date().toISOString(),
+          uploadedBy: String(user.name || user.email || ''),
+        });
+      }
+      if (!added.length) return;
+      const next = [...(selectedCo.master.documents ?? []), ...added];
+      await updateManagedCompany(selectedCo.id, {}, { documents: next } as CompanyMasterInput);
+      setMasterTick((n) => n + 1);
+      setSelectedCo({ ...selectedCo, master: loadMaster(selectedCo.id) });
+      toast(`문서 ${added.length}건 등록`);
+    } catch (error) {
+      toastError((error as Error).message);
+    } finally {
+      setDocBusy(false);
+    }
+  }
 
   const coLeases = useMemo(() => {
     if (!selectedCo) return [];
@@ -370,7 +440,20 @@ export default function ManagementPage() {
           onClose={() => { setEditing(false); setSelectedCo(null); }}
           sections={[
             {
-              title: '사업자', open: true, cols: [],
+              /* 이 법인이 «지금 어떻게 돌고 있나» — 상세를 열면 제일 먼저 보여야 할 것.
+                 카드·지표 금지라 KV 표로 낸다. 숫자를 누르면 그 원장으로 간다. */
+              title: '회사 현황', open: true, cols: [],
+              body: <KV rows={[
+                ['보유 차량', null, coKpi ? `${coKpi.totalVehicles}대` : LEDGER_EMPTY.dash],
+                ['운행 중', null, coKpi ? <>{coKpi.running}대 <span style={{ color: C.mute }}>· 가동 {coKpi.util}%</span></> : LEDGER_EMPTY.dash],
+                ['유휴', null, coKpi ? <span style={{ color: coKpi.idle ? C.warn : undefined }}>{coKpi.idle}대</span> : LEDGER_EMPTY.dash],
+                ['진행 계약', null, coKpi ? <>{coKpi.activeContracts}건 {coKpi.expiring30 ? <span style={{ color: C.warn }}>· 30일 내 만기 {coKpi.expiring30}</span> : null}</> : LEDGER_EMPTY.dash],
+                ['미수', null, coKpi ? <span style={{ color: coKpi.totalUnpaid ? C.danger : undefined }}>{won(coKpi.totalUnpaid)} · {coKpi.unpaidCount}건</span> : LEDGER_EMPTY.dash],
+                ['월 청구', null, coKpi ? won(coKpi.monthlyBilled) : LEDGER_EMPTY.dash],
+              ]} />,
+            },
+            {
+              title: '사업자', cols: [],
               body: <KV editing={editing} form={form} onChange={set} rows={[
                 ['회사명', 'label', selectedCo.name],
                 ['대표', 'ceo', selectedCo.ceo],
@@ -453,6 +536,26 @@ export default function ManagementPage() {
                   { key: 'merchantNo', label: '가맹점번호' }, { key: 'alias', label: '별명' },
                 ]}
                 onAdd={() => chanAdd('cardTerminals')} onSet={(i, k, v) => chanSet('cardTerminals', i, k, v)} onDel={(i) => chanDel('cardTerminals', i)} />,
+            },
+            {
+              /* ★문서는 «어느 슬롯»에 묶이지 않는다(VEHICLE360-SPEC §3-1 과 같은 원칙).
+                 사업자등록증·등기부·정관·인감… 종류를 골라 여러 개 올리고 한 목록에서 본다. */
+              title: '문서', cols: [], count: coDocs.length,
+              body: (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {coDocs.length ? (
+                    <ExcelSheet rows={coDocs} cols={DOC_COLS} rowKey={(r) => r.id} />
+                  ) : <DetailEmpty>문서 없음 — 사업자등록증부터 올리면 사업자 정보가 채워집니다.</DetailEmpty>}
+                  <FileDrop
+                    multiple
+                    disabled={docBusy}
+                    onFiles={(fs) => { void uploadDocs(Array.from(fs)); }}
+                    accept=".pdf,.jpg,.jpeg,.png,.webp"
+                    hint="사업자등록증 · 법인등기부 · 정관 · 인감증명 …"
+                    note={docBusy ? '올리는 중…' : undefined}
+                  />
+                </div>
+              ),
             },
             {
               title: '임대차', cols: [], count: coLeases.length,

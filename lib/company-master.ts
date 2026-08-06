@@ -20,6 +20,12 @@ export type OfficialDoc = {
   id: string; date?: string; direction: '발신' | '수신'; title?: string; counterpart?: string; docNo?: string; note?: string;
 };
 
+/** 법인 첨부 문서 — 사업자등록증·등기부·정관 등. 종류는 `lib/doc-kinds` 목록을 쓴다(두 벌 금지). */
+export type CompanyDoc = {
+  id: string; kind?: string; title?: string;
+  fileName?: string; url?: string; uploadedAt?: string; uploadedBy?: string;
+};
+
 /** 법인카드 — 지출. `cardLast4` 가 card_tx 매칭 키(무엇을 채워야 매칭되는지 명확히). */
 export type CorporateCard = {
   id: string; cardName?: string; cardCompany?: string; cardLast4?: string;
@@ -60,6 +66,8 @@ export type CompanyMaster = {
   cards?: CorporateCard[];          // 법인카드(지출) — card_tx 의 cardLast4 로 매칭
   autoTransfers?: AutoTransfer[];   // 자동이체 CMS(수입) — 입금거래의 cmsId 로 매칭
   cardTerminals?: CardTerminal[];   // 카드매출 단말기(수입) — terminalId 로 매칭
+  /** 첨부 문서 — 종류에 얽매이지 않고 여러 개(VEHICLE360-SPEC §3-1 과 같은 원칙). */
+  documents?: CompanyDoc[];
   registeredCount?: number;          // 관청 등록 대수
   regApplications?: RegApplication[]; // 증차·감차 신청 이력
   officialDocs?: OfficialDoc[];       // 공문 대장(발신·수신)
