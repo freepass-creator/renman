@@ -69,6 +69,18 @@ export function InfoDoc({
   const [collapsed, setCollapsed] = useState(false);
   useEffect(() => { if (collKey) { try { setCollapsed(localStorage.getItem(collKey) === 'collapsed'); } catch { /* 무시 */ } } }, [collKey]);
   const toggleCollapse = () => setCollapsed((c) => { const n = !c; if (collKey) { try { localStorage.setItem(collKey, n ? 'collapsed' : 'open'); } catch { /* 무시 */ } } return n; });
+  /* 「전부 펼치기/접기」 동조 — 이 블록은 details 가 아니라 자체 상태로 접히므로
+     차량360 의 일괄 토글이 DOM 만 훑으면 등록증·보험만 안 따라온다(그게 더 어색하다). */
+  useEffect(() => {
+    const onAll = (e: Event) => {
+      const open = (e as CustomEvent<{ open?: boolean }>).detail?.open;
+      if (typeof open !== 'boolean') return;
+      setCollapsed(!open);
+      if (collKey) { try { localStorage.setItem(collKey, open ? 'open' : 'collapsed'); } catch { /* 무시 */ } }
+    };
+    window.addEventListener('jpk:sections-toggle', onAll);
+    return () => window.removeEventListener('jpk:sections-toggle', onAll);
+  }, [collKey]);
 
   const current = docs[0] || null;
   const attached = !!(current && current.url);

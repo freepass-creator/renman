@@ -1,6 +1,6 @@
 'use client';
-import type { CSSProperties, ReactNode } from 'react';
-import { ChevronRight } from 'lucide-react';
+import { useRef, type CSSProperties, type ReactNode } from 'react';
+import { ChevronRight, ChevronsDownUp, ChevronsUpDown } from 'lucide-react';
 import {
   ActionMenu, Btn, TextLink, Badge, KV, EmptyState, Message, Input, Select,
   SectionLabel, Disclosure, th, thR, td, tdR, won, C, SH, PageLoading, SPACE_GROUP_M, type KVRow,
@@ -88,13 +88,24 @@ export function VehicleDetail({ plate, focus, embed, companyId: targetCompanyId 
     saveRecord, goSec, doTransition,
   } = useVehicleDetail(plate, focus, targetCompanyId);
 
+  /* 전부 펼치기/접기 — 섹션이 12개라 하나씩 여는 건 일이다.
+     `details.open` 을 직접 세팅한다: 각 섹션이 자기 상태를 들고 있어(InfoDoc 은 자체 접기까지)
+     React state 로 끌어올리면 그 상태와 두 벌이 된다. DOM 하나만 보는 쪽이 어긋날 여지가 없다. */
+  const rootRef = useRef<HTMLDivElement>(null);
+  const setAllSections = (open: boolean) => {
+    rootRef.current?.querySelectorAll<HTMLDetailsElement>('details.ledger-record-panel__section')
+      .forEach((el) => { el.open = open; });
+    // 등록증·보험(InfoDoc)은 details 가 아니라 자체 상태 — 이벤트로 같이 움직인다.
+    window.dispatchEvent(new CustomEvent('jpk:sections-toggle', { detail: { open } }));
+  };
+
   if (loading) return <PageLoading />;
 
   return (
     /* ★`Page frame` 은 창 스크롤을 잠그고 main 을 overflow:hidden 으로 고정한다(layout.tsx).
        그래서 **안쪽이 스스로 스크롤해야** 한다 — 안 그러면 아래 섹션이 잘린 채 스크롤이 안 된다.
        embed(원장 우측 패널)일 때는 패널이 이미 스크롤하므로 건드리지 않는다. */
-    <div style={{
+    <div ref={rootRef} style={{
       display: 'flex', flexDirection: 'column', gap: 10,
       ...(embed ? null : { flex: 1, minHeight: 0, overflowY: 'auto' as const, paddingBottom: 24 }),
     }}>
@@ -108,6 +119,12 @@ export function VehicleDetail({ plate, focus, embed, companyId: targetCompanyId 
         })()}
         {v?.companyId ? <span style={{ fontSize: 12.5, color: C.faint }}>{companyLabel(String(v.companyId))}</span> : null}
         <span style={{ flex: 1 }} />
+        <Btn variant="ghost" size="sm" iconOnly tip="전부 펼치기" onClick={() => setAllSections(true)}>
+          <ChevronsUpDown size={14} />
+        </Btn>
+        <Btn variant="ghost" size="sm" iconOnly tip="전부 접기" onClick={() => setAllSections(false)}>
+          <ChevronsDownUp size={14} />
+        </Btn>
         <Btn variant="ghost" size="sm" onClick={() => { setLogOpen(true); goSec('v-history'); }}>통화·기록</Btn>
       </div>
 
