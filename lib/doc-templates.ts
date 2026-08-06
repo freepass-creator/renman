@@ -353,4 +353,173 @@ registerTemplate({
 `,
 });
 
+/* ─── 5. 계약사실확인서 (법무 / 거래처) ───
+   거래사실확인서와 다르다: 저쪽은 «돈이 오갔다», 이쪽은 «이 차를 이 조건으로 빌려줬다»다.
+   차량·기간·월대여료가 특정돼야 하므로 필드가 다르다. */
+registerTemplate({
+  id: 'contract-confirmation', title: '계약사실확인서', category: '법무', target: 'partner', prefix: 'CTC',
+  description: '특정 차량의 임대차 계약 사실을 증명. 사고·분쟁·수사기관 제출용.',
+  fields: [
+    { key: 'purpose', label: '발급 용도', type: 'text', required: true, default: '사고 처리용', colSpan: 2 },
+    { key: 'plate', label: '차량번호', type: 'text', required: true },
+    { key: 'carName', label: '차명', type: 'text' },
+    { key: 'periodFrom', label: '계약 시작', type: 'date', required: true },
+    { key: 'periodTo', label: '계약 종료', type: 'date' },
+    { key: 'monthlyFee', label: '월 대여료 (원)', type: 'number' },
+    { key: 'driverName', label: '실사용자(운전자)', type: 'text' },
+    { key: 'note', label: '비고', type: 'textarea', colSpan: 2 },
+  ],
+  body: `
+<div class="doc-title">계 약 사 실 확 인 서</div>
+
+<section>
+  <div class="section-title">■ 계약자</div>
+  <table class="info">
+    <tr><th>성명 (상호)</th><td>{{target.name}}</td><th>사업자·생년</th><td>{{target.bizRegNo}}</td></tr>
+    <tr><th>연락처</th><td>{{target.mainPhone}}</td><th>실사용자</th><td>{{driverName}}</td></tr>
+    <tr><th>주 소</th><td colspan="3">{{target.address}}</td></tr>
+  </table>
+</section>
+
+<section>
+  <div class="section-title">■ 계약 차량</div>
+  <table class="info">
+    <tr><th>차량번호</th><td>{{plate}}</td><th>차 명</th><td>{{carName}}</td></tr>
+    <tr><th>계약기간</th><td colspan="3">{{periodFrom}} ~ {{periodTo}}</td></tr>
+    <tr><th>월 대여료</th><td colspan="3"><strong>{{monthlyFee}}</strong> 원</td></tr>
+    <tr><th>비고</th><td colspan="3">{{note}}</td></tr>
+  </table>
+</section>
+
+<section>
+  <div class="section-title">■ 용 도</div>
+  <div class="purpose-box">{{purpose}}</div>
+  <div class="body-text">위 차량에 대하여 본 회사와 상기 계약자 간 자동차대여 계약이 체결되었음을 확인합니다.</div>
+</section>
+
+<footer class="doc-footer">
+  <div class="issue-date">{{issuedAt}}</div>
+  <div class="company-line"><strong>{{company.name}}</strong>  대표이사  <strong>{{company.ceo}}</strong> <span class="seal">印</span></div>
+</footer>
+`,
+});
+
+/* ─── 6. 과태료 변경부과 요청 공문 (행정 / 자유) ───
+   렌터카는 «차주 = 회사, 운전자 = 임차인»이라 과태료가 회사로 온다.
+   이 공문으로 부과 대상을 실운전자로 바꿔 달라고 관청에 요청한다 — 계약서 사본이 근거다. */
+registerTemplate({
+  id: 'penalty-reassign', title: '과태료 변경부과 요청', category: '행정', target: 'free', prefix: 'PNR',
+  description: '과태료 부과 대상을 회사→실운전자(임차인)로 변경 요청. 관할 관청 제출용.',
+  fields: [
+    { key: 'agency', label: '수신 (관청)', type: 'text', required: true, placeholder: '○○경찰서장 / ○○시장', colSpan: 2 },
+    { key: 'penaltyNo', label: '과태료 고지번호', type: 'text', required: true },
+    { key: 'plate', label: '차량번호', type: 'text', required: true },
+    { key: 'violationAt', label: '위반일시', type: 'text', required: true, placeholder: '2026-07-15 14:20' },
+    { key: 'violationPlace', label: '위반장소', type: 'text', colSpan: 2 },
+    { key: 'violationKind', label: '위반내용', type: 'text', colSpan: 2 },
+    { key: 'driverName', label: '실운전자 성명', type: 'text', required: true },
+    { key: 'driverBirth', label: '실운전자 생년월일', type: 'text' },
+    { key: 'driverPhone', label: '실운전자 연락처', type: 'text' },
+    { key: 'driverAddress', label: '실운전자 주소', type: 'text', colSpan: 2 },
+    { key: 'periodFrom', label: '임대 시작', type: 'date', required: true },
+    { key: 'periodTo', label: '임대 종료', type: 'date' },
+  ],
+  body: `
+<div class="doc-title">과태료 부과대상 변경 요청</div>
+
+<section>
+  <table class="info">
+    <tr><th>수 신</th><td colspan="3">{{agency}}</td></tr>
+    <tr><th>발 신</th><td colspan="3">{{company.name}} (대표 {{company.ceo}})</td></tr>
+    <tr><th>제 목</th><td colspan="3">자동차대여사업자 과태료 부과대상 변경 요청</td></tr>
+  </table>
+</section>
+
+<section>
+  <div class="section-title">■ 대상 과태료</div>
+  <table class="info">
+    <tr><th>고지번호</th><td>{{penaltyNo}}</td><th>차량번호</th><td>{{plate}}</td></tr>
+    <tr><th>위반일시</th><td colspan="3">{{violationAt}}</td></tr>
+    <tr><th>위반장소</th><td colspan="3">{{violationPlace}}</td></tr>
+    <tr><th>위반내용</th><td colspan="3">{{violationKind}}</td></tr>
+  </table>
+</section>
+
+<section>
+  <div class="section-title">■ 위반 당시 실운전자 (임차인)</div>
+  <table class="info">
+    <tr><th>성 명</th><td>{{driverName}}</td><th>생년월일</th><td>{{driverBirth}}</td></tr>
+    <tr><th>연락처</th><td colspan="3">{{driverPhone}}</td></tr>
+    <tr><th>주 소</th><td colspan="3">{{driverAddress}}</td></tr>
+    <tr><th>임대기간</th><td colspan="3">{{periodFrom}} ~ {{periodTo}}</td></tr>
+  </table>
+</section>
+
+<section>
+  <div class="body-text">
+    위 차량은 본 회사가 자동차대여사업용으로 등록·보유한 차량으로, 위반일시 당시
+    상기 임차인에게 대여 중이었습니다. 이에 해당 과태료의 부과대상을 실운전자로
+    변경하여 주시기 바랍니다.
+  </div>
+  <div class="body-text">붙임 : 자동차대여계약서 사본 1부.  끝.</div>
+</section>
+
+<footer class="doc-footer">
+  <div class="issue-date">{{issuedAt}}</div>
+  <div class="company-line"><strong>{{company.name}}</strong>  대표이사  <strong>{{company.ceo}}</strong> <span class="seal">印</span></div>
+</footer>
+`,
+});
+
+/* ─── 7. 내용증명 (법무 / 거래처) ───
+   ⚠ 미수 독촉 내용증명은 `lib/docs/notice-claim.ts` 가 이미 «계산까지» 한다.
+   여기 것은 계산이 필요 없는 **일반 통고**용이다 — 반납요구·계약해지통보·원상회복 등.
+   미수 독촉은 그쪽을 쓴다. 두 벌로 만들지 말 것. */
+registerTemplate({
+  id: 'certified-mail', title: '내용증명', category: '법무', target: 'partner', prefix: 'CTM',
+  description: '반납요구·계약해지 통보·원상회복 청구 등 일반 통고. 미수 독촉은 미수관리의 [내용증명 발송]을 쓸 것.',
+  fields: [
+    { key: 'subject', label: '제 목', type: 'text', required: true, placeholder: '임대차량 반납 요구의 건', colSpan: 2 },
+    { key: 'plate', label: '차량번호', type: 'text' },
+    { key: 'facts', label: '사실관계', type: 'textarea', required: true, colSpan: 2, placeholder: '계약 체결일·경위를 시간순으로' },
+    { key: 'demand', label: '요구사항', type: 'textarea', required: true, colSpan: 2, placeholder: '무엇을 언제까지 이행할 것인지' },
+    { key: 'deadline', label: '이행기한', type: 'date', required: true },
+    { key: 'consequence', label: '불이행 시 조치', type: 'textarea', colSpan: 2, default: '민·형사상 법적 조치를 취할 예정입니다.' },
+  ],
+  body: `
+<div class="doc-title">내 용 증 명</div>
+
+<section>
+  <table class="info">
+    <tr><th>수 신</th><td colspan="3">{{target.name}} 귀하</td></tr>
+    <tr><th>주 소</th><td colspan="3">{{target.address}}</td></tr>
+    <tr><th>발 신</th><td colspan="3">{{company.name}} (대표 {{company.ceo}})</td></tr>
+    <tr><th>제 목</th><td colspan="3"><strong>{{subject}}</strong></td></tr>
+    <tr><th>대상 차량</th><td colspan="3">{{plate}}</td></tr>
+  </table>
+</section>
+
+<section>
+  <div class="section-title">1. 사실관계</div>
+  <div class="body-text">{{facts}}</div>
+</section>
+
+<section>
+  <div class="section-title">2. 요구사항</div>
+  <div class="body-text">{{demand}}</div>
+  <div class="body-text">이행기한 : <strong>{{deadline}}</strong> 까지</div>
+</section>
+
+<section>
+  <div class="section-title">3. 불이행 시</div>
+  <div class="body-text">{{consequence}}</div>
+</section>
+
+<footer class="doc-footer">
+  <div class="issue-date">{{issuedAt}}</div>
+  <div class="company-line"><strong>{{company.name}}</strong>  대표이사  <strong>{{company.ceo}}</strong> <span class="seal">印</span></div>
+</footer>
+`,
+});
+
 export const DOC_CATEGORIES: DocCategory[] = ['인사', '거래', '대외', '행정', '법무'];
