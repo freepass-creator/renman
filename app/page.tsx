@@ -204,12 +204,15 @@ export default function DashboardPage() {
     ...m, label: i === 0 ? `이번달 (${Number(m.ym.slice(5))}월)` : `${Number(m.ym.slice(5))}월`,
   })), [cashOutlook]);
 
+  /* 폭을 준 이유: 홈은 「화면 한 판」이라 패널 안에서 가로 스크롤이 나면 안 된다.
+     월·금액 3열은 폭이 정해진 값이고, 남는 폭은 「구성」이 가져간다(안 주면 5열 균등분할이라
+     금액열이 폭을 낭비하고 구성이 과하게 잘린다). */
   const outlookCols: SheetCol<OutlookRow>[] = useMemo(() => [
-    { key: 'label', label: '월', pin: true, render: (r) => r.label, text: (r) => r.label },
-    { key: 'inflow', label: '들어올 돈', align: 'r', sortNum: true, xf: 'money', render: (r) => won(r.inflow), text: (r) => r.inflow },
-    { key: 'outflow', label: '나갈 돈', align: 'r', sortNum: true, xf: 'money', render: (r) => won(r.outflow), text: (r) => r.outflow },
+    { key: 'label', label: '월', pin: true, width: 104, render: (r) => r.label, text: (r) => r.label },
+    { key: 'inflow', label: '들어올 돈', align: 'r', width: 108, sortNum: true, xf: 'money', render: (r) => won(r.inflow), text: (r) => r.inflow },
+    { key: 'outflow', label: '나갈 돈', align: 'r', width: 108, sortNum: true, xf: 'money', render: (r) => won(r.outflow), text: (r) => r.outflow },
     {
-      key: 'net', label: '순현금흐름', align: 'r', sortNum: true, xf: 'money',
+      key: 'net', label: '순현금흐름', align: 'r', width: 112, sortNum: true, xf: 'money',
       render: (r) => (
         <span style={{ color: r.net >= 0 ? C.ok : C.danger, fontWeight: 800 }}>{won(r.net)}</span>
       ),
@@ -217,7 +220,8 @@ export default function DashboardPage() {
     },
     {
       key: 'detail', label: '구성',
-      render: (r) => <span style={{ color: C.mute, fontSize: 11 }}>{outlookDetail(r)}</span>,
+      // 남는 폭 담당 — 좁으면 잘린다. 전체 내역은 행을 눌러 /cash 에서 본다.
+      render: (r) => <span style={{ color: C.mute, fontSize: 11 }} title={outlookDetail(r)}>{outlookDetail(r)}</span>,
       text: (r) => outlookDetail(r),
     },
   ], []);
@@ -376,7 +380,9 @@ export default function DashboardPage() {
                 <PageLoading />
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  <ExcelSheet cols={outlookCols} rows={outlookRows} rowKey={(r) => r.ym} onRow={() => go('/cash')} />
+                  {/* fit = 기본보기(표를 패널 폭에 맞춘다). 안 주면 폭이 `max-content` 라
+                      「구성」의 긴 텍스트가 표를 밀어내 패널에 가로 스크롤이 생긴다. */}
+                  <ExcelSheet fit cols={outlookCols} rows={outlookRows} rowKey={(r) => r.ym} onRow={() => go('/cash')} />
                   {outlookNotes ? (
                     <div style={{ fontSize: 11, color: C.mute }}>
                       {outlookNotes} — 자금관리 › 자금계획에서 확인

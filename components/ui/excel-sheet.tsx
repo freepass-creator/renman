@@ -39,6 +39,12 @@ export type SheetCol<T> = {
    * 고정 칸은 자기 배경이 필요해 행 호버가 끊긴다 — 신원 열 하나에만 붙인다.
    */
   pin?: boolean;
+  /**
+   * 기본보기(`fit`) 열 폭. `tableLayout:fixed` 라 지정한 열이 그 폭을 갖고 **나머지가 남은 폭을 나눈다**.
+   * 안 주면 전 열이 균등분할이라, 금액처럼 폭이 정해진 열이 남는 폭을 낭비하고 긴 열이 과하게 잘린다.
+   * 전체보기(`max-content`)에서는 내용이 폭을 정하므로 무시된다.
+   */
+  width?: number | string;
   render: (row: T) => React.ReactNode;
   /** CSV·검색·헤더필터·엑셀 공용 평문. 없으면 그 열은 필터·내보내기 불가. */
   text?: (row: T) => string | number;
@@ -345,6 +351,12 @@ export function ExcelSheet<T>({
    */
   const pinIndex = visibleCols.findIndex((c) => c.pin);
 
+  /** 기본보기 최소 폭 — 폭을 지정한 열은 그 값, 나머지는 하한(EXCEL_COL_MIN). 이보다 좁아지면 가로로 민다. */
+  const fitMinWidth = visibleCols.reduce(
+    (sum, c) => sum + (typeof c.width === 'number' ? c.width : EXCEL_COL_MIN),
+    0,
+  );
+
   const openC = openCol && byKey.get(openCol.key);
   const filterSourceRows = exportRows ?? rows;
   // 팝오버 개수는 «내 열을 뺀» 나머지 필터 결과로 센다 — 내 선택 때문에 목록이 쪼그라들지 않게(엑셀 동작).
@@ -371,7 +383,7 @@ export function ExcelSheet<T>({
           width: fit ? '100%' : 'max-content',
           /* 기본보기 최소 폭 — 이보다 좁아지면 열을 숨기지 않고 가로로 민다(AUDIT §4-3).
              종전엔 `100%` 라 아무리 좁아도 표가 영역에 욱여넣어졌고, 대신 열이 사라졌다. */
-          minWidth: fit ? Math.max(visibleCols.length * EXCEL_COL_MIN, 320) : '100%',
+          minWidth: fit ? Math.max(fitMinWidth, 320) : '100%',
           tableLayout: fit ? 'fixed' : 'auto',
         }}>
           <thead>
@@ -384,7 +396,8 @@ export function ExcelSheet<T>({
                   <th
                     key={c.key}
                     className="excel-sheet__col"
-                    style={{ ...base, color: on ? C.brand : base.color, userSelect: 'none' }}>
+                    // 폭은 기본보기에서만 뜻이 있다(fixed 레이아웃). 전체보기는 내용이 폭을 정한다.
+                    style={{ ...base, color: on ? C.brand : base.color, userSelect: 'none', ...(fit && c.width != null ? { width: c.width } : null) }}>
                     {canFilter ? (
                     <button
                       type="button"

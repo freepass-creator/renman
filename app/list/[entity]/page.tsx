@@ -51,8 +51,7 @@ export default function ListPage() {
   ];
 
   return (
-    <Page title={entity.label} meta={`${companyLabel(companyId)} · ${records.length}건 · ${user.role}`}
-      tools={<WorkbenchBar />}
+    <Page title={entity.label} meta={`${records.length}건 · ${roleLabel(user.role)}`}
       right={(
         <LedgerActions aria-label="투입">
           <Btn size="sm" variant="ghost" iconOnly tip={`${entity.label} 담기 — 데이터관리`} onClick={() => openIngest(entityKey)}>
@@ -64,7 +63,6 @@ export default function ListPage() {
         <Cards min={128} fit>
           <Metric label="데이터 건수" value={loading ? '…' : records.length} tone="ink" />
           <Metric label="엔티티" value={entity.label} tone="ink" />
-          <Metric label="회사 범위" value={scopeLabel} tone="ok" />
           <Metric label="목록" value="빠른 조회" tone="warn" />
         </Cards>
       </Sec>

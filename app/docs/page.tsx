@@ -8,7 +8,6 @@ import { useMemo } from 'react';
 import { useSession } from '@/lib/session';
 import { companyLabel } from '@/lib/companies';
 import { Page, Sec, EmptyState, DataTable, Badge, Btn, C, type Col, type BadgeTone, PageLoading } from '@/components/ui';
-import { WorkbenchBar } from '@/components/WorkbenchBar';
 import { DOC_PRINT_CSS } from '@/lib/doc-templates';
 import { sanitizeDocHtml, escapeDocText } from '@/lib/docs/sanitize-html';
 import { useEntityList } from '@/lib/use-entity-lists';
@@ -56,8 +55,7 @@ export default function DocsPage() {
   ];
 
   return (
-    <Page title="문서 발급" meta={`${companyLabel(companyId)} · 발급 ${rows.length}건`}
-      tools={<WorkbenchBar />}
+    <Page title="문서 발급" meta={`발급 ${rows.length}건`}
       right={<Btn size="sm" href="/docs/issue">+ 신규 발급</Btn>}>
       <Sec title="발급 이력" n={rows.length} desc="재직·거래사실·입금확인·위임장 — 발급 시 문서번호·발급자 기록(감사)" hideable={false}>
         {loading ? <PageLoading />

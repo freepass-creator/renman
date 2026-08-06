@@ -9,7 +9,7 @@ import { getStore } from '@/lib/store';
 import { COMPANIES, companyLabel } from '@/lib/companies';
 import { loadMaster, saveMaster, masterStampOf, ensureCompanyMasterHydrated, genId, MODULE_CATALOG, type CompanyMaster, type Garage, type RegApplication, type OfficialDoc } from '@/lib/company-master';
 import { toast } from '@/lib/toast';
-import { Page, Panel, Sec, Btn, Input, Select, C, useConfirm } from '@/components/ui';
+import { Page, Panel, Sec, Btn, Input, Select, C, useConfirm, EmptyState } from '@/components/ui';
 import { WorkbenchBar } from '@/components/WorkbenchBar';
 
 const lab: CSSProperties = { fontSize: 11.5, color: 'var(--text-sub)', display: 'block', marginBottom: 3 };
@@ -88,12 +88,12 @@ export default function CompanyWorkspace() {
   };
   const available = MODULE_CATALOG.filter((c) => !modules.includes(c.key));
 
-  if (!allowed) return <Page title="회사관리"><div style={{ padding: 20, color: C.mute }}>이 회사에 접근 권한이 없습니다.</div></Page>;
-  if (!COMPANIES.includes(id)) return <Page title="회사관리"><div style={{ padding: 20, color: C.mute }}>관리 목록에 없는 회사입니다.</div></Page>;
+  if (!allowed) return <Page title="법인관리"><EmptyState>이 회사에 접근 권한이 없습니다.</EmptyState></Page>;
+  if (!COMPANIES.includes(id)) return <Page title="법인관리"><EmptyState>관리 목록에 없는 회사입니다.</EmptyState></Page>;
 
   return (
-    <Page title={companyLabel(id)} meta="회사별 전용 워크스페이스"
-      tools={<WorkbenchBar actions={
+    <Page title={companyLabel(id)} meta="법인별 전용 워크스페이스"
+      tools={<WorkbenchBar search={false} actions={
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           {dirty && <span style={{ fontSize: 12, color: C.warn, fontWeight: 700 }}>저장 안 됨</span>}
           {!ready && <span style={{ fontSize: 12, color: C.mute }}>서버 확인 중…</span>}

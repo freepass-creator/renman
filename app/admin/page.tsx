@@ -4,13 +4,12 @@ import { companyLabel, COMPANIES } from '@/lib/companies';
 import { AccountAliases } from '@/components/AccountAliases';
 import { CompanyRegistry } from '@/components/CompanyRegistry';
 import { Page, Panel, DetailGrid, Btn, C } from '@/components/ui';
-import { WorkbenchBar } from '@/components/WorkbenchBar';
 
 export default function AdminPage() {
   const { companyId, user, isOperator } = useSession();
   const targets = isOperator ? COMPANIES : [companyId];
   return (
-    <Page title="일반관리" meta="관리 법인 · 계좌 약칭" tools={<WorkbenchBar />}>
+    <Page title="일반관리" meta="관리 법인 · 계좌 약칭">
       {/* ★이 페이지의 본론은 «관리 법인»이다 — 회사를 세워야 데이터가 붙는다(오픈 1단계).
           계정 정보·안내문 뒤에 묻혀 있어서 맨 위로 올렸다. */}
       <CompanyRegistry />
