@@ -22,6 +22,8 @@ import { COMPANY_DEFS, companyLabel, createManagedCompany, updateManagedCompany,
 import { loadMaster, MODULE_CATALOG, type CompanyMaster, type CompanyDoc } from '@/lib/company-master';
 import { uploadDoc, docPath } from '@/lib/storage';
 import { routeDocument } from '@/lib/document-router';
+import { callOcrExtract } from '@/lib/ocr-client';
+import { businessRegToMaster, mergeNonEmpty } from '@/lib/business-reg-extract';
 import FileDrop from '@/components/FileDrop';
 import { useEntityList } from '@/lib/use-entity-lists';
 import { buildBankAccountLedger, type BankAccountRow } from '@/lib/finance/cash-ledger';
@@ -261,7 +263,22 @@ export default function ManagementPage() {
       }
       if (!added.length) return;
       const next = [...(selectedCo.master.documents ?? []), ...added];
-      await updateManagedCompany(selectedCo.id, {}, { documents: next } as CompanyMasterInput);
+
+      /* ★사업자등록증이면 OCR 로 사업자 정보를 채운다 — /admin 까지 안 가도 되게(AUDIT §3).
+         빈 값은 기존을 덮지 않는다(mergeNonEmpty): 한 칸 못 읽었다고 넣어둔 정보가 지워지면 안 된다. */
+      let ocrPatch: CompanyMasterInput = {};
+      const bizReg = files.find((f, i) => (added[i]?.kind || '').includes('사업자등록증'));
+      if (bizReg) {
+        const result = await callOcrExtract(bizReg, 'business_reg');
+        if (result.ok && result.raw) {
+          const { label: read, master } = businessRegToMaster(result.raw);
+          ocrPatch = master;
+          toast(read ? `사업자등록증을 읽었습니다 — ${read}` : '사업자등록증을 읽었습니다. 상호는 확인하세요.');
+        } else {
+          toastError(result.error || '등록증을 읽지 못했습니다 — 파일은 보관됐습니다. [수정]에서 직접 넣으세요.');
+        }
+      }
+      await updateManagedCompany(selectedCo.id, {}, mergeNonEmpty(ocrPatch, { documents: next } as CompanyMasterInput));
       setMasterTick((n) => n + 1);
       setSelectedCo({ ...selectedCo, master: loadMaster(selectedCo.id) });
       toast(`문서 ${added.length}건 등록`);

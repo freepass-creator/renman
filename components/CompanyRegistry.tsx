@@ -15,6 +15,7 @@ import { useSession } from '@/lib/session';
 import { Panel, Btn, Input, C, useConfirm } from '@/components/ui';
 import FileDrop from '@/components/FileDrop';
 import { callOcrExtract } from '@/lib/ocr-client';
+import { businessRegToMaster } from '@/lib/business-reg-extract';
 import { docPath, uploadDoc } from '@/lib/storage';
 import { toast, toastError, toastInfo } from '@/lib/toast';
 
@@ -30,25 +31,11 @@ function list(raw: Record<string, unknown>, key: string): string[] | undefined {
   return value ? value.split(/[,\n]/).map((v) => v.trim()).filter(Boolean) : undefined;
 }
 
+/* 매핑 본체는 `lib/business-reg-extract` 가 SSOT — 경영관리 문서 섹션도 같은 것을 쓴다.
+   여기 손롤로 두면 «어디서 올렸냐»에 따라 읽히는 항목이 달라진다(AUDIT §3). */
 function draftFromBusinessRegistration(raw: Record<string, unknown>): CompanyDraft {
-  const businessAddress = text(raw, 'address');
-  const headquartersAddress = text(raw, 'hq_address');
-  return {
-    label: text(raw, 'partner_name'),
-    bizNo: text(raw, 'biz_no'),
-    corpNo: text(raw, 'corp_no'),
-    ceo: text(raw, 'ceo'),
-    openDate: text(raw, 'open_date'),
-    address: headquartersAddress || businessAddress,
-    businessAddress,
-    headquartersAddress,
-    entityType: text(raw, 'entity_type'),
-    industry: list(raw, 'industry'),
-    category: list(raw, 'category'),
-    email: text(raw, 'email'),
-    taxOffice: text(raw, 'tax_office'),
-    businessRegistration: { issueDate: text(raw, 'issue_date') },
-  };
+  const { label, master } = businessRegToMaster(raw);
+  return { label, ...master };
 }
 
 export function CompanyRegistry() {
