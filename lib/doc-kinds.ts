@@ -40,6 +40,25 @@ export const DOC_KINDS: readonly DocKindDef[] = [
   { kind: '기타', entity: 'inbox', nature: '증빙', division: '기타' },
 ] as const;
 
+/**
+ * `DocVersion.type` 으로 저장할 값.
+ *
+ * ⚠ **슬롯이 있는 종류는 슬롯 키로 저장해야 한다.** `doc-crosscheck` 가 서류미비를
+ * `type === 'vehicle' | 'insurance'` 로 판정하기 때문에, 차량360 「문서」 섹션에서 자동차등록증을
+ * 올렸는데 한글 종류명으로 저장하면 **올렸는데도 서류미비로 남는다**(오픈 조건 ①이 걸린 자리다).
+ */
+export function docVersionType(kind: string): string {
+  const d = docKindOf(kind);
+  return d?.slot || kind.trim() || '기타';
+}
+
+/** `DocVersion.type` → 사람이 읽는 종류명. 슬롯 키('vehicle')를 화면에 그대로 보이지 않게 한다. */
+export function docKindLabel(type: string): string {
+  const t = String(type || '').trim();
+  if (!t) return '분류 없음';
+  return DOC_KINDS.find((d) => d.slot === t)?.kind || t;
+}
+
 export function docKindOf(kind: string): DocKindDef | undefined {
   const k = kind.trim();
   return DOC_KINDS.find((d) => d.kind === k);

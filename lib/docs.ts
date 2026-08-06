@@ -16,6 +16,8 @@ export type DocVersion = {
   uploadedBy: string;              // 업로더(uid 또는 'system')
   ocr?: Record<string, unknown>;   // 이 버전의 OCR 원본 스냅샷(영구보존)
   reason?: string;                 // 재발급/변경/오류정정 등 사유
+  /** 올린 파일 이름. URL에서 되짚으면 저장경로의 타임스탬프 접두가 섞여 나오므로 그대로 남긴다. */
+  name?: string;
 };
 
 /** rec의 서류 배열(레거시 fileUrl 승격 포함). */
@@ -45,7 +47,7 @@ export function docHistory(rec: EntityRecord | null | undefined, type?: string):
 /** 새 버전 추가 → 갱신된 _docs 배열 반환(과거 버전 불변). 저장은 호출측(store.save/update)에서. */
 export function pushDocVersion(
   rec: EntityRecord | null | undefined,
-  { type, url, ocr, reason, by }: { type: string; url?: string; ocr?: Record<string, unknown>; reason?: string; by?: string },
+  { type, url, ocr, reason, by, name }: { type: string; url?: string; ocr?: Record<string, unknown>; reason?: string; by?: string; name?: string },
 ): DocVersion[] {
   const base = asDocs(rec);
   const v = base.length ? base[base.length - 1].v + 1 : 1;
@@ -55,6 +57,7 @@ export function pushDocVersion(
     uploadedBy: by || 'system',
     ...(ocr ? { ocr } : {}),
     ...(reason ? { reason } : {}),
+    ...(name ? { name } : {}),
   };
   return [...base, next];
 }

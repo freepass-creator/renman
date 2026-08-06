@@ -1,13 +1,17 @@
 'use client';
-import { useRef, type CSSProperties, type ReactNode } from 'react';
+import { useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { ChevronRight, ChevronsDownUp, ChevronsUpDown } from 'lucide-react';
 import {
   ActionMenu, Btn, TextLink, Badge, KV, EmptyState, Message, Input, Select,
   SectionLabel, Disclosure, th, thR, td, tdR, won, C, SH, PageLoading, SPACE_GROUP_M, type KVRow,
 } from '@/components/ui';
 import { InfoDoc } from '@/components/InfoDoc';
+import FileDrop from '@/components/FileDrop';
 import { LEDGER_EMPTY } from '@/lib/ledger-empty';
-import { docHistory, latestDoc } from '@/lib/docs';
+import { docHistory, latestDoc, pushDocVersion } from '@/lib/docs';
+import { DOC_KINDS, docKindLabel, docVersionType } from '@/lib/doc-kinds';
+import { uploadDoc, docPath, storageReady } from '@/lib/storage';
+import { classifyContract } from '@/lib/domain/model';
 import { effectiveEndDate, patchExtend, earlyTerminationFee, computeContractView } from '@/lib/contract-ops';
 import { isProductReady } from '@/lib/freepass/product-sync';
 import { FUEL_LEVELS } from '@/lib/domain/fuel';
@@ -68,6 +72,9 @@ function PanelSec({
   );
 }
 
+/** 「직접 입력…」 센티널 — 목록에 없는 종류 때문에 문서를 못 올리는 일이 없게(규격 §3-1). */
+const DOC_KIND_FREE = '__free__';
+
 const fLab: CSSProperties = { display: 'flex', flexDirection: 'column', gap: 3 };
 const fLl: CSSProperties = { fontSize: 11, color: C.mute };
 const Add = ({ type, plate, label }: { type: string; plate: string; label: string }) => (
@@ -91,6 +98,36 @@ export function VehicleDetail({ plate, focus, embed, companyId: targetCompanyId 
   /* 전부 펼치기/접기 — 섹션이 12개라 하나씩 여는 건 일이다.
      `details.open` 을 직접 세팅한다: 각 섹션이 자기 상태를 들고 있어(InfoDoc 은 자체 접기까지)
      React state 로 끌어올리면 그 상태와 두 벌이 된다. DOM 하나만 보는 쪽이 어긋날 여지가 없다. */
+  /* 문서 섹션(규격 §3-1) — 표시층 상태라 useVehicleDetail(훅)은 건드리지 않는다(규격 §5). */
+  const [docOpen, setDocOpen] = useState(false);
+  const [docKind, setDocKind] = useState<string>(DOC_KINDS[0].kind);
+  const [docFreeKind, setDocFreeKind] = useState('');
+  const [docReason, setDocReason] = useState('');
+  const [docBusy, setDocBusy] = useState(false);
+  const vehicleDocs = docHistory(v);   // 최신 먼저 · 종류 무관 전부
+
+  /** 종류를 골라(또는 적어) 파일 하나를 차량 레코드에 붙인다. 과거 버전은 건드리지 않는다(append-only). */
+  const uploadOtherDoc = async (file: File) => {
+    const kind = (docKind === DOC_KIND_FREE ? docFreeKind.trim() : docKind) || '기타';
+    if (!kind) { toast('문서 종류를 적어 주세요', 'error'); return; }
+    if (!v?._key) { toast('차량을 먼저 저장한 뒤 문서를 올릴 수 있습니다', 'error'); return; }
+    if (!storageReady()) { toast('파일 저장소가 설정되지 않았습니다(.env.local 확인)', 'error'); return; }
+    setDocBusy(true);
+    try {
+      const url = await uploadDoc(file, docPath(companyId, 'vehicle', String(v._key), file.name));
+      if (!url) { toast('업로드 실패 — 저장소 설정을 확인하세요', 'error'); return; }
+      // ★슬롯 있는 종류는 슬롯 키로 저장한다(docVersionType) — 안 그러면 등록증을 올려도 서류미비로 남는다.
+      const nextDocs = pushDocVersion(v, { type: docVersionType(kind), url, reason: docReason.trim() || undefined, name: file.name });
+      await commitUpdate({ entity: 'vehicle', sessionCompanyId: companyId, rec: v, key: String(v._key), patch: { _docs: nextDocs } });
+      setDocReason('');
+      toast(`${kind} 등록됨`, 'success');
+    } catch {
+      toast(NEED_COMPANY, 'error');
+    } finally {
+      setDocBusy(false);
+    }
+  };
+
   const rootRef = useRef<HTMLDivElement>(null);
   const setAllSections = (open: boolean) => {
     rootRef.current?.querySelectorAll<HTMLDetailsElement>('details.ledger-record-panel__section')
@@ -526,16 +563,60 @@ export function VehicleDetail({ plate, focus, embed, companyId: targetCompanyId 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         
 
-        {(active || pastContracts.length > 0) ? <PanelSec id="v-schedule" title="수납 스케줄" n={active ? schedule.length : pastContracts.length} desc={active ? '회차별 청구·미납 · 미수관리' : '이전 계약 수납 이력'}
-          right={active ? <span style={{ display: 'inline-flex', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+        {/* 계약이력 — 규격 §2·§3. 이 차를 거쳐 간 계약 전부(현재 포함). 행 클릭 = 계약 원장 딥링크.
+            ★수납 스케줄과 **다른 섹션**이다: 스케줄은 «현재 계약의 회차», 이력은 «누가 언제 탔나»다.
+              종전엔 이력이 스케줄 섹션 안에 카드로 묻혀 있어 규격(표)도, 자리도 어긋나 있었다. */}
+        {(active || pastContracts.length > 0) ? (() => {
+          const rows = [...(active ? [active] : []), ...pastContracts];
+          return (
+            <PanelSec id="v-contracts" title="계약이력" n={rows.length} desc="이 차를 거쳐 간 계약 · 행을 누르면 계약 원장">
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', whiteSpace: 'nowrap' }}>
+                  <thead><tr>
+                    <th style={th}>기간</th><th style={th}>계약자</th><th style={thR}>월대여료</th>
+                    <th style={th}>종료사유</th><th style={thR}>미수</th>
+                  </tr></thead>
+                  <tbody>
+                    {rows.map((c) => {
+                      const cv = computeContractView(c, TODAY);
+                      const cls = classifyContract(cv);
+                      const key = String(c._key || c.contractNo || '');
+                      return (
+                        <tr
+                          key={key || String(c.startDate)}
+                          onClick={key ? () => { window.location.href = `/contract?open=${encodeURIComponent(key)}`; } : undefined}
+                          style={key ? { cursor: 'pointer' } : undefined}
+                        >
+                          <td style={td}>{yy(c.startDate)} ~ {yy(c.returnedDate || effectiveEndDate(c))}</td>
+                          <td style={td}>{String(c.contractorName || '') || LEDGER_EMPTY.dash}</td>
+                          <td style={tdR}>{c.monthlyRent ? won(Number(c.monthlyRent)) : LEDGER_EMPTY.dash}</td>
+                          {/* 종료사유는 classifyContract SSOT — 화면에서 status로 손롤 금지 */}
+                          <td style={td}>{cls.phase === '종료'
+                            ? (String(c.endReason || '') || cls.endReason)
+                            : <Badge tone={cls.tone === 'danger' ? 'red' : 'green'}>{cls.label}</Badge>}</td>
+                          <td style={tdR}>{cv.net > 0
+                            ? <span style={{ color: C.danger, fontWeight: 700 }}>{won(cv.net)}</span>
+                            : LEDGER_EMPTY.dash}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </PanelSec>
+          );
+        })() : null}
+
+        {active ? <PanelSec id="v-schedule" title="수납 스케줄" n={schedule.length} desc="회차별 청구·미납 · 미수관리"
+          right={<span style={{ display: 'inline-flex', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
             <Btn onClick={() => setRecMode(recMode === 'pay' ? null : 'pay')}>+ 입금</Btn>
             <Btn variant="ghost" onClick={() => setRecMode(recMode === 'disc' ? null : 'disc')}>+ 청구할인</Btn>
             <PrintMenu items={[
               { label: '영수증', run: () => openPrintDoc('receipt', plate) },
               ...(totalUnpaid > 0 ? [{ label: '내용증명', run: () => openPrintDoc('notice', plate) }] : []),
             ]} />
-          </span> : undefined}>
-          {active && recMode ? <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'flex-end', padding: '10px 12px', border: `1px solid ${C.accent}`, borderRadius: 'var(--radius)', background: 'var(--bg-card)', marginBottom: 10 }}>
+          </span>}>
+          {recMode ? <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'flex-end', padding: '10px 12px', border: `1px solid ${C.accent}`, borderRadius: 'var(--radius)', background: 'var(--bg-card)', marginBottom: 10 }}>
             <label style={fLab}><span style={fLl}>회차</span><Select value={recForm.seq} onChange={(e) => setRecForm((r) => ({ ...r, seq: e.target.value }))}>{schedule.map((s) => <option key={s.seq} value={s.seq}>{s.seq} · {s.dueDate}</option>)}</Select></label>
             <label style={fLab}><span style={fLl}>일자</span><Input type="date" value={recForm.date} onChange={(e) => setRecForm((r) => ({ ...r, date: e.target.value }))} /></label>
             <label style={fLab}><span style={fLl}>금액</span><Input type="number" value={recForm.amount} onChange={(e) => setRecForm((r) => ({ ...r, amount: e.target.value }))} placeholder="0" /></label>
@@ -545,10 +626,7 @@ export function VehicleDetail({ plate, focus, embed, companyId: targetCompanyId 
             <Btn onClick={saveRecord}>{recMode === 'pay' ? '입금 저장' : '할인 저장'}</Btn>
             <Btn variant="ghost" onClick={() => setRecMode(null)}>취소</Btn>
           </div> : null}
-          {active ? (
-            <>
-              <div style={{ fontSize: 11.5, fontWeight: 700, color: C.mute, marginBottom: 8 }}>현재 계약</div>
-              {schedule.length === 0 ? <EmptyState variant="sec">스케줄 없음 (계약기간·월대여료 확인)</EmptyState> :
+          {schedule.length === 0 ? <EmptyState variant="sec">스케줄 없음 (계약기간·월대여료 확인)</EmptyState> : (
                 <div style={{ border: `1px solid ${C.line}`, borderRadius: 'var(--radius)', overflow: 'hidden', background: C.card }}>
                   <div style={{ maxHeight: 460, overflowY: 'auto', overflowX: 'auto' }}>
                     <table style={{ width: '100%', borderCollapse: 'collapse', whiteSpace: 'nowrap' }}>
@@ -572,30 +650,8 @@ export function VehicleDetail({ plate, focus, embed, companyId: targetCompanyId 
                       </tbody>
                     </table>
                   </div>
-                </div>}
-            </>
-          ) : null}
-          {pastContracts.length > 0 ? (
-            <div style={{ marginTop: active ? 14 : 0 }}>
-              <div style={{ fontSize: 11.5, fontWeight: 700, color: C.mute, marginBottom: 8 }}>이전 계약 수납</div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                {pastContracts.map((c) => {
-                  const pv = computeContractView(c, TODAY);
-                  return (
-                    <div key={String(c._key || c.contractNo)} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', borderRadius: 'var(--radius)', border: `1px solid ${C.line}`, background: C.card }}>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: 13, fontWeight: 600, color: C.ink }}>{String(c.contractorName || '—')}</div>
-                        <div style={{ fontSize: 11.5, color: C.faint }}>{yy(c.startDate)} ~ {yy(c.returnedDate || c.endDate)}</div>
-                      </div>
-                      <div style={{ fontSize: 12.5, fontWeight: 700, color: pv.net > 0 ? C.danger : C.mute, fontVariantNumeric: 'tabular-nums' }}>
-                        {pv.net > 0 ? `미수 ${won(pv.net)}` : '정산됨'}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          ) : null}
+                </div>
+          )}
         </PanelSec> : null}
 
         {pendDeposit ? <PanelSec id="v-deposit" title="보증금 정산" n={1} tone="warn" desc={`${String(pendDeposit.c.contractorName || '')} · 반납 ${String(pendDeposit.c.returnedDate || '')} · 미정산`}
@@ -726,6 +782,68 @@ export function VehicleDetail({ plate, focus, embed, companyId: targetCompanyId 
               </tbody>
             </table>
           </div> : <EmptyState variant="sec">수선/작업 이력 없음 · “+ 수선/작업” 버튼으로 남기세요</EmptyState>}
+        </PanelSec>
+
+        {/* 문서 — 규격 §3-1. 「어떤 하나에 얽매이지 않게」: 종류를 골라(또는 새로 적어) 여러 개를 올린다.
+            ★등록증·보험 블록은 그대로 둔다 — 그 둘은 OCR·정합성 검사가 붙는 특별한 슬롯이고,
+              여기는 그 위에 얹는 «나머지 전부»다. 다만 목록에는 슬롯 문서도 함께 보인다(한 차의 문서를 한 목록에서). */}
+        <PanelSec id="v-docs" title="문서" n={vehicleDocs.length} tone={docOpen ? 'ok' : undefined}
+          desc="종류 무관 · 버전 보관(과거본 안 지움)"
+          right={<Btn size="sm" variant="ghost" onClick={() => setDocOpen((o) => !o)}>{docOpen ? '닫기' : '+ 문서 올리기'}</Btn>}>
+          {docOpen ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '10px 12px', border: `1px solid ${C.accent}`, borderRadius: 'var(--radius)', background: 'var(--bg-card)', marginBottom: 12 }}>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+                <label style={fLab}>
+                  <span style={fLl}>종류</span>
+                  {/* 종류 목록 = lib/doc-kinds SSOT — 데이터센터와 같은 목록을 쓴다(두 벌 금지, 규격 §3-2) */}
+                  <Select value={docKind} onChange={(e) => setDocKind(e.target.value)}>
+                    {DOC_KINDS.map((d) => <option key={d.kind} value={d.kind}>{d.kind}</option>)}
+                    <option value={DOC_KIND_FREE}>직접 입력…</option>
+                  </Select>
+                </label>
+                {docKind === DOC_KIND_FREE ? (
+                  <label style={fLab}>
+                    <span style={fLl}>종류 직접 입력</span>
+                    {/* 목록에 없는 종류 때문에 못 올리는 일이 없게 — 모르는 종류가 「기타」로 죽지 않는다 */}
+                    <Input value={docFreeKind} onChange={(e) => setDocFreeKind(e.target.value)} placeholder="예: 인수인계 확인서" />
+                  </label>
+                ) : null}
+                <label style={fLab}>
+                  <span style={fLl}>사유(선택)</span>
+                  <Input value={docReason} onChange={(e) => setDocReason(e.target.value)} placeholder="재발급·변경·오류정정 등" />
+                </label>
+              </div>
+              <FileDrop
+                onFile={(f) => { void uploadOtherDoc(f); }}
+                disabled={docBusy}
+                note={docBusy ? '업로드 중…' : undefined}
+                hint="파일을 끌어다 놓거나 눌러서 선택 · Ctrl+V 붙여넣기"
+              />
+            </div>
+          ) : null}
+          {vehicleDocs.length ? <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', whiteSpace: 'nowrap' }}>
+              <thead><tr>
+                <th style={th}>종류</th><th style={th}>파일명</th><th style={{ ...th, textAlign: 'center' }}>버전</th>
+                <th style={th}>올린날</th><th style={th}>사유</th><th style={th}>올린이</th><th style={th}>열기</th>
+              </tr></thead>
+              <tbody>
+                {vehicleDocs.map((d, i) => (
+                  <tr key={`${d.v}-${i}`}>
+                    <td style={td}>{docKindLabel(d.type)}</td>
+                    <td style={td}>{d.name || LEDGER_EMPTY.dash}</td>
+                    <td style={{ ...td, textAlign: 'center' }}>v{d.v}</td>
+                    <td style={td}>{yy(d.uploadedAt)}</td>
+                    <td style={td}>{d.reason || LEDGER_EMPTY.dash}</td>
+                    <td style={td}>{d.uploadedBy || LEDGER_EMPTY.dash}</td>
+                    <td style={td}>{d.url
+                      ? <TextLink onClick={() => window.open(d.url, '_blank')}>열기</TextLink>
+                      : <span style={{ color: C.faint }}>미첨부</span>}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div> : <EmptyState variant="sec">문서 없음 · “+ 문서 올리기”로 등록증·계약서·견적서 등을 올리세요</EmptyState>}
         </PanelSec>
 
         <PanelSec id="v-history" title="활동 · 이력" n={history.length} tone={logOpen ? 'ok' : undefined} right={<Btn size="sm" variant="ghost" onClick={() => setLogOpen((o) => !o)}>{logOpen ? '닫기' : '+ 기록'}</Btn>}>
