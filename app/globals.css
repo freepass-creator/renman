@@ -2559,15 +2559,26 @@ kbd {
   grid-template-columns: minmax(0, 1fr);
   gap: 8px;
 }
+/* 상세패널 폭 — 기본은 KV 한 줄짜리 신원표에 맞춘 값이다.
+   섹션 안에 «표»가 들어가는 원장(경영관리 법인 = 계좌·임대차)은 이 폭에서 열이 깨진다.
+   그래서 폭을 변수로 빼고, 넓혀야 하는 원장만 `panelWide` 로 덮는다(§4-11). */
+.ledger-workspace {
+  --ledger-panel-w: clamp(320px, 32vw, 430px);
+  --ledger-panel-w-filter: clamp(320px, 30vw, 410px);
+}
+.ledger-workspace[data-panel-wide='1'] {
+  --ledger-panel-w: clamp(460px, 46vw, 720px);
+  --ledger-panel-w-filter: clamp(440px, 42vw, 660px);
+}
 .ledger-workspace[data-panel='open'] {
-  grid-template-columns: minmax(0, 1fr) clamp(320px, 32vw, 430px);
+  grid-template-columns: minmax(0, 1fr) var(--ledger-panel-w);
   align-items: stretch;
 }
 .ledger-workspace[data-filter='open'][data-panel='closed'] {
   grid-template-columns: 220px minmax(0, 1fr);
 }
 .ledger-workspace[data-filter='open'][data-panel='open'] {
-  grid-template-columns: 220px minmax(0, 1fr) clamp(320px, 30vw, 410px);
+  grid-template-columns: 220px minmax(0, 1fr) var(--ledger-panel-w-filter);
 }
 .ledger-workspace__filter {
   min-width: 0;

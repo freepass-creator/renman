@@ -36,7 +36,7 @@ export function LedgerFrame<R>({
   onRowMouseDown, onRowClickEvent, onRowContextMenu,
   onView, mobileCard,
   selectionBar,
-  detail, sidePanel, filterPanel,
+  detail, sidePanel, filterPanel, panelWide,
   icon,
 }: {
   title: string;
@@ -88,6 +88,8 @@ export function LedgerFrame<R>({
   selectionBar?: ReactNode;
   detail?: ReactNode;
   sidePanel?: ReactNode;
+  /** 섹션 안에 «표»가 들어가는 원장(계좌·이력 등)만 상세패널을 넓힌다. 기본 폭은 KV 신원표 기준. */
+  panelWide?: boolean;
   filterPanel?: ReactNode;
   /** 타이틀 nav 아이콘. 생략=경로 자동(lib/nav). false=숨김. */
   icon?: LucideIcon | false;
@@ -181,6 +183,7 @@ export function LedgerFrame<R>({
         <div
           className="ledger-workspace"
           data-panel={sidePanel != null ? 'open' : 'closed'}
+          data-panel-wide={panelWide ? '1' : undefined}
           data-filter={filterPanel != null ? 'open' : 'closed'}
         >
           {filterPanel != null && (

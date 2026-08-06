@@ -271,6 +271,7 @@ export default function ManagementPage() {
     <LedgerFrame
       title="경영관리"
       meta="법인 원장"
+      panelWide
       right={(
         <LedgerActions aria-label="관리 작업">
           <Btn size="sm" variant="solid" disabled={creating} onClick={() => { void createCompany(); }}>
