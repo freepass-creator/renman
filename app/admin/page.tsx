@@ -3,14 +3,18 @@ import { useSession, roleLabel, DEV_USERS } from '@/lib/session';
 import { companyLabel, COMPANIES } from '@/lib/companies';
 import { AccountAliases } from '@/components/AccountAliases';
 import { CompanyRegistry } from '@/components/CompanyRegistry';
-import { Page, Panel, DetailGrid, DetailEmpty, Btn, C } from '@/components/ui';
+import { Page, Panel, DetailGrid, Btn, C } from '@/components/ui';
 import { WorkbenchBar } from '@/components/WorkbenchBar';
 
 export default function AdminPage() {
   const { companyId, user, isOperator } = useSession();
   const targets = isOperator ? COMPANIES : [companyId];
   return (
-    <Page title="일반관리" meta="법인·직원·거래처 마스터" tools={<WorkbenchBar />}>
+    <Page title="일반관리" meta="관리 법인 · 계좌 약칭" tools={<WorkbenchBar />}>
+      {/* ★이 페이지의 본론은 «관리 법인»이다 — 회사를 세워야 데이터가 붙는다(오픈 1단계).
+          계정 정보·안내문 뒤에 묻혀 있어서 맨 위로 올렸다. */}
+      <CompanyRegistry />
+
       <Panel title="현재 보기">
         <DetailGrid rows={[
           ['보기 법인', companyLabel(companyId)],
@@ -18,8 +22,6 @@ export default function AdminPage() {
           ['권한', isOperator ? '본사 — 전 법인 합본·전환' : `법인 소속 — ${companyLabel(companyId)} 만 표시`],
         ]} />
       </Panel>
-
-      <CompanyRegistry />
 
       <Panel title="법인 정보">
         <div style={{ padding: '12px 16px', fontSize: 12.5, color: C.mute, lineHeight: 1.7 }}>
@@ -41,9 +43,6 @@ export default function AdminPage() {
         </Panel>
       )}
 
-      <Panel title="거래처">
-        <DetailEmpty>거래처(정비·보험·GPS·매입처) 마스터는 엔티티 추가 예정.</DetailEmpty>
-      </Panel>
     </Page>
   );
 }
