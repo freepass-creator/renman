@@ -399,9 +399,9 @@ export default function ManagementPage() {
           id: r.id || `gr_${r.address}`, name: r.name || '', address: r.address,
           capacity: r.capacity ? Number(r.capacity) : undefined,
         })),
-        cards: keep('cards', 'cardLast4'),
+        cards: keep('cards', 'cardMask'),
         autoTransfers: keep('autoTransfers', 'cmsId'),
-        cardTerminals: keep('cardTerminals', 'terminalId'),
+        cardTerminals: keep('cardTerminals', 'settleMethod'),
       } as CompanyMasterInput);
       // 새 계좌 — 계좌번호가 매칭 키다. 비어 있으면 만들지 않는다(영영 안 맞는 계좌가 된다).
       const fresh = newAccounts.filter((r) => String(r.accountNumber || '').trim());
@@ -626,11 +626,11 @@ export default function ManagementPage() {
               /* ★계좌 말고도 «돈이 들어오고 나가는 통로»가 셋 더 있다(jpkerp5 모델).
                  각 채널의 ★ 표시 필드가 업로드 거래를 이 회사로 붙이는 매칭 키다. */
               module: 'card', title: '법인카드 (지출)', cols: [], count: chanRows('cards').length || (selectedCo.master.cards?.length ?? 0),
-              body: <ChannelSec editing={editing} matchKey="cardLast4"
+              body: <ChannelSec editing={editing} matchKey="cardMask"
                 rows={editing ? chanRows('cards') : ((selectedCo.master.cards ?? []) as unknown as Record<string, string>[])}
                 cols={[
                   { key: 'cardName', label: '카드명' }, { key: 'cardCompany', label: '카드사' },
-                  { key: 'cardLast4', label: '끝 4자리' }, { key: 'holder', label: '명의자' },
+                  { key: 'cardMask', label: '카드번호(명세서 표기 그대로)' }, { key: 'holder', label: '명의자' },
                   { key: 'purpose', label: '용도' },
                 ]}
                 onAdd={() => chanAdd('cards')} onSet={(i, k, v) => chanSet('cards', i, k, v)} onDel={(i) => chanDel('cards', i)} />,
@@ -646,12 +646,13 @@ export default function ManagementPage() {
                 onAdd={() => chanAdd('autoTransfers')} onSet={(i, k, v) => chanSet('autoTransfers', i, k, v)} onDel={(i) => chanDel('autoTransfers', i)} />,
             },
             {
-              module: 'terminal', title: '카드매출 단말기 (수입)', cols: [], count: chanRows('cardTerminals').length || (selectedCo.master.cardTerminals?.length ?? 0),
-              body: <ChannelSec editing={editing} matchKey="terminalId"
+              module: 'terminal', title: '카드매출·PG 정산 (수입)', cols: [], count: chanRows('cardTerminals').length || (selectedCo.master.cardTerminals?.length ?? 0),
+              body: <ChannelSec editing={editing} matchKey="settleMethod"
                 rows={editing ? chanRows('cardTerminals') : ((selectedCo.master.cardTerminals ?? []) as unknown as Record<string, string>[])}
                 cols={[
-                  { key: 'vanProvider', label: 'VAN사' }, { key: 'terminalId', label: '단말기 ID' },
-                  { key: 'merchantNo', label: '가맹점번호' }, { key: 'alias', label: '별명' },
+                  { key: 'pgProvider', label: 'PG·VAN사' }, { key: 'settleMethod', label: '결제수단(정산파일 표기)' },
+                  { key: 'merchantNo', label: '가맹점번호' }, { key: 'terminalId', label: '단말기 ID(있으면)' },
+                  { key: 'alias', label: '별명' },
                 ]}
                 onAdd={() => chanAdd('cardTerminals')} onSet={(i, k, v) => chanSet('cardTerminals', i, k, v)} onDel={(i) => chanDel('cardTerminals', i)} />,
             },

@@ -26,20 +26,55 @@ export type CompanyDoc = {
   fileName?: string; url?: string; uploadedAt?: string; uploadedBy?: string;
 };
 
-/** 법인카드 — 지출. `cardLast4` 가 card_tx 매칭 키(무엇을 채워야 매칭되는지 명확히). */
+/**
+ * 법인카드 — 지출.
+ * ★매칭 키는 `cardMask` = **카드사가 준 마스킹 문자열 원문**이다.
+ *   실파일(신한 25년 이용내역)이 `9410-64**-****-9` 로 온다 — **끝 4자리를 안 준다**.
+ *   카드사마다 가리는 자리가 달라서 «끝 4자리»를 키로 잡으면 영영 안 맞는다.
+ *   원문을 그대로 저장하고 `cardMaskMatches()` 로 비교한다(docs/UPLOAD-FORMATS.md §3).
+ */
 export type CorporateCard = {
-  id: string; cardName?: string; cardCompany?: string; cardLast4?: string;
+  id: string; cardName?: string; cardCompany?: string;
+  cardMask?: string;   // ★ 카드사 표기 원문 (9410-64**-****-9)
+  cardLast4?: string;  // 아는 경우만. 없어도 매칭은 cardMask 로 된다
   holder?: string; purpose?: string;
   /** @deprecated 구 스키마(`{no, alias}`) 호환. 읽기만 하고 새로 쓰지 말 것. */
   no?: string; alias?: string;
 };
+
+/**
+ * 마스킹 카드번호 비교 — 별(*)은 «무엇이든»이다.
+ * 자릿수가 같고, 가려지지 않은 자리가 전부 일치하면 같은 카드로 본다.
+ * `9410-64**-****-9` vs `9410-6412-3456-789` → 자릿수 다름 → false (안전하게 불일치)
+ */
+export function cardMaskMatches(a: string, b: string): boolean {
+  const na = (a || '').replace(/[^0-9*]/g, '');
+  const nb = (b || '').replace(/[^0-9*]/g, '');
+  if (!na || !nb || na.length !== nb.length) return false;
+  for (let i = 0; i < na.length; i++) {
+    if (na[i] === '*' || nb[i] === '*') continue;
+    if (na[i] !== nb[i]) return false;
+  }
+  return true;
+}
 /** 자동이체 CMS — 수입. `cmsId` 가 입금거래 매칭 키. */
 export type AutoTransfer = {
   id: string; providerName?: string; cmsId?: string; alias?: string; purpose?: string;
 };
-/** 카드매출 단말기 — 수입. `terminalId` 가 매칭 키. */
+/**
+ * 카드매출·PG 정산 채널 — 수입.
+ * ⚠ 처음엔 `terminalId`(단말기 ID)를 키로 잡았는데 **실제 정산 파일에 단말기 ID가 없다.**
+ *   `일별정산내역_*.csv` 는 「결제수단(CMS / 카드(비회원)) + 정산일」 단위로만 온다 —
+ *   **단말기 단위가 아니라 PG사 정산 단위**다(docs/UPLOAD-FORMATS.md §3-2).
+ *   그래서 매칭 키는 `settleMethod`(정산 파일의 «결제수단» 표기 원문)다.
+ */
 export type CardTerminal = {
-  id: string; vanProvider?: string; terminalId?: string; merchantNo?: string; alias?: string;
+  id: string;
+  pgProvider?: string;    // PG·VAN 사
+  settleMethod?: string;  // ★ 정산 파일의 «결제수단» 표기 그대로 (CMS / 카드(비회원) …)
+  merchantNo?: string;
+  terminalId?: string;    // 있으면 받되 매칭 키는 아니다
+  alias?: string;
 };
 
 export type CompanyMaster = {
@@ -63,9 +98,9 @@ export type CompanyMaster = {
   /* ★자금 채널 — 단순 마스터가 아니라 «업로드한 거래를 어느 회사로 귀속시킬지» 정하는 매칭 키다.
      이게 없으면 자금을 올려도 회사가 안 붙어 미배정으로 쌓인다(jpkerp5 모델 이식).
      계좌는 renman에 `bank_account` 엔티티가 이미 SSOT라 여기 두지 않는다 — 두 벌 금지. */
-  cards?: CorporateCard[];          // 법인카드(지출) — card_tx 의 cardLast4 로 매칭
-  autoTransfers?: AutoTransfer[];   // 자동이체 CMS(수입) — 입금거래의 cmsId 로 매칭
-  cardTerminals?: CardTerminal[];   // 카드매출 단말기(수입) — terminalId 로 매칭
+  cards?: CorporateCard[];          // 법인카드(지출) — 매칭 키 = cardMask(마스킹 원문)
+  autoTransfers?: AutoTransfer[];   // 자동이체 CMS(수입) — 은행엔 «CMS집금» 총액 1줄, 상세와 1:N 대사
+  cardTerminals?: CardTerminal[];   // 카드매출·PG 정산(수입) — 매칭 키 = settleMethod
   /** 첨부 문서 — 종류에 얽매이지 않고 여러 개(VEHICLE360-SPEC §3-1 과 같은 원칙). */
   documents?: CompanyDoc[];
   registeredCount?: number;          // 관청 등록 대수
@@ -83,14 +118,14 @@ export const MODULE_CATALOG: { key: string; label: string; desc: string; core?: 
   { key: 'garage', label: '차고지', desc: '주소 + 수용대수 (등록대수 요건)' },
   { key: 'vehicleReg', label: '등록대수·증차신청', desc: '등록 대수 / 증차·감차 신청 워크플로우' },
   { key: 'officialDoc', label: '공문 대장', desc: '법인 명의 발신·수신 문서 대장' },
-  { key: 'card', label: '법인카드', desc: '카드사·끝4자리 — 카드 지출거래를 이 회사로 붙이는 키' },
+  { key: 'card', label: '법인카드', desc: '카드사·카드번호 표기 원문 — 카드 지출거래를 이 회사로 붙이는 키' },
   { key: 'license', label: '인허가 증빙', desc: '사업자등록증·대여사업 등록증·정관·등기부 (보관)' },
   /* ★자금 채널·계좌·임대차·문서 — 「필요에 맞춰서 등록」(사장님 확정 2026-08-06, AUDIT §6-2).
      경영관리 법인 패널이 섹션을 고정으로 박고 있었는데, 회사마다 필요한 게 다르다.
      섹션 = 모듈로 통일해 여기서 켜고 끈다. */
   { key: 'account', label: '법인계좌', desc: '은행·계좌번호 — 자금거래를 이 회사로 붙이는 키. 거래 붙으면 신원 잠금' },
-  { key: 'cms', label: '자동이체 CMS', desc: 'CMS 사업자·ID — 입금거래 매칭' },
-  { key: 'terminal', label: '카드매출 단말기', desc: 'VAN사·단말기 ID — 카드매출 매칭' },
+  { key: 'cms', label: '자동이체 CMS', desc: 'CMS 사업자·ID — 은행엔 총액 1줄로 들어온다(상세와 대사)' },
+  { key: 'terminal', label: '카드매출·PG 정산', desc: 'PG사·결제수단 표기 — 정산 입금을 이 회사로 붙이는 키' },
   { key: 'lease', label: '임대차', desc: '사무실·차고지 임대차 계약(임대인·보증금·만기)' },
   { key: 'document', label: '문서', desc: '종류에 얽매이지 않는 첨부 — 등기부·정관·인감 등' },
 ];
