@@ -7,7 +7,7 @@ import { staffDefs, addStaff, updateStaff, removeStaff, setStaffStatus, type Sta
 import { companyDefs, companyLabel } from '@/lib/companies';
 import { Panel, Btn, Input, Select, Badge, C, useConfirm } from '@/components/ui';
 import { apiAuthHeaders } from '@/lib/api-headers';
-import { toast } from '@/lib/toast';
+import { toast, toastError } from '@/lib/toast';
 
 const ROLES: StaffRole[] = ['본사', '법인'];
 
@@ -27,7 +27,7 @@ export function StaffConsole() {
   const add = () => {
     const id = addStaff({ name: nw.name, email: nw.email, role: nw.role, companyId: nw.role === '법인' ? nw.companyId : null, department: nw.department, phone: nw.phone });
     if (id) { setNw({ name: '', email: '', role: '법인', companyId: '', department: '', phone: '' }); rerender(); }
-    else window.alert('이름·이메일을 확인하세요(이메일 중복 불가).');
+    else toastError('이름·이메일을 확인하세요(이메일 중복 불가).');
   };
 
   /**

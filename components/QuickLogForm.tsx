@@ -5,6 +5,7 @@ import { saveIntake } from '@/lib/intake';
 import { resolveWriteCompany, NEED_COMPANY } from '@/lib/scope';
 import { Btn, Checkbox, Input, TextArea, PillTabs, C } from '@/components/ui';
 import { todayKST } from '@/lib/contracts/dates'; // KST 기준 오늘
+import { toastError } from '@/lib/toast'; // 손롤 alert 금지 — 공용 토스트로 통일(confirm.tsx 원칙)
 
 export type QuickLogCtx = { plate?: string; customer?: string; contractNo?: string; companyId?: string };
 
@@ -39,7 +40,7 @@ export function QuickLogForm({ ctx, onDone, onCancel, autoFocus = true, style }:
 
   async function save() {
     if (!text.trim()) return;
-    if (!target) { window.alert(NEED_COMPANY); return; }
+    if (!target) { toastError(NEED_COMPANY); return; }
     setSaving(true);
     try {
       await saveIntake('history', target, [{

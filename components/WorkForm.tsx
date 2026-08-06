@@ -15,6 +15,7 @@ import { Btn, Badge, Input, TextArea, Select, PillTabs, ToggleChips, C, ctrlH, c
 import { todayKST } from '@/lib/contracts/dates'; // KST 기준 오늘
 import { useIsMobile } from '@/lib/use-mobile';
 import { UploadCloud } from 'lucide-react';
+import { toastError } from '@/lib/toast'; // 손롤 alert 금지 — 공용 토스트로 통일(confirm.tsx 원칙)
 
 /** 수선 폼의 작업구분별 필드 정의(jpkerp4 상품화센터 이식). wide=한 줄 전체(메모/경위). */
 type WF = { key: string; label: string; type: 'text' | 'number' | 'date' | 'select'; options?: string[]; wide?: boolean };
@@ -142,7 +143,7 @@ export function WorkForm({ plate, companyId, vehicle, idle, onDone, onCancel, st
 
   async function save() {
     if (saving) return;
-    if (!target) { window.alert(NEED_COMPANY); return; }
+    if (!target) { toastError(NEED_COMPANY); return; }
     setSaving(true);
     try {
       // 첨부(선택) — Storage 업로드 실패/미설정이면 url '' 로 미첨부 기록(InfoDoc·과태료와 동일 관대 처리).
