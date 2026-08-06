@@ -34,13 +34,15 @@ export type FleetRow = {
   // 보험
   insurer: string; insEnd: string; insPremium: number;
   // 미수
-  /** 차량에 연결된 전체 미수. 현재 계약자 미수로 오인하지 않도록 화면에서는 maintainedNet/endedNet을 함께 표시한다. */
+  /** 차량에 연결된 전체 미수(유지+종료). 운영현황에는 쓰지 않는다 — 계약관리·리스크용. */
   net: number;
-  /** 반납·해지되지 않은 계약에서 발생한 미수. */
+  /** ★이 행이 보여주는 **그 계약**의 미수(displayContract 기준). 행의 계약자·조건과 같은 계약이다. */
   maintainedNet: number;
-  /** 반납·해지된 계약에 남은 채권. */
+  /** 반납·해지된 계약에 남은 채권. 운영현황 밖(계약관리·리스크)에서 쓴다. */
   endedNet: number;
-  /** 차량 기준 현재 계약 관계. 미수의 출처 구분은 maintainedNet/endedNet이 담당한다. */
+  /** 유지중 계약 수. 2 이상이면 행의 미수가 «그중 한 건»임을 화면이 알려야 한다(+N). */
+  activeContractCount: number;
+  /** 차량 기준 현재 계약 관계. 미수는 계약에 붙으므로 유지/종료 구분은 **이 분류값**이 한다. */
   contractState: '계약유지' | '계약예정' | '계약종료' | '계약없음';
   overdueDays: number;
   /** 차량에 연결된 미수 계약 중 계약조건상 가장 강한 현재 조치. */
@@ -77,9 +79,18 @@ export function buildFleetRows(vehicles: VehicleNode[], insurance: EntityRecord[
     const pending = [...plateContracts].reverse().find((c) => c.phase === '대기') ?? null;
     const displayContract = active ?? pending;
     const v = displayContract?.view;
-    const maintainedNet = plateContracts.reduce((s, c) => c.phase !== '종료' ? s + Math.max(0, c.net) : s, 0);
+    /* ★미수는 계약에 붙는다(사장님 확정 2026-08-06). 이 행은 이미 계약 하나(displayContract)를
+       골라 계약자·조건을 보여준다 — 그러면 **미수도 그 계약 것**이어야 앞뒤가 맞는다.
+       종전엔 번호판의 유지계약을 전부 합산해서 «계약자는 A인데 미수는 A+B 합»이 됐다.
+       재렌트로 계약이 갈린 차에서 행이 거짓말을 한다.
+       유지계약이 둘 이상이면 합치지 않고 건수(activeContractCount)로 알린다 — 파고드는 건 계약관리에서. */
+    const activeContracts = plateContracts.filter((c) => c.phase !== '종료');
+    const activeContractCount = activeContracts.length;
+    const maintainedNet = displayContract && displayContract.phase !== '종료'
+      ? Math.max(0, displayContract.net)
+      : 0;
     const endedNet = plateContracts.reduce((s, c) => c.phase === '종료' ? s + Math.max(0, c.net) : s, 0);
-    const net = maintainedNet + endedNet;
+    const net = activeContracts.reduce((s, c) => s + Math.max(0, c.net), 0) + endedNet;
     const contractState: FleetRow['contractState'] = active
       ? '계약유지'
       : pending ? '계약예정'
@@ -129,7 +140,7 @@ export function buildFleetRows(vehicles: VehicleNode[], insurance: EntityRecord[
       insurer: String(ins?.insurer || ''),
       insEnd: String(ins?.endDate || ''),
       insPremium: Number(ins?.totalPremium) || 0,
-      net, maintainedNet, endedNet, contractState, overdueDays, collectionInfo,
+      net, maintainedNet, endedNet, activeContractCount, contractState, overdueDays, collectionInfo,
       warnings: rowWarnings({
         held: asset.ownership !== '처분완료' && asset.status !== '차량없음',
         active: !!active, contractRec: displayContract?.view.rec ?? null, veh,

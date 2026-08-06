@@ -93,9 +93,21 @@ const FL = {
     render: (r) => r.net > 0 ? <span style={{ color: C.danger, fontWeight: 700 }}>{money0(r.net)}</span> : LEDGER_EMPTY.dash,
     text: (r) => r.net,
   },
+  /* 미수는 계약에 붙는다(사장님 확정 2026-08-06). 운영현황은 계약유지 건만 보므로
+     「계약유지 미수」라고 수식할 필요가 없다 — 그냥 「미수」다. 유지/종료 구분은 「계약상태」 열이 한다.
+     행이 고른 그 계약의 미수만 보여주고, 유지계약이 둘 이상이면 «+N» 으로 알린다(합치지 않는다). */
   maintainedNet: {
-    key: 'maintainedNet', label: '계약유지 미수', align: 'r', priority: 1 as const, sortNum: true, xf: 'money' as const,
-    render: (r) => r.maintainedNet > 0 ? <span style={{ color: C.danger, fontWeight: 700 }}>{money0(r.maintainedNet)}</span> : LEDGER_EMPTY.dash,
+    key: 'maintainedNet', label: '미수', align: 'r', priority: 1 as const, sortNum: true, xf: 'money' as const,
+    render: (r) => (r.maintainedNet > 0
+      ? (
+        <span style={{ color: C.danger, fontWeight: 700 }}>
+          {money0(r.maintainedNet)}
+          {r.activeContractCount > 1
+            ? <span style={{ marginLeft: 4, fontSize: 10.5, color: C.mute, fontWeight: 600 }}>+{r.activeContractCount - 1}</span>
+            : null}
+        </span>
+      )
+      : LEDGER_EMPTY.dash),
     text: (r) => r.maintainedNet,
   },
   endedNet: {

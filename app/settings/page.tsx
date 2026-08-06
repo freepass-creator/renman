@@ -2,7 +2,7 @@
 // 설정 = 통상 앱 설정 스타일(그룹 헤더 + ListBox 행 · 탭하면 펼침).
 import { useEffect, useState, type ReactNode } from 'react';
 import {
-  KeyRound, Download, Trash2, Building2, FileText,
+  KeyRound, Download, Trash2, Building2, FileText, LogOut,
   ShieldAlert, History, BarChart3, Wrench, Settings2, ChevronRight, ChevronDown,
 } from 'lucide-react';
 import { useSession, roleLabel } from '@/lib/session';
@@ -14,7 +14,6 @@ import { downloadCsv } from '@/lib/export-csv';
 import { todayKST } from '@/lib/contracts/dates'; // KST 기준 오늘(내보내기 파일명)
 import { Page, Panel, ListBox, ListRow, Btn, C, SPACE_M, useConfirm, usePrompt } from '@/components/ui';
 import { NAV_GROUPS } from '@/lib/nav';
-import { WorkbenchBar } from '@/components/WorkbenchBar';
 import { closePeriod, reopenPeriod, useClosedPeriods } from '@/lib/finance/period-lock';
 import { MobileTabsSettings, useMobileTabs } from '@/lib/mobile-tabs';
 import { toast } from '@/lib/toast';
@@ -101,7 +100,7 @@ function ClosingBody({ companyId, actor }: { companyId: string; actor: string })
 }
 
 export default function SettingsPage() {
-  const { user, companyId, scopeAll, isOperator } = useSession();
+  const { user, companyId, scopeAll, isOperator, logout } = useSession();
   const { ids: tabIds } = useMobileTabs();
   const confirm = useConfirm();
   const [msg, setMsg] = useState('');
@@ -121,6 +120,16 @@ export default function SettingsPage() {
   }, []);
   const pickLanding = (href: string) => { setLanding(href); try { localStorage.setItem('jpk:landing', href === '/' ? 'home' : href); sessionStorage.removeItem('jpk:landed'); } catch { /* 무시 */ } };
   const toggle = (k: OpenKey) => setOpen((cur) => (cur === k ? null : k));
+
+  async function doLogout() {
+    if (!(await confirm({
+      title: '로그아웃',
+      message: '이 계정에서 로그아웃합니까?',
+      confirmLabel: '로그아웃',
+      danger: true,
+    }))) return;
+    logout();
+  }
 
   async function sendReset() {
     if (!user.email) return;
@@ -158,7 +167,7 @@ export default function SettingsPage() {
   const landingLabel = landingItems.find((it) => it.href === landing)?.label || '대시보드';
 
   return (
-    <Page title="설정" meta={`${user.name} · ${roleLabel(user.role)}`} tools={<WorkbenchBar />} noCompany>
+    <Page title="설정" meta={`${user.name} · ${roleLabel(user.role)}`} noCompany>
       <Panel title="계정">
         <ListBox>
           <ListRow main="이름" right={<span style={{ fontSize: 12.5, color: C.mute }}>{user.name}</span>} />
@@ -166,6 +175,12 @@ export default function SettingsPage() {
           <ListRow main="역할" right={<span style={{ fontSize: 12.5, color: C.mute }}>{roleLabel(user.role)}</span>} />
           <ListRow main="보기 범위" right={<span style={{ fontSize: 12.5, color: C.mute }}>{scopeAll ? '전체 법인' : companyLabel(companyId)}</span>} />
           <ListRow main="소속" sub={isOperator ? '본사 — 전 법인 관리·전환' : `법인 고정 · ${companyLabel(user.companyId)}`} />
+          <ListRow
+            main="로그아웃"
+            sub="이 기기에서 세션 종료"
+            right={<LogOut size={15} color={C.faint} />}
+            onClick={() => { void doLogout(); }}
+          />
         </ListBox>
       </Panel>
 

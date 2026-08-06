@@ -81,13 +81,13 @@ export function MonthCalendar({
     }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, paddingBottom: 8 }}>
         <Btn size="sm" variant="ghost" iconOnly tip="이전 달" onClick={() => onYm(ymAdd(ym, -1))}>
-          <ChevronLeft size={14} />
+          <ChevronLeft size={14} strokeWidth={2.2} />
         </Btn>
         <span style={{ fontSize: 13, fontWeight: 800, color: C.ink, fontFamily: NUM, minWidth: 76, textAlign: 'center' }}>
           {year}년 {month}월
         </span>
         <Btn size="sm" variant="ghost" iconOnly tip="다음 달" onClick={() => onYm(ymAdd(ym, 1))}>
-          <ChevronRight size={14} />
+          <ChevronRight size={14} strokeWidth={2.2} />
         </Btn>
         {ym !== today.slice(0, 7) && (
           <Btn size="sm" variant="ghost" onClick={() => onYm(today.slice(0, 7))}>이번달</Btn>

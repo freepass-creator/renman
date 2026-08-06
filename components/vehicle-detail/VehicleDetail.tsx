@@ -1,5 +1,6 @@
 'use client';
 import type { CSSProperties, ReactNode } from 'react';
+import { ChevronRight } from 'lucide-react';
 import {
   Sec, Cards, Metric, ObjCard, ActionMenu, Btn, TextLink, Badge, KV, EmptyState, Message, Input, Select,
   SectionLabel, Disclosure, th, thR, td, tdR, won, C, SH, PageLoading, SPACE_GROUP_M, type KVRow,
@@ -81,7 +82,7 @@ export function VehicleDetail({ plate, focus, embed, companyId: targetCompanyId 
                 style={{ display: 'inline-flex', alignItems: 'center', gap: 7, border: 'none', background: 'transparent', padding: '4px 4px', cursor: it.go ? 'pointer' : 'default', WebkitTapHighlightColor: 'transparent' }}>
                 <Badge tone={it.tone === 'red' ? 'red' : it.tone === 'amber' ? 'amber' : 'gray'}>{it.label}</Badge>
                 <span style={{ fontSize: 12, color: C.mute }}>{it.detail}</span>
-                {it.go && <span style={{ fontSize: 12.5, color: C.faint, fontWeight: 700 }}>›</span>}
+                {it.go && <ChevronRight size={14} strokeWidth={2.2} aria-hidden style={{ flexShrink: 0, color: C.faint }} />}
               </button>
             ))}
           </div>

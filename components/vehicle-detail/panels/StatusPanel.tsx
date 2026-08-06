@@ -1,5 +1,6 @@
 'use client';
 import type { ReactNode } from 'react';
+import { ChevronRight } from 'lucide-react';
 import { Sec, Cards, Metric, Btn, KV, EmptyState, SectionLabel, Input, Select, Badge, won, C, type KVRow } from '@/components/ui';
 import { docHistory } from '@/lib/docs';
 import { effectiveEndDate } from '@/lib/contract-ops';
@@ -175,7 +176,7 @@ export function StatusPanel({ plate, vd }: PanelProps) {
         <span style={{ flex: 1 }} />
         <Btn size="sm" onClick={() => setRecMode(recMode === 'pay' ? null : 'pay')}>+ 입금</Btn>
         <Btn size="sm" variant="ghost" onClick={() => setRecMode(recMode === 'disc' ? null : 'disc')}>할인</Btn>
-        <Btn size="sm" variant="ghost" onClick={() => goSec('v-schedule')}>전체 ›</Btn>
+        <Btn size="sm" variant="ghost" onClick={() => goSec('v-schedule')}>전체 <ChevronRight size={14} strokeWidth={2.2} aria-hidden /></Btn>
       </div>
       {payInline}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
