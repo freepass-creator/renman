@@ -93,7 +93,8 @@ function Panel({ title, desc, children }: { title: string; desc: string; childre
         <div style={{ fontSize: 13.5, fontWeight: 800, color: C.ink }}>{title}</div>
         <div style={{ fontSize: 11.5, color: C.mute, marginTop: 3 }}>{desc}</div>
       </div>
-      <div style={{ flex: 1, minHeight: 0, padding: 12 }}>{children}</div>
+      {/* 스크롤은 패널 안에서만 — 화면(프레임)은 넘치지 않는다. */}
+      <div style={{ flex: 1, minHeight: 0, padding: 12, overflow: 'auto' }}>{children}</div>
     </section>
   );
 }
@@ -298,16 +299,22 @@ export default function DashboardPage() {
         </section>
       )}
       body={(
-        // 원장 시트와 동일: 워크스페이스 폭 그대로 · 상단 0(패널과 정렬) · 간격 12 통일
+        /* 원장 시트와 동일: 워크스페이스 폭 그대로 · 상단 0(패널과 정렬) · 간격 12 통일.
+           ★데스크톱은 «화면 한 판» — 프레임 높이를 그대로 채우고 페이지 스크롤을 만들지 않는다.
+             남는 높이는 아래 2분할(달력·현금흐름)이 먹고, 넘치는 내용은 각 패널 안에서 스크롤한다.
+             모바일은 세로로 쌓이므로 한 판에 넣지 않는다(자연 높이 + 스크롤). */
         <div style={{
           display: 'flex', flexDirection: 'column', gap: 12,
-          padding: mobile ? '0 0 24px' : '0 0 28px',
+          ...(mobile
+            ? { padding: '0 0 24px' }
+            : { flex: '1 1 auto', minHeight: 0, overflow: 'hidden' }),
         }}>
           {/* ★조회 실패를 지표 «0»으로 위장하지 않는다 — 거짓 안심 방지(QA 중요). */}
           {loadError ? <ErrorState variant="sec" message={`${loadError} — 아래 지표는 불완전합니다`} /> : null}
           <div style={{
             ...gridKpi,
             gridTemplateColumns: mobile ? 'repeat(2, minmax(0, 1fr))' : 'repeat(5, minmax(0, 1fr))',
+            flexShrink: 0,
           }}>
             <KpiTile
               label="보유"
@@ -354,12 +361,13 @@ export default function DashboardPage() {
             display: 'grid',
             gridTemplateColumns: mobile ? '1fr' : 'minmax(0, 3fr) minmax(280px, 2fr)',
             gap: 12,
+            ...(mobile ? {} : { flex: '1 1 auto', minHeight: 0 }),
           }}>
             <Panel title="일정 달력" desc="반납·만기 · 검사 · 보험 · 세금 · 과태료 — 어젠다 SSOT · 항목 클릭=해당 원장">
               {loading || planLoading ? (
                 <PageLoading />
               ) : (
-                <MonthCalendar ym={calYm} onYm={setCalYm} today={TODAY} items={calendarItems} />
+                <MonthCalendar ym={calYm} onYm={setCalYm} today={TODAY} items={calendarItems} fill={!mobile} />
               )}
             </Panel>
 
