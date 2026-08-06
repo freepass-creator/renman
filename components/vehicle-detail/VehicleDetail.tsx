@@ -2,7 +2,7 @@
 import type { CSSProperties, ReactNode } from 'react';
 import { ChevronRight } from 'lucide-react';
 import {
-  Sec, ActionMenu, Btn, TextLink, Badge, KV, EmptyState, Message, Input, Select,
+  ActionMenu, Btn, TextLink, Badge, KV, EmptyState, Message, Input, Select,
   SectionLabel, Disclosure, th, thR, td, tdR, won, C, SH, PageLoading, SPACE_GROUP_M, type KVRow,
 } from '@/components/ui';
 import { InfoDoc } from '@/components/InfoDoc';
@@ -30,6 +30,35 @@ function PrintMenu({ items }: { items: { label: string; run: () => void }[] }) {
   if (!items.length) return null;
   if (items.length === 1) return <Btn size="sm" variant="ghost" onClick={items[0].run}>{items[0].label}</Btn>;
   return <ActionMenu label="출력" menuLabel="출력 문서 선택" items={items.map((item) => ({ key: item.label, label: item.label, onClick: item.run }))} />;
+}
+
+/**
+ * 차량360 섹션 = **원장 우측 상세패널과 같은 껍데기**(사장님 확정 2026-08-06).
+ *   `details.ledger-record-panel__section` + 셰브론 + 건수 배지 — LedgerRecordPanel 이 쓰는 그 마크업이다.
+ *   `Sec`(눈 아이콘·드래그·그룹라벨)은 원장 페이지용이라 상세 화면에는 쓰지 않는다.
+ * 섹션별 액션(수정·서류 등록·+기록…)은 제목줄 오른쪽에 그대로 둔다 — 여기서만 할 수 있는 일이라 숨기면 안 된다.
+ */
+function PanelSec({
+  id, title, desc, n, right, tone, open = false, children,
+}: {
+  id?: string; title: ReactNode; desc?: ReactNode; n?: number;
+  right?: ReactNode; /** 'ok'=편집 중 등 상태 강조. 제목 색으로만(박스·틴트 금지). */ tone?: string;
+  open?: boolean; children: ReactNode;
+}) {
+  return (
+    <details id={id} className="ledger-record-panel__section" open={open || tone === 'ok'}>
+      <summary>
+        <ChevronRight className="ledger-record-panel__chevron" size={14} aria-hidden="true" />
+        <span style={{ fontWeight: 800, color: tone === 'ok' ? C.accent : C.ink }}>{title}</span>
+        {desc ? <span style={{ marginLeft: 6, fontSize: 11, color: C.faint, fontWeight: 400 }}>{desc}</span> : null}
+        {n != null ? <span className="ledger-record-panel__count">{n}건</span> : null}
+      </summary>
+      {right ? (
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 6, padding: '0 12px 8px' }}>{right}</div>
+      ) : null}
+      <div style={{ padding: '0 12px 12px' }}>{children}</div>
+    </details>
+  );
 }
 
 const fLab: CSSProperties = { display: 'flex', flexDirection: 'column', gap: 3 };
@@ -164,8 +193,8 @@ export function VehicleDetail({ plate, focus, embed, companyId: targetCompanyId 
 
       {/* ── 지금 ── */}
       <div>
-        <SectionLabel mt={4}>지금</SectionLabel>
-        <Sec id="v-status" title="현황" desc="한눈 요약 · 계약 조건"
+        
+        <PanelSec id="v-status" title="현황" desc="한눈 요약 · 계약 조건"
           right={active
             ? <span style={{ display: 'inline-flex', gap: 6 }}><Btn variant="ghost" size="sm" onClick={() => openPrintDoc('contract', plate)}>계약서 출력</Btn><Add type="contract" plate={plate} label="수정" /></span>
             : <Add type="contract" plate={plate} label="+ 계약" />}>
@@ -254,10 +283,10 @@ export function VehicleDetail({ plate, focus, embed, companyId: targetCompanyId 
               <EmptyState variant="sec">진행 중 계약 없음 · “+ 계약” 버튼으로 담기</EmptyState>
             </div>
           )}
-        </Sec>
+        </PanelSec>
 
         {v && (v.gpsDeviceId || v.gpsProvider) ? (
-          <Sec id="v-gps" title="GPS · 관제" desc="미납 원격 시동제어 연동" right={active ? <span style={{ display: 'inline-flex', gap: 6 }}><Btn size="sm" variant="danger" onClick={() => logIgnition('제어')} disabled={engineLocked}>시동 제어</Btn><Btn size="sm" variant="ghost" onClick={() => logIgnition('해제')} disabled={!engineLocked}>시동 해제</Btn></span> : null}>
+          <PanelSec id="v-gps" title="GPS · 관제" desc="미납 원격 시동제어 연동" right={active ? <span style={{ display: 'inline-flex', gap: 6 }}><Btn size="sm" variant="danger" onClick={() => logIgnition('제어')} disabled={engineLocked}>시동 제어</Btn><Btn size="sm" variant="ghost" onClick={() => logIgnition('해제')} disabled={!engineLocked}>시동 해제</Btn></span> : null}>
             <KV rows={[
               ['공급사', null, String(v.gpsProvider ?? '')],
               ['단말번호', null, String(v.gpsDeviceId ?? '')],
@@ -265,16 +294,16 @@ export function VehicleDetail({ plate, focus, embed, companyId: targetCompanyId 
               ['장비 시동제어', null, String(v.gpsControl ?? '—')],
               ['계약 시동제어', null, engineLocked ? `적용중 (${String(active?.engineDisabledAt || '').slice(0, 10)})` : '—'],
             ] as [string, string | null, ReactNode][]} />
-          </Sec>
+          </PanelSec>
         ) : null}
       </div>
 
       {/* ── 이 차 ── */}
       <div>
-        <SectionLabel>이 차</SectionLabel>
+        
         {!v && <Message variant="warning">등록증이 아직 안 들어왔습니다. 계약·보험·과태료만 표시. <b>정보 담기</b>로 등록하세요.</Message>}
 
-        <Sec id="v-info" title={editInfo ? '차량 정보 · 편집 중' : '차량 정보'} tone={editInfo ? 'ok' : undefined} desc="제조사 제공 — 5단계·선택옵션·색상" right={
+        <PanelSec id="v-info" title={editInfo ? '차량 정보 · 편집 중' : '차량 정보'} tone={editInfo ? 'ok' : undefined} desc="제조사 제공 — 5단계·선택옵션·색상" right={
           editInfo
             ? <span style={{ fontSize: 11.5, color: C.faint }}>함께 편집 중</span>
             : <Btn variant="ghost" onClick={startEdit}>{v ? '수정' : '+ 등록'}</Btn>
@@ -293,7 +322,7 @@ export function VehicleDetail({ plate, focus, embed, companyId: targetCompanyId 
                 ['변속기', 'transmission', String(v?.transmission ?? '')],
               ] as KVRow[]} />
             : <EmptyState variant="sec">차량 미등록</EmptyState>}
-        </Sec>
+        </PanelSec>
 
         <InfoDoc id="v-reg" title="등록증" desc="자동차등록증상 정보 그대로 · 원본과 한 몸"
           editing={editInfo} hideSaveCancel form={form} onChange={chg}
@@ -378,7 +407,7 @@ export function VehicleDetail({ plate, focus, embed, companyId: targetCompanyId 
           </div> : null}
         </>
 
-        {(v || editInfo) ? <Sec id="v-purchase" title="취득 · 구입" desc="소비자가·개소세 · 취득·매입 · 할부" tone={editInfo ? 'ok' : undefined} right={
+        {(v || editInfo) ? <PanelSec id="v-purchase" title="취득 · 구입" desc="소비자가·개소세 · 취득·매입 · 할부" tone={editInfo ? 'ok' : undefined} right={
           editInfo
             ? <span style={{ fontSize: 11.5, color: C.faint }}>함께 편집 중</span>
             : <Btn variant="ghost" onClick={startEdit}>수정</Btn>
@@ -427,9 +456,9 @@ export function VehicleDetail({ plate, focus, embed, companyId: targetCompanyId 
               </Disclosure>
             </div>
           ) : null}
-        </Sec> : null}
+        </PanelSec> : null}
 
-        {(v || editInfo) ? <Sec id="v-product" title="상품 정보" desc="대여료·보증금·보험 — 프리패스 매물 등록" tone={editInfo ? 'ok' : undefined} right={
+        {(v || editInfo) ? <PanelSec id="v-product" title="상품 정보" desc="대여료·보증금·보험 — 프리패스 매물 등록" tone={editInfo ? 'ok' : undefined} right={
           editInfo ? <span style={{ fontSize: 11.5, color: C.faint }}>함께 편집 중</span> : <Btn variant="ghost" onClick={startEdit}>수정</Btn>
         }>
           <KV editing={editInfo} form={form} onChange={chg} rows={[
@@ -442,9 +471,9 @@ export function VehicleDetail({ plate, focus, embed, companyId: targetCompanyId 
             <Btn onClick={registerProduct} disabled={prodBusy || !v}>{prodBusy ? '등록 중…' : '프리패스 상품 등록'}</Btn>
             <span style={{ fontSize: 11.5, color: C.faint }}>{isProductReady(v) ? '상태 상품대기 — 저장 시 자동 등록' : '상태를 «상품대기»로 두면 자동 등록'}</span>
           </div>
-        </Sec> : null}
+        </PanelSec> : null}
 
-        {econ ? <Sec id="v-econ" title="자산 손익" desc="이 차가 벌어온 돈 · 회수율">
+        {econ ? <PanelSec id="v-econ" title="자산 손익" desc="이 차가 벌어온 돈 · 회수율">
           <KV rows={[
             ['수입(수금)', '', won(econ.revenue)],
             ['감가', '', won(econ.depreciation)],
@@ -455,14 +484,14 @@ export function VehicleDetail({ plate, focus, embed, companyId: targetCompanyId 
             ...(econ.acquisition ? ([['회수율', '', `${Math.round(econ.recoveryRate * 100)}%`]] as KVRow[]) : []),
             ...(econ.bookValue != null ? ([['장부가', '', won(econ.bookValue)]] as KVRow[]) : []),
           ] as KVRow[]} />
-        </Sec> : null}
+        </PanelSec> : null}
       </div>
 
       {/* ── 수납 · 정산 ── */}
       <div>
-        <SectionLabel>수납 · 정산</SectionLabel>
+        
 
-        {(active || pastContracts.length > 0) ? <Sec id="v-schedule" title="수납 스케줄" n={active ? schedule.length : pastContracts.length} desc={active ? '회차별 청구·미납 · 미수관리' : '이전 계약 수납 이력'}
+        {(active || pastContracts.length > 0) ? <PanelSec id="v-schedule" title="수납 스케줄" n={active ? schedule.length : pastContracts.length} desc={active ? '회차별 청구·미납 · 미수관리' : '이전 계약 수납 이력'}
           right={active ? <span style={{ display: 'inline-flex', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
             <Btn onClick={() => setRecMode(recMode === 'pay' ? null : 'pay')}>+ 입금</Btn>
             <Btn variant="ghost" onClick={() => setRecMode(recMode === 'disc' ? null : 'disc')}>+ 청구할인</Btn>
@@ -532,9 +561,9 @@ export function VehicleDetail({ plate, focus, embed, companyId: targetCompanyId 
               </div>
             </div>
           ) : null}
-        </Sec> : null}
+        </PanelSec> : null}
 
-        {pendDeposit ? <Sec id="v-deposit" title="보증금 정산" n={1} tone="warn" desc={`${String(pendDeposit.c.contractorName || '')} · 반납 ${String(pendDeposit.c.returnedDate || '')} · 미정산`}
+        {pendDeposit ? <PanelSec id="v-deposit" title="보증금 정산" n={1} tone="warn" desc={`${String(pendDeposit.c.contractorName || '')} · 반납 ${String(pendDeposit.c.returnedDate || '')} · 미정산`}
           right={<span style={{ display: 'inline-flex', gap: 6 }}><Btn size="sm" variant="ghost" onClick={() => openPrintDoc('settlement', plate)}>정산서</Btn><Btn size="sm" onClick={settleDeposit}>보증금 반환 처리</Btn></span>}>
           <KV rows={[
             ['예치 보증금', '', won(pendDeposit.d.deposit)],
@@ -544,9 +573,9 @@ export function VehicleDetail({ plate, focus, embed, companyId: targetCompanyId 
               ? ['추가 청구액', '', won(pendDeposit.d.addCharge)] as KVRow
               : ['반환액', '', won(pendDeposit.d.refund)] as KVRow,
           ] as KVRow[]} />
-        </Sec> : null}
+        </PanelSec> : null}
 
-        {hist.count > 0 ? <Sec id="v-handover" title="손바뀜 이력" n={hist.count}
+        {hist.count > 0 ? <PanelSec id="v-handover" title="손바뀜 이력" n={hist.count}
           desc={hist.count >= 2 ? `${hist.count}손 · 첫 ${won(hist.firstRent)} → 현재 ${won(hist.lastRent)}${hist.totalDropPct > 0 ? ` · 누적 ${hist.totalDropPct}%↓` : ''}` : '첫 대여 · 손바뀜 없음'}
           right={hist.count > 1 ? <a href={`/contract-history?plate=${encodeURIComponent(plate)}`} style={{ fontSize: 11.5, color: C.accent, fontWeight: 700, textDecoration: 'none' }}>계약이력 →</a> : undefined}>
           {!active && reco ? <div style={{ marginBottom: 12, padding: '12px 14px', border: `1px solid ${C.accent}`, borderRadius: 'var(--radius)', background: 'var(--bg-card)' }}>
@@ -582,14 +611,14 @@ export function VehicleDetail({ plate, focus, embed, companyId: targetCompanyId 
               </tbody>
             </table>
           </div>
-        </Sec> : null}
+        </PanelSec> : null}
       </div>
 
       {/* ── 이력 ── */}
       <div>
-        <SectionLabel>이력</SectionLabel>
+        
 
-        <Sec id="v-penalty" title="과태료 · 변경부과" n={penalties.length} right={<span style={{ display: 'inline-flex', gap: 6 }}>{penalties.length ? <Btn size="sm" variant="ghost" onClick={() => openPrintDoc('penalty', plate)}>변경부과 공문</Btn> : null}<Add type="penalty" plate={plate} label="+ 추가" /></span>}>
+        <PanelSec id="v-penalty" title="과태료 · 변경부과" n={penalties.length} right={<span style={{ display: 'inline-flex', gap: 6 }}>{penalties.length ? <Btn size="sm" variant="ghost" onClick={() => openPrintDoc('penalty', plate)}>변경부과 공문</Btn> : null}<Add type="penalty" plate={plate} label="+ 추가" /></span>}>
           {penalties.length ? <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', whiteSpace: 'nowrap' }}>
               <thead><tr>
@@ -624,9 +653,9 @@ export function VehicleDetail({ plate, focus, embed, companyId: targetCompanyId 
               </tbody>
             </table>
           </div> : <EmptyState variant="sec">과태료 없음</EmptyState>}
-        </Sec>
+        </PanelSec>
 
-        <Sec id="v-work" title="차량 수선 · 정비·사고" n={workList.length} tone={workOpen ? 'ok' : undefined}
+        <PanelSec id="v-work" title="차량 수선 · 정비·사고" n={workList.length} tone={workOpen ? 'ok' : undefined}
           desc="정비·사고수리·상품화·세차 — 휴차는 작업상태가 휴차 워크벤치에 자동 반영"
           right={<Btn size="sm" variant="ghost" onClick={() => setWorkOpen((o) => !o)}>{workOpen ? '닫기' : '+ 수선/작업'}</Btn>}>
           {workOpen ? <WorkForm plate={plate} companyId={target} vehicle={v} idle={!active} onDone={() => setWorkOpen(false)} onCancel={() => setWorkOpen(false)} style={{ marginBottom: 12 }} /> : null}
@@ -662,9 +691,9 @@ export function VehicleDetail({ plate, focus, embed, companyId: targetCompanyId 
               </tbody>
             </table>
           </div> : <EmptyState variant="sec">수선/작업 이력 없음 · “+ 수선/작업” 버튼으로 남기세요</EmptyState>}
-        </Sec>
+        </PanelSec>
 
-        <Sec id="v-history" title="활동 · 이력" n={history.length} tone={logOpen ? 'ok' : undefined} right={<Btn size="sm" variant="ghost" onClick={() => setLogOpen((o) => !o)}>{logOpen ? '닫기' : '+ 기록'}</Btn>}>
+        <PanelSec id="v-history" title="활동 · 이력" n={history.length} tone={logOpen ? 'ok' : undefined} right={<Btn size="sm" variant="ghost" onClick={() => setLogOpen((o) => !o)}>{logOpen ? '닫기' : '+ 기록'}</Btn>}>
           {logOpen ? <QuickLogForm
             ctx={{ plate, ...(active ? { contractNo: String(active.contractNo || active._key || ''), customer: String(active.contractorName || '') } : {}) }}
             onDone={() => setLogOpen(false)} onCancel={() => setLogOpen(false)} style={{ marginBottom: 12 }} /> : null}
@@ -694,7 +723,7 @@ export function VehicleDetail({ plate, focus, embed, companyId: targetCompanyId 
               </tbody>
             </table>
           </div> : <EmptyState variant="sec">기록 없음 · “+ 기록” 버튼으로 남기세요</EmptyState>}
-        </Sec>
+        </PanelSec>
       </div>
 
       {/* footer — 차량 삭제만 */}
