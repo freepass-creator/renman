@@ -257,9 +257,32 @@ function bankRejectReason(row: Record<string, unknown>, cms: boolean): string {
   return '입금·출금 금액을 판독할 수 없음';
 }
 
+/**
+ * 워크북 읽기 — **CSV는 인코딩을 스스로 판단한다.**
+ *
+ * ★PG 정산 파일(`일별정산내역_*.csv`)이 **CP949(EUC-KR)** 로 온다.
+ *   UTF-8로 읽으면 헤더가 `°áÁ¦ÀÏ` 로 깨져 **어떤 키워드와도 안 맞고 «헤더를 찾지 못함»** 이 된다
+ *   (실측: 전건 0). SheetJS `codepage` 옵션은 `cpexcel.js`(~200KB)를 같이 실어야 동작하므로,
+ *   번들을 키우지 않고 **브라우저·Node 내장 `TextDecoder`** 로 해결한다.
+ *
+ * 판정: UTF-8로 디코드해 치환문자(U+FFFD)가 나오면 잘못된 인코딩으로 보고 EUC-KR로 다시 읽는다.
+ */
+function readWorkbook(buf: ArrayBuffer, fileName: string): XLSX.WorkBook {
+  if (!/\.csv$/i.test(fileName)) return XLSX.read(buf, { type: 'array', cellDates: true });
+  const bytes = new Uint8Array(buf);
+  let text = new TextDecoder('utf-8').decode(bytes);
+  if (text.includes('�')) {
+    try {
+      const alt = new TextDecoder('euc-kr').decode(bytes);
+      if (!alt.includes('�')) text = alt;
+    } catch { /* euc-kr 미지원 환경 — UTF-8 결과를 그대로 쓴다 */ }
+  }
+  return XLSX.read(text, { type: 'string', cellDates: true });
+}
+
 export async function parseTxFileReport(file: File): Promise<TxParseReport> {
   const buf = await file.arrayBuffer();
-  const wb = XLSX.read(buf, { type: 'array', cellDates: true });
+  const wb = readWorkbook(buf, file.name);
   const bankHint = detectBankFromFileName(file.name);
   const out: EntityRecord[] = [];
   const rejected: TxParseRejection[] = [];

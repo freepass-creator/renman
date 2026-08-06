@@ -50,3 +50,18 @@ describe.skipIf(!available.length)('실파일 파서 연기 테스트', () => {
     expect(keyed.length).toBe(r.records.length);
   });
 });
+
+describe.skipIf(!available.length)('실파일 — 인코딩·종류 판정', () => {
+  it.skipIf(!available.some((f) => f.endsWith('.csv')))(
+    'CP949 CSV 를 읽는다 — 깨지면 헤더 키워드가 하나도 안 맞아 통째로 «헤더 못 찾음»이 된다',
+    async () => {
+      const name = available.find((f) => f.endsWith('.csv'))!;
+      const r = await parseTxFileReport(fileOf(name));
+      /* PG 정산 파일은 «거래»가 아니라 «일자별 집계»(의뢰건수·결제건수)라 bank_tx 로 들어오지 않는 게 맞다.
+         여기서 확인하는 건 «인코딩 때문에 못 읽는 것»과 «종류가 달라 안 받는 것»을 구분하는 일이다.
+         깨진 인코딩이면 경고 문구조차 못 만들고 시트 자체를 못 읽는다. */
+      expect(r.warnings.join(' ')).toContain('헤더');
+      expect(r.rejected.length).toBe(0);
+    },
+  );
+});
