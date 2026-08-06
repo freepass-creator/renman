@@ -65,6 +65,7 @@ export type CompanyMasterInput = {
   industry?: string[];
   category?: string[];
   email?: string;
+  phone?: string;
   taxOffice?: string;
   businessRegistration?: {
     fileName?: string;

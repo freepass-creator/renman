@@ -10,12 +10,12 @@
  */
 import { useEffect, useMemo, useState } from 'react';
 import {
-  Badge, Btn, C, DetailEmpty, ExcelSheet, LedgerActions, LedgerFrame, LedgerRecordPanel, Search, won,
+  Badge, Btn, C, DetailEmpty, ExcelSheet, KV, LedgerActions, LedgerFrame, LedgerRecordPanel, Search, won,
   type SheetCol,
 } from '@/components/ui';
 import { usePrompt } from '@/components/ui/confirm';
 import { toast, toastError } from '@/lib/toast';
-import { COMPANY_DEFS, companyLabel, createManagedCompany } from '@/lib/companies';
+import { COMPANY_DEFS, companyLabel, createManagedCompany, updateManagedCompany } from '@/lib/companies';
 import { loadMaster, type CompanyMaster } from '@/lib/company-master';
 import { useEntityList } from '@/lib/use-entity-lists';
 import { buildBankAccountLedger, type BankAccountRow } from '@/lib/finance/cash-ledger';
@@ -92,6 +92,9 @@ export default function ManagementPage() {
   const [selectedCo, setSelectedCo] = useState<CompanyRow | null>(null);
   const [staffOpen, setStaffOpen] = useState(false);
   const [creating, setCreating] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [form, setForm] = useState<Record<string, string>>({});
   const [masterTick, setMasterTick] = useState(0);
 
   const { rows: accountRecords, loading: acctLoading, error: acctError } = useEntityList('bank_account');
@@ -164,6 +167,48 @@ export default function ManagementPage() {
     return leaseRows.filter((r) => String(r.raw.companyId || '') === selectedCo.id);
   }, [leaseRows, selectedCo]);
 
+  /* ★섹션 그자리 수정 — 차량360과 같은 규격(공용 `KV` + editing/form/onChange).
+     법인은 엔티티가 아니라 `updateManagedCompany`(레지스트리+마스터)로 저장한다.
+     `LedgerEditPanel`은 `getStore().update` 전용이라 여기 못 쓴다. */
+  const set = (k: string, v: string) => setForm((f) => ({ ...f, [k]: v }));
+
+  function startEdit() {
+    if (!selectedCo) return;
+    const m = selectedCo.master;
+    setForm({
+      label: selectedCo.name,
+      ceo: String(m.ceo || ''), bizNo: String(m.bizNo || ''), corpNo: String(m.corpNo || ''),
+      phone: String(m.phone || ''), email: String(m.email || ''),
+      openDate: String(m.openDate || ''), taxOffice: String(m.taxOffice || ''),
+      address: String(m.address || ''), businessAddress: String(m.businessAddress || ''),
+    });
+    setEditing(true);
+  }
+
+  async function saveEdit() {
+    if (!selectedCo) return;
+    const label = String(form.label || '').trim();
+    if (!label) { toastError('회사명은 비울 수 없습니다.'); return; }
+    setSaving(true);
+    try {
+      const { label: _drop, ...master } = form;
+      await updateManagedCompany(selectedCo.id, { label }, master);
+      setMasterTick((n) => n + 1);
+      const m = loadMaster(selectedCo.id);
+      setSelectedCo({
+        ...selectedCo, name: label, ceo: String(m.ceo || ''), bizNo: String(m.bizNo || ''),
+        address: String(m.address || ''), phone: String(m.phone || ''),
+        garages: m.garages?.length || 0, master: m,
+      });
+      setEditing(false);
+      toast('법인 정보를 저장했습니다.');
+    } catch (error) {
+      toastError((error as Error).message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
   /** 「+ 법인 등록」 — 빈 껍데기를 바로 만들고 그 패널을 연다. 등록 화면·모달 없음(§4-11). */
   async function createCompany() {
     const name = (await prompt({
@@ -228,18 +273,37 @@ export default function ManagementPage() {
       rows={shownCompanies}
       rowKey={(r) => r.id}
       selectedRowKey={selectedCo?.id ?? null}
-      onRowDoubleClick={(r) => setSelectedCo(r)}
-      onCloseDetail={() => setSelectedCo(null)}
+      onRowDoubleClick={(r) => { setEditing(false); setSelectedCo(r); }}
+      onCloseDetail={() => { setEditing(false); setSelectedCo(null); }}
       sidePanel={selectedCo ? (
         <LedgerRecordPanel
           title={selectedCo.name}
           identity={selectedCo.bizNo || '사업자번호 미등록'}
           statusBadge={<Badge tone="blue">법인</Badge>}
           row={selectedCo}
-          onClose={() => setSelectedCo(null)}
+          onClose={() => { setEditing(false); setSelectedCo(null); }}
           sections={[
-            { title: '사업자', open: true, cols: COMPANY_COLS.filter((c) => ['name', 'ceo', 'bizNo', 'phone'].includes(c.key)) },
-            { title: '소재지', cols: COMPANY_COLS.filter((c) => ['address', 'garages'].includes(c.key)) },
+            {
+              title: '사업자', open: true, cols: [],
+              body: <KV editing={editing} form={form} onChange={set} rows={[
+                ['회사명', 'label', selectedCo.name],
+                ['대표', 'ceo', selectedCo.ceo],
+                ['사업자번호', 'bizNo', selectedCo.bizNo],
+                ['법인번호', 'corpNo', String(selectedCo.master.corpNo || '')],
+                ['전화', 'phone', selectedCo.phone],
+                ['이메일', 'email', String(selectedCo.master.email || '')],
+                ['개업일', 'openDate', String(selectedCo.master.openDate || '')],
+                ['관할세무서', 'taxOffice', String(selectedCo.master.taxOffice || '')],
+              ]} />,
+            },
+            {
+              title: '소재지', cols: [],
+              body: <KV editing={editing} form={form} onChange={set} rows={[
+                ['본점', 'address', selectedCo.address],
+                ['사업장', 'businessAddress', String(selectedCo.master.businessAddress || '')],
+                ['차고지', null, `${selectedCo.garages}곳`],
+              ]} />,
+            },
             {
               title: '법인계좌', cols: [], count: coAccounts.length,
               body: coAccounts.length
@@ -253,8 +317,16 @@ export default function ManagementPage() {
                 : <DetailEmpty>임대차 계약 없음 — 데이터센터에서 계약서를 담으세요</DetailEmpty>,
             },
           ]}
-          actions={(
+          actions={editing ? (
             <>
+              <Btn size="sm" variant="solid" disabled={saving} onClick={() => { void saveEdit(); }}>
+                {saving ? '저장 중…' : '저장'}
+              </Btn>
+              <Btn size="sm" variant="ghost" disabled={saving} onClick={() => setEditing(false)}>취소</Btn>
+            </>
+          ) : (
+            <>
+              <Btn size="sm" variant="solid" onClick={startEdit}>수정</Btn>
               <Btn size="sm" variant="ghost" href="/cash">계좌 등록</Btn>
               <Btn size="sm" variant="ghost" onClick={() => openIngest('lease')}>임대차 담기</Btn>
             </>
