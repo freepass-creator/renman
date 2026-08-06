@@ -15,7 +15,8 @@ function functionBody(path: string, start: string, end: string): string {
 
 describe('출시 차단 회귀 가드', () => {
   it('자금일보 일괄 적용은 쓰기 직전에 현장수납 중복을 다시 검사한다', () => {
-    const body = functionBody('app/payments/page.tsx', 'async function apply()', 'async function unmatch');
+    // 2026-08-06 자금일보 원장 규격 재작성에서 apply() → applyMatches(). 가드의 뜻(쓰기 직전 재검사)은 그대로다.
+    const body = functionBody('app/payments/page.tsx', 'async function applyMatches()', 'async function applyCms');
     const duplicateGuard = body.indexOf('findDuplicateCashPayment({ ...crec, _payments: existing }, r.tx)');
     const write = body.indexOf('await commitAll([');
     expect(duplicateGuard).toBeGreaterThanOrEqual(0);

@@ -29,6 +29,11 @@
 
 **B그룹 잔여:** B-1 미수 원장 엔진 · B-4 필드 스키마 · globals 레거시.
 
+**미착수 지시 (사장님, 2026-08-06):**
+- **`/status` 운영현황 = 실제 보유 차량만.** 계약종료 미수는 운영현황에 넣지 않는다 — 종료 건은
+  계약관리·리스크에서 찾으면 된다. 운영현황은 「지금 굴러가는 차」를 보는 화면이라 종료분이 섞이면
+  보유 대수·가동률을 읽을 때마다 걸러내야 한다. (보유 판정 SSOT = `isVehicleHeld`)
+
 ---
 
 ## 3. 절대 규격 (요약 — 어길 경우 되돌림)
@@ -72,6 +77,7 @@ curl -s -o /dev/null -w "%{http_code}" http://localhost:6006/<route>   # 200
 
 | 날짜 | 작업자 | 내용 | 상태 |
 |---|---|---|---|
+| 2026-08-06 | Claude | **홈 «화면 한 판»**: 데스크톱 대시보드=페이지 스크롤 0·프레임 높이 꽉 채움(넘침은 각 패널 안에서만). body `flex:1 1 auto`+KPI `flexShrink:0`+2분할 `flex:1 1 auto` · `Panel` 본문 `overflow:auto` · `MonthCalendar` `fill` prop 신설(주 행 `1fr` 균등분배) · 모바일은 종전대로 세로 스택 | tsc0 · 브라우저측정 pageScroll 0·패널 404/404·바닥 710꽉참 |
 | 2026-08-06 | Claude | **P0-1 로컬/원격 혼합 승인 차단**: `lib/migrate/acceptance`(순수판정) · `migration-baseline`(runId 서버발급)·`migration-acceptance`(서버가 Firestore 실물 재계수 후 대조, create-only) · rules `migration` 전면차단+businessColl 제외 · reflect=대조 통과 후에만 승인, 로컬백엔드면 미발송 | tsc0 · vitest 65파일 549건 · 로컬 403 확인 · rules테스트는 CI(Java 없음) |
 | 2026-08-06 | Claude | **P0-3 수납이력 정합성**: `acceptance-normalization`(txKey 부여+기준일 이전 계약성 입금 `matchedKind:'history'`) · `receipt-integrity`(유실/이력/매칭대기 3분 + fail-closed) · pack 단일지점 정규화 · reflect 반영 후 대조 · money-status history=해당없음 → **할 일 1,948→0 · 유실 1→0** | tsc0 · vitest 64파일 526건 · curl200 |
 | 2026-08-06 | Claude | **P0-2 자금 원자 create-only**: `lib/finance/immutable-money`(SSOT·순수판정) · 엔티티 POST=자금만 `getAll` 선검사 409(`conflictIds`)+`batch.create` · 마감월 기존문서 재검사 제거(덮어쓰기 불가로 흡수) · ALREADY_EXISTS→409 | tsc0 · vitest 63파일 510건 |
