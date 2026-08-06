@@ -99,7 +99,10 @@ export function VehicleDetail({ plate, focus, embed, companyId: targetCompanyId 
     window.dispatchEvent(new CustomEvent('jpk:sections-toggle', { detail: { open } }));
   };
 
-  if (loading) return <PageLoading />;
+  /* ★스피너는 **처음 들어올 때만**. 저장하면 목록을 다시 부르는데(jpk:saved),
+     그때마다 화면 전체를 스피너로 갈아치우면 «번쩍»하고 새로고침처럼 보인다.
+     이미 그린 내용이 있으면 그대로 두고 조용히 갱신한다(soft-load — 홈·원장과 같은 규칙). */
+  if (loading && !v) return <PageLoading />;
 
   return (
     /* ★`Page frame` 은 창 스크롤을 잠그고 main 을 overflow:hidden 으로 고정한다(layout.tsx).
@@ -359,7 +362,10 @@ export function VehicleDetail({ plate, focus, embed, companyId: targetCompanyId 
           docType="vehicle" docLabel="자동차등록증" docs={docHistory(v, 'vehicle')}
           companyId={target} recordKey={plate} onReplaceDoc={onReplaceReg}
           fields={[
-            ['차량번호', null, plate],
+            /* ★차량번호는 편집 키를 준다. null 이면 InfoDoc 이 «편집 가능한 칸»만 OCR 로 채우므로
+               (InfoDoc.tsx editKeys) 등록증에서 읽은 번호가 확인창에 뜨지도 못하고 버려진다.
+               자동 저장이 아니라 **사람이 보고 확인한 뒤** 저장되는 경로라 오독 위험도 여기서 걸린다. */
+            ['차량번호', 'plate', String(v?.plate ?? plate)],
             ['차대번호(VIN)', 'vin', String(v?.vin ?? '')],
             ['차명', 'carName', String(v?.carName ?? '')],
             ['차종', 'vehicleType', String(v?.vehicleType ?? '')],
