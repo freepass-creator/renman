@@ -2,10 +2,11 @@
 import type { CSSProperties, ReactNode } from 'react';
 import { ChevronRight } from 'lucide-react';
 import {
-  Sec, Cards, Metric, ObjCard, ActionMenu, Btn, TextLink, Badge, KV, EmptyState, Message, Input, Select,
+  Sec, ActionMenu, Btn, TextLink, Badge, KV, EmptyState, Message, Input, Select,
   SectionLabel, Disclosure, th, thR, td, tdR, won, C, SH, PageLoading, SPACE_GROUP_M, type KVRow,
 } from '@/components/ui';
 import { InfoDoc } from '@/components/InfoDoc';
+import { LEDGER_EMPTY } from '@/lib/ledger-empty';
 import { docHistory, latestDoc } from '@/lib/docs';
 import { effectiveEndDate, patchExtend, earlyTerminationFee, computeContractView } from '@/lib/contract-ops';
 import { isProductReady } from '@/lib/freepass/product-sync';
@@ -352,10 +353,28 @@ export function VehicleDetail({ plate, focus, embed, companyId: targetCompanyId 
           })() : null}
           {olderIns.length > 0 ? <div style={{ marginTop: 10 }}>
             <div style={{ fontSize: 11.5, color: C.faint, marginBottom: 6 }}>이전 증권 ({olderIns.length})</div>
-            <Cards min={340}>{olderIns.map((ins, i) => {
-              const id = dday(ins.endDate);
-              return <ObjCard key={i} badge="이전" badgeTone="gray" name={String(ins.insurer || '보험')} carType={ins.policyNo ? String(ins.policyNo) : undefined} right={id == null ? undefined : <span style={{ color: C.faint }}>{id < 0 ? `만료 ${-id}일` : `D-${id}`}</span>} fields={[['기간', `${ins.startDate || ''}~${ins.endDate || ''}`], ['보험료', ins.totalPremium ? won(ins.totalPremium) : '—']]} />;
-            })}</Cards>
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', whiteSpace: 'nowrap' }}>
+                <thead><tr>
+                  <th style={th}>보험사</th><th style={th}>증권번호</th><th style={th}>기간</th>
+                  <th style={thR}>보험료</th><th style={th}>만기</th>
+                </tr></thead>
+                <tbody>
+                  {olderIns.map((ins, i) => {
+                    const id = dday(ins.endDate);
+                    return (
+                      <tr key={i}>
+                        <td style={td}>{String(ins.insurer || '') || LEDGER_EMPTY.dash}</td>
+                        <td style={td}>{String(ins.policyNo || '') || LEDGER_EMPTY.dash}</td>
+                        <td style={td}>{`${ins.startDate || ''}~${ins.endDate || ''}`.trim() || LEDGER_EMPTY.dash}</td>
+                        <td style={tdR}>{ins.totalPremium ? won(ins.totalPremium) : LEDGER_EMPTY.dash}</td>
+                        <td style={td}>{id == null ? LEDGER_EMPTY.dash : <span style={{ color: C.faint }}>{id < 0 ? `만료 ${-id}일` : `D-${id}`}</span>}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           </div> : null}
         </>
 
@@ -540,20 +559,28 @@ export function VehicleDetail({ plate, focus, embed, companyId: targetCompanyId 
             </div>
             <div style={{ fontSize: 11.5, color: C.faint, marginTop: 6 }}>{reco.basis}</div>
           </div> : null}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            {hist.steps.map((s, i) => (
-              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '9px 12px', borderRadius: 'var(--radius)', background: s.phase === '운행' ? 'var(--bg-card)' : 'var(--bg-stripe)', border: `1px solid ${s.phase === '운행' ? C.accent : C.line}` }}>
-                <span style={{ fontSize: 12, fontWeight: 800, color: s.phase === '운행' ? C.accent : C.mute, minWidth: 26 }}>{s.seq}손</span>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: C.ink, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{s.customer || '—'}</div>
-                  <div style={{ fontSize: 11, color: C.faint }}>{yy(s.start)}{s.phase === '운행' ? ' · 운행중' : ' · 종료'}{s.net > 0 ? ` · 미수 ${won(s.net)}` : ''}</div>
-                </div>
-                <div style={{ textAlign: 'right' }}>
-                  <div style={{ fontSize: 13.5, fontWeight: 700, color: C.ink, fontFamily: 'var(--font-mono)', fontVariantNumeric: 'tabular-nums' }}>{won(s.rent)}</div>
-                  {s.drop > 0 ? <div style={{ fontSize: 11, color: C.danger, fontWeight: 700 }}>-{won(s.drop)} · {s.dropPct}%↓</div> : <div style={{ fontSize: 11, color: C.faint }}>{i === 0 ? '첫 대여' : '동결'}</div>}
-                </div>
-              </div>
-            ))}
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', whiteSpace: 'nowrap' }}>
+              <thead><tr>
+                <th style={th}>손</th><th style={th}>계약자</th><th style={th}>개시</th>
+                <th style={th}>상태</th><th style={thR}>월 대여료</th><th style={thR}>하락</th><th style={thR}>미수</th>
+              </tr></thead>
+              <tbody>
+                {hist.steps.map((s, i) => (
+                  <tr key={i}>
+                    <td style={td}><b>{s.seq}손</b></td>
+                    <td style={td}>{s.customer || LEDGER_EMPTY.dash}</td>
+                    <td style={td}>{yy(s.start)}</td>
+                    <td style={td}>{s.phase === '운행' ? <Badge tone="green">운행중</Badge> : <Badge tone="gray">종료</Badge>}</td>
+                    <td style={tdR}>{won(s.rent)}</td>
+                    <td style={tdR}>{s.drop > 0
+                      ? <span style={{ color: C.danger, fontWeight: 700 }}>-{won(s.drop)} · {s.dropPct}%↓</span>
+                      : <span style={{ color: C.faint }}>{i === 0 ? '첫 대여' : '동결'}</span>}</td>
+                    <td style={tdR}>{s.net > 0 ? <span style={{ color: C.danger, fontWeight: 700 }}>{won(s.net)}</span> : LEDGER_EMPTY.dash}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </Sec> : null}
       </div>
@@ -563,70 +590,110 @@ export function VehicleDetail({ plate, focus, embed, companyId: targetCompanyId 
         <SectionLabel>이력</SectionLabel>
 
         <Sec id="v-penalty" title="과태료 · 변경부과" n={penalties.length} right={<span style={{ display: 'inline-flex', gap: 6 }}>{penalties.length ? <Btn size="sm" variant="ghost" onClick={() => openPrintDoc('penalty', plate)}>변경부과 공문</Btn> : null}<Add type="penalty" plate={plate} label="+ 추가" /></span>}>
-          {penalties.length ? <Cards min={360}>{penalties.map((p, i) => {
-            const drv = matchDriver(p, contracts); const st = penaltyStatus(p);
-            const NEXT: Record<string, string | null> = { '접수': '임차인확인', '임차인확인': '변경부과신청', '변경부과신청': '변경부과완료', '변경부과완료': '종결', '종결': null };
-            const next = NEXT[st] || null;
-            const advance = async () => {
-              if (!p._key) return;
-              const patch: EntityRecord = { reassignStatus: next };
-              if (next === '임차인확인' && drv) { patch.driverName = drv.contractorName; patch.driverPhone = drv.contractorPhone; patch.billedToRenter = true; patch.reassignDate = TODAY; }
-              try {
-                await commitUpdate({ entity: 'penalty', sessionCompanyId: companyId, rec: p, key: String(p._key), patch });
-              } catch { toast(NEED_COMPANY, 'error'); }
-            };
-            return <div key={i} style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-              <div style={{ flex: 1, minWidth: 0 }}><ObjCard badge={st} badgeTone={penaltyTone(st)} title={String(p.description || p.docType || '과태료')} right={p.amount ? won(p.amount) : undefined} fields={[['위반', String(p.violationDate || '—')], ['실운전자', drv ? String(drv.contractorName || '—') : '미매칭'], ['기한', String(p.dueDate || '—')]]} /></div>
-              {next ? <Btn variant="ghost" onClick={advance}>{next} →</Btn> : null}
-            </div>;
-          })}</Cards> : <EmptyState variant="sec">과태료 없음</EmptyState>}
+          {penalties.length ? <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', whiteSpace: 'nowrap' }}>
+              <thead><tr>
+                <th style={th}>위반일</th><th style={th}>내용</th><th style={th}>실운전자</th>
+                <th style={th}>기한</th><th style={thR}>금액</th><th style={th}>처리상태</th><th style={th}>다음</th>
+              </tr></thead>
+              <tbody>
+                {penalties.map((p, i) => {
+                  const drv = matchDriver(p, contracts); const st = penaltyStatus(p);
+                  const NEXT: Record<string, string | null> = { '접수': '임차인확인', '임차인확인': '변경부과신청', '변경부과신청': '변경부과완료', '변경부과완료': '종결', '종결': null };
+                  const next = NEXT[st] || null;
+                  const advance = async () => {
+                    if (!p._key) return;
+                    const patch: EntityRecord = { reassignStatus: next };
+                    if (next === '임차인확인' && drv) { patch.driverName = drv.contractorName; patch.driverPhone = drv.contractorPhone; patch.billedToRenter = true; patch.reassignDate = TODAY; }
+                    try {
+                      await commitUpdate({ entity: 'penalty', sessionCompanyId: companyId, rec: p, key: String(p._key), patch });
+                    } catch { toast(NEED_COMPANY, 'error'); }
+                  };
+                  return (
+                    <tr key={i}>
+                      <td style={td}>{String(p.violationDate || '') || LEDGER_EMPTY.dash}</td>
+                      <td style={td}>{String(p.description || p.docType || '과태료')}</td>
+                      <td style={td}>{drv ? String(drv.contractorName || '') || LEDGER_EMPTY.dash : <span style={{ color: C.warn }}>미매칭</span>}</td>
+                      <td style={td}>{String(p.dueDate || '') || LEDGER_EMPTY.dash}</td>
+                      <td style={tdR}>{p.amount ? won(p.amount) : LEDGER_EMPTY.dash}</td>
+                      <td style={td}><Badge tone={penaltyTone(st)}>{st}</Badge></td>
+                      <td style={td}>{next ? <Btn size="sm" variant="ghost" onClick={advance}>{next} →</Btn> : LEDGER_EMPTY.dash}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div> : <EmptyState variant="sec">과태료 없음</EmptyState>}
         </Sec>
 
         <Sec id="v-work" title="차량 수선 · 정비·사고" n={workList.length} tone={workOpen ? 'ok' : undefined}
           desc="정비·사고수리·상품화·세차 — 휴차는 작업상태가 휴차 워크벤치에 자동 반영"
           right={<Btn size="sm" variant="ghost" onClick={() => setWorkOpen((o) => !o)}>{workOpen ? '닫기' : '+ 수선/작업'}</Btn>}>
           {workOpen ? <WorkForm plate={plate} companyId={target} vehicle={v} idle={!active} onDone={() => setWorkOpen(false)} onCancel={() => setWorkOpen(false)} style={{ marginBottom: 12 }} /> : null}
-          {workList.length ? <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>{workList.map((h, i) => {
-            const cat = String(h.category || '수선'); const ws = String(h.work_status || ''); const doc = latestDoc(h); const amt = Number(h.amount) || 0;
-            return (
-              <div key={i} style={{ border: `1px solid ${C.line}`, borderRadius: 'var(--radius)', background: C.card, padding: '10px 13px', boxShadow: SH.rest }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                  <Badge tone={workCategoryTone(cat)}>{cat}</Badge>
-                  {ws ? <Badge tone={workStatusTone(ws)}>{ws}</Badge> : null}
-                  <span style={{ fontSize: 12.5, fontWeight: 600, color: C.ink }}>{workSummary(h)}</span>
-                  <span style={{ flex: 1 }} />
-                  {amt > 0 ? <span style={{ fontSize: 12.5, fontWeight: 700, color: C.ink, fontVariantNumeric: 'tabular-nums' }}>{won(amt)}</span> : null}
-                </div>
-                <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', marginTop: 7, fontSize: 11.5, color: C.mute }}>
-                  <span>일자 <b style={{ color: C.ink }}>{yy(h.date)}</b></span>
-                  {h.vendor ? <span>업체 <b style={{ color: C.ink }}>{String(h.vendor)}</b></span> : null}
-                  {cat === '사고수리' && Number(h.insurance_amount) > 0 ? <span>보험처리 <b style={{ color: C.ink }}>{won(h.insurance_amount)}</b></span> : null}
-                  {cat === '사고수리' && Number(h.self_pay) > 0 ? <span>자기부담 <b style={{ color: C.ink }}>{won(h.self_pay)}</b></span> : null}
-                  {cat === '사고수리' && h.repair_out_date ? <span>출고예정 <b style={{ color: C.warn }}>{yy(h.repair_out_date)}</b></span> : null}
-                  {cat === '정비' && h.next_maint_date ? <span>다음정비 <b style={{ color: C.warn }}>{yy(h.next_maint_date)}</b></span> : null}
-                  {h.author ? <span>작성 <b style={{ color: C.ink }}>{String(h.author)}</b></span> : null}
-                  <span style={{ flex: 1 }} />
-                  {doc
-                    ? (doc.url
-                        ? <TextLink onClick={() => window.open(doc.url, '_blank')}>{doc.type || '서류'} 열기</TextLink>
-                        : <span style={{ color: C.faint }}>{doc.type || '서류'} · 미첨부</span>)
-                    : <span style={{ color: C.faint }}>서류 미첨부</span>}
-                </div>
-              </div>
-            );
-          })}</div> : <EmptyState variant="sec">수선/작업 이력 없음 · “+ 수선/작업” 버튼으로 남기세요</EmptyState>}
+          {workList.length ? <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', whiteSpace: 'nowrap' }}>
+              <thead><tr>
+                <th style={th}>일자</th><th style={th}>구분</th><th style={th}>내용</th><th style={th}>업체</th>
+                <th style={thR}>금액</th><th style={th}>상태</th><th style={th}>후속</th><th style={th}>서류</th>
+              </tr></thead>
+              <tbody>
+                {workList.map((h, i) => {
+                  const cat = String(h.category || '수선'); const ws = String(h.work_status || '');
+                  const doc = latestDoc(h); const amt = Number(h.amount) || 0;
+                  const followUp = cat === '사고수리' && h.repair_out_date ? `출고 ${yy(h.repair_out_date)}`
+                    : cat === '정비' && h.next_maint_date ? `다음정비 ${yy(h.next_maint_date)}` : '';
+                  return (
+                    <tr key={i}>
+                      <td style={td}>{yy(h.date)}</td>
+                      <td style={td}><Badge tone={workCategoryTone(cat)}>{cat}</Badge></td>
+                      <td style={td}>{workSummary(h)}</td>
+                      <td style={td}>{String(h.vendor || '') || LEDGER_EMPTY.dash}</td>
+                      <td style={tdR}>{amt > 0 ? won(amt) : LEDGER_EMPTY.dash}</td>
+                      <td style={td}>{ws ? <Badge tone={workStatusTone(ws)}>{ws}</Badge> : LEDGER_EMPTY.dash}</td>
+                      <td style={td}>{followUp ? <span style={{ color: C.warn, fontWeight: 700 }}>{followUp}</span> : LEDGER_EMPTY.dash}</td>
+                      <td style={td}>{doc
+                        ? (doc.url
+                          ? <TextLink onClick={() => window.open(doc.url, '_blank')}>{doc.type || '서류'} 열기</TextLink>
+                          : <span style={{ color: C.faint }}>미첨부</span>)
+                        : <span style={{ color: C.faint }}>미첨부</span>}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div> : <EmptyState variant="sec">수선/작업 이력 없음 · “+ 수선/작업” 버튼으로 남기세요</EmptyState>}
         </Sec>
 
         <Sec id="v-history" title="활동 · 이력" n={history.length} tone={logOpen ? 'ok' : undefined} right={<Btn size="sm" variant="ghost" onClick={() => setLogOpen((o) => !o)}>{logOpen ? '닫기' : '+ 기록'}</Btn>}>
           {logOpen ? <QuickLogForm
             ctx={{ plate, ...(active ? { contractNo: String(active.contractNo || active._key || ''), customer: String(active.contractorName || '') } : {}) }}
             onDone={() => setLogOpen(false)} onCancel={() => setLogOpen(false)} style={{ marginBottom: 12 }} /> : null}
-          {history.length ? <Cards min={340}>{history.map((h, i) => {
-            const cat = String(h.category || '이력');
-            const tone = (cat === '사고' ? 'red' : cat === '이동' ? 'blue' : (cat === '통화' || cat === '문자') ? 'green' : (cat === '방문' || cat === '상담') ? 'purple' : cat === '메모' ? 'gray' : cat === '검사' ? 'teal' : 'amber') as 'red' | 'blue' | 'green' | 'purple' | 'gray' | 'teal' | 'amber';
-            const who = isComm(h) ? (contracts.find((c) => matchesContract(h, c))?.contractorName || h.customer || '') : '';
-            return <ObjCard key={i} badge={cat} badgeTone={tone} title={String(h.title || '—')} right={h.cost ? won(h.cost) : (h.nextDate ? <span style={{ color: C.warn, fontSize: 11.5 }}>후속 {String(h.nextDate)}</span> : undefined)} fields={[['일자', String(h.date || '—')], ...(who ? [['상대', String(who)] as [string, string]] : []), [h.author ? '작성' : '업체', String(h.author || h.vendor || '—')]]} />;
-          })}</Cards> : <EmptyState variant="sec">기록 없음 · “+ 기록” 버튼으로 남기세요</EmptyState>}
+          {history.length ? <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', whiteSpace: 'nowrap' }}>
+              <thead><tr>
+                <th style={th}>일자</th><th style={th}>구분</th><th style={th}>내용</th>
+                <th style={th}>상대</th><th style={th}>작성·업체</th><th style={thR}>금액</th><th style={th}>후속</th>
+              </tr></thead>
+              <tbody>
+                {history.map((h, i) => {
+                  const cat = String(h.category || '이력');
+                  const tone = (cat === '사고' ? 'red' : cat === '이동' ? 'blue' : (cat === '통화' || cat === '문자') ? 'green' : (cat === '방문' || cat === '상담') ? 'purple' : cat === '메모' ? 'gray' : cat === '검사' ? 'teal' : 'amber') as 'red' | 'blue' | 'green' | 'purple' | 'gray' | 'teal' | 'amber';
+                  const who = isComm(h) ? (contracts.find((c) => matchesContract(h, c))?.contractorName || h.customer || '') : '';
+                  return (
+                    <tr key={i}>
+                      <td style={td}>{String(h.date || '') || LEDGER_EMPTY.dash}</td>
+                      <td style={td}><Badge tone={tone}>{cat}</Badge></td>
+                      <td style={td}>{String(h.title || '') || LEDGER_EMPTY.dash}</td>
+                      <td style={td}>{String(who || '') || LEDGER_EMPTY.dash}</td>
+                      <td style={td}>{String(h.author || h.vendor || '') || LEDGER_EMPTY.dash}</td>
+                      <td style={tdR}>{h.cost ? won(h.cost) : LEDGER_EMPTY.dash}</td>
+                      <td style={td}>{h.nextDate ? <span style={{ color: C.warn, fontWeight: 700 }}>{String(h.nextDate)}</span> : LEDGER_EMPTY.dash}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div> : <EmptyState variant="sec">기록 없음 · “+ 기록” 버튼으로 남기세요</EmptyState>}
         </Sec>
       </div>
 
