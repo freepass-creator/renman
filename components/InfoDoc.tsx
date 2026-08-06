@@ -109,9 +109,12 @@ export function InfoDoc({
   }
 
   return (
-    <div id={id} style={{ marginTop: 22, scrollMarginTop: 62, order }}>
+    /* ★껍데기 = 상세패널 섹션과 같은 박스(`ledger-record-panel__section`).
+       종전엔 InfoDoc 만 박스 없이 marginTop 22 로 떠 있어 등록증·보험 섹션만 튀어 보였다.
+       접기 토글은 InfoDoc 자체 상태(첨부·편집과 얽힘)라 details 로 바꾸지 않고 헤더만 맞춘다. */
+    <div id={id} className="ledger-record-panel__section" style={{ scrollMarginTop: 62, order }}>
       {/* 헤더: 접기토글(제목) + 첨부상태 배지 + 우측 액션(수정 / 서류 교체·재발급). 접히면 본문 숨김. */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 9, flexWrap: mobile ? 'wrap' : 'nowrap', minHeight: ctrlH(mobile) }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px', flexWrap: mobile ? 'wrap' : 'nowrap', minHeight: ctrlH(mobile) }}>
         <button
           type="button"
           onClick={toggleCollapse}
@@ -132,7 +135,7 @@ export function InfoDoc({
         {!collapsed && canEditDoc && <Btn size="sm" variant="ghost" onClick={() => (mode === 'replace' ? resetReplace() : setMode('replace'))}>서류 등록·변경</Btn>}
       </div>
 
-      {!collapsed && (<>
+      {!collapsed && (<div style={{ padding: '0 12px 12px' }}>
       {/* 정보 KV (인라인 편집 — 세부 360과 동일 패턴) */}
       <KV rows={fields} editing={editing} form={form} onChange={onChange} />
 
@@ -222,7 +225,7 @@ export function InfoDoc({
           )}
         </div>
       )}
-      </>)}
+      </div>)}
     </div>
   );
 }

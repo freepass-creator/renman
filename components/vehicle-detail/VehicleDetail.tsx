@@ -52,10 +52,17 @@ function PanelSec({
         <span style={{ fontWeight: 800, color: tone === 'ok' ? C.accent : C.ink }}>{title}</span>
         {desc ? <span style={{ marginLeft: 6, fontSize: 11, color: C.faint, fontWeight: 400 }}>{desc}</span> : null}
         {n != null ? <span className="ledger-record-panel__count">{n}건</span> : null}
+        {/* 액션은 제목줄 오른쪽에 붙인다 — 별도 줄로 빼면 버튼만 툭 튀어나온다.
+            summary 안이라 클릭이 접기로 새지 않게 여기서 멈춘다. */}
+        {right ? (
+          <span
+            style={{ marginLeft: n != null ? 8 : 'auto', display: 'inline-flex', alignItems: 'center', gap: 6 }}
+            onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}
+          >
+            {right}
+          </span>
+        ) : null}
       </summary>
-      {right ? (
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 6, padding: '0 12px 8px' }}>{right}</div>
-      ) : null}
       <div style={{ padding: '0 12px 12px' }}>{children}</div>
     </details>
   );
@@ -88,7 +95,7 @@ export function VehicleDetail({ plate, focus, embed, companyId: targetCompanyId 
        그래서 **안쪽이 스스로 스크롤해야** 한다 — 안 그러면 아래 섹션이 잘린 채 스크롤이 안 된다.
        embed(원장 우측 패널)일 때는 패널이 이미 스크롤하므로 건드리지 않는다. */
     <div style={{
-      display: 'flex', flexDirection: 'column', gap: embed ? 12 : SPACE_GROUP_M,
+      display: 'flex', flexDirection: 'column', gap: 10,
       ...(embed ? null : { flex: 1, minHeight: 0, overflowY: 'auto' as const, paddingBottom: 24 }),
     }}>
       {/* 신분 행 */}
@@ -198,7 +205,7 @@ export function VehicleDetail({ plate, focus, embed, companyId: targetCompanyId 
       )}
 
       {/* ── 지금 ── */}
-      <div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         
         <PanelSec id="v-status" title="현황" desc="한눈 요약 · 계약 조건"
           right={active
@@ -305,8 +312,7 @@ export function VehicleDetail({ plate, focus, embed, companyId: targetCompanyId 
       </div>
 
       {/* ── 이 차 ── */}
-      <div>
-        
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         {!v && <Message variant="warning">등록증이 아직 안 들어왔습니다. 계약·보험·과태료만 표시. <b>정보 담기</b>로 등록하세요.</Message>}
 
         <PanelSec id="v-info" title={editInfo ? '차량 정보 · 편집 중' : '차량 정보'} tone={editInfo ? 'ok' : undefined} desc="제조사 제공 — 5단계·선택옵션·색상" right={
@@ -494,7 +500,7 @@ export function VehicleDetail({ plate, focus, embed, companyId: targetCompanyId 
       </div>
 
       {/* ── 수납 · 정산 ── */}
-      <div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         
 
         {(active || pastContracts.length > 0) ? <PanelSec id="v-schedule" title="수납 스케줄" n={active ? schedule.length : pastContracts.length} desc={active ? '회차별 청구·미납 · 미수관리' : '이전 계약 수납 이력'}
@@ -621,7 +627,7 @@ export function VehicleDetail({ plate, focus, embed, companyId: targetCompanyId 
       </div>
 
       {/* ── 이력 ── */}
-      <div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         
 
         <PanelSec id="v-penalty" title="과태료 · 변경부과" n={penalties.length} right={<span style={{ display: 'inline-flex', gap: 6 }}>{penalties.length ? <Btn size="sm" variant="ghost" onClick={() => openPrintDoc('penalty', plate)}>변경부과 공문</Btn> : null}<Add type="penalty" plate={plate} label="+ 추가" /></span>}>
