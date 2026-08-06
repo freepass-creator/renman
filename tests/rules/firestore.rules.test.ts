@@ -129,6 +129,45 @@ describe('서버 전용 rate-limit 컬렉션', () => {
   });
 });
 
+describe('자금 원자 불변 — 수집된 거래의 금액·일자는 아무도 못 고친다', () => {
+  test('본사도 수집 거래(txKey 보유)의 금액을 못 고친다', async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'bank_tx', 'C1__imported'), {
+        companyId: 'C1', txKey: 'k1', txDate: '2026-07-15', amount: 1000, counterparty: '고객',
+      });
+    });
+    await assertFails(updateDoc(doc(hq(), 'bank_tx', 'C1__imported'), { amount: 9999 }));
+    await assertFails(updateDoc(doc(hq(), 'bank_tx', 'C1__imported'), { txDate: '2026-07-20' }));
+    await assertFails(updateDoc(doc(staffA(), 'bank_tx', 'C1__imported'), { counterparty: '다른사람' }));
+  });
+  test('txKey 를 지우는 2단계 우회도 막힌다', async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'bank_tx', 'C1__imported2'), {
+        companyId: 'C1', txKey: 'k2', txDate: '2026-07-15', amount: 1000,
+      });
+    });
+    await assertFails(updateDoc(doc(hq(), 'bank_tx', 'C1__imported2'), { txKey: null }));
+  });
+  test('매칭·계정과목 수정은 통과 — 막히면 수납 업무가 멈춘다', async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'bank_tx', 'C1__imported3'), {
+        companyId: 'C1', txKey: 'k3', txDate: '2026-07-15', amount: 1000,
+      });
+    });
+    await assertSucceeds(updateDoc(doc(staffA(), 'bank_tx', 'C1__imported3'), {
+      category: '대여료수입', matchedContractId: 'ctr_1', matchedKind: 'receivable',
+    }));
+  });
+  test('손입력 단건(txKey 없음)은 오타 정정 허용 — 마감 가드는 그대로', async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'bank_tx', 'C1__manual'), {
+        companyId: 'C1', txDate: '2026-07-15', amount: 1000,
+      });
+    });
+    await assertSucceeds(updateDoc(doc(staffA(), 'bank_tx', 'C1__manual'), { amount: 1200 }));
+  });
+});
+
 describe('마이그레이션 기준선·승인(migration) — 서버 Admin 전용', () => {
   test('본사 Claim이어도 승인 기록을 직접 쓸 수 없다 — 로컬 반영을 «승인됨»으로 위장하는 경로 차단', async () => {
     await assertFails(setDoc(doc(hq(), 'migration', 'C1__run_forged'), {

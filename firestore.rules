@@ -113,6 +113,26 @@ service cloud.firestore {
       return !isMoneyColl(coll) || ymOpen(companyId, ymOf(resource.data));
     }
 
+    // ── 자금 원자 불변(moneySourceImmutable) ──────────────────────────────
+    // 왜: 서버 임포트 라우트는 create-only 로 «덮어쓰기»를 막았지만(P0-2), 클라이언트 SDK 의
+    //   update 는 규칙이 지배한다. 막지 않으면 매칭 화면을 통해 들어온 update 하나로
+    //   통장 거래의 금액·일자를 고쳐 결산을 사후에 바꿀 수 있다.
+    // 무엇을: 은행·카드사가 만든 사실만. 앱이 붙이는 값(계정과목·매칭·정산·메모·수단)은 가변이다.
+    //   ★목록은 lib/finance/immutable-money.ts MONEY_SOURCE_FIELDS 와 동일하게 유지할 것.
+    //     (`memo` 는 일부러 제외 — 앱이 정산 라벨을 쓴다. 적요 원문 보존은 `jeokyo` 담당)
+    // 누구까지: 본사도 막는다. 잘못 읽힌 거래는 원천 재수집, 취소·정정은 별도 거래가 정답이다.
+    // 손입력 단건(txKey 없음)은 오타 정정을 허용한다 — 사람이 친 값이고 마감 가드는 그대로 걸린다.
+    //   txKey 를 지운 뒤 고치는 2단계 우회는 불가(txKey 자체가 목록에 있다).
+    function moneySourceImmutable(coll) {
+      return !isMoneyColl(coll)
+        || !('txKey' in resource.data)
+        || !request.resource.data.diff(resource.data).affectedKeys().hasAny([
+             'account', 'txDate', 'txTime', 'amount', 'withdraw', 'balance', 'counterparty', 'jeokyo',
+             'approvalNo', 'cardNo', 'cardLast4', 'merchant',
+             'txKey', '_key', 'raw'
+           ]);
+    }
+
     // 업무 데이터(vehicle·contract·payment·bank_tx…) — 법인 격리. businessColl()로 민감 컬렉션(users·period_locks·audit_logs)은 절대 여기 안 걸림 → 범용 OR 우회 차단.
     match /{coll}/{docId} {
       allow read: if isSignedIn() && businessColl(coll) && tenantOK(resource.data.companyId);
@@ -126,7 +146,8 @@ service cloud.firestore {
       allow update: if isSignedIn() && businessColl(coll)
                     && tenantOK(resource.data.companyId)
                     && (isHQ() || request.resource.data.companyId == resource.data.companyId)
-                    && moneyUpdatable(coll, resource.data.companyId);
+                    && moneyUpdatable(coll, resource.data.companyId)
+                    && moneySourceImmutable(coll);
       // 하드삭제=본사만. 일반 삭제는 soft-delete(deletedAt=update)로 → 휴지통·감사 보존.
       allow delete: if businessColl(coll) && isHQ() && moneyDeletable(coll, resource.data.companyId);
     }

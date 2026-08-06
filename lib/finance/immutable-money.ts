@@ -48,3 +48,66 @@ export function moneyConflictMessage(conflicts: string[]): string {
   const rest = conflicts.length > 3 ? ` 외 ${conflicts.length - 3}건` : '';
   return `이미 저장된 자금거래가 포함되어 저장하지 않았습니다 (${head}${rest}) — 자금 원자는 덮어쓸 수 없습니다. 수정이 필요하면 해당 거래를 열어 고치세요`;
 }
+
+/* ────────────────────────────────────────────────────────────────────────────
+ * 원자 필드 불변 (update 경계) — create-only 가 «덮어쓰기»를 막는다면, 이쪽은 «고쳐쓰기»를 막는다.
+ *
+ * 은행이 찍은 사실(계좌·일자·금액·상대·잔액)은 우리가 고칠 값이 아니다. 고쳐야 할 상황은
+ * «잘못 읽었다»(=재수집) 또는 «취소·정정 거래가 따로 있다»이지, 원장의 숫자를 바꾸는 일이 아니다.
+ * 이 규약은 firestore.rules `moneySourceImmutable()` 과 **같은 목록**을 쓴다(양쪽이 갈라지면
+ * 클라는 통과시키고 서버가 PERMISSION_DENIED 를 내는 «원인 모를 저장 실패»가 된다).
+ * ──────────────────────────────────────────────────────────────────────────── */
+
+/**
+ * 은행·카드사가 만든 사실. 앱이 붙이는 값(계정과목·매칭·정산·메모·수단)은 여기 없다.
+ *
+ * ★`memo` 는 일부러 뺐다 — 원문 적요는 `jeokyo` 이고, `memo` 에는 앱이 정산 라벨
+ *   (「CMS집금 정산(수동) 수수료 …」 · `lib/payments/auto-settle`)을 써 왔다. 목록에 넣으면
+ *   정상 기능인 정산이 규칙에 막힌다. 적요 원문 보존은 `jeokyo` 가 담당한다.
+ */
+export const MONEY_SOURCE_FIELDS = [
+  'account', 'txDate', 'txTime', 'amount', 'withdraw', 'balance', 'counterparty', 'jeokyo',
+  'approvalNo', 'cardNo', 'cardLast4', 'merchant',
+  'txKey', '_key', 'raw',
+] as const;
+
+/**
+ * 파일·마이그레이션으로 들어온 거래인가 — `txKey` 유무로 가른다.
+ *
+ * 손으로 넣은 단건(`/cash` 단건 입력)은 txKey 가 없다. 그건 사람이 친 값이므로 오타 정정을
+ * 허용해야 한다(마감 가드·감사로그·소프트삭제는 그대로 적용된다). 반대로 파일에서 온 건은
+ * 원천을 다시 담는 것이 정정 방법이다.
+ * ★txKey 를 지우고 고치는 2단계 우회는 성립하지 않는다 — txKey 자체가 불변 목록에 있다.
+ */
+export function isImportedMoneyRecord(before: Record<string, unknown> | null | undefined): boolean {
+  return !!before && !!before.txKey;
+}
+
+/** 패치가 건드리는 원자 필드 — 값이 «실제로 달라지는» 것만 센다(같은 값 재전송은 수정이 아니다). */
+export function changedMoneySourceFields(
+  before: Record<string, unknown> | null | undefined,
+  patch: Record<string, unknown> | null | undefined,
+): string[] {
+  if (!before || !patch) return [];
+  return MONEY_SOURCE_FIELDS.filter((f) => {
+    if (!Object.hasOwn(patch, f)) return false;
+    return JSON.stringify(patch[f] ?? null) !== JSON.stringify(before[f] ?? null);
+  });
+}
+
+/**
+ * 클라 가드 — 규칙에 막혀 «원인 모를 저장 실패»를 보기 전에, 왜 안 되는지 먼저 말한다.
+ * 규칙(서버)이 진짜 경계이고 이건 사용자에게 사유를 주기 위한 앞단이다.
+ */
+export function assertMoneySourceUnchanged(
+  entityKey: string,
+  before: Record<string, unknown> | null | undefined,
+  patch: Record<string, unknown> | null | undefined,
+): void {
+  if (!isMoneyEntity(entityKey) || !isImportedMoneyRecord(before)) return;
+  const changed = changedMoneySourceFields(before, patch);
+  if (changed.length === 0) return;
+  throw new Error(
+    `수집된 자금거래의 원자 항목(${changed.join(', ')})은 고칠 수 없습니다 — 잘못 읽힌 거래는 원천을 다시 담고, 취소·정정은 별도 거래로 넣으세요`,
+  );
+}

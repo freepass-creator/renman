@@ -15,6 +15,7 @@ import {
 } from './audit';
 import { newId } from './domain/ids';
 import { assertMoneyMutable, ensurePeriodLocksHydrated, isPeriodLocked } from './finance/period-lock';
+import { assertMoneySourceUnchanged } from './finance/immutable-money';
 import { normPlate } from './plate';
 import { assertNoLockConflict, peelExpectedUpdatedAt } from './lock-conflict';
 import { withTimeout } from './async';
@@ -419,6 +420,8 @@ class AuditingStore implements StoreAdapter {
     if (entityKey === AUDIT_COLL) return this.base.update(entityKey, companyId, key, patch);
     const before = await this.base.get(entityKey, companyId, key);
     assertMoneyMutable(entityKey, companyId, before as Record<string, unknown> | null, patch as Record<string, unknown>);
+    // 수집된 자금거래의 원자(금액·일자·상대…)는 고칠 수 없다 — 규칙(moneySourceImmutable)과 같은 목록.
+    assertMoneySourceUnchanged(entityKey, before as Record<string, unknown> | null, patch as Record<string, unknown>);
     const carried = carryPlateHistory(entityKey, before, patch);
     await this.base.update(entityKey, companyId, key, { ...patch, ...carried, ...stampUpdateFields() });
     void this.writeLog(companyId, { action: 'update', entityType: entityKey, entityId: key, label: this.label(entityKey, key, '수정'), before: beforeSubset(before, patch), after: patch });
