@@ -317,7 +317,7 @@ function ContractLedgerInner() {
           {' · '}연체 <b style={{ color: scheduleStats.overdueCount ? C.danger : C.ink }}>{scheduleStats.overdueCount}</b>
         </span>
       ) : (
-        <span style={{ fontSize: 12.5, color: C.mute }}>진행 계약 <b style={{ color: C.ok }}>{active}건</b> · 진행 리스크 <b style={{ color: C.danger }}>{riskCount}건</b>{riskDebtSum > 0 ? <> · 진행 미수 {won(riskDebtSum)}</> : null} · 종료 후 리스크 <b>{endedRiskCount}건</b>{endedRiskDebtSum > 0 ? <> · 종료 미수 {won(endedRiskDebtSum)}</> : null}</span>
+        <span style={{ fontSize: 12.5, color: C.mute }}>진행 계약 <b style={{ color: C.ok }}>{active}건</b> · 진행 리스크 <b style={{ color: C.danger }}>{riskCount}건</b>{riskDebtSum > 0 ? <> · 계약유지 미수 {won(riskDebtSum)}</> : null} · 종료 후 리스크 <b>{endedRiskCount}건</b>{endedRiskDebtSum > 0 ? <> · 계약종료 미수 {won(endedRiskDebtSum)}</> : null}</span>
       )}
       showColView={false}
       colView={sheetView === '전체' ? '전체' : '기본'}

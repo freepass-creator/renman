@@ -32,7 +32,7 @@ const HUB: HubLink[] = [
   { href: '/company', label: '법인관리', desc: '소재지·차고지·등록대수·공문', icon: Building2 },
   { href: '/admin', label: '일반관리', desc: '계좌 약칭·법인 레지스트리', icon: Settings2 },
   { href: '/docs', label: '문서 발급', desc: '내용증명·공문 등', icon: FileText },
-  { href: '/integrity', label: '리스크·정합성', desc: '데이터 이상·만기 점검', icon: ShieldAlert },
+  { href: '/integrity', label: '정합성', desc: '데이터 이상·만기 점검', icon: ShieldAlert },
   { href: '/audit', label: '감사 로그', desc: '변경 이력', icon: History },
   { href: '/manage', label: '경영·손익', desc: '가동률·미수 aging·재무 요약', icon: BarChart3, hqOnly: true },
   { href: '/dev/data', label: '개발도구', desc: '시드·백엔드·회사별 데이터', icon: Wrench, hqOnly: true },

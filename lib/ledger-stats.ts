@@ -61,15 +61,16 @@ export type FleetStatusStats = {
   heldN: number;
   runN: number;
   utilPct: number;
+  /** @deprecated 운영현황은 계약유지 미수만 — maintainedNetSum 사용 */
   netSum: number;
   maintainedNetSum: number;
-  endedNetSum: number;
   inspSoon: number;
 };
 
 /**
  * 운영현황 배지.
  *   held/run = 검색 스코프(`searched`) 중 `isVehicleHeld` · 미수합·검사임박 = 표에 보이는 행(`rows`).
+ *   미수 = 계약유지분만(종료 미수는 /risk·계약).
  */
 export function summarizeFleetStatusStats(searched: FleetRow[], rows: FleetRow[]): FleetStatusStats {
   let heldN = 0, runN = 0;
@@ -78,11 +79,9 @@ export function summarizeFleetStatusStats(searched: FleetRow[], rows: FleetRow[]
     heldN++;
     if (r.util === '운행') runN++;
   }
-  let netSum = 0, maintainedNetSum = 0, endedNetSum = 0, inspSoon = 0;
+  let maintainedNetSum = 0, inspSoon = 0;
   for (const r of rows) {
-    netSum += Math.max(0, r.net);
     maintainedNetSum += Math.max(0, r.maintainedNet);
-    endedNetSum += Math.max(0, r.endedNet);
     const d = dday(r.inspectionTo);
     if (d != null && d <= 30) inspSoon++;
   }
@@ -90,9 +89,8 @@ export function summarizeFleetStatusStats(searched: FleetRow[], rows: FleetRow[]
     heldN,
     runN,
     utilPct: heldN ? Math.round((runN / heldN) * 100) : 0,
-    netSum,
+    netSum: maintainedNetSum,
     maintainedNetSum,
-    endedNetSum,
     inspSoon,
   };
 }

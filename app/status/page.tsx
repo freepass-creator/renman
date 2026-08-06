@@ -78,7 +78,8 @@ export default function StatusPage() {
     if (activeScope === '운행' || activeScope === '정비' || activeScope === '휴차') {
       if (r.util !== activeScope) return false;
     } else if (activeScope === '리스크') {
-      if (!(r.net > 0 || r.warnings.length > 0 || (r.dday != null && r.dday < 0))) return false;
+      // 운영현황은 계약유지 미수만 — 종료 미수는 /risk·계약에서.
+      if (!(r.maintainedNet > 0 || r.warnings.length > 0 || (r.dday != null && r.dday < 0))) return false;
     }
     if (range.from || range.to) {
       const s = (r.start || '').slice(0, 10);
@@ -94,7 +95,7 @@ export default function StatusPage() {
     });
   }), [searched, activeScope, range.from, range.to, detailFilters]);
 
-  const { heldN, utilPct, maintainedNetSum, endedNetSum, inspSoon } = useMemo(
+  const { heldN, utilPct, maintainedNetSum, inspSoon } = useMemo(
     () => summarizeFleetStatusStats(searched, rows),
     [searched, rows],
   );
@@ -106,7 +107,7 @@ export default function StatusPage() {
     <>
     <LedgerFrame
       title="운영현황"
-      meta="차량 1대=1행·자산+계약+미수·조회 전용"
+      meta="보유 차량 1대=1행 · 조회 전용"
       filters={<>
         <Search
           size="sm"
@@ -159,8 +160,7 @@ export default function StatusPage() {
         <span style={{ fontSize: 12.5, color: C.mute, whiteSpace: 'nowrap', display: 'inline-flex', gap: 12 }}>
           <span>보유 <b style={{ color: C.ink }}>{heldN}</b></span>
           <span>가동률 <b style={{ color: utilPct >= 70 ? 'var(--green-text)' : utilPct < 50 ? C.warn : C.ink }}>{utilPct}%</b></span>
-          {maintainedNetSum > 0 && <span>보유차량·계약유지 미수 <b style={{ color: C.danger }}>{won(maintainedNetSum)}</b></span>}
-          {endedNetSum > 0 && <span>보유차량·계약종료 미수 <b style={{ color: C.danger }}>{won(endedNetSum)}</b></span>}
+          {maintainedNetSum > 0 && <span>계약유지 미수 <b style={{ color: C.danger }}>{won(maintainedNetSum)}</b></span>}
           {inspSoon > 0 && <span>검사임박 <b style={{ color: C.warn }}>{inspSoon}</b></span>}
         </span>
       }
@@ -184,7 +184,7 @@ export default function StatusPage() {
           ['사용처', r.customer || LEDGER_EMPTY.noContract],
           ...(r.warnings.length ? [['확인', `${r.warnings.length}건`] as [string, string]] : []),
         ],
-        right: r.net > 0 ? won(r.net) : undefined,
+        right: r.maintainedNet > 0 ? won(r.maintainedNet) : undefined,
       })}
       onView={xl.onView}
       onRowContextMenu={(e) => {
@@ -206,7 +206,7 @@ export default function StatusPage() {
             <>
               {selected.plate ? <Btn size="sm" onClick={() => openCar(selected.plate, undefined, selected.companyId)}>차량 360</Btn> : null}
               {selected.contractNo ? <Btn size="sm" variant="ghost" onClick={() => router.push(`/contract?open=${encodeURIComponent(selected.contractNo)}`)}>계약 열기</Btn> : null}
-              {selected.net > 0 ? <Btn size="sm" variant="ghost" onClick={() => openReceivables()}>미수 회수</Btn> : null}
+              {selected.maintainedNet > 0 ? <Btn size="sm" variant="ghost" onClick={() => openReceivables()}>미수 회수</Btn> : null}
             </>
           )}
         />

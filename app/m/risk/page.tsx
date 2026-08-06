@@ -69,7 +69,6 @@ export default function MRisk() {
                 {visible.map((item) => (
                   <ObjRow
                     key={item.id}
-                    rail={item.tone === 'danger' ? 'danger' : item.tone === 'warn' ? 'warn' : item.tone === 'brand' ? 'brand' : 'mute'}
                     badge={item.group}
                     badgeTone={item.badgeTone}
                     plate={item.plate || undefined}

@@ -36,6 +36,7 @@ import {
   RECEIVABLE_BASIC_COLS, RECEIVABLE_DETAIL_SECTIONS, RECEIVABLE_EXPANDED_COLS,
   receivableContractState, receivableNextAction, receivableRowKey,
 } from '@/lib/receivables-cols';
+import { LEDGER_EMPTY } from '@/lib/ledger-empty';
 import { useTableSelection } from '@/lib/use-table-selection';
 import { useCtrlASelectAll, useRowSelection } from '@/lib/use-row-selection';
 
@@ -374,8 +375,8 @@ export default function ReceivablesPage() {
         }}
         sidePanel={selected ? (
           <LedgerRecordPanel
-            title={selected.v.ended ? '종료계약 잔존채권' : '계약유지 미수'}
-            identity={`${String(selected.rec.contractorName || '—')} · ${String(selected.rec.plate || '—')}`}
+            title={selected.v.ended ? '계약종료 미수' : '계약유지 미수'}
+            identity={`${String(selected.rec.contractorName || LEDGER_EMPTY.none)} · ${String(selected.rec.plate || LEDGER_EMPTY.unassigned)}`}
             statusBadge={<Badge tone={STONE[selected.st.stage] || 'gray'}>{selected.st.stage}</Badge>}
             row={selected}
             cols={RECEIVABLE_EXPANDED_COLS}

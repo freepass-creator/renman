@@ -49,7 +49,7 @@ const PAGE_VIEWS = [
   ]],
   ['운영', FLEET_BASIC_COLS, FLEET_EXPANDED_COLS, [
     'company', 'plate', 'car', 'own', 'status', 'contractState', 'cust', 'loc', 'phone', 'rent', 'dep', 'paymentDay', 'round',
-    'maintainedNet', 'endedNet', 'end', 'inspect', 'insEnd', 'mileage', 'warn',
+    'maintainedNet', 'end', 'inspect', 'insEnd', 'mileage', 'warn',
   ]],
   ['자금', CASH_BASIC_COLS, CASH_EXPANDED_COLS, [
     'company', 'acctName', 'party', 'moneyClass', 'match', 'bundle', 'cat', 'flowNature', 'date', 'content', 'in', 'out',

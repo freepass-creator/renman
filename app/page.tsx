@@ -335,7 +335,7 @@ export default function DashboardPage() {
             <KpiTile
               label="계약유지 미수"
               value={Soft(loading, won(kpi.misuActive))}
-              meta={loading ? undefined : `유지 ${kpi.misuActiveCount}건 · 종료 ${kpi.misuReturnedCount}건 ${won(kpi.misuReturned)}`}
+              meta={loading ? undefined : `유지 ${kpi.misuActiveCount}건`}
               bar={<Bar pct={loading || !kpi.monthlyBilled ? 0 : Math.min(100, Math.round((kpi.misuActive / kpi.monthlyBilled) * 100))} tone="danger" />}
               onClick={() => go('/risk')}
             />

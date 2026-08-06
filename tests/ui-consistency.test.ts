@@ -113,8 +113,9 @@ describe('UI 공용 원자 규격', () => {
     expect(vehicle).toContain('buildRiskSheetRows');
     expect(vehicle).toContain('buildWorkItemLedgerRows');
     expect(vehicle).toContain('buildMobileVehicleScope(vehicles, contracts, plate, companyId)');
-    expect(vehicle).toContain('유지계약 미수');
-    expect(vehicle).toContain('종료계약 미수');
+    // 2026-08-06 용어 통일 — 유지계약/종료계약 → 계약유지/계약종료 (계약·미수·모바일이 같은 말을 쓴다)
+    expect(vehicle).toContain('계약유지 미수');
+    expect(vehicle).toContain('계약종료 미수');
     expect(workNew).toContain("params.get('plate')");
     expect(workNew).toContain("params.get('company')");
     expect(workNew).toContain("plate ? mobileVehicleHref(plate, companyId) : '/m/work'");

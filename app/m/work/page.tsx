@@ -9,6 +9,7 @@ import { useEntityLists } from '@/lib/use-entity-lists';
 import { textMatch } from '@/lib/search-match';
 import { todayKST } from '@/lib/contracts/dates';
 import { buildWorkItemLedgerRows, workAttentionRank, workDueSignal, workStatusTone } from '@/lib/work-ledger';
+import { LEDGER_EMPTY } from '@/lib/ledger-empty';
 
 type View = '할 일' | '미배정' | '완료' | '전체';
 
@@ -71,17 +72,16 @@ export default function MWork() {
                 return (
                   <ObjRow
                     key={row.id}
-                    rail={due.state === '기한경과' ? 'danger' : 'none'}
                     co={row.companyId}
                     plate={row.plate || undefined}
-                    name={row.plate ? undefined : row.title || '내용 확인 필요'}
+                    name={row.plate ? undefined : row.title || LEDGER_EMPTY.dash}
                     badge={row.status}
                     badgeTone={workStatusTone(row.status)}
-                    meta={row.plate ? (row.title || '내용 확인 필요') : row.kind}
+                    meta={row.plate ? (row.title || LEDGER_EMPTY.dash) : row.kind}
                     fields={[
                       ['구분', row.kind],
                       ['기한', row.dueDate ? `${row.dueDate}${due.label ? ` · ${due.label}` : ''}` : '미지정'],
-                      ['담당', row.assignee || '미배정'],
+                      ['담당', row.assignee || LEDGER_EMPTY.unassigned],
                     ]}
                     onClick={key ? () => router.push(`/m/work/${encodeURIComponent(key)}`) : undefined}
                   />

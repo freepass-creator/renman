@@ -13,6 +13,7 @@ import { buildRiskSheetRows } from '@/lib/risk-ledger';
 import { buildWorkItemLedgerRows, workAttentionRank, workDueSignal, workStatusTone } from '@/lib/work-ledger';
 import { normPlate } from '@/lib/plate';
 import { buildMobileVehicleScope, scopeMobileVehicleRecords } from '@/lib/mobile-vehicle-scope';
+import { LEDGER_EMPTY } from '@/lib/ledger-empty';
 import type { EntityRecord } from '@/lib/intake/entities';
 
 export const dynamic = 'force-dynamic';
@@ -22,7 +23,7 @@ function recentStamp(record: EntityRecord): string {
 }
 
 function historyTitle(record: EntityRecord): string {
-  return String(record.title || record.description || record.memo || record.note || '이력 내용 확인 필요');
+  return String(record.title || record.description || record.memo || record.note || LEDGER_EMPTY.dash);
 }
 
 export default function MVehicle() {
@@ -97,8 +98,8 @@ export default function MVehicle() {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 8 }}>
           <Metric label="계약 상태" value={row.contractState} tone={row.contractState === '계약유지' ? 'ok' : 'ink'} />
           <Metric label="전체 미수" value={won(row.net)} tone={row.net > 0 ? 'danger' : 'ink'} />
-          <Metric label="유지계약 미수" value={won(row.maintainedNet)} tone={row.maintainedNet > 0 ? 'danger' : 'ink'} />
-          <Metric label="종료계약 미수" value={won(row.endedNet)} tone={row.endedNet > 0 ? 'danger' : 'ink'} />
+          <Metric label="계약유지 미수" value={won(row.maintainedNet)} tone={row.maintainedNet > 0 ? 'danger' : 'ink'} />
+          <Metric label="계약종료 미수" value={won(row.endedNet)} tone={row.endedNet > 0 ? 'danger' : 'ink'} />
         </div>
 
         {row.customer ? (
@@ -118,7 +119,6 @@ export default function MVehicle() {
             {risks.slice(0, 5).map((item) => (
               <ObjRow
                 key={item.id}
-                rail={item.tone === 'danger' ? 'danger' : item.tone === 'warn' ? 'warn' : 'none'}
                 badge={item.group}
                 badgeTone={item.badgeTone}
                 name={item.kind}
@@ -138,12 +138,11 @@ export default function MVehicle() {
             return (
               <ObjRow
                 key={item.id}
-                rail={due.state === '기한경과' ? 'danger' : 'none'}
                 badge={item.status}
                 badgeTone={workStatusTone(item.status)}
-                name={item.title || '내용 확인 필요'}
+                name={item.title || LEDGER_EMPTY.dash}
                 meta={item.kind}
-                fields={[["기한", item.dueDate ? `${item.dueDate}${due.label ? ` · ${due.label}` : ''}` : '미지정'], ["담당", item.assignee || '미배정']]}
+                fields={[["기한", item.dueDate ? `${item.dueDate}${due.label ? ` · ${due.label}` : ''}` : '미지정'], ["담당", item.assignee || LEDGER_EMPTY.unassigned]]}
                 onClick={key ? () => router.push(`/m/work/${encodeURIComponent(key)}`) : undefined}
               />
             );

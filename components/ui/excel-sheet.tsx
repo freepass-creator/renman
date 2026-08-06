@@ -4,9 +4,10 @@ import { Check, ChevronDown, ChevronUp } from 'lucide-react';
 import { useIsMobile } from '@/lib/use-mobile';
 import { useSession } from '@/lib/session';
 import { haptic } from '@/lib/haptics';
-import { C, R, SH, thX, thXR, thXC, thXPin, tdX, tdXR, tdXC, tdXPin, ctrlH, ctrlFs } from './tokens';
+import { C, R, SH, NUM, thX, thXR, thXC, thXPin, tdX, tdXR, tdXC, tdXPin, ctrlH, ctrlFs } from './tokens';
 import { ObjCard, Cards, type ObjCardProps } from './misc';
 import { Btn, Search } from './controls';
+import { money } from './table';
 
 /**
  * 엑셀 시트 뷰 — 프리패스 ERP4 엑셀뷰 이식(현황 한눈).
@@ -15,7 +16,7 @@ import { Btn, Search } from './controls';
  *
  * 헤더 필터(= ERP4 엑셀 오토필터) 규칙:
  *   · 열 간 AND · 열 안 OR (엑셀과 동일)
- *   · 체크리스트 값 = **셀에 보이는 문자열 그대로**(col.text). 보이는 것만 고를 수 있어야 헷갈리지 않는다.
+ *   · 체크리스트 키 = col.text 평문(매칭·CSV). 표시는 formatFilterLabel 로 셀과 같은 말(금액 콤마 등).
  *   · 개수는 «다른 열 필터를 반영한» 교차집계 — 내 열만 빼고 센다. 그래야 숫자가 실제 결과와 맞는다.
  *   · 필터는 원자 안에 산다. 페이지는 onView 로 보이는 rows·cols 를 받아 건수·엑셀에 쓴다(집계 손롤 금지).
  *
@@ -55,8 +56,29 @@ const cellValues = <T,>(c: SheetCol<T>, r: T): string[] => {
   const v = cellText(c, r);
   return [v || '(없음)'];
 };
+
+const PURE_NUM = /^-?\d+(\.\d+)?$/;
+const isNumKey = (v: string) => v !== '(없음)' && PURE_NUM.test(v);
+const colIsNumeric = <T,>(c: SheetCol<T>, keys: string[]): boolean => {
+  if (c.sortNum || c.xf === 'money' || c.xf === 'int' || c.xf === 'rate') return true;
+  const vals = keys.filter((k) => k !== '(없음)');
+  return vals.length > 0 && vals.every(isNumKey);
+};
+/** 필터 체크리스트 표시 — 매칭 키(text)는 그대로 두고, 금액·숫자는 셀과 같이 콤마. */
+const formatFilterLabel = <T,>(c: SheetCol<T>, v: string): string => {
+  if (v === '(없음)') return '(없음)';
+  if (c.xf === 'money') return money(v);
+  if ((c.xf === 'int' || c.xf === 'rate' || c.sortNum || PURE_NUM.test(v)) && isNumKey(v)) {
+    return Number(v).toLocaleString('ko-KR');
+  }
+  return v;
+};
 const sortVal = <T,>(c: SheetCol<T>, r: T): number | string => {
-  if (c.sortNum) return Number(String(c.text ? c.text(r) : '').replace(/[^\d.-]/g, '')) || 0;
+  const raw = String(c.text ? c.text(r) : '').trim();
+  if (c.sortNum || c.xf === 'money' || c.xf === 'int' || c.xf === 'rate') {
+    return Number(raw.replace(/[^\d.-]/g, '')) || 0;
+  }
+  if (PURE_NUM.test(raw)) return Number(raw);
   return cellText(c, r);
 };
 
@@ -82,10 +104,28 @@ function FilterPop<T>({ col, x, y, rows, sel, onSel, sort, onSort, onClose }: {
   const entries = React.useMemo(() => {
     const m = new Map<string, number>();
     for (const r of rows) for (const v of cellValues(col, r)) m.set(v, (m.get(v) || 0) + 1);
-    return [...m.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], 'ko'));
+    const list = [...m.entries()];
+    const numeric = colIsNumeric(col, list.map(([k]) => k));
+    list.sort((a, b) => {
+      if (numeric) {
+        const na = a[0] === '(없음)' ? Number.NEGATIVE_INFINITY : Number(a[0]);
+        const nb = b[0] === '(없음)' ? Number.NEGATIVE_INFINITY : Number(b[0]);
+        return na - nb || b[1] - a[1];
+      }
+      return b[1] - a[1] || a[0].localeCompare(b[0], 'ko');
+    });
+    return list;
   }, [rows, col]);
 
-  const shown = entries.filter(([k]) => !q || k.toLowerCase().includes(q.toLowerCase()));
+  const qNorm = q.replace(/,/g, '').trim().toLowerCase();
+  const shown = entries.filter(([k]) => {
+    if (!qNorm) return true;
+    const label = formatFilterLabel(col, k);
+    return k.toLowerCase().includes(qNorm)
+      || label.toLowerCase().includes(q.toLowerCase())
+      || label.replace(/,/g, '').toLowerCase().includes(qNorm);
+  });
+  const numericList = colIsNumeric(col, entries.map(([k]) => k));
   const toggle = (v: string) => { haptic.select(); const n = new Set(sel); if (n.has(v)) n.delete(v); else n.add(v); onSel(n); };
   const isS = (dir: 'asc' | 'desc') => !!sort && sort.key === col.key && sort.dir === dir;
   const setDir = (dir: 'asc' | 'desc') => { haptic.select(); onSort(isS(dir) ? null : { key: col.key, dir }); };
@@ -94,6 +134,7 @@ function FilterPop<T>({ col, x, y, rows, sel, onSel, sort, onSort, onClose }: {
     flex: 1, height: ctrlH(false, 'sm'), fontSize: ctrlFs(false, 'sm'), fontWeight: 600, boxSizing: 'border-box',
     border: `1px solid ${active ? C.brand : C.line}`, borderRadius: R,
     background: active ? C.brand : C.card, color: active ? C.inverse : C.mute, cursor: 'pointer',
+    display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 4,
   });
 
   return (
@@ -101,8 +142,8 @@ function FilterPop<T>({ col, x, y, rows, sel, onSel, sort, onSort, onClose }: {
       <div style={{ position: 'fixed', inset: 0, zIndex: 90 }} onClick={onClose} />
       <div role="dialog" aria-label={`${col.label} 필터`}
         style={{
-          position: 'fixed', top: y + 2, left: Math.max(6, Math.min(x, (typeof window !== 'undefined' ? window.innerWidth : 1280) - 236)),
-          width: 230, zIndex: 91, background: C.card, border: `1px solid ${C.line}`,
+          position: 'fixed', top: y + 2, left: Math.max(6, Math.min(x, (typeof window !== 'undefined' ? window.innerWidth : 1280) - 264)),
+          width: 248, zIndex: 91, background: C.card, border: `1px solid ${C.line}`,
           borderRadius: R, boxShadow: SH.pop, padding: 8,
         }}>
         <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
@@ -114,6 +155,7 @@ function FilterPop<T>({ col, x, y, rows, sel, onSel, sort, onSort, onClose }: {
           {shown.length === 0 ? <div style={{ fontSize: 12, color: C.faint, padding: '10px 4px' }}>값 없음</div>
             : shown.map(([v, n]) => {
               const on = sel.has(v);
+              const label = formatFilterLabel(col, v);
               return (
                 <button key={v} type="button" onClick={() => toggle(v)}
                   style={{
@@ -123,8 +165,13 @@ function FilterPop<T>({ col, x, y, rows, sel, onSel, sort, onSort, onClose }: {
                     fontSize: 12, color: C.ink,
                   }}>
                   <span style={{ width: 12, color: on ? C.brand : C.line2, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>{on ? <Check size={12} strokeWidth={2.6} aria-hidden /> : null}</span>
-                  <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{v}</span>
-                  <span style={{ fontSize: 11, color: C.faint, fontVariantNumeric: 'tabular-nums' }}>{n}</span>
+                  <span style={{
+                    flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                    fontFamily: numericList && isNumKey(v) ? NUM : undefined,
+                    fontVariantNumeric: numericList && isNumKey(v) ? 'tabular-nums' : undefined,
+                    textAlign: numericList && isNumKey(v) ? 'right' : 'left',
+                  }}>{label}</span>
+                  <span style={{ fontSize: 11, color: C.faint, fontVariantNumeric: 'tabular-nums', fontFamily: NUM, minWidth: 18, textAlign: 'right' }}>{n}</span>
                 </button>
               );
             })}

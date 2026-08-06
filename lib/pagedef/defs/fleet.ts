@@ -1,11 +1,12 @@
 /**
- * FLEET_DEF — 운영원장(/sheet) 정의. E-grid 원형.
+ * FLEET_DEF — 운영현황(/status, /m/ops · 레거시 /sheet) 정의. E-grid 원형.
  *   자산+계약 1행 마스터 → 행클릭 Vehicle360. 도메인(linkFleet·buildFleetRows) 불변.
+ *   미수 표시 = 계약유지분만(종료 미수는 /risk·계약).
  */
 import { useMemo } from 'react';
 import { TODAY, dday } from '@/lib/dashboard-consts';
 import { isVehicleHeld, linkFleet } from '@/lib/domain/model';
-import { buildFleetRows, statusRank, fleetRail, type FleetRow } from '@/lib/sheet-rows';
+import { buildFleetRows, statusRank, type FleetRow } from '@/lib/sheet-rows';
 import { FLEET_BASIC_COLS, FLEET_EXPANDED_COLS, FLEET_REVEAL_COLS } from '@/lib/sheet-cols';
 import { useEntityLists } from '@/lib/use-entity-lists';
 import { openCar } from '@/lib/ui-bus';
@@ -15,24 +16,23 @@ import type { PageDef } from '@/lib/pagedef/types';
 
 const OWN = ['보유', '전체', '매각'];
 
-const netTotal = (rows: FleetRow[]) => rows.reduce((s, r) => s + Math.max(0, r.net), 0);
+const maintainedNetTotal = (rows: FleetRow[]) => rows.reduce((s, r) => s + Math.max(0, r.maintainedNet), 0);
 
 export const FLEET_DEF: PageDef<FleetRow> = {
   href: '/sheet',
   archetype: 'E-grid',
-  title: '운영원장',
+  title: '운영현황',
   rowKey: (r) => r.plate,
   drill: (r) => openCar(r.plate),
   mDrill: (r) => mobileVehicleHref(r.plate, r.companyId),
 
-  // 모바일 리스트 — 상태 레일 + 차번 + 차종/고객 + 우측 미수(danger). 상태별 그룹.
+  // 모바일 리스트 — 배지만 상태색(행 틴트·레일 금지). 우측=유지미수.
   row: (r) => ({
-    rail: fleetRail(r),
     co: r.companyId,
     plate: r.plate,
     meta: r.carName,
     sub: `${r.customer || '계약없음'}${r.end ? ` · 만기 ${r.end.slice(2)}` : ''}`,
-    right: r.net > 0 ? won(r.net) : undefined,
+    right: r.maintainedNet > 0 ? won(r.maintainedNet) : undefined,
     rightTone: 'danger',
   }),
   groups: [
@@ -60,7 +60,7 @@ export const FLEET_DEF: PageDef<FleetRow> = {
   radioKeys: OWN,
   facetDefault: ['보유'],
   period: 'month',
-  csvName: (view) => `운영원장_${view}_${TODAY}`,
+  csvName: (view) => `운영현황_${view}_${TODAY}`,
   sort: (a, b) => statusRank(a) - statusRank(b) || a.plate.localeCompare(b.plate, 'ko'),
 
   // app/sheet/page.tsx rows useMemo 술어 그대로.
@@ -76,7 +76,7 @@ export const FLEET_DEF: PageDef<FleetRow> = {
     else if (facets.has('매각')) { if (r.ownership !== '처분완료') return false; }
     else if (!held) return false;
     if (util.length && !util.includes(r.util)) return false;
-    if (misu.length && !((misu.includes('미수있음') && r.net > 0) || (misu.includes('연체90일+') && r.overdueDays >= 90))) return false;
+    if (misu.length && !((misu.includes('미수있음') && r.maintainedNet > 0) || (misu.includes('연체90일+') && r.overdueDays >= 90))) return false;
     if (due.length) {
       const insp = dday(r.inspectionTo), insE = dday(r.insEnd);
       if (!((due.includes('검사임박') && insp != null && insp <= 30) || (due.includes('보험임박') && insE != null && insE <= 30))) return false;
@@ -108,7 +108,7 @@ export const FLEET_DEF: PageDef<FleetRow> = {
       if (!r.customer && isVehicleHeld(r) && r.status !== '차량없음') c['계약없음']++;
       if (r.warnings.length > 0) c['경고있음']++;
       if (r.warnings.some((w) => w.sev === 'high')) c['위험만']++;
-      if (r.net > 0) c['미수있음']++;
+      if (r.maintainedNet > 0) c['미수있음']++;
       if (r.overdueDays >= 90) c['연체90일+']++;
       const insp = dday(r.inspectionTo); if (insp != null && insp <= 30) c['검사임박']++;
       const insE = dday(r.insEnd); if (insE != null && insE <= 30) c['보험임박']++;
@@ -121,6 +121,6 @@ export const FLEET_DEF: PageDef<FleetRow> = {
   summary: [
     { key: 'held', label: '보유', value: (rows) => rows.reduce((n, r) => n + (isVehicleHeld(r) ? 1 : 0), 0) },
     { key: 'idle', label: '휴차', value: (rows) => rows.reduce((n, r) => n + (r.util === '휴차' ? 1 : 0), 0) },
-    { key: 'net', label: '미수', tone: 'danger', show: (rows) => netTotal(rows) > 0, value: (rows) => won(netTotal(rows)) },
+    { key: 'net', label: '유지미수', tone: 'danger', show: (rows) => maintainedNetTotal(rows) > 0, value: (rows) => won(maintainedNetTotal(rows)) },
   ],
 };

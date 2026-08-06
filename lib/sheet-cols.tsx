@@ -58,22 +58,22 @@ const FL = {
   year: { key: 'year', label: '연식', render: (r) => r.year || LEDGER_EMPTY.dash, text: (r) => r.year },
   vin: { key: 'vin', label: '차대번호', render: (r) => r.vin || LEDGER_EMPTY.dash, text: (r) => r.vin },
   acqDate: { key: 'acqDate', label: '취득일', render: (r) => ymd(r.acqDate), text: (r) => r.acqDate },
-  acqPrice: { key: 'acqPrice', label: '취득가', align: 'r', render: (r) => money0(r.acqPrice), text: (r) => r.acqPrice },
+  acqPrice: { key: 'acqPrice', label: '취득가', align: 'r', sortNum: true, xf: 'money' as const, render: (r) => money0(r.acqPrice), text: (r) => r.acqPrice },
   inspect: { key: 'inspect', label: '검사만기', priority: 3 as const, render: (r) => ddayCell(r.inspectionTo), text: (r) => r.inspectionTo },
   gps: { key: 'gps', label: 'GPS', render: (r) => r.gps || LEDGER_EMPTY.dash, text: (r) => r.gps },
   loanCo: { key: 'loanCo', label: '할부사', render: (r) => r.loanCompany || LEDGER_EMPTY.dash, text: (r) => r.loanCompany },
-  loanAmt: { key: 'loanAmt', label: '할부원금', align: 'r', render: (r) => money0(r.loanPrincipal), text: (r) => r.loanPrincipal },
-  loanRate: { key: 'loanRate', label: '이율', align: 'r', render: (r) => r.loanRate ? `${(r.loanRate * 100).toFixed(1)}%` : LEDGER_EMPTY.dash, text: (r) => r.loanRate },
-  loanMon: { key: 'loanMon', label: '할부개월', align: 'r', render: (r) => r.loanMonths || LEDGER_EMPTY.dash, text: (r) => r.loanMonths },
+  loanAmt: { key: 'loanAmt', label: '할부원금', align: 'r', sortNum: true, xf: 'money' as const, render: (r) => money0(r.loanPrincipal), text: (r) => r.loanPrincipal },
+  loanRate: { key: 'loanRate', label: '이율', align: 'r', sortNum: true, xf: 'rate' as const, render: (r) => r.loanRate ? `${(r.loanRate * 100).toFixed(1)}%` : LEDGER_EMPTY.dash, text: (r) => r.loanRate },
+  loanMon: { key: 'loanMon', label: '할부개월', align: 'r', sortNum: true, xf: 'int' as const, render: (r) => r.loanMonths || LEDGER_EMPTY.dash, text: (r) => r.loanMonths },
   cust: { key: 'cust', label: '사용처', priority: 1 as const, render: (r) => r.customer || LEDGER_EMPTY.none, text: (r) => r.customer },
   term: { key: 'term', label: '계약기간', align: 'r', render: (r) => r.termMonths ? `${r.termMonths}개월` : LEDGER_EMPTY.dash, text: (r) => r.termMonths },
   phone: { key: 'phone', label: '연락처', priority: 2 as const, render: (r) => r.phone || LEDGER_EMPTY.dash, text: (r) => r.phone },
-  rent: { key: 'rent', label: '대여료', align: 'r', priority: 2 as const, render: (r) => money0(r.rent), text: (r) => r.rent },
-  dep: { key: 'dep', label: '보증금', align: 'r', priority: 3 as const, render: (r) => money0(r.deposit), text: (r) => r.deposit },
+  rent: { key: 'rent', label: '대여료', align: 'r', priority: 2 as const, sortNum: true, xf: 'money' as const, render: (r) => money0(r.rent), text: (r) => r.rent },
+  dep: { key: 'dep', label: '보증금', align: 'r', priority: 3 as const, sortNum: true, xf: 'money' as const, render: (r) => money0(r.deposit), text: (r) => r.deposit },
   start: { key: 'start', label: '시작', render: (r) => ymd(r.start), text: (r) => r.start },
   end: { key: 'end', label: '만기', priority: 2 as const, render: (r) => ymd(r.end), text: (r) => r.end },
   dday: {
-    key: 'dday', label: '반납까지', align: 'r',
+    key: 'dday', label: '반납까지', align: 'r', sortNum: true, xf: 'int' as const,
     render: (r) => {
       if (r.dday == null) return LEDGER_EMPTY.dash;
       const tip = remainSpanLabel(r.dday);
@@ -87,19 +87,19 @@ const FL = {
   },
   insurer: { key: 'insurer', label: '보험사', render: (r) => r.insurer || LEDGER_EMPTY.dash, text: (r) => r.insurer },
   insEnd: { key: 'insEnd', label: '보험만기', priority: 3 as const, render: (r) => ddayCell(r.insEnd), text: (r) => r.insEnd },
-  insPrem: { key: 'insPrem', label: '보험료', align: 'r', render: (r) => money0(r.insPremium), text: (r) => r.insPremium },
+  insPrem: { key: 'insPrem', label: '보험료', align: 'r', sortNum: true, xf: 'money' as const, render: (r) => money0(r.insPremium), text: (r) => r.insPremium },
   net: {
-    key: 'net', label: '미수합계', align: 'r', priority: 1 as const,
+    key: 'net', label: '미수합계', align: 'r', priority: 1 as const, sortNum: true, xf: 'money' as const,
     render: (r) => r.net > 0 ? <span style={{ color: C.danger, fontWeight: 700 }}>{money0(r.net)}</span> : LEDGER_EMPTY.dash,
     text: (r) => r.net,
   },
   maintainedNet: {
-    key: 'maintainedNet', label: '계약유지 미수', align: 'r', priority: 1 as const,
+    key: 'maintainedNet', label: '계약유지 미수', align: 'r', priority: 1 as const, sortNum: true, xf: 'money' as const,
     render: (r) => r.maintainedNet > 0 ? <span style={{ color: C.danger, fontWeight: 700 }}>{money0(r.maintainedNet)}</span> : LEDGER_EMPTY.dash,
     text: (r) => r.maintainedNet,
   },
   endedNet: {
-    key: 'endedNet', label: '계약종료 미수', align: 'r', priority: 1 as const,
+    key: 'endedNet', label: '계약종료 미수', align: 'r', priority: 1 as const, sortNum: true, xf: 'money' as const,
     render: (r) => r.endedNet > 0 ? <span style={{ color: C.danger, fontWeight: 700 }}>{money0(r.endedNet)}</span> : LEDGER_EMPTY.dash,
     text: (r) => r.endedNet,
   },
@@ -109,7 +109,7 @@ const FL = {
     text: (r) => r.contractState,
   },
   od: {
-    key: 'od', label: '미수기간', align: 'r',
+    key: 'od', label: '미수기간', align: 'r', sortNum: true, xf: 'int' as const,
     render: (r) => r.overdueDays > 0 ? <span style={{ color: r.overdueDays >= 90 ? C.danger : C.warn, fontWeight: 700 }}>{r.overdueDays}일</span> : LEDGER_EMPTY.dash,
     text: (r) => r.overdueDays,
   },
@@ -204,15 +204,16 @@ const FLEET_COL_CATALOG: SheetCol<FleetRow>[] = alignCols([
 /** 운영 엑셀 열 — `운영 · 엑셀기본|엑셀전체 · +|-key` @see lib/ledger-ext.ts */
 export const FLEET_SHEET_KEYS: SheetViewKeys = {
   // 회사·차번·차명·소유(분류)·상태·사용처·연락처·현위치·대여료·보증금·결제일·회차/기간·미수·만기·검사·보험·주행·경고
+  // 운영현황 = 보유·가동 화면. 계약종료 미수(endedNet)·합계(net)는 /risk·계약에서.
   basic: [
     'company', 'plate', 'car', 'own', 'status', 'contractState', 'cust', 'loc', 'phone',
-    'rent', 'dep', 'paymentDay', 'round', 'maintainedNet', 'endedNet', 'end', 'inspect', 'insEnd', 'mileage', 'warn',
+    'rent', 'dep', 'paymentDay', 'round', 'maintainedNet', 'end', 'inspect', 'insEnd', 'mileage', 'warn',
   ],
   all: [
     'company', 'plate', 'car', 'own', 'status', 'contractState',
     'cust', 'loc', 'phone', 'maker', 'sub', 'year',
     'rentalType', 'term', 'start', 'end', 'dep', 'rent', 'paymentDay', 'paymentTiming', 'round', 'dday',
-    'maintainedNet', 'endedNet', 'net', 'od', 'stage', 'warn', 'note',
+    'maintainedNet', 'od', 'stage', 'warn', 'note',
     'util', 'mileage', 'contractNo',
     'vin', 'acqDate', 'acqPrice', 'gps',
     'loanCo', 'loanAmt', 'loanRate', 'loanMon', 'loanStart',
@@ -236,7 +237,7 @@ export const FLEET_DETAIL_DEFS: DetailSectionDef[] = [
   },
   {
     title: '수납·리스크',
-    keys: ['maintainedNet', 'endedNet', 'net', 'od', 'stage', 'warn', 'note'],
+    keys: ['maintainedNet', 'od', 'stage', 'warn', 'note'],
   },
   {
     title: '자산·취득',
