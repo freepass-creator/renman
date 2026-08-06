@@ -21,6 +21,14 @@ export type LedgerRecordSection<T> = {
   cols: SheetCol<T>[];
   /** 기본 펼침. 없으면 첫 섹션만 연다. */
   open?: boolean;
+  /**
+   * 섹션 안에 들어갈 표·목록. **여러 건인 이력**(계약이력·정비·사고·과태료)은 KV 한 줄로
+   * 못 담으므로 여기로 넣는다 — 접기·제목 위계는 KV 섹션과 완전히 같다(같은 규격, 다른 내용).
+   * cols 가 비어 있으면 KV 없이 body 만 그린다.
+   */
+  body?: React.ReactNode;
+  /** 제목 옆 건수 배지. 접힌 상태에서도 «몇 건인지»가 보이게. */
+  count?: number;
 };
 
 /** 빈 값 → '—'. 0·false는 유지(금액 0·불리언). */
@@ -47,11 +55,17 @@ function RecordSection<T>({
   cols,
   initiallyOpen,
   fieldList,
+  body,
+  count,
 }: {
   title: React.ReactNode;
   cols: SheetCol<T>[];
   initiallyOpen: boolean;
   fieldList: (fieldCols: SheetCol<T>[]) => React.ReactNode;
+  /** 여러 건인 이력(계약·정비·사고…) — KV 로는 못 담아 섹션 안에 표로 넣는다. */
+  body?: React.ReactNode;
+  /** 제목 옆 건수. 이력 섹션이 몇 건인지 접힌 채로도 보이게. */
+  count?: number;
 }) {
   const [open, setOpen] = React.useState(initiallyOpen);
   const userToggleRef = React.useRef(false);
@@ -75,8 +89,10 @@ function RecordSection<T>({
       <summary onClick={() => { userToggleRef.current = true; }}>
         <ChevronRight className="ledger-record-panel__chevron" size={14} aria-hidden="true" />
         {title}
+        {count != null ? <span className="ledger-record-panel__count">{count}건</span> : null}
       </summary>
-      {fieldList(cols)}
+      {cols.length > 0 ? fieldList(cols) : null}
+      {body}
     </details>
   );
 }
@@ -121,7 +137,8 @@ export function LedgerRecordPanel<T>({
   );
 
   const visibleSections = React.useMemo(
-    () => (sections || []).filter((section) => sectionHasValue(section.cols, row)),
+    // body 만 있는 섹션(이력 표)은 cols 가 비어 있으므로 KV 기준으로 지우면 안 된다.
+    () => (sections || []).filter((section) => section.body != null || sectionHasValue(section.cols, row)),
     [sections, row],
   );
   const hasSections = visibleSections.length > 0;
@@ -154,6 +171,8 @@ export function LedgerRecordPanel<T>({
                   key={key}
                   title={section.title}
                   cols={section.cols}
+                  body={section.body}
+                  count={section.count}
                   initiallyOpen={section.open ?? index === 0}
                   fieldList={fieldList}
                 />
