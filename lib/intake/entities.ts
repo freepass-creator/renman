@@ -10,7 +10,7 @@
 import type { DataLayer } from '@/lib/domain/layers';
 import { ENTITY_LAYER } from '@/lib/domain/layers';
 import { RENTAL_TYPES } from '@/lib/schema/contract';
-import { WORK_CATEGORIES } from '@/lib/work-taxonomy';
+import { WORK_CATEGORIES_ACTIVE } from '@/lib/work-taxonomy';
 import { LEDGER_SUBJECTS } from '@/lib/payments/ledger-subjects';
 
 export type FieldType = 'text' | 'number' | 'date' | 'select' | 'vehicle-picker' | 'contract-picker';
@@ -154,7 +154,8 @@ export const ENTITIES: Record<string, Entity> = {
     key: 'work_item', label: '업무', layer: ENTITY_LAYER.work_item, source: '업무 직접입력', idFrom: 'workId',
     fields: [
       { key: 'date', label: '업무일', type: 'date', required: true },
-      { key: 'category', label: '업무분류', type: 'select', options: [...WORK_CATEGORIES], note: '비워 두면 미분류로 저장되며 나중에 이어서 보완할 수 있습니다.' },
+      // 선택지 = 활성 세부(필수 최소)만. 옛 값이 들어 있는 기존 업무는 그대로 보이고 대분류 판정도 정상이다.
+      { key: 'category', label: '업무분류', type: 'select', options: [...WORK_CATEGORIES_ACTIVE], note: '비워 두면 미분류로 저장되며 나중에 이어서 보완할 수 있습니다.' },
       { key: 'status', label: '상태', type: 'select', options: ['대기', '진행', '완료', '보류', '미배정'] },
       { key: 'priority', label: '우선순위', type: 'select', options: ['긴급', '높음', '보통', '낮음'] },
       { key: 'title', label: '업무내용', type: 'text', required: true },

@@ -4,7 +4,7 @@
  *   과태료 = 분류 유지 + kindGateways「고지서 업로드」섹션(폼 필드 없음).
  */
 
-import { WORK_CATEGORIES, isWorkCategory, type WorkCategory } from '@/lib/work-taxonomy';
+import { WORK_CATEGORIES_ACTIVE, isWorkCategory, type WorkCategory } from '@/lib/work-taxonomy';
 
 export type WorkGroup = WorkCategory;
 /** 업무생성 Select 값 — 과태료 포함(선택 시 업로드 섹션으로 분기). */
@@ -13,7 +13,8 @@ export type WorkCreateKind = WorkGroup;
 /** LedgerFormSection과 동일 형태(lib→components 순환 import 방지). */
 export type WorkFormSection = { title: string; fields: string[]; open?: boolean };
 
-export const WORK_CREATE_KINDS: WorkCreateKind[] = [...WORK_CATEGORIES];
+/** 생성 폼에서 고를 수 있는 업무 종류 = 활성 세부(필수 최소). 옛 값은 목록에서만 빠지고 데이터는 유지된다. */
+export const WORK_CREATE_KINDS: WorkCreateKind[] = [...WORK_CATEGORIES_ACTIVE];
 
 const CLASSIFY: WorkFormSection = {
   title: '업무 분류', open: true,
