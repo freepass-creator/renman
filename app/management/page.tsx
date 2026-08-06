@@ -338,6 +338,7 @@ export default function ManagementPage() {
   const chanDel = (k: string, i: number) => setChan((c) => {
     const rows = [...(c[k] ?? [])]; rows.splice(i, 1); return { ...c, [k]: rows };
   });
+  const garageRows = chanRows('garages');
 
   function startEdit() {
     if (!selectedCo) return;
@@ -361,6 +362,7 @@ export default function ManagementPage() {
     });
     setChan({
       cards: asRows(m.cards), autoTransfers: asRows(m.autoTransfers), cardTerminals: asRows(m.cardTerminals),
+      garages: asRows(m.garages),
     });
     setNewAccounts([]);
     setEditing(true);
@@ -387,6 +389,11 @@ export default function ManagementPage() {
       const keep = (k: string, req: string) => chanRows(k).filter((r) => String(r[req] || '').trim());
       await updateManagedCompany(selectedCo.id, { label }, {
         ...master,
+        // 차고지는 주소가 실체다 — 이름만 있고 주소 없는 행은 요건 근거가 못 된다.
+        garages: chanRows('garages').filter((r) => String(r.address || '').trim()).map((r) => ({
+          id: r.id || `gr_${r.address}`, name: r.name || '', address: r.address,
+          capacity: r.capacity ? Number(r.capacity) : undefined,
+        })),
         cards: keep('cards', 'cardLast4'),
         autoTransfers: keep('autoTransfers', 'cmsId'),
         cardTerminals: keep('cardTerminals', 'terminalId'),
@@ -534,6 +541,18 @@ export default function ManagementPage() {
                  수정 잠금은 «기 등록이냐»가 아니라 «거래가 붙었냐»로 가른다 —
                  은행·계좌번호·예금주는 신원이라 거래가 붙은 뒤 바꾸면 과거 귀속이 흔들린다.
                  약칭·용도·메모는 라벨이라 언제나 열어둔다(자금거래 불변 규칙과 같은 논리). */
+              /* ★차고지 — `/company/[id]` GarageModule 이식(AUDIT §6-2).
+                 등록대수 요건의 근거라 법인 정보와 같은 화면에 있어야 한다. */
+              module: 'garage', title: '차고지', cols: [], count: garageRows.length,
+              body: <ChannelSec editing={editing} matchKey="capacity"
+                rows={editing ? garageRows : ((selectedCo.master.garages ?? []) as unknown as Record<string, string>[])}
+                cols={[
+                  { key: 'name', label: '차고지명' }, { key: 'address', label: '주소' },
+                  { key: 'capacity', label: '수용대수' },
+                ]}
+                onAdd={() => chanAdd('garages')} onSet={(i, k, v) => chanSet('garages', i, k, v)} onDel={(i) => chanDel('garages', i)} />,
+            },
+            {
               module: 'account', title: '법인계좌', cols: [], count: coAccounts.length,
               body: !coAccounts.length && !editing
                 ? <DetailEmpty>계좌 없음 — [수정]에서 추가하세요. 계좌가 있어야 자금이 들어옵니다.</DetailEmpty>
