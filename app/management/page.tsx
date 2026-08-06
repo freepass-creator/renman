@@ -11,6 +11,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   Badge, Btn, C, DetailEmpty, ExcelSheet, KV, LedgerActions, LedgerFrame, LedgerRecordPanel, Search, won,
+  type LedgerRecordSection,
   type SheetCol,
 } from '@/components/ui';
 import { usePrompt } from '@/components/ui/confirm';
@@ -18,7 +19,7 @@ import { toast, toastError } from '@/lib/toast';
 import { getStore } from '@/lib/store';
 import type { EntityRecord } from '@/lib/intake/entities';
 import { COMPANY_DEFS, companyLabel, createManagedCompany, updateManagedCompany, type CompanyMasterInput } from '@/lib/companies';
-import { loadMaster, type CompanyMaster, type CompanyDoc } from '@/lib/company-master';
+import { loadMaster, MODULE_CATALOG, type CompanyMaster, type CompanyDoc } from '@/lib/company-master';
 import { uploadDoc, docPath } from '@/lib/storage';
 import { routeDocument } from '@/lib/document-router';
 import FileDrop from '@/components/FileDrop';
@@ -271,6 +272,34 @@ export default function ManagementPage() {
     }
   }
 
+  /* ★활성 모듈 — 「필요에 맞춰서 등록」(AUDIT §6-2).
+     `modules` 가 아직 없는 기존 법인은 **전부 켠 것으로 본다** — 갑자기 섹션이 사라지면 안 된다. */
+  const activeModules = useMemo(() => {
+    const saved = selectedCo?.master.modules;
+    return saved?.length ? saved : MODULE_CATALOG.map((m) => m.key);
+  }, [selectedCo]);
+
+  const offModules = useMemo(
+    () => MODULE_CATALOG.filter((m) => !m.core && !activeModules.includes(m.key)),
+    [activeModules],
+  );
+
+  async function addModule() {
+    if (!selectedCo || !offModules.length) return;
+    const picked = await prompt({
+      title: '항목 추가',
+      message: offModules.map((m) => `· ${m.label} — ${m.desc}`).join('\n'),
+      placeholder: offModules.map((m) => m.label).join(' / '),
+      confirmLabel: '추가', required: true,
+    });
+    const hit = offModules.find((m) => m.label === String(picked || '').trim());
+    if (!hit) { toastError('목록에 있는 항목명을 그대로 적어주세요.'); return; }
+    await updateManagedCompany(selectedCo.id, {}, { modules: [...activeModules, hit.key] } as CompanyMasterInput);
+    setMasterTick((n) => n + 1);
+    setSelectedCo({ ...selectedCo, master: loadMaster(selectedCo.id) });
+    toast(`「${hit.label}」 항목을 켰습니다.`);
+  }
+
   const coLeases = useMemo(() => {
     if (!selectedCo) return [];
     return leaseRows.filter((r) => String(r.raw.companyId || '') === selectedCo.id);
@@ -446,7 +475,9 @@ export default function ManagementPage() {
           statusBadge={<Badge tone="blue">법인</Badge>}
           row={selectedCo}
           onClose={() => { setEditing(false); setSelectedCo(null); }}
-          sections={[
+          /* ★섹션 = 모듈. 회사마다 필요한 것만 켠다(AUDIT §6-2).
+             `module` 키가 붙은 섹션은 켜져 있을 때만 그린다. 현황·사업자·소재지는 고정(basic). */
+          sections={([
             {
               /* 이 법인이 «지금 어떻게 돌고 있나» — 상세를 열면 제일 먼저 보여야 할 것.
                  카드·지표 금지라 KV 표로 낸다. 숫자를 누르면 그 원장으로 간다. */
@@ -486,7 +517,7 @@ export default function ManagementPage() {
                  수정 잠금은 «기 등록이냐»가 아니라 «거래가 붙었냐»로 가른다 —
                  은행·계좌번호·예금주는 신원이라 거래가 붙은 뒤 바꾸면 과거 귀속이 흔들린다.
                  약칭·용도·메모는 라벨이라 언제나 열어둔다(자금거래 불변 규칙과 같은 논리). */
-              title: '법인계좌', cols: [], count: coAccounts.length,
+              module: 'account', title: '법인계좌', cols: [], count: coAccounts.length,
               body: !coAccounts.length && !editing
                 ? <DetailEmpty>계좌 없음 — [수정]에서 추가하세요. 계좌가 있어야 자금이 들어옵니다.</DetailEmpty>
                 : editing
@@ -535,7 +566,7 @@ export default function ManagementPage() {
             {
               /* ★계좌 말고도 «돈이 들어오고 나가는 통로»가 셋 더 있다(jpkerp5 모델).
                  각 채널의 ★ 표시 필드가 업로드 거래를 이 회사로 붙이는 매칭 키다. */
-              title: '법인카드 (지출)', cols: [], count: chanRows('cards').length || (selectedCo.master.cards?.length ?? 0),
+              module: 'card', title: '법인카드 (지출)', cols: [], count: chanRows('cards').length || (selectedCo.master.cards?.length ?? 0),
               body: <ChannelSec editing={editing} matchKey="cardLast4"
                 rows={editing ? chanRows('cards') : ((selectedCo.master.cards ?? []) as unknown as Record<string, string>[])}
                 cols={[
@@ -546,7 +577,7 @@ export default function ManagementPage() {
                 onAdd={() => chanAdd('cards')} onSet={(i, k, v) => chanSet('cards', i, k, v)} onDel={(i) => chanDel('cards', i)} />,
             },
             {
-              title: '자동이체 CMS (수입)', cols: [], count: chanRows('autoTransfers').length || (selectedCo.master.autoTransfers?.length ?? 0),
+              module: 'cms', title: '자동이체 CMS (수입)', cols: [], count: chanRows('autoTransfers').length || (selectedCo.master.autoTransfers?.length ?? 0),
               body: <ChannelSec editing={editing} matchKey="cmsId"
                 rows={editing ? chanRows('autoTransfers') : ((selectedCo.master.autoTransfers ?? []) as unknown as Record<string, string>[])}
                 cols={[
@@ -556,7 +587,7 @@ export default function ManagementPage() {
                 onAdd={() => chanAdd('autoTransfers')} onSet={(i, k, v) => chanSet('autoTransfers', i, k, v)} onDel={(i) => chanDel('autoTransfers', i)} />,
             },
             {
-              title: '카드매출 단말기 (수입)', cols: [], count: chanRows('cardTerminals').length || (selectedCo.master.cardTerminals?.length ?? 0),
+              module: 'terminal', title: '카드매출 단말기 (수입)', cols: [], count: chanRows('cardTerminals').length || (selectedCo.master.cardTerminals?.length ?? 0),
               body: <ChannelSec editing={editing} matchKey="terminalId"
                 rows={editing ? chanRows('cardTerminals') : ((selectedCo.master.cardTerminals ?? []) as unknown as Record<string, string>[])}
                 cols={[
@@ -568,7 +599,7 @@ export default function ManagementPage() {
             {
               /* ★문서는 «어느 슬롯»에 묶이지 않는다(VEHICLE360-SPEC §3-1 과 같은 원칙).
                  사업자등록증·등기부·정관·인감… 종류를 골라 여러 개 올리고 한 목록에서 본다. */
-              title: '문서', cols: [], count: coDocs.length,
+              module: 'document', title: '문서', cols: [], count: coDocs.length,
               body: (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                   {coDocs.length ? (
@@ -586,12 +617,13 @@ export default function ManagementPage() {
               ),
             },
             {
-              title: '임대차', cols: [], count: coLeases.length,
+              module: 'lease', title: '임대차', cols: [], count: coLeases.length,
               body: coLeases.length
                 ? <ExcelSheet rows={coLeases} cols={LEASE_COLS} rowKey={(r) => r.id} />
                 : <DetailEmpty>임대차 계약 없음 — 데이터센터에서 계약서를 담으세요</DetailEmpty>,
             },
-          ]}
+          ] as (LedgerRecordSection<CompanyRow> & { module?: string })[])
+            .filter((s) => !s.module || activeModules.includes(s.module))}
           actions={editing ? (
             <>
               <Btn size="sm" variant="solid" disabled={saving} onClick={() => { void saveEdit(); }}>
@@ -602,7 +634,10 @@ export default function ManagementPage() {
           ) : (
             <>
               <Btn size="sm" variant="solid" onClick={startEdit}>수정</Btn>
-              
+              {/* 「필요에 맞춰서」 — 안 쓰는 항목은 안 보이고, 필요하면 여기서 켠다(AUDIT §6-2). */}
+              <Btn size="sm" variant="ghost" disabled={!offModules.length} onClick={() => { void addModule(); }}>
+                + 항목 추가{offModules.length ? ` (${offModules.length})` : ''}
+              </Btn>
               <Btn size="sm" variant="ghost" onClick={() => openIngest('lease')}>임대차 담기</Btn>
             </>
           )}

@@ -83,10 +83,19 @@ export const MODULE_CATALOG: { key: string; label: string; desc: string; core?: 
   { key: 'garage', label: '차고지', desc: '주소 + 수용대수 (등록대수 요건)' },
   { key: 'vehicleReg', label: '등록대수·증차신청', desc: '등록 대수 / 증차·감차 신청 워크플로우' },
   { key: 'officialDoc', label: '공문 대장', desc: '법인 명의 발신·수신 문서 대장' },
-  { key: 'card', label: '법인카드', desc: '법인카드 번호·별명' },
+  { key: 'card', label: '법인카드', desc: '카드사·끝4자리 — 카드 지출거래를 이 회사로 붙이는 키' },
   { key: 'license', label: '인허가 증빙', desc: '사업자등록증·대여사업 등록증·정관·등기부 (보관)' },
+  /* ★자금 채널·계좌·임대차·문서 — 「필요에 맞춰서 등록」(사장님 확정 2026-08-06, AUDIT §6-2).
+     경영관리 법인 패널이 섹션을 고정으로 박고 있었는데, 회사마다 필요한 게 다르다.
+     섹션 = 모듈로 통일해 여기서 켜고 끈다. */
+  { key: 'account', label: '법인계좌', desc: '은행·계좌번호 — 자금거래를 이 회사로 붙이는 키. 거래 붙으면 신원 잠금' },
+  { key: 'cms', label: '자동이체 CMS', desc: 'CMS 사업자·ID — 입금거래 매칭' },
+  { key: 'terminal', label: '카드매출 단말기', desc: 'VAN사·단말기 ID — 카드매출 매칭' },
+  { key: 'lease', label: '임대차', desc: '사무실·차고지 임대차 계약(임대인·보증금·만기)' },
+  { key: 'document', label: '문서', desc: '종류에 얽매이지 않는 첨부 — 등기부·정관·인감 등' },
 ];
-export const DEFAULT_MODULES = ['basic', 'garage', 'vehicleReg'];
+/** 신규 법인 기본 — 계좌는 «없으면 자금이 안 들어온다»라 처음부터 켠다. */
+export const DEFAULT_MODULES = ['basic', 'account', 'garage', 'vehicleReg'];
 
 // app 런타임 전용 id 생성(스크립트 아님 — Date/Math 사용 가능).
 export function genId(prefix = 'm'): string { return `${prefix}_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`; }
