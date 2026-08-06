@@ -84,7 +84,13 @@ export function VehicleDetail({ plate, focus, embed, companyId: targetCompanyId 
   if (loading) return <PageLoading />;
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: embed ? 12 : SPACE_GROUP_M }}>
+    /* ★`Page frame` 은 창 스크롤을 잠그고 main 을 overflow:hidden 으로 고정한다(layout.tsx).
+       그래서 **안쪽이 스스로 스크롤해야** 한다 — 안 그러면 아래 섹션이 잘린 채 스크롤이 안 된다.
+       embed(원장 우측 패널)일 때는 패널이 이미 스크롤하므로 건드리지 않는다. */
+    <div style={{
+      display: 'flex', flexDirection: 'column', gap: embed ? 12 : SPACE_GROUP_M,
+      ...(embed ? null : { flex: 1, minHeight: 0, overflowY: 'auto' as const, paddingBottom: 24 }),
+    }}>
       {/* 신분 행 */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
         <Badge tone={statusTone}>{status}</Badge>
