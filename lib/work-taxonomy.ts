@@ -85,6 +85,11 @@ export const WORK_DIVISION_CATEGORIES: Record<WorkDivision, readonly WorkCategor
  */
 export const WORK_CATEGORIES_ACTIVE = [
   '정비·수선', '사고', '검사', '보험',   // 자산 — 각각 전용 필드·만기관리가 다르다
+  /* ★세차는 뺄 수 없다 — 자산 작업 중 **유일하게 차량 상태를 안 바꾸는** 작업이고(work-ops.ts
+     workStatusPatch 가 '세차'만 null 반환), 그 판정이 가동률 KPI까지 흐른다.
+     세차를 정비로 넣게 만들면 차가 «정비중»으로 전이돼 가동률이 오염된다.
+     '상품화세차'(반납 후 재상품화 = 차 못 나감)와 일반세차의 구분도 여기서만 표현된다. */
+  '세차',
   '입출고', '매각·처분',                  // 자산 — 실행(배차·처분). 담당·기한·진행이 붙는다
   '고객상담',                            // 계약 — 상담·연락·클레임·분쟁을 하나로 받는다
   '수납이슈', '자금',                     // 자금

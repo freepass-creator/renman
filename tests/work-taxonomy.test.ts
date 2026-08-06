@@ -12,6 +12,7 @@ import {
   workDivisionOf, isWorkDivision, missingWorkRequirements,
 } from '@/lib/work-taxonomy';
 import { WORK_GROUPS, parseWorkGroup, workRowInDivision } from '@/lib/work-ledger';
+import { workSectionsFor } from '@/lib/work-form-sections';
 
 describe('대분류 6축 — 원장과 같은 축', () => {
   it('★축 이름이 원장·메뉴와 같다 — 자산·계약·자금 + 일정·과태료·기타', () => {
@@ -35,11 +36,11 @@ describe('대분류 6축 — 원장과 같은 축', () => {
   });
 
   it('★목록에서 뺀 옛 값도 대분류가 정상 판정된다 — 과거 업무가 「기타」로 안 떨어진다', () => {
-    for (const legacy of ['세차', '부품교체', '연락기록', '클레임', '분쟁'] as const) {
+    for (const legacy of ['부품교체', '연락기록', '클레임', '분쟁'] as const) {
       expect(WORK_CATEGORIES_ACTIVE as readonly string[]).not.toContain(legacy);
       expect(workDivisionOf(legacy)).not.toBe('기타');
     }
-    expect(workDivisionOf('세차')).toBe('자산');
+    expect(workDivisionOf('부품교체')).toBe('자산');
     expect(workDivisionOf('클레임')).toBe('계약');
   });
 
@@ -59,6 +60,31 @@ describe('대분류 6축 — 원장과 같은 축', () => {
   it('탭 목록 = 전체 + 6축 (세부 17개를 늘어놓지 않는다)', () => {
     expect(WORK_GROUPS).toEqual(['전체', '자산', '계약', '자금', '일정', '과태료', '기타']);
     expect(WORK_GROUPS).toHaveLength(7);
+  });
+});
+
+/**
+ * 선택지를 좁히면서 잃을 뻔한 것들 — 병합 감사(2026-08-06)가 찾아낸 손실 2건의 회귀 가드.
+ * 세부를 더 줄이거나 늘릴 때 이 셋이 깨지면 «최소화»가 기능을 깎아먹고 있다는 뜻이다.
+ */
+describe('★활성 세부만으로도 기능이 유지되는가', () => {
+  it('계약 축에서 새로 만든 업무도 기한을 넣을 수 있다 — 기한경과 정렬·배지 이탈 방지', () => {
+    const contractActive = WORK_CATEGORIES_ACTIVE.filter((c) => workDivisionOf(c) === '계약');
+    expect(contractActive.length).toBeGreaterThan(0);
+    for (const c of contractActive) {
+      const fields = workSectionsFor(c).flatMap((s) => s.fields);
+      expect(fields, `${c} 폼에 기한(dueDate) 입력이 없다`).toContain('dueDate');
+    }
+  });
+
+  it('세차는 활성 — 자산 작업 중 유일하게 차량 상태를 안 바꾼다(가동률 KPI 축)', () => {
+    expect(WORK_CATEGORIES_ACTIVE as readonly string[]).toContain('세차');
+  });
+
+  it('부품 품목·수량은 정비·수선 폼에서 받는다 — 부품교체를 뺀 대가를 메운다', () => {
+    const fields = workSectionsFor('정비·수선').flatMap((s) => s.fields);
+    expect(fields).toContain('partName');
+    expect(fields).toContain('partQty');
   });
 });
 

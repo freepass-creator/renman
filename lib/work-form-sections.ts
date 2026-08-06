@@ -44,7 +44,10 @@ export const WORK_SECTIONS_BY_KIND: Record<WorkCreateKind, WorkFormSection[]> = 
   }),
   '고객상담': secs({
     title: '상담', open: true,
-    fields: ['callChannel', 'callDirection', 'callResult', 'nextActionDate', 'assigneeName', 'description'],
+    /* ★dueDate 필수 — 계약 축에서 새로 만들 수 있는 세부가 이것뿐이다(클레임·분쟁은 목록에서 뺐다).
+       기한이 없으면 「기한경과」 판정(work-ledger workDueSignal)·최상단 정렬·기한경과 배지·위험 레일에서
+       영구 이탈한다. 고객 클레임이 «어제까지였는데 안 닫힘»으로 튀어오르지 못하고 상담더미에 묻힌다. */
+    fields: ['callChannel', 'callDirection', 'callResult', 'dueDate', 'nextActionDate', 'assigneeName', 'description'],
   }),
   '연락기록': secs({
     title: '연락기록', open: true,
@@ -52,7 +55,8 @@ export const WORK_SECTIONS_BY_KIND: Record<WorkCreateKind, WorkFormSection[]> = 
   }),
   '정비·수선': secs({
     title: '정비', open: true,
-    fields: ['maintType', 'vendor', 'amount', 'mileage', 'nextMaintDate', 'description'],
+    // 부품교체를 목록에서 뺐으므로 품목·수량을 여기서 받는다 — 안 그러면 «무슨 부품 몇 개»가 기록될 자리가 없다.
+    fields: ['maintType', 'vendor', 'amount', 'partName', 'partQty', 'mileage', 'nextMaintDate', 'description'],
   }),
   // 배차·인수인계 — 어디서 주고받는지(장소)·누가(탁송사)·그때 주행거리가 실무 기록이다.
   '입출고': secs({

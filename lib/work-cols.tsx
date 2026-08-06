@@ -326,7 +326,7 @@ const WORK_KIND_DETAIL_DEFS: Record<WorkLedgerRow['group'], DetailSectionDef[]> 
   일정: [{ title: '일정', keys: ['endDate', 'location'] }],
   고객상담: [{ title: '고객상담', keys: ['callChannel', 'callDirection', 'callResult', 'nextActionDate'] }],
   연락기록: [{ title: '연락기록', keys: ['callChannel', 'callDirection', 'callResult', 'nextActionDate'] }],
-  '정비·수선': [{ title: '정비·수선', keys: ['maintType', 'vendor', 'mileage', 'nextMaintDate'] }],
+  '정비·수선': [{ title: '정비·수선', keys: ['maintType', 'vendor', 'partName', 'partQty', 'mileage', 'nextMaintDate'] }],
   사고: [{
     title: '사고',
     keys: [
