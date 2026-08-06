@@ -31,6 +31,7 @@ service cloud.firestore {
         && coll != 'company_registry'
         && coll != 'period_locks'
         && coll != 'audit_logs'
+        && coll != 'migration'
         && coll != '_api_rate_limits';
     }
 
@@ -41,6 +42,14 @@ service cloud.firestore {
 
     // 목록의 생성·이름변경·보관은 HQ 검증 API만 수행한다(Admin SDK).
     match /company_registry/{companyId} {
+      allow read, write: if false;
+    }
+
+    // 마이그레이션 기준선·승인 — 서버 Admin 전용.
+    //   승인은 «서버가 Firestore 실물을 세어 기준선과 대조했다»는 사실이다. 클라이언트가 쓸 수 있으면
+    //   그 사실을 지어낼 수 있고(로컬 반영을 승인된 것으로 위장), 오픈 판단이 위조된 기록 위에 선다.
+    //   읽기도 막는다 — 기대치·실제치가 곧 회사별 규모 정보다.
+    match /migration/{docId} {
       allow read, write: if false;
     }
 

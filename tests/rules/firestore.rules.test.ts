@@ -129,6 +129,24 @@ describe('서버 전용 rate-limit 컬렉션', () => {
   });
 });
 
+describe('마이그레이션 기준선·승인(migration) — 서버 Admin 전용', () => {
+  test('본사 Claim이어도 승인 기록을 직접 쓸 수 없다 — 로컬 반영을 «승인됨»으로 위장하는 경로 차단', async () => {
+    await assertFails(setDoc(doc(hq(), 'migration', 'C1__run_forged'), {
+      companyId: 'C1', runId: 'run_forged', acceptedBy: 'hq', acceptedAt: '2026-08-06T00:00:00Z',
+    }));
+    await assertFails(setDoc(doc(hq(), 'migration', 'C1__baseline'), {
+      companyId: 'C1', runId: 'run_forged', perEntity: { contract: 0 },
+    }));
+  });
+  test('조회도 거부 — 기대치·실제치가 곧 회사 규모 정보다', async () => {
+    await assertFails(getDoc(doc(hq(), 'migration', 'C1__baseline')));
+    await assertFails(getDoc(doc(staffA(), 'migration', 'C1__baseline')));
+  });
+  test('법인 사용자가 자기 회사 접두어로도 못 쓴다(범용 match 우회 차단)', async () => {
+    await assertFails(setDoc(doc(staffA(), 'migration', 'C1__run_x'), { companyId: 'C1', runId: 'run_x' }));
+  });
+});
+
 describe('관리회사 레지스트리(company_registry) — 서버 API 전용', () => {
   test('본사 Claim이어도 클라이언트 직접 조회·쓰기는 거부한다', async () => {
     await assertFails(getDoc(doc(hq(), 'company_registry', 'C1')));
