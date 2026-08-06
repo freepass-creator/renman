@@ -41,6 +41,44 @@ export const DOC_KINDS: readonly DocKindDef[] = [
 ] as const;
 
 /**
+ * 데이터센터 투입 선택값의 인코딩 (규격 `docs/VEHICLE360-SPEC.md` §3-2).
+ *
+ * 실무자가 손에 든 것은 **종이**(자동차등록증·매매계약서)지 엔티티(차량·계약)가 아니다.
+ * 그래서 고르는 축은 종류이고, 어느 엔티티·어느 OCR 스키마로 갈지는 **시스템이 정한다**.
+ *
+ * 다만 종이가 없는 원장(이력·계좌·임대차·카드거래)도 직접입력·엑셀로 넣어야 하므로
+ * `entity:` 로 남겨 둔다 — 종류 축으로만 좁히면 그 원장들이 화면에서 사라진다.
+ */
+export type IntakePick =
+  | { by: 'kind'; kind: string; entity: string; ocrType?: string }
+  | { by: 'entity'; kind: string; entity: string; ocrType?: string };
+
+export function encodeIntakePick(by: 'kind' | 'entity', value: string): string {
+  return `${by}:${value}`;
+}
+
+/**
+ * 선택값 → 종류·엔티티·OCR 스키마. `entityOcrType` 는 종이에 ocrType 이 없을 때만 쓰는 폴백이다
+ * (예: 견적서는 vehicle 이지만 자동차등록증 OCR 을 돌리면 안 된다 → 종이에 없으면 OCR 없음).
+ */
+export function decodeIntakePick(raw: string, entityOcrTypeOf: (entity: string) => string | undefined): IntakePick {
+  const s = String(raw || '');
+  if (s.startsWith('entity:')) {
+    const entity = s.slice('entity:'.length) || 'vehicle';
+    return { by: 'entity', entity, kind: defaultDocKindForEntity(entity), ocrType: entityOcrTypeOf(entity) };
+  }
+  const kind = s.startsWith('kind:') ? s.slice('kind:'.length) : s;
+  const def = resolveDocKind(kind);
+  return { by: 'kind', kind: def.kind, entity: def.entity, ocrType: def.ocrType };
+}
+
+/** 어떤 종이도 가리키지 않는 엔티티 키 — 「원장 직접」 그룹에 남겨 도달 가능하게 한다. */
+export function entitiesWithoutDocKind(allEntityKeys: readonly string[]): string[] {
+  const covered = new Set(DOC_KINDS.map((d) => d.entity));
+  return allEntityKeys.filter((k) => !covered.has(k));
+}
+
+/**
  * `DocVersion.type` 으로 저장할 값.
  *
  * ⚠ **슬롯이 있는 종류는 슬롯 키로 저장해야 한다.** `doc-crosscheck` 가 서류미비를

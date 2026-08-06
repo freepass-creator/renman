@@ -43,7 +43,9 @@ import {
   makeIngestPage, mergePageExtracts, buildMergedCrosscheck,
   type IngestPendingRow, type IngestPage,
 } from '@/lib/ingest-summary';
-import { defaultDocKindForEntity } from '@/lib/doc-kinds';
+import {
+  DOC_KINDS, decodeIntakePick, docVersionType, encodeIntakePick, entitiesWithoutDocKind,
+} from '@/lib/doc-kinds';
 
 export const dynamic = 'force-dynamic';
 
@@ -55,12 +57,19 @@ const LAYER_TITLE: Record<string, string> = {
   event: '③ 이벤트',
   system: '도구',
 };
-const ENTITY_GROUPS = (['ledger', 'event', 'system'] as const)
-  .map((layer) => ({
-    title: LAYER_TITLE[layer],
-    items: ENTITY_LIST.filter((e) => layerOfEntity(e.key) === layer),
-  }))
-  .filter((g) => g.items.length > 0);
+/**
+ * 어떤 종이도 가리키지 않는 원장만 층별로 묶는다 — 종류 축(문서) 아래에 「원장 직접」으로 남긴다.
+ * 종이가 있는 원장을 여기 또 넣으면 같은 목적지가 두 줄이 되어 어느 쪽을 골라야 하는지가 흐려진다.
+ */
+const ORPHAN_ENTITY_GROUPS = (() => {
+  const orphans = new Set(entitiesWithoutDocKind(ENTITY_LIST.map((e) => e.key)));
+  return (['ledger', 'event', 'system'] as const)
+    .map((layer) => ({
+      title: LAYER_TITLE[layer],
+      items: ENTITY_LIST.filter((e) => orphans.has(e.key) && layerOfEntity(e.key) === layer),
+    }))
+    .filter((g) => g.items.length > 0);
+})();
 
 /** 직접입력 첫 화면에는 실제 한 건 등록에 자주 쓰는 필드만 노출한다. */
 const MANUAL_PRIMARY_KEYS: Record<string, readonly string[]> = {
@@ -93,7 +102,17 @@ function IngestInner() {
   const router = useRouter();
   const { companyId, user } = useSession();
   const sp = useSearchParams();
-  const [entityKey, setEntityKey] = useState(() => sp.get('type') || 'vehicle');
+  /* 투입 축 = **종이(문서 종류)**. 엔티티는 종류에서 파생한다(규격 §3-2).
+     `?type=` 딥링크는 엔티티를 직접 가리키므로 그대로 존중한다(기존 링크·북마크 보존). */
+  const [pickSrc, setPickSrc] = useState(() => {
+    const t = sp.get('type');
+    return t ? encodeIntakePick('entity', t) : encodeIntakePick('kind', DOC_KINDS[0].kind);
+  });
+  const pick = useMemo(() => decodeIntakePick(pickSrc, (e) => ENTITIES[e]?.ocrType), [pickSrc]);
+  const entityKey = pick.entity;
+  /** 이 투입에 쓸 OCR 스키마 — **종이가 정한다**. 견적서처럼 종이에 OCR이 없으면 없는 것이다
+   *  (엔티티 폴백을 쓰면 견적서에 자동차등록증 OCR 이 돌아 엉뚱한 값이 들어온다). */
+  const activeOcrType = pick.ocrType;
   const [saving, setSaving] = useState(false);
   const [sheetView, setSheetView] = useState<SheetView>('대기');
   const [panelOpen, setPanelOpen] = useState(true);
@@ -133,8 +152,8 @@ function IngestInner() {
   );
   const manualReady = manualMissingFields.length === 0;
   useEffect(() => {
-    if (tab === 'ocr' && !entity.ocrType) setTab('excel');
-  }, [tab, entity.ocrType]);
+    if (tab === 'ocr' && !activeOcrType) setTab('excel');
+  }, [tab, activeOcrType]);
 
   useEffect(() => {
     if (sheetView === '저장본') reloadSaved();
@@ -205,7 +224,7 @@ function IngestInner() {
         toast(`업로드 취소 — ${saved}건 접수 · ${list.length - saved - failures.length}건 남김`, 'info');
       } else if (!failures.length && saved) {
         toast(`원본 ${saved}건 접수${duplicates ? ` · 중복 ${duplicates}건` : ' · 처리대기'}`, 'success');
-        setEntityKey('inbox');
+        setPickSrc(encodeIntakePick('entity', 'inbox'));
         setSheetView('저장본');
         setStagedFiles([]);
         setUniversalOpen(false);
@@ -247,7 +266,7 @@ function IngestInner() {
           rec = {
             ...rec,
             _docs: pushDocVersion(rec, {
-              type: entityKey, url, ocr: page.extracted || ocrRaw,
+              type: docVersionType(pick.kind), url, ocr: page.extracted || ocrRaw,
               reason: `데이터센터 OCR · ${page.fileName}`, by: String(user?.name || user?.email || ''),
             }),
           };
@@ -264,7 +283,7 @@ function IngestInner() {
             toSave[0] = {
               ...rec,
               _docs: pushDocVersion(rec, {
-                type: entityKey, url, ocr: ocrRaw,
+                type: docVersionType(pick.kind), url, ocr: ocrRaw,
                 reason: '데이터센터 OCR 투입', by: String(user?.name || user?.email || ''),
               }),
             };
@@ -289,13 +308,14 @@ function IngestInner() {
 
   async function runOcr() {
     if (!ocrFiles.length) { setError('파일을 선택하세요'); return; }
-    if (!entity.ocrType) { setError('이 엔티티는 OCR을 지원하지 않습니다'); return; }
+    if (!activeOcrType) { setError(`「${pick.kind}」은 OCR 스키마가 없습니다 — 엑셀·직접입력 또는 「무엇이든 올리기」로 원본을 보관하세요`); return; }
     setError('');
     setOcrCrosscheck(null);
 
     const pages = ocrFiles.map((f) => makeIngestPage(f));
     const rid = newRid();
-    const docKind = defaultDocKindForEntity(entityKey);
+    // 종류는 사용자가 이미 골랐다 — 엔티티에서 되짚어 추측하지 않는다(규격 §3-2).
+    const docKind = pick.kind;
     let row = buildPendingRow({
       rid,
       entityKey,
@@ -324,7 +344,8 @@ function IngestInner() {
         if (!file) {
           working[i] = { ...working[i], status: '미인식', error: '파일 없음' };
         } else {
-          const r = await callOcrExtract(file, entity.ocrType);
+          // 스키마는 고른 종이가 정한다(runOcr 진입에서 activeOcrType 유무를 이미 막았다).
+          const r = await callOcrExtract(file, activeOcrType || '');
           if (!r.ok || !r.raw) {
             working[i] = { ...working[i], status: '미인식', error: r.error || '추출 실패', extracted: null };
           } else {
@@ -373,7 +394,8 @@ function IngestInner() {
         if (!file || !entity.ocrType) {
           working[i] = { ...working[i], status: '미인식', error: 'OCR 불가' };
         } else {
-          const r = await callOcrExtract(file, entity.ocrType);
+          // 스키마는 고른 종이가 정한다(runOcr 진입에서 activeOcrType 유무를 이미 막았다).
+          const r = await callOcrExtract(file, activeOcrType || '');
           working[i] = r.ok && r.raw
             ? { ...working[i], status: '읽음', extracted: r.raw }
             : { ...working[i], status: '미인식', error: r.error || '추출 실패' };
@@ -497,10 +519,10 @@ function IngestInner() {
 
   const methodTabs = useMemo(() => {
     const list: { key: Tab; label: string }[] = [];
-    if (entity.ocrType) list.push({ key: 'ocr', label: 'OCR' });
+    if (activeOcrType) list.push({ key: 'ocr', label: 'OCR' });
     list.push({ key: 'excel', label: '엑셀' }, { key: 'manual', label: '직접' });
     return list;
-  }, [entity.ocrType]);
+  }, [activeOcrType]);
 
   /** 대기 표 — §4-9-2: 형태·성격·귀속·대상·행선지·장·분석 */
   const pendingCols = useMemo<SheetCol<IngestPendingRow>[]>(() => [
@@ -876,7 +898,7 @@ function IngestInner() {
                 multiple
                 onFiles={(files) => setOcrFiles((prev) => [...prev, ...Array.from(files)])}
                 accept=".pdf,.jpg,.jpeg,.png,.webp"
-                hint={`${entity.source || defaultDocKindForEntity(entityKey)} — 앞·뒤 등 여러 장 한 번에`}
+                hint={`${pick.kind} — 앞·뒤 등 여러 장 한 번에`}
                 note={ocrFiles.length ? `${ocrFiles.length}장 선택됨 — 한 건으로 묶어 OCR` : undefined}
                 style={ocrFiles.length ? { borderColor: 'var(--green-border)', background: 'var(--green-bg)' } : undefined}
               />
@@ -1059,12 +1081,14 @@ function IngestInner() {
       showColView={false}
       filters={(
         <>
+          {/* 고르는 축 = **종이**(규격 §3-2). 실무자가 손에 든 건 「자동차등록증」이지 「차량」이 아니다.
+              어느 원장·어느 OCR 로 갈지는 시스템이 정하고, 그 결과를 옆에 그대로 보여준다(숨기지 않는다). */}
           <Select
             size="sm"
-            aria-label="엔티티"
-            value={entityKey}
+            aria-label="문서 종류"
+            value={pickSrc}
             onChange={(e) => {
-              setEntityKey(e.target.value);
+              setPickSrc(e.target.value);
               setSelectedSaved(null);
               setSelectedPending(null);
               resetQueue();
@@ -1072,14 +1096,26 @@ function IngestInner() {
               setStagedFiles([]);
               setSheetView('대기');
             }}
-            style={{ minWidth: mobile ? '100%' : 200 }}
+            style={{ minWidth: mobile ? '100%' : 230 }}
           >
-            {ENTITY_GROUPS.map((g) => (
-              <optgroup key={g.title} label={g.title}>
-                {g.items.map((e) => <option key={e.key} value={e.key}>{e.label}</option>)}
+            <optgroup label="문서(종이)">
+              {DOC_KINDS.map((d) => (
+                <option key={d.kind} value={encodeIntakePick('kind', d.kind)}>{d.kind}</option>
+              ))}
+            </optgroup>
+            {/* 종이가 없는 원장(이력·계좌·임대차·카드거래)도 직접입력·엑셀로 넣어야 한다 —
+                종류 축으로만 좁히면 이 원장들이 화면에서 사라진다. */}
+            {ORPHAN_ENTITY_GROUPS.map((g) => (
+              <optgroup key={g.title} label={`${g.title} · 원장 직접`}>
+                {g.items.map((e) => (
+                  <option key={e.key} value={encodeIntakePick('entity', e.key)}>{e.label}</option>
+                ))}
               </optgroup>
             ))}
           </Select>
+          <span style={{ fontSize: 11.5, color: C.faint, whiteSpace: 'nowrap' }}>
+            → {entity.label}{activeOcrType ? ` · OCR ${activeOcrType}` : ' · OCR 없음'}
+          </span>
           <PillTabs
             size="sm"
             value={tab}
