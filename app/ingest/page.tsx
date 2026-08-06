@@ -7,6 +7,8 @@ import { Suspense, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { DATA_CENTER_TITLE, processingAttentionRank, summarizeProcessingQueue } from '@/lib/data-center-terms';
 import { uploadToInbox } from '@/lib/inbox-upload';
+import { uploadDoc, docPath } from '@/lib/storage';
+import { pushDocVersion } from '@/lib/docs';
 import { ENTITY_LIST, ENTITIES, mapOcrToEntity, type EntityRecord } from '@/lib/intake/entities';
 import { parseCsv } from '@/lib/intake/csv';
 import { saveIntake } from '@/lib/intake';
@@ -182,6 +184,26 @@ function IngestInner() {
       const toSave = ocrRaw && cleanRecords.length === 1
         ? [{ ...cleanRecords[0], _ocrOriginal: { raw: ocrRaw, at: new Date().toISOString(), source: entity.source } }]
         : cleanRecords;
+
+      /* ★OCR 로 만든 레코드에는 **원본 파일도 함께 붙인다.**
+         종전에는 추출값(_ocrOriginal)만 저장해서, 등록증으로 차를 만들어도 `_docs` 가 비어 있었다 —
+         자산 화면이 「등록증은 데이터센터에서 담으세요」라고 안내하는데 그 길로 가면
+         서류 없는 차량이 생기고 정합성은 계속 「자동차등록증 미첨부(high)」를 띄운다.
+         대량 경로(/ingest/bulk)는 이미 이렇게 하고 있어 두 경로 결과가 달랐다. */
+      if (ocrRaw && file && toSave.length === 1) {
+        const rec = toSave[0];
+        const key = String(rec.plate || rec.policyNo || 'new');
+        const url = await uploadDoc(file, docPath(target, entityKey, key, file.name));
+        if (url) {
+          toSave[0] = {
+            ...rec,
+            _docs: pushDocVersion(rec, {
+              type: entityKey, url, ocr: ocrRaw,
+              reason: '데이터센터 OCR 투입', by: String(user?.name || user?.email || ''),
+            }),
+          };
+        }
+      }
       const r = await saveIntake(entityKey, target, toSave, {
         context: { source: ocrRaw ? 'ocr' : tab === 'excel' ? 'upload' : 'manual' },
       });

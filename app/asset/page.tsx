@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { Pencil, Plus, UploadCloud, X } from 'lucide-react';
+import { FileText, Pencil, Plus, UploadCloud, X } from 'lucide-react';
 import { assetMasterRow, type AssetMasterRow } from '@/lib/master-ledgers';
 import {
   ASSET_DETAIL_SECTIONS, ASSET_MASTER_BASIC_COLS, ASSET_MASTER_EXPANDED_COLS,
@@ -21,7 +21,7 @@ import { TODAY } from '@/lib/dashboard-consts';
 import { linkFleet, type Fleet } from '@/lib/domain/model';
 import { normPlate } from '@/lib/plate';
 import { latestDateOf, summarizeAssetLedgerStats } from '@/lib/ledger-stats';
-import { openIngest } from '@/lib/ui-bus';
+import { openCar, openIngest } from '@/lib/ui-bus';
 import {
   ASSET_FILTER_DEFS, countActiveFilters, emptyFilterValues, eqFilter, matchLedgerFilters,
 } from '@/lib/ledger-filter-defs';
@@ -348,7 +348,10 @@ export default function AssetLedgerPage() {
           entityKey="vehicle"
           title="자산 생성"
           sections={ASSET_CREATE_SECTIONS}
-          initial={{ status: '등록대기' }}
+          /* ★기본 상태를 비워 둔다(= 보유중·휴차로 판정). 종전 기본값 '등록대기'는 ownership 이
+             '등록예정'이 되어 isVehicleHeld=false → **등록한 차가 운영현황에 아예 안 떴다.**
+             실무자는 차를 넣고도 /status 에서 못 찾는다. 데이터센터 직접입력(상태 공란)과도
+             결과가 달라 «어느 화면으로 넣었느냐»에 따라 차가 보였다 안 보였다 했다. */
           fileIngest={{ label: '파일로 투입 (데이터센터)', onClick: () => openIngest('vehicle') }}
           onClose={() => setCreating(false)}
         />
@@ -372,6 +375,14 @@ export default function AssetLedgerPage() {
           sections={ASSET_DETAIL_SECTIONS}
           onClose={() => { setSelected(null); setEditing(false); }}
           actions={<>
+            {/* ★서류(등록증·보험증권)를 붙이는 유일한 상시 화면이 차량360이다. 종전에는 그 진입점이
+                「수선·이력」이라는 무관한 접힌 섹션 안에 숨어 있어, 실무자가 서류 첨부를 끝낼 수 없었다.
+                오픈 조건 ①(등록증·가입증명서를 갖춘다)의 동선이므로 패널 하단에 상시 노출한다. */}
+            {selected.plate ? (
+              <Btn size="sm" variant="ghost" onClick={() => openCar(selected.plate, undefined, selected.companyId)}>
+                <FileText size={14} /> 서류·이력
+              </Btn>
+            ) : null}
             <Btn size="sm" onClick={() => setEditing(true)}><Pencil size={14} /> 수정</Btn>
           </>}
         />
