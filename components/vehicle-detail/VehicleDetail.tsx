@@ -168,21 +168,39 @@ export function VehicleDetail({ plate, focus, embed, companyId: targetCompanyId 
           right={active
             ? <span style={{ display: 'inline-flex', gap: 6 }}><Btn variant="ghost" size="sm" onClick={() => openPrintDoc('contract', plate)}>계약서 출력</Btn><Add type="contract" plate={plate} label="수정" /></span>
             : <Add type="contract" plate={plate} label="+ 계약" />}>
-          <Cards min={128} fit>
-            {active ? <>
-              <Metric label="계약자" value={String(active.contractorName || '—')} />
-              <Metric label="반납예정" value={remainText(effectiveEndDate(active), TODAY)} tone={d != null && d < 0 ? 'danger' : d != null && d <= 7 ? 'warn' : 'ink'} />
-              <Metric label="미수" value={won(totalUnpaid)} tone={totalUnpaid > 0 ? 'danger' : 'ink'} />
-            </> : <>
-              <Metric label="상태" value={String(v?.status || (loc.work && loc.work !== '대기' ? loc.work : '휴차'))} tone={loc.work === '정비' || loc.work === '사고' ? 'warn' : 'ink'} />
-              <Metric label="계약" value="계약 없음" tone="ink" />
-              <Metric label="위치" value={locStr} tone={loc.work === '정비' || loc.work === '사고' ? 'warn' : 'ink'} />
-              <Metric label="대기 일수" value={idleDays != null ? `${idleDays}일` : '—'} tone={idleDays != null && idleDays > 180 ? 'danger' : idleDays != null && idleDays > 60 ? 'warn' : 'ink'} />
-              <Metric label="최종 반납" value={lastReturn ? yy(lastReturn) : '—'} />
-              {v?.inspectionTo ? <Metric label="검사만기" value={yy(v.inspectionTo)} tone={(() => { const id = dday(v.inspectionTo); return id != null && id < 0 ? 'danger' : id != null && id <= 30 ? 'warn' : 'ink'; })()} /> : null}
-              {totalUnpaid > 0 ? <Metric label="미수(과거 채권)" value={won(totalUnpaid)} tone="danger" /> : null}
-            </>}
-          </Cards>
+          {/* ★현황도 KV 표 — 상세 규격은 「접히는 섹션 + 그 안에 표」 하나다(사장님 확정 2026-08-06).
+              Metric 카드로 두면 같은 화면 안에서 「차량 정보」(KV)와 몸집이 달라 규격이 섞인다.
+              신호는 값의 색으로만 준다(카드 톤 대신) — 행 틴트·박스 금지 규격과도 맞는다. */}
+          <KV rows={((): [string, string | null, ReactNode][] => {
+            const warnColor = (tone: 'danger' | 'warn' | null, node: ReactNode): ReactNode => (tone
+              ? <span style={{ color: tone === 'danger' ? C.danger : C.warn, fontWeight: 700 }}>{node}</span>
+              : node);
+            if (active) {
+              return [
+                ['계약자', null, String(active.contractorName || '') || '—'],
+                ['반납예정', null, warnColor(d != null && d < 0 ? 'danger' : d != null && d <= 7 ? 'warn' : null,
+                  remainText(effectiveEndDate(active), TODAY))],
+                ['미수', null, warnColor(totalUnpaid > 0 ? 'danger' : null, won(totalUnpaid))],
+              ];
+            }
+            const workTone = loc.work === '정비' || loc.work === '사고' ? 'warn' as const : null;
+            const idleTone = idleDays != null && idleDays > 180 ? 'danger' as const
+              : idleDays != null && idleDays > 60 ? 'warn' as const : null;
+            const insp = v?.inspectionTo ? dday(v.inspectionTo) : null;
+            return [
+              ['상태', null, warnColor(workTone, String(v?.status || (loc.work && loc.work !== '대기' ? loc.work : '휴차')))],
+              ['계약', null, '계약 없음'],
+              ['위치', null, warnColor(workTone, locStr)],
+              ['대기 일수', null, warnColor(idleTone, idleDays != null ? `${idleDays}일` : '—')],
+              ['최종 반납', null, lastReturn ? yy(lastReturn) : '—'],
+              ...(v?.inspectionTo
+                ? [['검사만기', null, warnColor(insp != null && insp < 0 ? 'danger' : insp != null && insp <= 30 ? 'warn' : null, yy(v.inspectionTo))]] as [string, string | null, ReactNode][]
+                : []),
+              ...(totalUnpaid > 0
+                ? [['미수(과거 채권)', null, warnColor('danger', won(totalUnpaid))]] as [string, string | null, ReactNode][]
+                : []),
+            ];
+          })()} />
           {active ? (
             <div id="v-contract" style={{ marginTop: 14 }}>
               <SectionLabel mt={0} mb={8}>계약 조건</SectionLabel>
