@@ -92,6 +92,22 @@ function get(row: Record<string, unknown>, ...keys: string[]): string {
   for (const k of keys) { const v = row[k]; if (v != null && String(v).trim() !== '') return String(v).trim(); }
   return '';
 }
+/**
+ * 날짜 후보 중 **실제로 날짜로 읽히는 첫 값**을 쓴다.
+ *
+ * ★자금일보는 `거래월 | 거래일 | 거래일시` 를 다 갖는다(docs/UPLOAD-FORMATS.md §3-4).
+ *   `거래일` 값은 `2` 같은 «일자 숫자»라 앞에서 집어 가면 판독 실패 → 파일 전체가 0건이 된다
+ *   (실측: 1,794건 전건 거부). 이름 순서가 아니라 «읽히는가»로 골라야 한다.
+ */
+function getDate(row: Record<string, unknown>, ...keys: string[]): string {
+  for (const k of keys) {
+    const v = row[k];
+    if (v == null || String(v).trim() === '') continue;
+    const d = normalizeKoreanDate(v);
+    if (d) return d;
+  }
+  return '';
+}
 function toNum(s: string): number { const n = Number(String(s).replace(/[^\d.-]/g, '')); return Number.isFinite(n) ? n : 0; }
 function deriveMethod(summary: string, memo: string): string {
   const t = `${summary} ${memo}`;
@@ -102,7 +118,7 @@ function deriveMethod(summary: string, memo: string): string {
 
 /* ── 은행 통장 행 → bank_tx (v5 parseBankTxRow 이식) ── */
 export function parseBankRow(row: Record<string, unknown>, fileName: string, bankHint?: string): EntityRecord | null {
-  const txDate = normalizeKoreanDate(get(row, '거래일자', '거래일', '거래일시', '거래시각', '거래시간', '입금일', '출금일', '일자', '발생일', '처리일', '결제일', '청구완납일자', '수납일'));
+  const txDate = getDate(row, '거래일자', '거래일시', '거래일', '거래시각', '거래시간', '입금일', '출금일', '일자', '발생일', '처리일', '결제일', '청구완납일자', '수납일');
   if (!txDate) return null;
   const deposit = toNum(get(row, '입금액', '입금', '받은금액', '입금금액', '예입액', '수납금액', '납입금액'));
   const withdraw = toNum(get(row, '출금액', '출금', '지급액', '인출액', '출금금액'));
@@ -202,7 +218,7 @@ export type TxParseReport = {
 function bankRejectReason(row: Record<string, unknown>, cms: boolean): string {
   const status = get(row, '수납상태', '납부상태', '결제상태');
   if (status && /미납|연체|미수|취소|정지|보류|실패/.test(status)) return `미완료 거래 상태(${status})`;
-  const date = normalizeKoreanDate(get(row, '거래일자', '거래일', '거래일시', '거래시각', '거래시간', '입금일', '출금일', '일자', '발생일', '처리일', '결제일', '청구완납일자', '수납일'));
+  const date = getDate(row, '거래일자', '거래일시', '거래일', '거래시각', '거래시간', '입금일', '출금일', '일자', '발생일', '처리일', '결제일', '청구완납일자', '수납일');
   if (!date) return '거래일을 판독할 수 없음';
   if (cms && !get(row, '회원명', '고객명', '납부자', '납부자명')) return 'CMS 회원·납부자 없음';
   return '입금·출금 금액을 판독할 수 없음';
