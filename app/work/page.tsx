@@ -1,7 +1,7 @@
 'use client';
 
 import { Suspense, useEffect, useMemo, useState } from 'react';
-import { Plus, FileText, Pencil, Trash2, X } from 'lucide-react';
+import { Plus, FileText, Pencil, Trash2, X, UserPlus, Clock, CalendarClock } from 'lucide-react';
 import { useEntityLists } from '@/lib/use-entity-lists';
 import { textMatch } from '@/lib/search-match';
 import { companyDisplay } from '@/lib/companies';
@@ -12,7 +12,9 @@ import {
   PeriodBar, useConfirm, useSheetExport, type LedgerColView,
 } from '@/components/ui';
 import { useSession } from '@/lib/session';
-import { commitRemove } from '@/lib/commit';
+import { commitRemove, commitSave, commitUpdate } from '@/lib/commit';
+import { buildAgenda } from '@/lib/agenda';
+import { isSnoozed, reconcileDirectives, reschedulePatch, snoozeDate } from '@/lib/directives';
 import { NEED_COMPANY } from '@/lib/scope';
 import { toast } from '@/lib/toast';
 import { useIsMobile } from '@/lib/use-mobile';
@@ -34,7 +36,7 @@ import { WORK_SECTIONS_BY_KIND, workSectionsFor } from '@/lib/work-form-sections
 import { PenaltyBucketPanel } from '@/components/work/PenaltyBucketPanel';
 import {
   WORK_GROUPS, WORK_SOURCE_LABEL, WORK_DETAIL_CATEGORIES, workRowInDivision,
-  buildWorkItemLedgerRows, carNameOf, contractMeta, inboxWorkStatus, normalizeWorkStatus, parseWorkGroup, summarizeWorkLedgerRows, workGroup,
+  buildDirectiveLedgerRows, buildWorkItemLedgerRows, carNameOf, contractMeta, inboxWorkStatus, normalizeWorkStatus, parseWorkGroup, summarizeWorkLedgerRows, workGroup,
   workAttentionRank, workDueSignal,
   type WorkGroupFilter, type WorkLedgerRow, type WorkSource, type WorkStatus,
 } from '@/lib/work-ledger';
@@ -51,8 +53,8 @@ function WorkLedgerInner() {
   const searchParams = useSearchParams();
   const { companyId, isOperator } = useSession();
   const confirm = useConfirm();
-  const { data: [workItems = [], history = [], penalties = [], inbox = [], contracts = [], vehicles = []], loading, error: loadError, reload } =
-    useEntityLists(['work_item', 'history', 'penalty', 'inbox', 'contract', 'vehicle']);
+  const { data: [workItems = [], history = [], penalties = [], inbox = [], contracts = [], vehicles = [], insurances = []], loading, error: loadError, reload } =
+    useEntityLists(['work_item', 'history', 'penalty', 'inbox', 'contract', 'vehicle', 'insurance']);
   const [q, setQ] = useState('');
   const [colView, setColView] = useState<LedgerColView>('기본');
   const [group, setGroup] = useState<WorkGroupFilter>(() => parseWorkGroup(searchParams.get('group')));
@@ -62,6 +64,9 @@ function WorkLedgerInner() {
   const [selected, setSelected] = useState<WorkLedgerRow | null>(null);
   const [creating, setCreating] = useState(false);
   const [editing, setEditing] = useState(false);
+  /** 스누즈(다시 보기 날짜가 미래)한 자동업무를 펼칠지. 기본은 접어 둔다 — 스누즈의 뜻이 그것이다. */
+  const [showSnoozed, setShowSnoozed] = useState(false);
+  const [busy, setBusy] = useState(false);
   const [penProcess, setPenProcess] = useState<PenaltyProcess | null>(null);
   const [penKind, setPenKind] = useState<PenaltyKind | null>(null);
   const [ctxMenu, setCtxMenu] = useState<{ open: boolean; x: number; y: number }>({ open: false, x: 0, y: 0 });
@@ -126,8 +131,27 @@ function WorkLedgerInner() {
     [penaltyRows],
   );
 
+  /**
+   * 지시(자동 업무) — 「조건이 업무를 낳는다」.
+   * 어젠다가 감지한 기한을 **아직 저장되지 않은 제안행**으로 합성하고, 이미 실체화된 자동업무에는
+   * 기한변경·근거소멸 표식을 붙인다. 저장은 사람이 손댈 때만 일어난다(`lib/directives.ts` 참고).
+   */
+  const directives = useMemo(
+    () => reconcileDirectives(buildAgenda(contracts, vehicles, insurances, penalties), workItems),
+    [contracts, vehicles, insurances, penalties, workItems],
+  );
+
   const otherRows = useMemo<WorkLedgerRow[]>(() => {
-    const scheduled = buildWorkItemLedgerRows(workItems, contracts, vehicles);
+    const scheduled = buildWorkItemLedgerRows(workItems, contracts, vehicles)
+      .filter((r) => showSnoozed || !isSnoozed(r.raw, TODAY))
+      .map((r) => {
+        const flag = directives.flags[String(r.raw._key || r.raw.workId || '')];
+        if (!flag || flag.flag === 'ok') return r;
+        return flag.flag === '기한변경'
+          ? { ...r, autoFlag: '기한변경' as const, nextDue: flag.nextDue }
+          : { ...r, autoFlag: '근거소멸' as const };
+      });
+    const proposals = buildDirectiveLedgerRows(directives.proposals, contracts, vehicles, TODAY);
     const activities = history.map((r): WorkLedgerRow => {
       const createdAt = String(r.createdAt || r.occurredAt || r.date || '');
       const updatedAt = String(r.updatedAt || r.occurredAt || createdAt);
@@ -193,11 +217,11 @@ function WorkLedgerInner() {
       };
     });
     // 기본 정렬 = 최종처리 오래된 순(방치 감지)
-    return [...scheduled, ...activities, ...documents]
+    return [...scheduled, ...activities, ...documents, ...proposals]
       .sort((a, b) => workAttentionRank(a, TODAY) - workAttentionRank(b, TODAY)
         || (a.updatedAt || '').localeCompare(b.updatedAt || '')
         || a.kind.localeCompare(b.kind, 'ko'));
-  }, [workItems, history, inbox, vehicles, contracts]);
+  }, [workItems, history, inbox, vehicles, contracts, directives, showSnoozed]);
 
   const penaltyMode = group === '과태료';
 
@@ -270,6 +294,8 @@ function WorkLedgerInner() {
     () => summarizeWorkLedgerRows(rows, TODAY),
     [rows],
   );
+  /** 아직 아무도 안 맡은 자동 제안 — 「할 일이 얼마나 밀려 있나」의 답. */
+  const autoProposed = useMemo(() => rows.filter((r) => r.source === 'agenda').length, [rows]);
 
   const setGroupAndUrl = (next: WorkGroupFilter, opts?: { keepCreating?: boolean }) => {
     setGroup(next);
@@ -308,6 +334,64 @@ function WorkLedgerInner() {
       toast('삭제됨', 'success');
     } catch {
       toast(NEED_COMPANY, 'error');
+    }
+  };
+
+  /**
+   * 자동 제안 → 실제 업무. **이 지시 엔진의 유일한 저장 지점**이다(지연 실체화).
+   * `workId` 가 근거키(자연키)라 두 번 눌러도, 다른 사람이 동시에 눌러도 문서는 하나다.
+   */
+  const materialize = async (row: WorkLedgerRow, patch: EntityRecord, msg: string) => {
+    if (busy) return;
+    setBusy(true);
+    try {
+      const rec: EntityRecord = { ...row.raw, ...patch };
+      await commitSave({ entity: 'work_item', sessionCompanyId: companyId, rec, records: [rec] });
+      setSelected(null);
+      reload();
+      toast(msg, 'success');
+    } catch (e) {
+      toast((e as Error).message || NEED_COMPANY, 'error');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  /** 「기한변경」 반영 — 새 업무를 만들지 않고 기존 문서의 기한만 옮긴다(이력 유지). */
+  const applyReschedule = async (row: WorkLedgerRow) => {
+    const key = String(row.raw._key || row.raw.workId || '');
+    const flag = directives.flags[key];
+    if (!key || !flag || flag.flag !== '기한변경' || busy) return;
+    setBusy(true);
+    try {
+      await commitUpdate({ entity: 'work_item', sessionCompanyId: companyId, rec: row.raw, key, patch: reschedulePatch(flag) });
+      setSelected(null);
+      reload();
+      toast(`기한을 ${flag.nextDue}(으)로 옮겼습니다`, 'success');
+    } catch (e) {
+      toast((e as Error).message || NEED_COMPANY, 'error');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  /** 「근거소멸」 종결 — 자동으로 닫지 않는다. 사람이 확인하고 닫는다(감사 흔적). */
+  const closeVanished = async (row: WorkLedgerRow) => {
+    const key = String(row.raw._key || row.raw.workId || '');
+    if (!key || busy) return;
+    setBusy(true);
+    try {
+      await commitUpdate({
+        entity: 'work_item', sessionCompanyId: companyId, rec: row.raw, key,
+        patch: { status: '완료', completedAt: new Date().toISOString(), description: [String(row.raw.description || ''), '근거 해소로 종결'].filter(Boolean).join(' · ') },
+      });
+      setSelected(null);
+      reload();
+      toast('종결됨', 'success');
+    } catch (e) {
+      toast((e as Error).message || NEED_COMPANY, 'error');
+    } finally {
+      setBusy(false);
     }
   };
 
@@ -371,6 +455,11 @@ function WorkLedgerInner() {
           }}
         />}
         <PeriodBar latest={latest} initial="전체" size="sm" onRange={setRange} />
+        {!penaltyMode && (
+          <Btn size="sm" variant={showSnoozed ? 'solid' : 'ghost'} aria-pressed={showSnoozed} onClick={() => setShowSnoozed((v) => !v)}>
+            <Clock size={14} /> 미룬 일
+          </Btn>
+        )}
       </>}
       filterPanel={filterOpen ? (
         <LedgerFilterPanel
@@ -425,7 +514,7 @@ function WorkLedgerInner() {
       stats={<span style={{ fontSize: 12.5, color: C.mute }}>
         {penaltyMode
           ? <>과태료 <b>{rowTotal}</b> · 미매칭 <b style={{ color: C.danger }}>{unmatchedPenalty}</b></>
-          : <>전체 <b>{rowTotal}</b> · 진행 <b style={{ color: C.warn }}>{inProgress}</b> · 기한경과 <b style={{ color: C.danger }}>{overdue}</b> · 미배정 <b style={{ color: C.danger }}>{unassigned}</b></>}
+          : <>전체 <b>{rowTotal}</b> · 진행 <b style={{ color: C.warn }}>{inProgress}</b> · 기한경과 <b style={{ color: C.danger }}>{overdue}</b> · 미배정 <b style={{ color: C.danger }}>{unassigned}</b> · 자동제안 <b>{autoProposed}</b></>}
       </span>}
       colView={colView}
       onColView={setColView}
@@ -555,6 +644,33 @@ function WorkLedgerInner() {
             <>
               {selected.source === 'work_item' ? (
                 <Btn size="sm" onClick={() => setEditing(true)}><Pencil size={14} /> 이어서 수정</Btn>
+              ) : null}
+              {/* 자동 제안 — 여기서 처음으로 실제 업무가 된다. 맡기거나, 미루거나 둘 뿐이다. */}
+              {selected.source === 'agenda' ? (
+                <>
+                  <Btn
+                    size="sm"
+                    variant="solid"
+                    disabled={busy}
+                    onClick={() => { void materialize(selected, { status: '대기' }, '업무로 등록됨'); }}
+                  ><UserPlus size={14} /> 업무로 맡기</Btn>
+                  <Btn
+                    size="sm"
+                    variant="ghost"
+                    disabled={busy}
+                    onClick={() => { void materialize(selected, { status: '보류', snoozeUntil: snoozeDate(TODAY, 7) }, '7일 뒤에 다시 보입니다'); }}
+                  ><Clock size={14} /> 7일 뒤에</Btn>
+                </>
+              ) : null}
+              {selected.autoFlag === '기한변경' && selected.nextDue ? (
+                <Btn size="sm" variant="solid" disabled={busy} onClick={() => { void applyReschedule(selected); }}>
+                  <CalendarClock size={14} /> 기한 {selected.nextDue} 반영
+                </Btn>
+              ) : null}
+              {selected.autoFlag === '근거소멸' ? (
+                <Btn size="sm" disabled={busy} onClick={() => { void closeVanished(selected); }}>
+                  <X size={14} /> 근거 해소 — 종결
+                </Btn>
               ) : null}
               {selected.source === 'inbox' ? (
                 <>

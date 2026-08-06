@@ -25,6 +25,14 @@ export type AgendaItem = {
   companyId: string;
   company: string;
   tone: 'red' | 'amber' | 'green' | 'gray';
+  /**
+   * 근거 레코드의 자연키(계약 `_key`·차량 `_key`·과태료 `_key`).
+   * 지시(업무 자동생성)의 대상 식별자 — 차량번호로는 과태료 여러 건이 한 키로 뭉친다.
+   * `lib/directives.ts` 가 소비한다. 표시에는 쓰지 않는다.
+   */
+  refKey?: string;
+  /** 금액이 근거에 있는 종류(자동차세)만. 없으면 undefined — 0으로 채우지 않는다(모르는 것과 0원은 다르다). */
+  amount?: number;
 };
 
 const isDate = (s: unknown) => /^\d{4}-\d{2}-\d{2}/.test(String(s || ''));
@@ -50,7 +58,10 @@ export function buildAgenda(
   penalties: EntityRecord[],
 ): AgendaItem[] {
   const items: AgendaItem[] = [];
-  const push = (date: unknown, kind: AgendaKind, plate: string, title: string, companyId: string, key: string) => {
+  const push = (
+    date: unknown, kind: AgendaKind, plate: string, title: string, companyId: string, key: string,
+    extra?: { refKey?: string; amount?: number },
+  ) => {
     if (!isDate(date)) return;
     const d = dday(date);
     if (d == null) return;
@@ -66,6 +77,8 @@ export function buildAgenda(
       companyId,
       company: companyShort(companyId),
       tone: toneFor(d),
+      ...(extra?.refKey ? { refKey: extra.refKey } : {}),
+      ...(extra?.amount != null ? { amount: extra.amount } : {}),
     });
   };
 
@@ -80,6 +93,7 @@ export function buildAgenda(
         String(c.contractorName || c.contractNo || '계약'),
         String(c.companyId || ''),
         `cx:${c._key || c.contractNo || c.plate}:${end}`,
+        { refKey: String(c._key || c.contractNo || '') },
       );
     }
   }
@@ -92,6 +106,7 @@ export function buildAgenda(
       String(v.carName || ''),
       String(v.companyId || ''),
       `insp:${v._key || v.plate}:${v.inspectionTo}`,
+      { refKey: String(v._key || v.plate || '') },
     );
   }
   for (const v of vehicles) {
@@ -106,6 +121,7 @@ export function buildAgenda(
       String(v.carName || '자동차세'),
       String(v.companyId || ''),
       `tax:${v._key || v.plate}:${due}`,
+      { refKey: String(v._key || v.plate || ''), amount: Number(v.vehicleTaxAmount) || undefined },
     );
   }
   const curIns = new Map<string, EntityRecord>();
@@ -124,6 +140,7 @@ export function buildAgenda(
       String(ins.insurer || '보험'),
       String(ins.companyId || ''),
       `ins:${ins._key || ins.plate}:${ins.endDate}`,
+      { refKey: String(ins._key || ins.plate || '') },
     );
   }
   for (const p of penalties) {
@@ -136,6 +153,7 @@ export function buildAgenda(
       String(p.description || p.docType || '과태료'),
       String(p.companyId || ''),
       `pen:${p._key || p.plate}:${p.dueDate}`,
+      { refKey: String(p._key || p.plate || ''), amount: Number(p.amount) || undefined },
     );
   }
   return items.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : a.kind < b.kind ? -1 : 1));

@@ -7,8 +7,9 @@ import type { PenaltyKind, PenaltyProcess } from '@/lib/penalty-work';
 import type { WorkGroup } from '@/lib/work-form-sections';
 import { rentalTypeOf } from '@/lib/schema/contract';
 import { LEDGER_EMPTY } from '@/lib/ledger-empty';
-import { WORK_CATEGORIES, WORK_DIVISIONS, workDivisionOf, isWorkDivision, type WorkDivision } from '@/lib/work-taxonomy';
+import { WORK_CATEGORIES, WORK_DIVISIONS, workDivisionOf, isWorkCategory, isWorkDivision, type WorkDivision } from '@/lib/work-taxonomy';
 import { companyDisplay } from '@/lib/companies';
+import { materializePatch, type DirectiveProposal } from '@/lib/directives';
 
 /**
  * 목록 1단 필터 = **대분류**(work-taxonomy WORK_DIVISIONS).
@@ -16,7 +17,8 @@ import { companyDisplay } from '@/lib/companies';
  * 저장값을 건드리지 않으므로 과거 데이터도 즉시 새 탭에 들어온다.
  */
 export type WorkGroupFilter = '전체' | WorkDivision;
-export type WorkSource = 'work_item' | 'history' | 'penalty' | 'inbox';
+/** `agenda` = 아직 저장되지 않은 **자동 제안**(지연 실체화). `lib/directives.ts` 참고. */
+export type WorkSource = 'work_item' | 'history' | 'penalty' | 'inbox' | 'agenda';
 /** 업무 상태 SSOT — 미분류는 업무구분(분류) 미지정값이지 상태 아님. */
 export type WorkStatus = '대기' | '진행' | '완료' | '보류' | '미배정';
 export type WorkDueState = '기한없음' | '기한경과' | '오늘' | '임박' | '예정' | '종결';
@@ -56,6 +58,10 @@ export type WorkLedgerRow = {
   matched?: boolean;
   count?: number;
   openCount?: number;
+  /** 자동 생성 업무의 근거 표식 — `lib/directives.ts` `reconcileDirectives` 결과. 손으로 만든 업무엔 없다. */
+  autoFlag?: '기한변경' | '근거소멸';
+  /** `autoFlag === '기한변경'` 일 때 근거가 가리키는 새 기한. */
+  nextDue?: string;
   raw: EntityRecord;
 };
 
@@ -69,6 +75,7 @@ export const WORK_SOURCE_LABEL: Record<WorkSource, string> = {
   history: '이력',
   penalty: '과태료',
   inbox: '문서함',
+  agenda: '자동',
 };
 
 export function carNameOf(plate: string, vehicles: EntityRecord[]): string {
@@ -165,6 +172,51 @@ export function buildWorkItemLedgerRows(
 }
 
 /**
+ * 자동 제안(아직 실체 없음) → 업무 원장 행.
+ * `raw` 는 «저장한다면 이렇게 될 레코드»(`materializePatch`) — 상세패널·실체화가 그대로 쓴다.
+ * 실체화 전이므로 `id` 에 `agenda:` 접두를 붙여 저장된 업무(`work:`)와 구분한다.
+ */
+export function buildDirectiveLedgerRows(
+  proposals: DirectiveProposal[],
+  contracts: EntityRecord[],
+  vehicles: EntityRecord[],
+  today: string,
+): WorkLedgerRow[] {
+  return proposals.map((p) => {
+    const meta = contractMeta(p.contractKey, contracts);
+    const plate = p.plate || meta.plate;
+    const carName = carNameOf(plate, vehicles);
+    const customerName = meta.customerName;
+    return {
+      id: `agenda:${p.sourceKey}`,
+      company: companyDisplay(p.companyId),
+      companyId: p.companyId,
+      kind: p.category,
+      group: p.category,
+      target: [plate, carName, customerName, meta.contractNo].filter(Boolean).join(' '),
+      title: p.title,
+      workAt: today,
+      workDate: today,
+      createdAt: today,
+      updatedAt: today,
+      dueDate: p.dueDate,
+      status: '대기' as const,
+      assignee: '',
+      amount: p.amount,
+      source: 'agenda' as const,
+      plate,
+      carName,
+      contractKey: p.contractKey,
+      contractNo: meta.contractNo,
+      customerName,
+      rentalType: meta.rentalType,
+      priority: p.priority,
+      raw: materializePatch(p, today),
+    };
+  });
+}
+
+/**
  * 수집함 문서의 업무 상태.
  * 차량번호는 연결 대상 중 하나일 뿐이므로 배정 여부를 차량번호로 추정하지 않는다.
  * 자금 자료처럼 차량번호가 없는 원본도 담당자가 잡으면 진행, 실제 매칭이 끝나야 완료다.
@@ -228,6 +280,9 @@ export function workStatusTone(status: string): 'green' | 'amber' | 'red' | 'gra
 export function workGroup(kind: unknown): WorkGroup {
   const value = String(kind || '');
   if (!value || value === '미분류' || value === '일반') return '기타';
+  // 정규 세부값이면 추측하지 않는다 — 아래 정규식은 «자유입력·옛 이름»을 끌어오기 위한 것이다.
+  // (없으면 신규 세부가 추가될 때마다 정규식에 걸리지 않아 조용히 「기타」로 떨어진다. 실제로 '반납·정산'이 그랬다.)
+  if (isWorkCategory(value)) return value;
   if (/일정|스케줄|예약/.test(value)) return '일정';
   if (/연락기록/.test(value)) return '연락기록';
   if (/상담|통화|문자|연락|고객|민원/.test(value)) return '고객상담';

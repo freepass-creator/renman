@@ -166,6 +166,11 @@ export const ENTITIES: Record<string, Entity> = {
       { key: 'customerName', label: '고객명', type: 'text' },
       { key: 'dueDate', label: '기한', type: 'date' },
       { key: 'assigneeName', label: '담당자', type: 'text' },
+      // ── 자동 생성(지시) — lib/directives.ts. 손으로 만드는 업무에는 붙지 않는다 ──
+      // workId(자연키)와 같은 값을 넣는다: 같은 근거로 다시 저장해도 문서가 하나다.
+      { key: 'sourceKey', label: '근거키', type: 'text', manual: true, note: '자동 생성 업무의 근거(대상+종류+기한). 직접 수정하지 마세요' },
+      { key: 'autoSource', label: '생성경로', type: 'text', manual: true, note: '자동 생성 원천(agenda 등). 비어 있으면 손으로 만든 업무' },
+      { key: 'snoozeUntil', label: '다시 보기', type: 'date', manual: true, note: '이 날짜까지 목록에서 접어 둡니다(스누즈)' },
       { key: 'vendor', label: '업체/거래처', type: 'text' },
       { key: 'amount', label: '금액(원)', type: 'number' },
       { key: 'cashFlow', label: '자금방향', type: 'select', options: ['입금예정', '출금예정'], manual: true, note: '자금계획 반영 방향. 미선택이면 분류필요로 보관' },

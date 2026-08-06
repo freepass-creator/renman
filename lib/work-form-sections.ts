@@ -49,6 +49,13 @@ export const WORK_SECTIONS_BY_KIND: Record<WorkCreateKind, WorkFormSection[]> = 
        영구 이탈한다. 고객 클레임이 «어제까지였는데 안 닫힘»으로 튀어오르지 못하고 상담더미에 묻힌다. */
     fields: ['callChannel', 'callDirection', 'callResult', 'dueDate', 'nextActionDate', 'assigneeName', 'description'],
   }),
+  /* 반납·정산 — 반납 만기가 자동으로 낳는 일(lib/directives.ts).
+     ★여기서 «반납 처리»를 하지 않는다. 실제 상태 전이(반납 확정·정산)는 계약화면 버튼이 유일한 경로다
+       — 두 곳에서 전이하면 어느 쪽이 진실인지 알 수 없게 된다. 여기 담는 것은 회수 준비: 언제·누가·어디서. */
+  '반납·정산': secs({
+    title: '반납 준비', open: true,
+    fields: ['dueDate', 'location', 'vendor', 'mileage', 'assigneeName', 'description'],
+  }),
   '연락기록': secs({
     title: '연락기록', open: true,
     fields: ['callChannel', 'callDirection', 'callResult', 'nextActionDate', 'assigneeName', 'description'],

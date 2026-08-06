@@ -79,8 +79,16 @@ const WORK_COL_CATALOG: SheetCol<WorkLedgerRow>[] = [
   },
   {
     key: 'status', label: '업무상태', align: 'c', priority: 1,
-    render: (r) => <Badge tone={workStatusTone(r.status)}>{r.status}</Badge>,
-    text: (r) => r.status,
+    // 자동업무의 근거 표식(기한변경·근거소멸)은 상태 옆에 붙인다 — 열을 새로 만들면 6원장 폭이 다 밀린다.
+    render: (r) => (r.autoFlag
+      ? (
+        <span style={{ display: 'inline-flex', gap: 4, alignItems: 'center', justifyContent: 'center' }}>
+          <Badge tone={workStatusTone(r.status)}>{r.status}</Badge>
+          <Badge tone={r.autoFlag === '근거소멸' ? 'gray' : 'amber'}>{r.autoFlag}</Badge>
+        </span>
+      )
+      : <Badge tone={workStatusTone(r.status)}>{r.status}</Badge>),
+    text: (r) => (r.autoFlag ? `${r.status} ${r.autoFlag}` : r.status),
   },
   {
     key: 'plate', label: '차량번호', priority: 1, pin: true,
@@ -343,6 +351,8 @@ const WORK_KIND_DETAIL_DEFS: Record<WorkLedgerRow['group'], DetailSectionDef[]> 
   수납이슈: [{ title: '수납이슈', keys: ['paymentIssueType', 'expectedAmount', 'receivedAmount', 'nextActionDate'] }],
   분쟁: [{ title: '분쟁', keys: ['disputeType', 'counterparty', 'nextActionDate'] }],
   클레임: [{ title: '클레임', keys: ['claimType', 'callChannel', 'nextActionDate'] }],
+  // 반납 준비 — 회수 장소·탁송사·인수 주행거리. 정산 금액은 계약(반납정산)이 계산한다(여기서 손롤 금지).
+  '반납·정산': [{ title: '반납 준비', keys: ['location', 'vendor', 'mileage'] }],
   입출고: [{ title: '입출고', keys: ['location', 'vendor', 'mileage'] }],
   '매각·처분': [{ title: '매각·처분', keys: ['counterparty', 'vendor', 'mileage'] }],
   문서: [{ title: '문서', keys: ['docKind', 'docStatus'] }],
