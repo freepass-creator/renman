@@ -29,6 +29,20 @@
 
 **B그룹 잔여:** B-1 미수 원장 엔진 · B-4 필드 스키마 · globals 레거시.
 
+**🔴 버그 (2026-08-06 dev 로그 실측 · 오픈 전 수정):**
+- **감사로그·이벤트가 서버에서 거부된다.**
+  `POST /api/entities/audit_logs 404` · `POST /api/entities/atomic_event 404`
+  원인 = `app/api/entities/[entity]/route.ts` 가 `ENTITIES` 에 없는 키를 404 로 막는데
+  `audit_logs`(store.ts AUDIT_COLL)·`atomic_event` 는 ENTITIES 에 없다.
+  **데이터는 저장되는데 «누가 언제 무엇을 바꿨는지»가 안 남는다.**
+  ▸ 방향: 이 둘은 Admin 라우트를 태우면 안 된다 — 라우트의 문서ID 규약(`{companyId}__자연키`)이
+    감사로그 id 와 안 맞고, rules 에 이미 전용 match 가 있다(audit_logs = append-only · byUid 강제).
+    `store.save` 에서 이 둘만 **클라 SDK 직행**으로 보내면 된다.
+
+**UI 요청 (사장님, 2026-08-06 · 미착수):**
+- **「무엇이든 올리기」에 [업로드]·[업로드 취소] 버튼**을 그 패널 안에 둘 것. 지금은 드롭존만 있고 명시 버튼이 없다.
+- **데이터센터 우측 투입패널이 열리는 형태**를 원장 상세패널과 같게 재검토.
+
 **미착수 지시 (사장님, 2026-08-06):**
 - **차량360(`/vehicle/[plate]`) 규격 이식 — 규격서 = `docs/VEHICLE360-SPEC.md` (그것만 읽고 한 번에).**
   진행: 현황 KV 전환 완료(`ed511be`) · 토대(`LedgerRecordSection.body`/`count`) 완료.
