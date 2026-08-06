@@ -11,26 +11,28 @@ import { useIsMobile } from '@/lib/use-mobile';
  *   붙여넣기: 포커스 후 Ctrl+V (클립보드 이미지·파일)
  * 조립(OCR·업로드)까지 필요하면 `<DocUpload>`(components/ui/doc-upload)를 쓴다.
  */
-export default function FileDrop({ onFile, onFiles, multiple, accept, file, hint, note, style }: {
+export default function FileDrop({ onFile, onFiles, multiple, accept, file, hint, note, disabled, style }: {
   onFile?: (f: File) => void;
   onFiles?: (fs: FileList) => void;
   multiple?: boolean;
   accept?: string;
   file?: File | null;
   hint?: string;
-  /** 진행 상태 등 부가 문구(예: 'OCR 분석 중…') */
+  /** 진행 상태 등 부가 문구(예: 'OCR 분석 중…') — 박스 안에서 표시, 레이아웃 유지 */
   note?: string;
+  /** 진행 중 재선택 차단 */
+  disabled?: boolean;
   style?: React.CSSProperties;
 }) {
   const mobile = useIsMobile();
   const ref = useRef<HTMLInputElement>(null);
   const [over, setOver] = useState(false);
   const take = (fs: FileList | null) => {
-    if (!fs || !fs.length) return;
+    if (disabled || !fs || !fs.length) return;
     if (onFiles) onFiles(fs); else onFile?.(fs[0]);
   };
   const takeItems = (items: DataTransferItemList | undefined) => {
-    if (!items?.length) return;
+    if (disabled || !items?.length) return;
     const files: File[] = [];
     for (let i = 0; i < items.length; i++) {
       const it = items[i];
@@ -47,17 +49,19 @@ export default function FileDrop({ onFile, onFiles, multiple, accept, file, hint
   };
   return (
     <div
-      tabIndex={0}
+      tabIndex={disabled ? -1 : 0}
       role="button"
       aria-label="파일 선택"
-      onClick={() => ref.current?.click()}
+      aria-disabled={disabled || undefined}
+      onClick={() => { if (!disabled) ref.current?.click(); }}
       onKeyDown={(event) => {
+        if (disabled) return;
         if (event.key === 'Enter' || event.key === ' ') {
           event.preventDefault();
           ref.current?.click();
         }
       }}
-      onDragOver={(e) => { e.preventDefault(); setOver(true); }}
+      onDragOver={(e) => { e.preventDefault(); if (!disabled) setOver(true); }}
       onDragLeave={() => setOver(false)}
       onDrop={(e) => { e.preventDefault(); setOver(false); take(e.dataTransfer.files); }}
       onPaste={(e) => { takeItems(e.clipboardData?.items); }}
@@ -67,13 +71,14 @@ export default function FileDrop({ onFile, onFiles, multiple, accept, file, hint
         border: `1.5px dashed ${over ? C.accent : file ? 'var(--green-border)' : C.line}`,
         borderRadius: 'var(--radius)',
         background: over ? 'var(--bg-hover)' : file ? 'var(--green-bg)' : C.bg,
-        cursor: 'pointer', textAlign: 'center', transition: 'all .12s',
+        cursor: disabled ? 'default' : 'pointer', textAlign: 'center', transition: 'all .12s',
         minWidth: 0, minHeight: 120, boxSizing: 'border-box', outline: 'none',
+        opacity: disabled ? 0.85 : 1,
         ...style,
       }}
     >
-      <input ref={ref} type="file" accept={accept} multiple={multiple} style={{ display: 'none' }}
-        onChange={(e) => { take(e.target.files); e.currentTarget.value = ''; }} />
+      <input ref={ref} type="file" accept={accept} multiple={multiple} disabled={disabled} style={{ display: 'none' }}
+        onChange={(e) => { take(e.currentTarget.files); e.currentTarget.value = ''; }} />
       {file ? <CheckCircle2 size={26} color="var(--green-text)" /> : <UploadCloud size={26} color={C.faint} />}
       {file
         ? <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--green-text)', wordBreak: 'break-all' }}>{file.name}</div>

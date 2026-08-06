@@ -1,7 +1,9 @@
 'use client';
 /**
  * 데이터관리 — 전 엔티티 투입구 (OCR·엑셀·직접).
- * LedgerFrame 공용 셸 + body(시트) + sidePanel(투입). 엔진(saveIntake·OCR·xlsx) 유지.
+ * LedgerFrame 공용 셸 + body(시트) + sidePanel(투입/상세). 엔진(saveIntake·OCR·xlsx) 유지.
+ *
+ * 표 = 문서종류·카테고리·분석요약(원장 행문법). 엔티티 필드는 우측 패널.
  */
 import { Suspense, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
@@ -22,9 +24,9 @@ import { UploadCloud, Trash2, FileSpreadsheet, PanelRight, PanelRightClose, File
 import FileDrop from '@/components/FileDrop';
 import { toast } from '@/lib/toast';
 import {
-  LedgerFrame, LedgerPanelCloseButton, LedgerRecordPanel, Badge, Btn, FormGrid, PillTabs, Select, Input, Search,
-  C, Message, Loading, OcrCrosscheck, PageLoading, EmptyState, LedgerActions,
-  ExcelSheet, LedgerPanelFooter, type SheetCol,
+  LedgerFrame, LedgerRecordPanel, Badge, Btn, FormGrid, PillTabs, Select, Search,
+  C, Message, OcrCrosscheck, PageLoading, EmptyState, LedgerActions,
+  ExcelSheet, TwoLineCell, type SheetCol,
 } from '@/components/ui';
 import type { CrosscheckResult } from '@/lib/ocr-crosscheck';
 import { useIsMobile } from '@/lib/use-mobile';
@@ -35,13 +37,16 @@ import { getStore } from '@/lib/store';
 import { buildMatchContract } from '@/lib/contract-ops';
 import { analyzeMatchProposal, proposalPatch, toBankTransaction } from '@/lib/payments/match-proposal';
 import { TODAY } from '@/lib/dashboard-consts';
+import { LEDGER_EMPTY } from '@/lib/ledger-empty';
+import {
+  buildPendingRow, refreshPendingRow, summarizeSavedRow,
+  type IngestPendingRow,
+} from '@/lib/ingest-summary';
 
 export const dynamic = 'force-dynamic';
 
 type Tab = 'ocr' | 'excel' | 'manual';
 type SheetView = '대기' | '저장본';
-
-type PendingRow = EntityRecord & { _rid: string };
 
 const LAYER_TITLE: Record<string, string> = {
   ledger: '① 원장',
@@ -77,9 +82,10 @@ function IngestInner() {
   const [panelOpen, setPanelOpen] = useState(true);
   const [universalOpen, setUniversalOpen] = useState(false);
   const [universalBusy, setUniversalBusy] = useState(false);
+  const [stagedFiles, setStagedFiles] = useState<File[]>([]);
   const { rows: savedList, loading: savedLoading, reload: reloadSaved } = useEntityList(entityKey);
   const [tab, setTab] = useState<Tab>(() => (sp.get('plate') ? 'manual' : 'ocr'));
-  const [records, setRecords] = useState<PendingRow[]>([]);
+  const [records, setRecords] = useState<IngestPendingRow[]>([]);
   const [ocrRaw, setOcrRaw] = useState<Record<string, unknown> | null>(null);
   const [ocrCrosscheck, setOcrCrosscheck] = useState<CrosscheckResult | null>(null);
   const [error, setError] = useState('');
@@ -94,6 +100,7 @@ function IngestInner() {
   const [selectedSaved, setSelectedSaved] = useState<EntityRecord | null>(null);
   const [savedPickedKey, setSavedPickedKey] = useState<string | null>(null);
   const [picked, setPicked] = useState<string | null>(null);
+  const [selectedPending, setSelectedPending] = useState<IngestPendingRow | null>(null);
   const [parseNotice, setParseNotice] = useState('');
 
   const entity = ENTITIES[entityKey];
@@ -119,6 +126,8 @@ function IngestInner() {
   useEffect(() => {
     setSelectedSaved(null);
     setSavedPickedKey(null);
+    setSelectedPending(null);
+    setPicked(null);
   }, [companyId, entityKey, sheetView]);
 
   function resetQueue() {
@@ -127,13 +136,19 @@ function IngestInner() {
     setOcrRaw(null);
     setOcrCrosscheck(null);
     setPicked(null);
+    setSelectedPending(null);
     setFile(null);
   }
 
-  async function uploadOriginals(files: FileList) {
+  function cancelUniversal() {
+    if (universalBusy) return;
+    setStagedFiles([]);
+    setUniversalOpen(false);
+  }
+
+  async function uploadOriginals(list: File[]) {
     const target = resolveWriteCompany(companyId, null);
     if (!target) { toast(NEED_COMPANY, 'error'); return; }
-    const list = [...files];
     if (!list.length) return;
     setUniversalBusy(true);
     let saved = 0;
@@ -158,6 +173,7 @@ function IngestInner() {
         toast(`원본 ${saved}건 접수${duplicates ? ` · 중복 ${duplicates}건` : ' · 처리대기'}`, 'success');
         setEntityKey('inbox');
         setSheetView('저장본');
+        setStagedFiles([]);
         setUniversalOpen(false);
         setPanelOpen(false);
       } else if (failures.length) {
@@ -179,17 +195,12 @@ function IngestInner() {
     if (!target) { toast(NEED_COMPANY, 'error'); return; }
     setSaving(true); setError('');
     try {
-      // _rid는 대기표 선택용 UI 키다. OCR·엑셀·직접입력 어느 경로에서도 원장에 저장하지 않는다.
-      const cleanRecords = records.map(({ _rid: _pendingKey, ...rest }) => rest);
+      const cleanRecords = records.map((row) => row.record);
       const toSave = ocrRaw && cleanRecords.length === 1
         ? [{ ...cleanRecords[0], _ocrOriginal: { raw: ocrRaw, at: new Date().toISOString(), source: entity.source } }]
         : cleanRecords;
 
-      /* ★OCR 로 만든 레코드에는 **원본 파일도 함께 붙인다.**
-         종전에는 추출값(_ocrOriginal)만 저장해서, 등록증으로 차를 만들어도 `_docs` 가 비어 있었다 —
-         자산 화면이 「등록증은 데이터센터에서 담으세요」라고 안내하는데 그 길로 가면
-         서류 없는 차량이 생기고 정합성은 계속 「자동차등록증 미첨부(high)」를 띄운다.
-         대량 경로(/ingest/bulk)는 이미 이렇게 하고 있어 두 경로 결과가 달랐다. */
+      /* ★OCR 로 만든 레코드에는 **원본 파일도 함께 붙인다.** */
       if (ocrRaw && file && toSave.length === 1) {
         const rec = toSave[0];
         const key = String(rec.plate || rec.policyNo || 'new');
@@ -228,9 +239,22 @@ function IngestInner() {
       if (!r.ok) { setError(r.error || '추출 실패'); toast('OCR 추출 실패', 'error'); return; }
       setOcrRaw(r.raw || {});
       setOcrCrosscheck(r.crosscheck || null);
-      setRecords([{ ...mapOcrToEntity(entityKey, r.raw || {}), _rid: newRid() }]);
+      const mapped = mapOcrToEntity(entityKey, r.raw || {});
+      const row = buildPendingRow({
+        rid: newRid(),
+        entityKey,
+        record: mapped,
+        source: 'ocr',
+        crosscheck: r.crosscheck || null,
+        filename: file.name,
+        mime: file.type,
+      });
+      setRecords([row]);
+      setSelectedPending(row);
+      setPicked(row._rid);
       setSheetView('대기');
-      setPanelOpen(true);
+      setPanelOpen(false);
+      setUniversalOpen(false);
       toast('OCR 추출 완료 — 검토 후 저장', 'success');
     } catch (e) {
       setError((e as Error).message);
@@ -293,7 +317,9 @@ function IngestInner() {
         toast('인식된 행 0', 'error');
         return;
       }
-      setRecords(recs.map((r) => ({ ...r, _rid: newRid() })));
+      setRecords(recs.map((r) => buildPendingRow({ rid: newRid(), entityKey, record: r, source: 'excel' })));
+      setSelectedPending(null);
+      setPicked(null);
       setSheetView('대기');
       toast(`${recs.length.toLocaleString()}행 — 검토 후 저장`, 'success');
     } catch (e) {
@@ -314,9 +340,22 @@ function IngestInner() {
     if (!Object.keys(filled).length) { setError('입력값이 없습니다'); return; }
     setOcrRaw(null);
     setOcrCrosscheck(null);
-    setRecords([{ ...filled, _rid: newRid() }]);
+    const row = buildPendingRow({ rid: newRid(), entityKey, record: filled, source: 'manual' });
+    setRecords([row]);
+    setSelectedPending(row);
+    setPicked(row._rid);
     setSheetView('대기');
+    setPanelOpen(false);
     toast('직접입력 1건 — 검토 후 저장', 'success');
+  }
+
+  function patchPendingRecord(rid: string, next: EntityRecord) {
+    setRecords((prev) => prev.map((row) => {
+      if (row._rid !== rid) return row;
+      const refreshed = refreshPendingRow(entityKey, row, next);
+      setSelectedPending((cur) => (cur && cur._rid === rid ? refreshed : cur));
+      return refreshed;
+    }));
   }
 
   const methodTabs = useMemo(() => {
@@ -326,36 +365,58 @@ function IngestInner() {
     return list;
   }, [entity.ocrType]);
 
-  const pendingCols = useMemo<SheetCol<PendingRow>[]>(() => {
-    const pendingLimit = entityKey === 'bank_tx' ? 13 : 10;
-    const fields = entity.fields.slice(0, sheetView === '대기' ? pendingLimit : 6);
-    return fields.map((f, i) => ({
-      key: f.key,
-      label: f.manual ? `${f.label}·확인` : f.label,
-      pin: i === 0,
-      priority: (i < 4 ? 1 : i < 7 ? 2 : 3) as 1 | 2 | 3,
-      text: (r) => String(r[f.key] ?? ''),
+  /** 대기 표 — 파일형태 · 문서종류 · 카테고리 · 분석요약 · 신뢰도 · 상태 */
+  const pendingCols = useMemo<SheetCol<IngestPendingRow>[]>(() => [
+    {
+      key: 'fileForm',
+      label: '파일',
+      pin: true,
+      priority: 1,
+      text: (r) => r.fileForm,
+      render: (r) => r.fileForm || LEDGER_EMPTY.dash,
+    },
+    {
+      key: 'docKind',
+      label: '문서종류',
+      priority: 1,
+      text: (r) => r.docKind,
+      render: (r) => <span style={{ fontWeight: 700 }}>{r.docKind || LEDGER_EMPTY.dash}</span>,
+    },
+    {
+      key: 'category',
+      label: '카테고리',
+      priority: 1,
+      text: (r) => r.category,
+      render: (r) => <Badge tone="blue">{r.category}</Badge>,
+    },
+    {
+      key: 'analysisSummary',
+      label: '분석 결과',
+      priority: 1,
+      text: (r) => r.analysisSummary,
       render: (r) => (
-        sheetView === '대기' ? (
-          <Input
-            size="sm"
-            value={String(r[f.key] ?? '')}
-            onChange={(e) => {
-              const v = e.target.value;
-              setRecords((prev) => prev.map((row) => row._rid === r._rid ? { ...row, [f.key]: v } : row));
-            }}
-            style={{
-              width: '100%',
-              minWidth: f.type === 'text' ? 88 : 72,
-              background: f.manual && !r[f.key] ? 'var(--orange-bg)' : undefined,
-            }}
-          />
-        ) : (
-          <span>{r[f.key] != null && r[f.key] !== '' ? String(r[f.key]) : '—'}</span>
-        )
+        <TwoLineCell
+          main={r.analysisSummary}
+          sub={r.unreadLabels.length ? `미인식 ${r.unreadLabels.length} · ${r.unreadLabels.slice(0, 3).join('·')}` : undefined}
+        />
       ),
-    }));
-  }, [entity.fields, entityKey, sheetView]);
+    },
+    {
+      key: 'confidence',
+      label: '신뢰도',
+      priority: 2,
+      align: 'r',
+      text: (r) => r.confidence == null ? '' : String(r.confidence),
+      render: (r) => (r.confidence == null ? LEDGER_EMPTY.dash : `${r.confidence}%`),
+    },
+    {
+      key: 'status',
+      label: '상태',
+      priority: 1,
+      text: (r) => r.statusLabel,
+      render: (r) => <Badge tone={r.statusTone}>{r.statusLabel}</Badge>,
+    },
+  ], []);
 
   const savedRows = useMemo(() => {
     if (sheetView !== '저장본') return [];
@@ -378,34 +439,73 @@ function IngestInner() {
   );
 
   const savedCols = useMemo<SheetCol<EntityRecord>[]>(() => [
-    ...(entityKey === 'inbox'
-      ? ['filename', 'kind', 'processingState', 'classificationState', 'intakeState', 'assignmentState', 'assignee', 'dueDate']
-        .map((key) => entity.fields.find((field) => field.key === key))
-        .filter((field): field is (typeof entity.fields)[number] => !!field)
-      : entity.fields.slice(0, 6)).map((f, i) => ({
-      key: f.key,
-      label: f.label,
-      pin: i === 0,
-      priority: (i < 3 ? 1 : 2) as 1 | 2,
-      text: (r: EntityRecord) => String(r[f.key] ?? ''),
-      render: (r: EntityRecord) => {
-        const value = String(r[f.key] ?? '').trim();
-        if (!value) return '—';
-        if (entityKey === 'inbox' && /State$/.test(f.key)) {
-          const tone = /완료|분류됨|배정됨/.test(value) ? 'green' : /오류|중복/.test(value) ? 'red' : 'amber';
-          return <Badge tone={tone}>{value}</Badge>;
-        }
-        return value;
+    {
+      key: 'fileForm',
+      label: '파일',
+      pin: true,
+      priority: 1,
+      text: (r) => summarizeSavedRow(entityKey, r).fileForm,
+      render: (r) => summarizeSavedRow(entityKey, r).fileForm || LEDGER_EMPTY.dash,
+    },
+    {
+      key: 'docKind',
+      label: '문서종류',
+      priority: 1,
+      text: (r) => summarizeSavedRow(entityKey, r).docKind,
+      render: (r) => {
+        const s = summarizeSavedRow(entityKey, r);
+        return <span style={{ fontWeight: 700 }}>{s.docKind || LEDGER_EMPTY.dash}</span>;
       },
-    })),
+    },
+    {
+      key: 'category',
+      label: '카테고리',
+      priority: 1,
+      text: (r) => summarizeSavedRow(entityKey, r).category,
+      render: (r) => <Badge tone="blue">{summarizeSavedRow(entityKey, r).category}</Badge>,
+    },
+    {
+      key: 'analysisSummary',
+      label: '분석 결과',
+      priority: 1,
+      text: (r) => summarizeSavedRow(entityKey, r).analysisSummary,
+      render: (r) => {
+        const s = summarizeSavedRow(entityKey, r);
+        return <TwoLineCell main={s.analysisSummary} sub={s.unreadHint || undefined} />;
+      },
+    },
+    {
+      key: 'confidence',
+      label: '신뢰도',
+      priority: 2,
+      align: 'r',
+      text: (r) => {
+        const c = summarizeSavedRow(entityKey, r).confidence;
+        return c == null ? '' : String(c);
+      },
+      render: (r) => {
+        const c = summarizeSavedRow(entityKey, r).confidence;
+        return c == null ? LEDGER_EMPTY.dash : `${c}%`;
+      },
+    },
+    {
+      key: 'status',
+      label: '상태',
+      priority: 1,
+      text: (r) => summarizeSavedRow(entityKey, r).statusLabel,
+      render: (r) => {
+        const s = summarizeSavedRow(entityKey, r);
+        return <Badge tone={s.statusTone}>{s.statusLabel}</Badge>;
+      },
+    },
     {
       key: '_at',
       label: '저장시각',
-      priority: 3 as const,
-      text: (r: EntityRecord) => String(r.createdAt || ''),
-      render: (r: EntityRecord) => String(r.createdAt || '').slice(0, 16).replace('T', ' ') || '—',
+      priority: 3,
+      text: (r) => String(r.createdAt || r.uploadedAt || ''),
+      render: (r) => String(r.createdAt || r.uploadedAt || '').slice(0, 16).replace('T', ' ') || LEDGER_EMPTY.dash,
     },
-  ], [entity.fields, entityKey]);
+  ], [entityKey]);
 
   const savedDetailCols = useMemo<SheetCol<EntityRecord>[]>(() => entity.fields.map((field) => ({
     key: field.key,
@@ -413,7 +513,7 @@ function IngestInner() {
     text: (row) => String(row[field.key] ?? ''),
     render: (row) => {
       const value = String(row[field.key] ?? '').trim();
-      if (!value) return '—';
+      if (!value) return LEDGER_EMPTY.dash;
       if (field.key === 'url') {
         return <a href={value} target="_blank" rel="noreferrer" style={{ color: C.accent, fontWeight: 700 }}>원본 열기</a>;
       }
@@ -440,35 +540,49 @@ function IngestInner() {
     ];
   }, [entityKey, manualPrimaryFields, savedDetailCols]);
 
-  const sheetBusy = (sheetView === '저장본' && savedLoading) || loading;
+  const pendingDetailCols = useMemo<SheetCol<EntityRecord>[]>(() => entity.fields.map((field) => ({
+    key: field.key,
+    label: field.manual ? `${field.label}·확인` : field.label,
+    text: (row) => String(row[field.key] ?? ''),
+    render: (row) => {
+      const value = String(row[field.key] ?? '').trim();
+      return value || LEDGER_EMPTY.dash;
+    },
+  })), [entity.fields]);
+
+  const pendingDetailSections = useMemo(() => {
+    const primaryKeys = new Set(manualPrimaryFields.map((field) => field.key));
+    return [
+      { title: '기본정보', open: true, cols: pendingDetailCols.filter((col) => primaryKeys.has(col.key)) },
+      { title: '추가 운영정보', cols: pendingDetailCols.filter((col) => !primaryKeys.has(col.key)) },
+    ];
+  }, [manualPrimaryFields, pendingDetailCols]);
+
+  // OCR 추출 중에는 시트 자리를 비우지 않는다 — 진행은 투입패널 FileDrop note.
+  const sheetBusy = sheetView === '저장본' && savedLoading;
 
   const sheetBody = sheetBusy ? (
-    <PageLoading label={loading ? 'OCR 추출 중…' : '불러오는 중…'} />
+    <PageLoading label="불러오는 중…" />
   ) : sheetView === '대기' ? (
-    !records.length ? (
-      <EmptyState variant="sheet">
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
-          <strong style={{ color: C.ink }}>{isAllScope(companyId) ? '대상 회사를 먼저 선택하세요' : '분석 대기 자료가 없습니다'}</strong>
-          <span>{isAllScope(companyId)
-            ? '상단의 전체 회사에서 원본과 분석 결과를 보관할 법인을 선택하세요.'
-            : <>오른쪽에서 {tab === 'ocr' ? '문서를 선택해 OCR을 실행' : tab === 'excel' ? '엑셀을 올려 행을 검토' : '기본정보를 입력'}하거나, 종류를 모르면 원본부터 보관하세요.</>}</span>
-          {!isAllScope(companyId) && (
-            <Btn size="sm" variant="ghost" onClick={() => { setUniversalOpen(true); setPanelOpen(false); }}>
-              <UploadCloud size={14} /> 원본 먼저 올리기
-            </Btn>
-          )}
-        </div>
-      </EmptyState>
-    ) : (
+    <div style={{ display: 'flex', flexDirection: 'column', flex: '1 1 auto', minHeight: 0, gap: 8 }}>
+      {/* 안내 배너 없음 — 헤더가 상시 서 있으므로 «뭘 올리면 뭐가 채워지는지»는 표가 말한다.
+          올리기는 상단 툴바 [업로드] 버튼 하나로 충분하다(같은 일을 두 자리에서 시키지 않는다). */}
       <ExcelSheet
-        cols={pendingCols.map((c) => ({ ...c, pin: false }))}
+        cols={pendingCols}
         rows={records}
         rowKey={(r) => r._rid}
         selectedRowKey={picked}
         onRow={(r) => setPicked(r._rid)}
+        onRowDoubleClick={(r) => {
+          setPicked(r._rid);
+          setSelectedPending((cur) => (cur && cur._rid === r._rid ? null : r));
+          setPanelOpen(false);
+          setUniversalOpen(false);
+          setSelectedSaved(null);
+        }}
         fit
       />
-    )
+    </div>
   ) : isAllScope(companyId) ? (
     <EmptyState variant="sheet">저장 회사를 선택하세요</EmptyState>
   ) : (
@@ -483,138 +597,201 @@ function IngestInner() {
         />
         <span style={{ fontSize: 12.5, color: C.mute }}>{savedRows.length}건</span>
       </div>
+      {/* 빈 저장본도 열 헤더는 상시 — EmptyState로 표를 갈아엎지 않음 */}
+      <ExcelSheet
+        cols={savedCols}
+        rows={savedRows}
+        rowKey={(r, i) => String(r._key || r.id || i)}
+        selectedRowKey={selectedSaved ? String(selectedSaved._key || selectedSaved.id || '') : savedPickedKey}
+        onRow={(row) => {
+          setSavedPickedKey(String(row._key || row.id || ''));
+        }}
+        onRowDoubleClick={(row) => {
+          const key = String(row._key || row.id || '');
+          setSavedPickedKey(key);
+          setSelectedSaved((current) => {
+            const currentKey = current ? String(current._key || current.id || '') : '';
+            return currentKey === key ? null : row;
+          });
+          setPanelOpen(false);
+          setUniversalOpen(false);
+          setSelectedPending(null);
+        }}
+        fit
+      />
       {!savedRows.length ? (
-        <EmptyState variant="sheet">저장본 없음</EmptyState>
-      ) : (
-        <ExcelSheet
-          cols={savedCols}
-          rows={savedRows}
-          rowKey={(r, i) => String(r._key || r.id || i)}
-          selectedRowKey={selectedSaved ? String(selectedSaved._key || selectedSaved.id || '') : savedPickedKey}
-          onRow={(row) => {
-            setSavedPickedKey(String(row._key || row.id || ''));
-          }}
-          onRowDoubleClick={(row) => {
-            const key = String(row._key || row.id || '');
-            setSavedPickedKey(key);
-            setSelectedSaved((current) => {
-              const currentKey = current ? String(current._key || current.id || '') : '';
-              return currentKey === key ? null : row;
-            });
-            setPanelOpen(false);
-            setUniversalOpen(false);
-          }}
-          fit
-        />
-      )}
+        <div style={{ padding: '8px 0 0' }}>
+          <Message variant="info">저장본 없음 — 대기에서 검토 후 저장하면 여기 쌓입니다.</Message>
+        </div>
+      ) : null}
     </>
   );
 
   const universalPanel = universalOpen ? (
-    <section className="ledger-record-panel" aria-label="원본 자료 투입">
-      <header className="ledger-record-panel__header">
-        <div className="ledger-record-panel__heading">
-          <div className="ledger-record-panel__title">무엇이든 올리기</div>
-          <div className="ledger-record-panel__subtitle">종류를 몰라도 먼저 등록 · 이후 분석과 분류를 이어서 처리</div>
-        </div>
-        <LedgerPanelCloseButton onClose={() => setUniversalOpen(false)} label="원본 투입패널 닫기" />
-      </header>
-      <div className="ledger-record-panel__body" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-        {isAllScope(companyId) && (
-          <Message variant="warning">원본 자료가 잘못 귀속되지 않도록 상단에서 보관할 회사를 먼저 선택하세요.</Message>
-        )}
-        {!isAllScope(companyId) && <FileDrop
-          multiple
-          onFiles={(files) => { void uploadOriginals(files); }}
-          accept=".pdf,.jpg,.jpeg,.png,.webp,.xlsx,.xls,.csv"
-          hint="등록증 · 계약서 · 보험증권 · 계좌엑셀 · 영수증 · 일반문서"
-          note={universalBusy ? '원본 보관 중…' : undefined}
-        />}
-        <Message variant="info">파일은 즉시 원본 건으로 보관됩니다. 아직 판정할 수 없는 자료는 미분류·미처리·미배정 상태로 남습니다.</Message>
-      </div>
-    </section>
+    <LedgerRecordPanel
+      title="업로드"
+      identity="종류를 몰라도 먼저 등록 · 이후 분석·분류"
+      row={{}}
+      cols={[]}
+      onClose={cancelUniversal}
+      actions={(
+        <>
+          <Btn size="sm" variant="ghost" disabled={universalBusy} onClick={cancelUniversal}>업로드 취소</Btn>
+          <Btn
+            size="sm"
+            variant="solid"
+            disabled={universalBusy || !stagedFiles.length || isAllScope(companyId)}
+            onClick={() => { void uploadOriginals(stagedFiles); }}
+          >
+            {universalBusy ? '보관 중…' : `업로드${stagedFiles.length ? ` ${stagedFiles.length}건` : ''}`}
+          </Btn>
+        </>
+      )}
+    >
+      {isAllScope(companyId) ? (
+        <Message variant="warning">원본 자료가 잘못 귀속되지 않도록 상단에서 보관할 회사를 먼저 선택하세요.</Message>
+      ) : (
+        <>
+          <FileDrop
+            multiple
+            disabled={universalBusy}
+            onFiles={(files) => setStagedFiles((prev) => [...prev, ...Array.from(files)])}
+            accept=".pdf,.jpg,.jpeg,.png,.webp,.xlsx,.xls,.csv"
+            hint="등록증 · 계약서 · 보험증권 · 계좌엑셀 · 영수증 · 일반문서"
+            note={universalBusy ? '원본 보관 중…' : stagedFiles.length ? `${stagedFiles.length}개 선택됨 — 업로드를 누르세요` : undefined}
+            style={stagedFiles.length ? { borderColor: 'var(--green-border)', background: 'var(--green-bg)' } : undefined}
+          />
+              {stagedFiles.length > 0 && (
+            <div style={{ fontSize: 12.5, color: C.mute, lineHeight: 1.6 }}>
+              {stagedFiles.map((f, i) => (
+                <div key={`${f.name}-${i}`} style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.name}</div>
+              ))}
+              <div style={{ marginTop: 6 }}>
+                <Btn size="sm" variant="ghost" disabled={universalBusy} onClick={() => setStagedFiles([])}>선택 비우기</Btn>
+              </div>
+            </div>
+          )}
+          <Message variant="info">파일을 고른 뒤 [업로드]로 원본 건을 만듭니다. [업로드 취소]는 선택·패널을 닫습니다.</Message>
+        </>
+      )}
+    </LedgerRecordPanel>
   ) : null;
 
-  const inputPanel = panelOpen && !universalOpen ? (
-    <section className="ledger-record-panel">
-      <header className="ledger-record-panel__header">
-        <div className="ledger-record-panel__heading">
-          <div className="ledger-record-panel__title">{entity.label} 투입</div>
-          <div className="ledger-record-panel__subtitle">
-            {tab === 'ocr' ? entity.source : tab === 'excel' ? 'xlsx · csv' : '폼 확정 → 대기'}
-          </div>
-        </div>
-        <LedgerPanelCloseButton onClose={() => setPanelOpen(false)} label="투입패널 닫기" />
-      </header>
-
-      <div className="ledger-record-panel__body" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-        {isAllScope(companyId) ? (
-          <Message variant="warning">분석 결과와 원본이 잘못 귀속되지 않도록 상단에서 대상 회사를 먼저 선택하세요.</Message>
-        ) : (
-          <>
-        {tab === 'ocr' && (
-          <>
+  const inputPanel = panelOpen && !universalOpen && !selectedPending && !selectedSaved ? (
+    <LedgerRecordPanel
+      title={`${entity.label} 투입`}
+      identity={tab === 'ocr' ? entity.source : tab === 'excel' ? 'xlsx · csv' : '폼 확정 → 대기'}
+      row={{}}
+      cols={[]}
+      onClose={() => setPanelOpen(false)}
+      actions={!isAllScope(companyId) ? (
+        <>
+          {tab === 'ocr' && (
+            <Btn size="sm" variant="solid" onClick={runOcr} disabled={loading || !file}>
+              {loading ? '추출 중…' : 'OCR 추출'}
+            </Btn>
+          )}
+          {tab === 'excel' && (
+            <Btn
+              size="sm"
+              variant="ghost"
+              onClick={async () => {
+                const { downloadXlsxTemplate } = await import('@/lib/intake/xlsx');
+                downloadXlsxTemplate(entityKey);
+              }}
+            >
+              빈 템플릿
+            </Btn>
+          )}
+          {tab === 'manual' && (
+            <Btn size="sm" variant="solid" onClick={submitManual} disabled={!manualReady}>입력 확정</Btn>
+          )}
+          {records.length > 0 && sheetView === '대기' && (
+            <Btn size="sm" variant="ghost" onClick={resetQueue}>대기 비우기</Btn>
+          )}
+        </>
+      ) : undefined}
+    >
+      {isAllScope(companyId) ? (
+        <Message variant="warning">분석 결과와 원본이 잘못 귀속되지 않도록 상단에서 대상 회사를 먼저 선택하세요.</Message>
+      ) : (
+        <>
+          {tab === 'ocr' && (
             <FileDrop
               onFile={setFile}
               file={file}
+              disabled={loading}
               accept=".pdf,.jpg,.jpeg,.png,.webp"
               hint={`${entity.source} (PDF·JPG·PNG)`}
+              note={loading ? 'OCR 추출 중…' : parsing ? '읽는 중…' : undefined}
             />
-            {parsing || loading ? <Loading label={loading ? '추출 중…' : '읽는 중…'} color={C.accent} /> : null}
-          </>
-        )}
-        {tab === 'excel' && (
-          <>
-            <FileDrop onFile={onExcelFile} accept=".xlsx,.xls,.csv" hint=".xlsx · .csv" />
-            {parsing && <Loading label="읽는 중…" color={C.accent} />}
-          </>
-        )}
-        {tab === 'manual' && (
-          <>
-            <div style={{ fontSize: 12, fontWeight: 800, color: C.ink }}>필수·기본정보</div>
-            <FormGrid fields={manualPrimaryFields} form={form} onChange={(k, v) => setForm({ ...form, [k]: v })} />
-            {manualMoreFields.length > 0 ? (
-              <details style={{ borderTop: `1px solid ${C.line}`, paddingTop: 10 }}>
-                <summary style={{ cursor: 'pointer', fontSize: 12.5, fontWeight: 800, color: C.ink, padding: '6px 0' }}>
-                  추가 운영정보 {manualMoreFields.length}개
-                </summary>
-                <div style={{ marginTop: 10 }}>
-                  <FormGrid fields={manualMoreFields} form={form} onChange={(k, v) => setForm({ ...form, [k]: v })} />
-                </div>
-              </details>
-            ) : null}
-          </>
-        )}
-          </>
-        )}
-      </div>
+          )}
+          {tab === 'excel' && (
+            <FileDrop
+              onFile={onExcelFile}
+              disabled={parsing}
+              accept=".xlsx,.xls,.csv"
+              hint=".xlsx · .csv"
+              note={parsing ? '엑셀 읽는 중…' : undefined}
+            />
+          )}
+          {tab === 'manual' && (
+            <>
+              <div style={{ fontSize: 12, fontWeight: 800, color: C.ink }}>필수·기본정보</div>
+              <FormGrid fields={manualPrimaryFields} form={form} onChange={(k, v) => setForm({ ...form, [k]: v })} />
+              {manualMoreFields.length > 0 ? (
+                <details style={{ borderTop: `1px solid ${C.line}`, paddingTop: 10 }}>
+                  <summary style={{ cursor: 'pointer', fontSize: 12.5, fontWeight: 800, color: C.ink, padding: '6px 0' }}>
+                    추가 운영정보 {manualMoreFields.length}개
+                  </summary>
+                  <div style={{ marginTop: 10 }}>
+                    <FormGrid fields={manualMoreFields} form={form} onChange={(k, v) => setForm({ ...form, [k]: v })} />
+                  </div>
+                </details>
+              ) : null}
+            </>
+          )}
+        </>
+      )}
+    </LedgerRecordPanel>
+  ) : null;
 
-      {!isAllScope(companyId) && <LedgerPanelFooter hint={records.length ? `대기 ${records.length}건 · 제목줄 저장` : undefined}>
-        {tab === 'ocr' && (
-          <Btn size="sm" variant="solid" onClick={runOcr} disabled={loading || !file}>
-            {loading ? '추출 중…' : 'OCR 추출'}
+  const pendingDetailPanel = sheetView === '대기' && selectedPending ? (
+    <LedgerRecordPanel
+      title={selectedPending.docKind}
+      identity={selectedPending.category}
+      statusBadge={<Badge tone={selectedPending.statusTone}>{selectedPending.statusLabel}</Badge>}
+      row={selectedPending.record}
+      cols={pendingDetailCols}
+      sections={pendingDetailSections}
+      onClose={() => setSelectedPending(null)}
+      actions={(
+        <>
+          <Btn size="sm" variant="ghost" onClick={() => {
+            setRecords((prev) => prev.filter((r) => r._rid !== selectedPending._rid));
+            setSelectedPending(null);
+            setPicked(null);
+          }}>대기에서 제거</Btn>
+          <Btn size="sm" variant="solid" disabled={saving} onClick={() => { void saveRecords(); }}>
+            {saving ? '저장 중…' : records.length > 1 ? `전체 저장 ${records.length}건` : '저장'}
           </Btn>
-        )}
-        {tab === 'excel' && (
-          <Btn
-            size="sm"
-            variant="ghost"
-            onClick={async () => {
-              const { downloadXlsxTemplate } = await import('@/lib/intake/xlsx');
-              downloadXlsxTemplate(entityKey);
-            }}
-          >
-            빈 템플릿
-          </Btn>
-        )}
-        {tab === 'manual' && (
-          <Btn size="sm" variant="solid" onClick={submitManual} disabled={!manualReady}>입력 확정</Btn>
-        )}
-        {records.length > 0 && sheetView === '대기' && (
-          <Btn size="sm" variant="ghost" onClick={resetQueue}>대기 비우기</Btn>
-        )}
-      </LedgerPanelFooter>}
-    </section>
+        </>
+      )}
+    >
+      <div style={{ marginBottom: 12 }}>
+        <TwoLineCell
+          main={selectedPending.analysisSummary}
+          sub={selectedPending.confidence != null ? `신뢰도 ${selectedPending.confidence}%` : selectedPending.unreadLabels.length ? `미인식 ${selectedPending.unreadLabels.join('·')}` : undefined}
+        />
+      </div>
+      {selectedPending.crosscheck ? <OcrCrosscheck result={selectedPending.crosscheck} /> : null}
+      <div style={{ fontSize: 12, fontWeight: 800, color: C.ink, margin: '10px 0 8px' }}>필드 수정</div>
+      <FormGrid
+        fields={entity.fields.filter((f) => manualPrimaryFields.some((p) => p.key === f.key) || selectedPending.record[f.key] != null || f.required || f.manual)}
+        form={selectedPending.record}
+        onChange={(k, v) => patchPendingRecord(selectedPending._rid, { ...selectedPending.record, [k]: v })}
+      />
+    </LedgerRecordPanel>
   ) : null;
 
   const savedDetailPanel = sheetView === '저장본' && selectedSaved ? (
@@ -659,8 +836,10 @@ function IngestInner() {
             onChange={(e) => {
               setEntityKey(e.target.value);
               setSelectedSaved(null);
+              setSelectedPending(null);
               resetQueue();
               setForm({});
+              setStagedFiles([]);
               setSheetView('대기');
             }}
             style={{ minWidth: mobile ? '100%' : 200 }}
@@ -674,7 +853,7 @@ function IngestInner() {
           <PillTabs
             size="sm"
             value={tab}
-            onChange={(k) => { setTab(k as Tab); setError(''); setFile(null); setPanelOpen(true); }}
+            onChange={(k) => { setTab(k as Tab); setError(''); setFile(null); setPanelOpen(true); setSelectedPending(null); }}
             tabs={methodTabs}
           />
         </>
@@ -709,14 +888,15 @@ function IngestInner() {
             size="sm"
             variant="ghost"
             iconOnly
-            tip={panelOpen || universalOpen ? '투입패널 숨기기' : '투입패널 표시하기'}
+            tip={panelOpen || universalOpen || selectedPending || selectedSaved ? '패널 숨기기' : '투입패널 표시하기'}
             onClick={() => {
               if (selectedSaved) setSelectedSaved(null);
+              else if (selectedPending) setSelectedPending(null);
               else if (universalOpen) setUniversalOpen(false);
               else setPanelOpen((o) => !o);
             }}
           >
-            {panelOpen || universalOpen ? <PanelRightClose size={14} /> : <PanelRight size={14} />}
+            {panelOpen || universalOpen || selectedPending || selectedSaved ? <PanelRightClose size={14} /> : <PanelRight size={14} />}
           </Btn>
           <Btn
             size="sm"
@@ -743,9 +923,9 @@ function IngestInner() {
           <Btn
             size="sm"
             variant={records.length ? 'ghost' : 'solid'}
-            onClick={() => { setUniversalOpen(true); setPanelOpen(false); setSelectedSaved(null); }}
+            onClick={() => { setUniversalOpen(true); setPanelOpen(false); setSelectedSaved(null); setSelectedPending(null); setStagedFiles([]); }}
           >
-            <UploadCloud size={14} /> 무엇이든 올리기
+            <UploadCloud size={14} /> 업로드
           </Btn>
           {records.length > 0 ? (
             <Btn
@@ -760,14 +940,14 @@ function IngestInner() {
           ) : null}
         </LedgerActions>
       )}
-      hint={error || (ocrCrosscheck && sheetView === '대기') ? (
+      hint={error || (ocrCrosscheck && sheetView === '대기' && !selectedPending) ? (
         <>
           {error ? <Message variant="danger">{error}</Message> : null}
-          {ocrCrosscheck && sheetView === '대기' ? <OcrCrosscheck result={ocrCrosscheck} /> : null}
+          {ocrCrosscheck && sheetView === '대기' && !selectedPending ? <OcrCrosscheck result={ocrCrosscheck} /> : null}
         </>
       ) : parseNotice ? <Message variant="warning">{parseNotice}</Message> : undefined}
       body={sheetBody}
-      sidePanel={savedDetailPanel || universalPanel || inputPanel}
+      sidePanel={savedDetailPanel || pendingDetailPanel || universalPanel || inputPanel}
     />
   );
 }

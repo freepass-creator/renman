@@ -20,8 +20,6 @@ import { callOcrExtract, type OcrOriginal } from '@/lib/ocr-client';
 import { uploadDoc, docPath, storageReady } from '@/lib/storage';
 import { Btn } from './controls';
 import { Message } from './misc';
-import { Loading } from '../Spinner';
-import { C } from './tokens';
 
 export type DocUploadResult = {
   file: File;
@@ -91,10 +89,12 @@ export function DocUpload({
 
   return (
     <div style={{ display: 'flex', gap: 14, alignItems: 'flex-start', flexWrap: 'wrap', ...style }}>
-      <FileDrop onFile={pick} file={file} accept={accept} hint={hint} />
+      <FileDrop onFile={pick} file={file} accept={accept} hint={hint} note={busy || undefined} />
       <div style={{ marginTop: 28, display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
         {!autoRun && <Btn variant="solid" onClick={() => file && run(file)} disabled={!file || !!busy || disabled}>{busy || label}</Btn>}
-        {busy && <Loading label={busy} color={C.accent} />}
+        {!autoRun && file && !busy && (
+          <Btn variant="ghost" onClick={() => { setFile(null); setErr(''); }} disabled={disabled}>취소</Btn>
+        )}
       </div>
       {err && <div style={{ width: '100%' }}><Message variant="warning">{err}</Message></div>}
     </div>
