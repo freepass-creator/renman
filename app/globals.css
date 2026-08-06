@@ -2530,24 +2530,19 @@ kbd {
   font-size: 11px;
   font-weight: 600;
 }
+/* 기본보기 — 넓으면 영역에 맞추고, 좁아지면 **가로로 민다**(사장님 확정 2026-08-07, AUDIT §4-3).
+   ★종전엔 `overflow-x:hidden` + 컨테이너 쿼리로 중요도 낮은 열을 **숨겼다**(p4→p3→p2).
+     그래서 화면이 좁아지면 열이 조용히 사라졌고 — 쓰는 사람은 무엇이 없어졌는지 몰랐다 —
+     가로 스크롤이 안 생기니 `pin`(틀고정)이 발동할 상황 자체가 없었다. 「틀고정 없어」의 원인이 이것이다.
+   이제 열은 안 숨기고 스크롤한다. 최소 폭은 표가 인라인 style 로 계산해 준다(열 수 × 최소 열폭). */
 .excel-sheet--fit {
-  overflow-x: hidden;
-  container-type: inline-size;
+  overflow-x: auto;
 }
 .excel-sheet--fit th,
 .excel-sheet--fit td {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
-}
-@container (max-width: 1380px) {
-  .excel-sheet--fit .excel-sheet__col--p4 { display: none; }
-}
-@container (max-width: 1040px) {
-  .excel-sheet--fit .excel-sheet__col--p3 { display: none; }
-}
-@container (max-width: 720px) {
-  .excel-sheet--fit .excel-sheet__col--p2 { display: none; }
 }
 
 /* 상세패널은 화면을 덮지 않는다. 열리면 표가 남은 공간을 다시 계산한다. */

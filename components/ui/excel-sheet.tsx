@@ -4,7 +4,7 @@ import { Check, ChevronDown, ChevronUp } from 'lucide-react';
 import { useIsMobile } from '@/lib/use-mobile';
 import { useSession } from '@/lib/session';
 import { haptic } from '@/lib/haptics';
-import { C, R, SH, NUM, thX, thXR, thXC, thXPin, tdX, tdXR, tdXC, tdXPin, ctrlH, ctrlFs } from './tokens';
+import { C, R, SH, NUM, EXCEL_COL_MIN, thX, thXR, thXC, thXPin, tdX, tdXR, tdXC, tdXPin, ctrlH, ctrlFs } from './tokens';
 import { ObjCard, Cards, type ObjCardProps } from './misc';
 import { Btn, Search } from './controls';
 import { money } from './table';
@@ -27,11 +27,17 @@ export type SheetCol<T> = {
   label: string;
   align?: 'l' | 'c' | 'r';
   /**
-   * 기본보기 반응형 중요도. 1은 항상 유지하고, 숫자가 클수록 표 영역이
-   * 좁아질 때 먼저 숨긴다. 전체보기에서는 이 값과 무관하게 모두 표시한다.
+   * @deprecated 2026-08-07부터 **아무 동작도 하지 않는다.**
+   * 종전엔 표가 좁아질 때 이 값이 큰 열부터 숨겼는데, 그러면 쓰는 사람이 무엇이 사라졌는지 모른다.
+   * 이제 좁아지면 열을 숨기지 않고 **가로로 민다**(AUDIT §4-3). 기본/전체 보기의 열 구성은
+   * `pickCols(catalog, KEYS)` 의 **명시 목록**이 정한다 — 이 값이 아니다.
+   * (기존 카탈로그의 표기는 「중요도 메모」로 남겨 둔다. 새 열에는 붙이지 말 것.)
    */
   priority?: 1 | 2 | 3 | 4;
-  /** 좌측 틀고정 — 고정 칸은 자기 배경이 필요해 행 호버가 끊긴다. 꼭 필요할 때만. */
+  /**
+   * 좌측 틀고정. **실제로 고정되는 것은 첫 번째 `pin` 열 하나뿐이다**(둘 이상이면 전부 `left:0` 이라 겹친다).
+   * 고정 칸은 자기 배경이 필요해 행 호버가 끊긴다 — 신원 열 하나에만 붙인다.
+   */
   pin?: boolean;
   render: (row: T) => React.ReactNode;
   /** CSV·검색·헤더필터·엑셀 공용 평문. 없으면 그 열은 필터·내보내기 불가. */
@@ -329,6 +335,16 @@ export function ExcelSheet<T>({
     );
   }
 
+  /**
+   * 좌측 틀고정 = **첫 한 열만**(사장님 확정 2026-08-07).
+   * `pin` 이 붙은 열이 여러 개면 전부 `left:0` 이라 서로 겹쳐 글자가 포개진다(실제로 회사명·구분·차량번호
+   * 셋에 붙어 있었다). 어느 열을 고정할지는 각 원장의 첫 `pin` 이 정하고, 없으면 첫 열이 신원 열이다.
+   * 폭을 재서 left 를 누적시키는 방법도 있지만, 고정 열이 늘수록 볼 수 있는 폭이 줄어 ERP 표에선 손해다.
+   * ★`pin` 이 하나도 없으면 **아무 열도 고정하지 않는다**(-1). 첫 열을 임의로 고정하면 `tdXPin` 의
+   *   mono·굵게·그림자가 «부탁한 적 없는» 표까지 바꾼다.
+   */
+  const pinIndex = visibleCols.findIndex((c) => c.pin);
+
   const openC = openCol && byKey.get(openCol.key);
   const filterSourceRows = exportRows ?? rows;
   // 팝오버 개수는 «내 열을 뺀» 나머지 필터 결과로 센다 — 내 선택 때문에 목록이 쪼그라들지 않게(엑셀 동작).
@@ -353,19 +369,21 @@ export function ExcelSheet<T>({
         <table style={{
           borderCollapse: 'separate', borderSpacing: 0, fontSize: 12,
           width: fit ? '100%' : 'max-content',
-          minWidth: '100%',
+          /* 기본보기 최소 폭 — 이보다 좁아지면 열을 숨기지 않고 가로로 민다(AUDIT §4-3).
+             종전엔 `100%` 라 아무리 좁아도 표가 영역에 욱여넣어졌고, 대신 열이 사라졌다. */
+          minWidth: fit ? Math.max(visibleCols.length * EXCEL_COL_MIN, 320) : '100%',
           tableLayout: fit ? 'fixed' : 'auto',
         }}>
           <thead>
             <tr>
               {visibleCols.map((c, colIndex) => {
-                const base = c.pin ? thXPin : c.align === 'r' ? thXR : c.align === 'c' ? thXC : thX;
+                const base = colIndex === pinIndex ? thXPin : c.align === 'r' ? thXR : c.align === 'c' ? thXC : thX;
                 const canFilter = !!c.text;
                 const on = !!colFilter[c.key]?.size || (colSort?.key === c.key);
                 return (
                   <th
                     key={c.key}
-                    className={`excel-sheet__col excel-sheet__col--p${c.priority ?? Math.min(4, Math.floor(colIndex / 3) + 1)}`}
+                    className="excel-sheet__col"
                     style={{ ...base, color: on ? C.brand : base.color, userSelect: 'none' }}>
                     {canFilter ? (
                     <button
@@ -460,11 +478,11 @@ export function ExcelSheet<T>({
                   onMouseLeave={() => setHover((h) => (h === i ? null : h))}
                 >
                   {visibleCols.map((c, colIndex) => {
-                    const base = c.pin ? { ...tdXPin, background: rowBg } : c.align === 'r' ? tdXR : c.align === 'c' ? tdXC : tdX;
+                    const base = colIndex === pinIndex ? { ...tdXPin, background: rowBg } : c.align === 'r' ? tdXR : c.align === 'c' ? tdXC : tdX;
                     return (
                       <td
                         key={c.key}
-                        className={`excel-sheet__col excel-sheet__col--p${c.priority ?? Math.min(4, Math.floor(colIndex / 3) + 1)}`}
+                        className="excel-sheet__col"
                         style={{ ...base, textOverflow: fit ? 'ellipsis' : undefined }}
                       >
                         {c.render(r)}

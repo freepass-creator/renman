@@ -169,6 +169,12 @@ export const thX: CSSProperties = {
 export const thXR: CSSProperties = { ...thX, textAlign: 'right', fontFamily: NUM, fontVariantNumeric: 'tabular-nums' };
 export const thXC: CSSProperties = { ...thX, textAlign: 'center' };
 export const thXPin: CSSProperties = { ...thX, left: 0, zIndex: 5, boxShadow: `1px 0 0 ${C.line}` };
+/**
+ * 기본보기에서 표가 최소한 확보하는 폭 = 보이는 열 수 × 이 값.
+ * 이보다 좁아지면 열을 숨기지 않고 **가로로 민다**(AUDIT §4-3 · 사장님 확정 2026-08-07).
+ * 12px 한글 기준 6~7자 — 「차량번호」·「만기임박」 같은 라벨이 접히지 않는 하한.
+ */
+export const EXCEL_COL_MIN = 92;
 export const tdX: CSSProperties = {
   padding: `${EXCEL_PAD_Y}px ${EXCEL_PAD_X}px`, fontSize: 12, whiteSpace: 'nowrap', color: C.ink,
   borderRight: `1px solid ${C.line2}`,
