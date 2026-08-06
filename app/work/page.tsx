@@ -33,11 +33,12 @@ import { TODAY } from '@/lib/dashboard-consts';
 import { WORK_SECTIONS_BY_KIND, workSectionsFor } from '@/lib/work-form-sections';
 import { PenaltyBucketPanel } from '@/components/work/PenaltyBucketPanel';
 import {
-  WORK_GROUPS, WORK_SOURCE_LABEL,
+  WORK_GROUPS, WORK_SOURCE_LABEL, WORK_DETAIL_CATEGORIES, workRowInDivision,
   buildWorkItemLedgerRows, carNameOf, contractMeta, inboxWorkStatus, normalizeWorkStatus, parseWorkGroup, summarizeWorkLedgerRows, workGroup,
   workAttentionRank, workDueSignal,
   type WorkGroupFilter, type WorkLedgerRow, type WorkSource, type WorkStatus,
 } from '@/lib/work-ledger';
+import { WORK_DIVISION_CATEGORIES } from '@/lib/work-taxonomy';
 import {
   WORK_BASIC_COLS, WORK_ALL_COLS, workDetailSectionsFor, INBOX_DETAIL_SECTIONS,
   PENALTY_BASIC_COLS, PENALTY_ALL_COLS, PENALTY_DETAIL_SECTIONS,
@@ -231,6 +232,8 @@ function WorkLedgerInner() {
   const statuses = useMemo(() => [...new Set(allRows.map((r) => r.status).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'ko')), [allRows]);
   const sources = useMemo(() => [...new Set(allRows.map((r) => r.source))], [allRows]);
   const workFilterMatchers = useMemo(() => ({
+    // 세부(17종) — 대분류 탭으로 좁힌 뒤 더 좁히는 2단.
+    category: eqFilter<WorkLedgerRow>((r) => String(r.group || '')),
     status: eqFilter<WorkLedgerRow>((r) => r.status),
     assignee: eqFilter<WorkLedgerRow>((r) => r.assignee),
     source: eqFilter<WorkLedgerRow>((r) => r.source),
@@ -244,7 +247,8 @@ function WorkLedgerInner() {
     if (penaltyMode) {
       if (penProcess && r.process !== penProcess) return false;
       if (penKind && r.penaltyKind !== penKind) return false;
-    } else if (group !== '전체' && r.group !== group && r.nest !== 'penalty-bucket') {
+    } else if (group !== '전체' && !workRowInDivision(r.group, group) && r.nest !== 'penalty-bucket') {
+      // 탭 = 대분류(6축). 행의 group 은 세부 17종이라 workDivisionOf 로 승격해 비교한다(손롤 비교 금지).
       return false;
     } else if (group !== '전체' && r.nest === 'penalty-bucket') {
       return false;
@@ -312,7 +316,7 @@ function WorkLedgerInner() {
   const workFilterDefs = WORK_FILTER_DEFS.filter((def) => (
     penaltyMode
       ? def.key === 'group' || def.key === 'penProcess' || def.key === 'penKind'
-      : def.key === 'group' || def.key === 'status' || def.key === 'assignee' || def.key === 'source'
+      : def.key === 'group' || def.key === 'category' || def.key === 'status' || def.key === 'assignee' || def.key === 'source'
   ));
   const activeFilterValues = {
     ...detailFilters,
@@ -401,6 +405,10 @@ function WorkLedgerInner() {
             }}
             options={{
               group: WORK_GROUPS.filter((g) => g !== '전체'),
+              // 세부는 선택된 대분류의 것만 — 「차량」 탭에서 「분쟁」을 고를 수 있으면 결과가 항상 0건이다.
+              category: (group === '전체'
+                ? [...WORK_DETAIL_CATEGORIES]
+                : [...(WORK_DIVISION_CATEGORIES[group] ?? [])]).map((c) => ({ value: c, label: c })),
               status: statuses,
               assignee: assignees,
               source: sources.map((value) => ({ value, label: WORK_SOURCE_LABEL[value] })),

@@ -7,10 +7,15 @@ import type { PenaltyKind, PenaltyProcess } from '@/lib/penalty-work';
 import type { WorkGroup } from '@/lib/work-form-sections';
 import { rentalTypeOf } from '@/lib/schema/contract';
 import { LEDGER_EMPTY } from '@/lib/ledger-empty';
-import { WORK_CATEGORIES } from '@/lib/work-taxonomy';
+import { WORK_CATEGORIES, WORK_DIVISIONS, workDivisionOf, isWorkDivision, type WorkDivision } from '@/lib/work-taxonomy';
 import { companyDisplay } from '@/lib/companies';
 
-export type WorkGroupFilter = '전체' | WorkGroup;
+/**
+ * 목록 1단 필터 = **대분류**(work-taxonomy WORK_DIVISIONS).
+ * row.group 은 세부(17종) 그대로 두고, 대분류는 `workDivisionOf`로 파생해 비교한다 —
+ * 저장값을 건드리지 않으므로 과거 데이터도 즉시 새 탭에 들어온다.
+ */
+export type WorkGroupFilter = '전체' | WorkDivision;
 export type WorkSource = 'work_item' | 'history' | 'penalty' | 'inbox';
 /** 업무 상태 SSOT — 미분류는 업무구분(분류) 미지정값이지 상태 아님. */
 export type WorkStatus = '대기' | '진행' | '완료' | '보류' | '미배정';
@@ -54,7 +59,10 @@ export type WorkLedgerRow = {
   raw: EntityRecord;
 };
 
-export const WORK_GROUPS: WorkGroupFilter[] = ['전체', ...WORK_CATEGORIES];
+export const WORK_GROUPS: WorkGroupFilter[] = ['전체', ...WORK_DIVISIONS];
+
+/** 세부 17종 — 세부필터 패널의 「업무분류(세부)」 옵션. 탭은 대분류만 쓴다. */
+export const WORK_DETAIL_CATEGORIES = WORK_CATEGORIES;
 
 export const WORK_SOURCE_LABEL: Record<WorkSource, string> = {
   work_item: '업무',
@@ -239,9 +247,21 @@ export function workGroup(kind: unknown): WorkGroup {
   return '기타';
 }
 
+/**
+ * `?group=` 딥링크 해석.
+ * 대분류면 그대로, **옛 세부 이름(정비·수선 등)이면 그 세부가 속한 대분류로** 승격한다 —
+ * 기존 링크·북마크·다른 화면의 딥링크가 조용히 「전체」로 떨어지지 않게 한다.
+ */
 export function parseWorkGroup(raw: string | null): WorkGroupFilter {
-  if (raw && (WORK_GROUPS as string[]).includes(raw)) return raw as WorkGroupFilter;
+  if (!raw) return '전체';
+  if (raw === '전체' || isWorkDivision(raw)) return raw as WorkGroupFilter;
+  if ((WORK_CATEGORIES as readonly string[]).includes(raw)) return workDivisionOf(raw);
   return '전체';
+}
+
+/** 행이 대분류 탭에 속하는가. 페이지에서 손롤 비교 금지 — 이 함수만 쓴다. */
+export function workRowInDivision(rowGroup: unknown, division: WorkGroupFilter): boolean {
+  return division === '전체' || workDivisionOf(rowGroup) === division;
 }
 
 /** 업무/과태료 표 배지 — 페이지 `.filter().length` 손롤 금지. */

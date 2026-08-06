@@ -78,6 +78,8 @@ curl -s -o /dev/null -w "%{http_code}" http://localhost:6006/<route>   # 200
 | 날짜 | 작업자 | 내용 | 상태 |
 |---|---|---|---|
 | 2026-08-06 | Claude | **홈 «화면 한 판»**: 데스크톱 대시보드=페이지 스크롤 0·프레임 높이 꽉 채움(넘침은 각 패널 안에서만). body `flex:1 1 auto`+KPI `flexShrink:0`+2분할 `flex:1 1 auto` · `Panel` 본문 `overflow:auto` · `MonthCalendar` `fill` prop 신설(주 행 `1fr` 균등분배) · 모바일은 종전대로 세로 스택 | tsc0 · 브라우저측정 pageScroll 0·패널 404/404·바닥 710꽉참 |
+| 2026-08-06 | Claude | **업무분류 2단 확정**(사장님): 대분류 6축=대상 축 `차량·계약·일정·자금·과태료·기타` · 세부 17종 유지(파생, 저장 안 함) · 탭=대분류·세부는 필터 2단 · 대상별 필수(차량=차번·계약=계약·자금=금액·일정=기한·과태료=차번) · 옛 `?group=세부` 딥링크는 대분류로 승격 | tsc0 · vitest 68파일 586건 · /work 200 |
+| 2026-08-06 | Claude | **자금일보 원장 규격 재작성**: FacetPage/Sec/ListBox 폐기 → LedgerFrame 거래1건=1행 · 열=cash-cols SSOT · 처리=우측패널 · 대량=선택액션바(후보 상시계산) · 보기=일보/미매칭 | tsc0 · vitest 67파일 569건 · curl200 |
 | 2026-08-06 | Claude | **P0-1 로컬/원격 혼합 승인 차단**: `lib/migrate/acceptance`(순수판정) · `migration-baseline`(runId 서버발급)·`migration-acceptance`(서버가 Firestore 실물 재계수 후 대조, create-only) · rules `migration` 전면차단+businessColl 제외 · reflect=대조 통과 후에만 승인, 로컬백엔드면 미발송 | tsc0 · vitest 65파일 549건 · 로컬 403 확인 · rules테스트는 CI(Java 없음) |
 | 2026-08-06 | Claude | **P0-3 수납이력 정합성**: `acceptance-normalization`(txKey 부여+기준일 이전 계약성 입금 `matchedKind:'history'`) · `receipt-integrity`(유실/이력/매칭대기 3분 + fail-closed) · pack 단일지점 정규화 · reflect 반영 후 대조 · money-status history=해당없음 → **할 일 1,948→0 · 유실 1→0** | tsc0 · vitest 64파일 526건 · curl200 |
 | 2026-08-06 | Claude | **P0-2 자금 원자 create-only**: `lib/finance/immutable-money`(SSOT·순수판정) · 엔티티 POST=자금만 `getAll` 선검사 409(`conflictIds`)+`batch.create` · 마감월 기존문서 재검사 제거(덮어쓰기 불가로 흡수) · ALREADY_EXISTS→409 | tsc0 · vitest 63파일 510건 |

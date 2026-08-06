@@ -79,6 +79,8 @@ export const AGENDA_FILTER_DEFS: LedgerFilterFieldDef[] = [
 /** 업무 세부필터. */
 export const WORK_FILTER_DEFS: LedgerFilterFieldDef[] = [
   { key: 'group', label: LEDGER_LABEL.workCategory },
+  // 대분류(탭)로 좁힌 뒤 더 좁힐 때 쓰는 2단. 탭에 세부 17개를 늘어놓지 않으려고 여기로 내렸다.
+  { key: 'category', label: '분류(세부)' },
   { key: 'penProcess', label: '과태료상태' },
   { key: 'penKind', label: '과태료분류' },
   { key: 'status', label: '업무상태' },
