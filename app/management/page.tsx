@@ -15,6 +15,8 @@ import {
 } from '@/components/ui';
 import { usePrompt } from '@/components/ui/confirm';
 import { toast, toastError } from '@/lib/toast';
+import { getStore } from '@/lib/store';
+import type { EntityRecord } from '@/lib/intake/entities';
 import { COMPANY_DEFS, companyLabel, createManagedCompany, updateManagedCompany } from '@/lib/companies';
 import { loadMaster, type CompanyMaster } from '@/lib/company-master';
 import { useEntityList } from '@/lib/use-entity-lists';
@@ -99,6 +101,7 @@ export default function ManagementPage() {
 
   const { rows: accountRecords, loading: acctLoading, error: acctError } = useEntityList('bank_account');
   const { rows: leaseRecords, loading: leaseLoading, error: leaseError } = useEntityList('lease');
+  const { rows: bankTxRecords } = useEntityList('bank_tx');
 
   useEffect(() => {
     const on = () => setMasterTick((n) => n + 1);
@@ -157,10 +160,13 @@ export default function ManagementPage() {
      탭으로 나란히 두면 «어느 법인 계좌인지»를 사람이 머리로 이어붙여야 한다(§4-11). */
   const coAccounts = useMemo(() => {
     if (!selectedCo) return [];
+    /* bank_tx 를 함께 넘겨 `transactionCount` 를 채운다 — «신원 잠금» 판정 근거다.
+       거래-계좌 매칭은 `matchTxToAccount`(cash-ledger)가 SSOT라 여기서 다시 세지 않는다. */
     return buildBankAccountLedger(
-      accountRecords.filter((r) => String(r.companyId || '') === selectedCo.id), [], [], [],
+      accountRecords.filter((r) => String(r.companyId || '') === selectedCo.id),
+      bankTxRecords, [], [],
     );
-  }, [accountRecords, selectedCo]);
+  }, [accountRecords, bankTxRecords, selectedCo]);
 
   const coLeases = useMemo(() => {
     if (!selectedCo) return [];
@@ -181,6 +187,11 @@ export default function ManagementPage() {
       phone: String(m.phone || ''), email: String(m.email || ''),
       openDate: String(m.openDate || ''), taxOffice: String(m.taxOffice || ''),
       address: String(m.address || ''), businessAddress: String(m.businessAddress || ''),
+      ...Object.fromEntries(coAccounts.flatMap((a) => [
+        [`acct:${a.id}:accountAlias`, a.accountAlias], [`acct:${a.id}:bankName`, a.bankName],
+        [`acct:${a.id}:accountNumber`, a.accountNumber], [`acct:${a.id}:accountHolder`, a.accountHolder],
+        [`acct:${a.id}:accountType`, a.accountType],
+      ])),
     });
     setEditing(true);
   }
@@ -191,8 +202,24 @@ export default function ManagementPage() {
     if (!label) { toastError('회사명은 비울 수 없습니다.'); return; }
     setSaving(true);
     try {
-      const { label: _drop, ...master } = form;
+      // 계좌 패치는 `acct:<id>:<field>` 로 같은 폼에 모인다 — 분리해서 각각 저장한다.
+      const master: Record<string, string> = {};
+      const acctPatch = new Map<string, EntityRecord>();
+      for (const [k, v] of Object.entries(form)) {
+        if (k === 'label') continue;
+        const m = /^acct:(.+):([A-Za-z]+)$/.exec(k);
+        if (!m) { master[k] = v; continue; }
+        const cur = acctPatch.get(m[1]) || {};
+        cur[m[2]] = v;
+        acctPatch.set(m[1], cur);
+      }
       await updateManagedCompany(selectedCo.id, { label }, master);
+      for (const [id, patch] of acctPatch) {
+        const before = coAccounts.find((a) => a.id === id);
+        // 안 바뀐 계좌까지 쓰지 않는다 — 감사 트레일에 빈 변경이 쌓인다.
+        if (before && Object.entries(patch).every(([f, v]) => String((before as unknown as EntityRecord)[f] ?? '') === v)) continue;
+        await getStore().update('bank_account', selectedCo.id, id, patch);
+      }
       setMasterTick((n) => n + 1);
       const m = loadMaster(selectedCo.id);
       setSelectedCo({
@@ -305,10 +332,35 @@ export default function ManagementPage() {
               ]} />,
             },
             {
+              /* ★계좌가 먼저 있어야 ERP가 돈다(자금일보·거래매칭이 계좌 기준).
+                 수정 잠금은 «기 등록이냐»가 아니라 «거래가 붙었냐»로 가른다 —
+                 은행·계좌번호·예금주는 신원이라 거래가 붙은 뒤 바꾸면 과거 귀속이 흔들린다.
+                 약칭·용도·메모는 라벨이라 언제나 열어둔다(자금거래 불변 규칙과 같은 논리). */
               title: '법인계좌', cols: [], count: coAccounts.length,
-              body: coAccounts.length
-                ? <ExcelSheet rows={coAccounts} cols={ACCOUNT_BASIC_COLS} rowKey={(r) => r.id} />
-                : <DetailEmpty>계좌 없음 — 자금관리에서 등록하세요</DetailEmpty>,
+              body: !coAccounts.length
+                ? <DetailEmpty>계좌 없음 — [계좌 등록]으로 먼저 만드세요. 계좌가 있어야 자금이 들어옵니다.</DetailEmpty>
+                : editing
+                  ? <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                      {coAccounts.map((a) => {
+                        const locked = a.transactionCount > 0;
+                        return (
+                          <div key={a.id}>
+                            <div style={{ fontSize: 11.5, color: C.mute, padding: '0 0 4px 2px' }}>
+                              {a.accountAlias || a.bankName || '계좌'}
+                              {locked ? <> · <b style={{ color: C.warn }}>거래 {a.transactionCount}건 — 신원 잠금</b></> : null}
+                            </div>
+                            <KV editing form={form} onChange={set} rows={[
+                              ['약칭', `acct:${a.id}:accountAlias`, a.accountAlias],
+                              ['은행', locked ? null : `acct:${a.id}:bankName`, a.bankName],
+                              ['계좌번호', locked ? null : `acct:${a.id}:accountNumber`, a.accountNumber],
+                              ['예금주', locked ? null : `acct:${a.id}:accountHolder`, a.accountHolder],
+                              ['용도', `acct:${a.id}:accountType`, a.accountType],
+                            ]} />
+                          </div>
+                        );
+                      })}
+                    </div>
+                  : <ExcelSheet rows={coAccounts} cols={ACCOUNT_BASIC_COLS} rowKey={(r) => r.id} />,
             },
             {
               title: '임대차', cols: [], count: coLeases.length,
