@@ -5,13 +5,13 @@
  *
  * 표 = 문서종류·카테고리·분석요약(원장 행문법). 엔티티 필드는 우측 패널.
  */
-import { Suspense, useEffect, useMemo, useState } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { DATA_CENTER_TITLE, processingAttentionRank, summarizeProcessingQueue } from '@/lib/data-center-terms';
 import { uploadToInbox } from '@/lib/inbox-upload';
 import { uploadDoc, docPath } from '@/lib/storage';
 import { pushDocVersion } from '@/lib/docs';
-import { ENTITY_LIST, ENTITIES, mapOcrToEntity, type EntityRecord } from '@/lib/intake/entities';
+import { ENTITY_LIST, ENTITIES, type EntityRecord } from '@/lib/intake/entities';
 import { parseCsv } from '@/lib/intake/csv';
 import { saveIntake } from '@/lib/intake';
 import { useEntityList } from '@/lib/use-entity-lists';
@@ -20,13 +20,13 @@ import { useSession } from '@/lib/session';
 import { companyLabel } from '@/lib/companies';
 import { resolveWriteCompany, NEED_COMPANY, isAllScope } from '@/lib/scope';
 import { layerOfEntity } from '@/lib/domain/layers';
-import { UploadCloud, Trash2, FileSpreadsheet, PanelRight, PanelRightClose, FileText } from 'lucide-react';
+import { UploadCloud, Trash2, FileSpreadsheet, PanelRight, PanelRightClose, FileText, ExternalLink } from 'lucide-react';
 import FileDrop from '@/components/FileDrop';
 import { toast } from '@/lib/toast';
 import {
   LedgerFrame, LedgerRecordPanel, Badge, Btn, FormGrid, PillTabs, Select, Search,
   C, Message, OcrCrosscheck, PageLoading, EmptyState, LedgerActions,
-  ExcelSheet, TwoLineCell, type SheetCol,
+  ExcelSheet, TwoLineCell, Spinner, TextLink, type SheetCol,
 } from '@/components/ui';
 import type { CrosscheckResult } from '@/lib/ocr-crosscheck';
 import { useIsMobile } from '@/lib/use-mobile';
@@ -40,8 +40,10 @@ import { TODAY } from '@/lib/dashboard-consts';
 import { LEDGER_EMPTY } from '@/lib/ledger-empty';
 import {
   buildPendingRow, refreshPendingRow, summarizeSavedRow,
-  type IngestPendingRow,
+  makeIngestPage, mergePageExtracts, buildMergedCrosscheck,
+  type IngestPendingRow, type IngestPage,
 } from '@/lib/ingest-summary';
+import { defaultDocKindForEntity } from '@/lib/doc-kinds';
 
 export const dynamic = 'force-dynamic';
 
@@ -72,8 +74,23 @@ function newRid() {
   return `p_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`;
 }
 
+function pageStatusTone(status: IngestPage['status']): 'green' | 'amber' | 'red' | 'gray' {
+  if (status === '읽음') return 'green';
+  if (status === '분석중') return 'amber';
+  if (status === '미인식') return 'red';
+  return 'gray';
+}
+
+function openPageFile(page: IngestPage) {
+  if (!page.file) return;
+  const url = URL.createObjectURL(page.file);
+  window.open(url, '_blank', 'noopener');
+  setTimeout(() => URL.revokeObjectURL(url), 60_000);
+}
+
 function IngestInner() {
   const mobile = useIsMobile();
+  const router = useRouter();
   const { companyId, user } = useSession();
   const sp = useSearchParams();
   const [entityKey, setEntityKey] = useState(() => sp.get('type') || 'vehicle');
@@ -89,8 +106,8 @@ function IngestInner() {
   const [ocrRaw, setOcrRaw] = useState<Record<string, unknown> | null>(null);
   const [ocrCrosscheck, setOcrCrosscheck] = useState<CrosscheckResult | null>(null);
   const [error, setError] = useState('');
-  const [file, setFile] = useState<File | null>(null);
-  const [loading, setLoading] = useState(false);
+  /** OCR 투입용 장 후보(아직 건으로 묶기 전). */
+  const [ocrFiles, setOcrFiles] = useState<File[]>([]);
   const [parsing, setParsing] = useState(false);
   const [form, setForm] = useState<EntityRecord>(() => {
     const p = sp.get('plate');
@@ -137,7 +154,12 @@ function IngestInner() {
     setOcrCrosscheck(null);
     setPicked(null);
     setSelectedPending(null);
-    setFile(null);
+    setOcrFiles([]);
+  }
+
+  function applyPending(rid: string, next: IngestPendingRow) {
+    setRecords((prev) => prev.map((row) => (row._rid === rid ? next : row)));
+    setSelectedPending((cur) => (cur && cur._rid === rid ? next : cur));
   }
 
   function cancelUniversal() {
@@ -146,16 +168,24 @@ function IngestInner() {
     setUniversalOpen(false);
   }
 
+  /* ★업로드 버튼은 «업로드 ⇄ 취소» 토글 1개다(사장님 확정). 나란히 두 개 두지 않는다 —
+     멈출 수 있는 건 도는 동안뿐이니 자리도 같아야 한다. 파일 사이에서만 끊어
+     이미 올라간 건은 살리고(부분 성공 보고) 남은 건만 버린다. */
+  const abortUpload = useRef(false);
+
   async function uploadOriginals(list: File[]) {
     const target = resolveWriteCompany(companyId, null);
     if (!target) { toast(NEED_COMPANY, 'error'); return; }
     if (!list.length) return;
+    abortUpload.current = false;
     setUniversalBusy(true);
     let saved = 0;
     let duplicates = 0;
+    let aborted = false;
     const failures: string[] = [];
     try {
       for (const original of list) {
+        if (abortUpload.current) { aborted = true; break; }
         try {
           const result = await uploadToInbox(original, '기타', target, String(user.name || user.email || ''));
           if (result.ok) {
@@ -169,7 +199,11 @@ function IngestInner() {
           failures.push(`${original.name}: ${reason}`);
         }
       }
-      if (!failures.length && saved) {
+      if (aborted) {
+        // 이미 올라간 건은 되돌리지 않는다 — 몇 건이 남았는지 알려주고 그 건들만 선택에 남긴다.
+        setStagedFiles(list.slice(saved + failures.length));
+        toast(`업로드 취소 — ${saved}건 접수 · ${list.length - saved - failures.length}건 남김`, 'info');
+      } else if (!failures.length && saved) {
         toast(`원본 ${saved}건 접수${duplicates ? ` · 중복 ${duplicates}건` : ' · 처리대기'}`, 'success');
         setEntityKey('inbox');
         setSheetView('저장본');
@@ -185,6 +219,7 @@ function IngestInner() {
       const reason = error instanceof Error ? error.message : String(error || '알 수 없는 오류');
       toast(`원본 업로드 중단 — ${reason}`, 'error');
     } finally {
+      abortUpload.current = false;
       setUniversalBusy(false);
     }
   }
@@ -200,19 +235,40 @@ function IngestInner() {
         ? [{ ...cleanRecords[0], _ocrOriginal: { raw: ocrRaw, at: new Date().toISOString(), source: entity.source } }]
         : cleanRecords;
 
-      /* ★OCR 로 만든 레코드에는 **원본 파일도 함께 붙인다.** */
-      if (ocrRaw && file && toSave.length === 1) {
-        const rec = toSave[0];
+      /* ★OCR 건에는 **장마다 원본 파일**을 붙인다(앞·뒤 등록증 등). */
+      const pendingWithPages = records.find((row) => row.pages.some((p) => p.file));
+      if (ocrRaw && pendingWithPages && toSave.length === 1) {
+        let rec = toSave[0];
         const key = String(rec.plate || rec.policyNo || 'new');
-        const url = await uploadDoc(file, docPath(target, entityKey, key, file.name));
-        if (url) {
-          toSave[0] = {
+        for (const page of pendingWithPages.pages) {
+          if (!page.file) continue;
+          const url = await uploadDoc(page.file, docPath(target, entityKey, key, page.fileName));
+          if (!url) continue;
+          rec = {
             ...rec,
             _docs: pushDocVersion(rec, {
-              type: entityKey, url, ocr: ocrRaw,
-              reason: '데이터센터 OCR 투입', by: String(user?.name || user?.email || ''),
+              type: entityKey, url, ocr: page.extracted || ocrRaw,
+              reason: `데이터센터 OCR · ${page.fileName}`, by: String(user?.name || user?.email || ''),
             }),
           };
+        }
+        toSave[0] = rec;
+      } else if (ocrRaw && toSave.length === 1) {
+        // pages 없이 단일 추출만 남은 폴백
+        const rec = toSave[0];
+        const key = String(rec.plate || rec.policyNo || 'new');
+        const firstFile = records[0]?.pages[0]?.file;
+        if (firstFile) {
+          const url = await uploadDoc(firstFile, docPath(target, entityKey, key, firstFile.name));
+          if (url) {
+            toSave[0] = {
+              ...rec,
+              _docs: pushDocVersion(rec, {
+                type: entityKey, url, ocr: ocrRaw,
+                reason: '데이터센터 OCR 투입', by: String(user?.name || user?.email || ''),
+              }),
+            };
+          }
         }
       }
       const r = await saveIntake(entityKey, target, toSave, {
@@ -232,36 +288,117 @@ function IngestInner() {
   }
 
   async function runOcr() {
-    if (!file) { setError('파일을 선택하세요'); return; }
-    setLoading(true); setError(''); setOcrCrosscheck(null);
-    try {
-      const r = await callOcrExtract(file, entity.ocrType || '');
-      if (!r.ok) { setError(r.error || '추출 실패'); toast('OCR 추출 실패', 'error'); return; }
-      setOcrRaw(r.raw || {});
-      setOcrCrosscheck(r.crosscheck || null);
-      const mapped = mapOcrToEntity(entityKey, r.raw || {});
-      const row = buildPendingRow({
-        rid: newRid(),
-        entityKey,
-        record: mapped,
-        source: 'ocr',
-        crosscheck: r.crosscheck || null,
-        filename: file.name,
-        mime: file.type,
-      });
-      setRecords([row]);
-      setSelectedPending(row);
-      setPicked(row._rid);
-      setSheetView('대기');
-      setPanelOpen(false);
-      setUniversalOpen(false);
-      toast('OCR 추출 완료 — 검토 후 저장', 'success');
-    } catch (e) {
-      setError((e as Error).message);
-      toast('OCR 실패: ' + (e as Error).message, 'error');
-    } finally {
-      setLoading(false);
+    if (!ocrFiles.length) { setError('파일을 선택하세요'); return; }
+    if (!entity.ocrType) { setError('이 엔티티는 OCR을 지원하지 않습니다'); return; }
+    setError('');
+    setOcrCrosscheck(null);
+
+    const pages = ocrFiles.map((f) => makeIngestPage(f));
+    const rid = newRid();
+    const docKind = defaultDocKindForEntity(entityKey);
+    let row = buildPendingRow({
+      rid,
+      entityKey,
+      record: {},
+      source: 'ocr',
+      docKind,
+      pages,
+    });
+    setRecords((prev) => [...prev, row]);
+    setSelectedPending(row);
+    setPicked(rid);
+    setSheetView('대기');
+    setPanelOpen(false);
+    setUniversalOpen(false);
+    setOcrFiles([]);
+    toast(`${pages.length}장 OCR 시작`, 'info');
+
+    const working = [...pages];
+    for (let i = 0; i < working.length; i++) {
+      working[i] = { ...working[i], status: '분석중', error: undefined };
+      row = refreshPendingRow(entityKey, row, { pages: [...working] });
+      applyPending(rid, row);
+
+      try {
+        const file = working[i].file;
+        if (!file) {
+          working[i] = { ...working[i], status: '미인식', error: '파일 없음' };
+        } else {
+          const r = await callOcrExtract(file, entity.ocrType);
+          if (!r.ok || !r.raw) {
+            working[i] = { ...working[i], status: '미인식', error: r.error || '추출 실패', extracted: null };
+          } else {
+            working[i] = { ...working[i], status: '읽음', extracted: r.raw, error: undefined };
+          }
+        }
+      } catch (e) {
+        working[i] = {
+          ...working[i],
+          status: '미인식',
+          error: (e as Error).message || 'OCR 실패',
+          extracted: null,
+        };
+      }
+
+      const { record, conflicts, mergedRaw } = mergePageExtracts(entityKey, working);
+      const cc = buildMergedCrosscheck(entity.ocrType, mergedRaw, conflicts);
+      row = refreshPendingRow(entityKey, row, { record, pages: [...working], crosscheck: cc });
+      applyPending(rid, row);
+      setOcrRaw(mergedRaw);
+      setOcrCrosscheck(cc);
     }
+
+    const ok = working.filter((p) => p.status === '읽음').length;
+    const fail = working.filter((p) => p.status === '미인식').length;
+    if (ok) toast(`OCR ${ok}장 읽음${fail ? ` · ${fail}장 미인식` : ''} — 검토 후 저장`, fail ? 'info' : 'success');
+    else toast('OCR 실패 — 장을 확인하고 다시 시도하세요', 'error');
+  }
+
+  async function addPagesToPending(files: FileList | File[]) {
+    if (!selectedPending || selectedPending.source !== 'ocr') return;
+    const list = [...files];
+    if (!list.length) return;
+    const rid = selectedPending._rid;
+    let working = [...selectedPending.pages, ...list.map((f) => makeIngestPage(f))];
+    let row = refreshPendingRow(entityKey, selectedPending, { pages: working });
+    applyPending(rid, row);
+
+    for (let i = 0; i < working.length; i++) {
+      if (working[i].status !== '대기') continue;
+      working[i] = { ...working[i], status: '분석중' };
+      row = refreshPendingRow(entityKey, row, { pages: [...working] });
+      applyPending(rid, row);
+      try {
+        const file = working[i].file;
+        if (!file || !entity.ocrType) {
+          working[i] = { ...working[i], status: '미인식', error: 'OCR 불가' };
+        } else {
+          const r = await callOcrExtract(file, entity.ocrType);
+          working[i] = r.ok && r.raw
+            ? { ...working[i], status: '읽음', extracted: r.raw }
+            : { ...working[i], status: '미인식', error: r.error || '추출 실패' };
+        }
+      } catch (e) {
+        working[i] = { ...working[i], status: '미인식', error: (e as Error).message };
+      }
+      const { record, conflicts, mergedRaw } = mergePageExtracts(entityKey, working);
+      const cc = buildMergedCrosscheck(entity.ocrType, mergedRaw, conflicts);
+      row = refreshPendingRow(entityKey, row, { record, pages: [...working], crosscheck: cc });
+      applyPending(rid, row);
+      setOcrRaw(mergedRaw);
+      setOcrCrosscheck(cc);
+    }
+  }
+
+  function removePageFromPending(pageId: string) {
+    if (!selectedPending) return;
+    const working = selectedPending.pages.filter((p) => p.id !== pageId);
+    const { record, conflicts, mergedRaw } = mergePageExtracts(entityKey, working);
+    const cc = working.length ? buildMergedCrosscheck(entity.ocrType, mergedRaw, conflicts) : null;
+    const row = refreshPendingRow(entityKey, selectedPending, { record, pages: working, crosscheck: cc });
+    applyPending(selectedPending._rid, row);
+    setOcrRaw(working.length ? mergedRaw : null);
+    setOcrCrosscheck(cc);
   }
 
   async function onExcelFile(f: File) {
@@ -352,7 +489,7 @@ function IngestInner() {
   function patchPendingRecord(rid: string, next: EntityRecord) {
     setRecords((prev) => prev.map((row) => {
       if (row._rid !== rid) return row;
-      const refreshed = refreshPendingRow(entityKey, row, next);
+      const refreshed = refreshPendingRow(entityKey, row, { record: next });
       setSelectedPending((cur) => (cur && cur._rid === rid ? refreshed : cur));
       return refreshed;
     }));
@@ -365,56 +502,72 @@ function IngestInner() {
     return list;
   }, [entity.ocrType]);
 
-  /** 대기 표 — 파일형태 · 문서종류 · 카테고리 · 분석요약 · 신뢰도 · 상태 */
+  /** 대기 표 — §4-9-2: 형태·성격·귀속·대상·행선지·장·분석 */
   const pendingCols = useMemo<SheetCol<IngestPendingRow>[]>(() => [
     {
       key: 'fileForm',
-      label: '파일',
+      label: '형태',
       pin: true,
       priority: 1,
       text: (r) => r.fileForm,
       render: (r) => r.fileForm || LEDGER_EMPTY.dash,
     },
     {
-      key: 'docKind',
-      label: '문서종류',
+      key: 'nature',
+      label: '성격',
       priority: 1,
-      text: (r) => r.docKind,
-      render: (r) => <span style={{ fontWeight: 700 }}>{r.docKind || LEDGER_EMPTY.dash}</span>,
+      text: (r) => r.nature,
+      render: (r) => <Badge tone="purple">{r.nature}</Badge>,
     },
     {
-      key: 'category',
-      label: '카테고리',
+      key: 'division',
+      label: '귀속',
       priority: 1,
-      text: (r) => r.category,
-      render: (r) => <Badge tone="blue">{r.category}</Badge>,
+      text: (r) => r.division,
+      render: (r) => <Badge tone="blue">{r.division}</Badge>,
     },
     {
-      key: 'analysisSummary',
-      label: '분석 결과',
+      key: 'target',
+      label: '대상',
       priority: 1,
-      text: (r) => r.analysisSummary,
+      text: (r) => r.target,
       render: (r) => (
-        <TwoLineCell
-          main={r.analysisSummary}
-          sub={r.unreadLabels.length ? `미인식 ${r.unreadLabels.length} · ${r.unreadLabels.slice(0, 3).join('·')}` : undefined}
-        />
+        <span style={{ fontWeight: 700, color: r.targetAssigned ? C.ink : C.danger }}>
+          {r.target}
+        </span>
       ),
     },
     {
-      key: 'confidence',
-      label: '신뢰도',
-      priority: 2,
-      align: 'r',
-      text: (r) => r.confidence == null ? '' : String(r.confidence),
-      render: (r) => (r.confidence == null ? LEDGER_EMPTY.dash : `${r.confidence}%`),
+      key: 'dest',
+      label: '행선지',
+      priority: 1,
+      text: (r) => r.destLabel,
+      render: (r) => (
+        <TextLink stop onClick={() => router.push(r.destHref)}>
+          {r.destLabel}
+        </TextLink>
+      ),
     },
     {
-      key: 'status',
-      label: '상태',
+      key: 'pages',
+      label: '장',
+      priority: 2,
+      text: (r) => r.pageCountLabel,
+      render: (r) => r.pageCountLabel,
+    },
+    {
+      key: 'analysis',
+      label: '분석',
       priority: 1,
-      text: (r) => r.statusLabel,
-      render: (r) => <Badge tone={r.statusTone}>{r.statusLabel}</Badge>,
+      text: (r) => r.analysisLabel,
+      render: (r) => <Badge tone={r.analysisTone}>{r.analysisLabel}</Badge>,
+    },
+    {
+      key: 'docKind',
+      label: '종류',
+      priority: 2,
+      text: (r) => r.docKind,
+      render: (r) => <TwoLineCell main={r.docKind} sub={r.analysisSummary} />,
     },
   ], []);
 
@@ -636,14 +789,16 @@ function IngestInner() {
       onClose={cancelUniversal}
       actions={(
         <>
-          <Btn size="sm" variant="ghost" disabled={universalBusy} onClick={cancelUniversal}>업로드 취소</Btn>
           <Btn
             size="sm"
-            variant="solid"
-            disabled={universalBusy || !stagedFiles.length || isAllScope(companyId)}
-            onClick={() => { void uploadOriginals(stagedFiles); }}
+            variant={universalBusy ? 'ghost' : 'solid'}
+            disabled={universalBusy ? false : (!stagedFiles.length || isAllScope(companyId))}
+            onClick={() => {
+              if (universalBusy) { abortUpload.current = true; return; }
+              void uploadOriginals(stagedFiles);
+            }}
           >
-            {universalBusy ? '보관 중…' : `업로드${stagedFiles.length ? ` ${stagedFiles.length}건` : ''}`}
+            {universalBusy ? '업로드 취소' : stagedFiles.length ? `업로드 ${stagedFiles.length}장` : '업로드'}
           </Btn>
         </>
       )}
@@ -671,7 +826,6 @@ function IngestInner() {
               </div>
             </div>
           )}
-          <Message variant="info">파일을 고른 뒤 [업로드]로 원본 건을 만듭니다. [업로드 취소]는 선택·패널을 닫습니다.</Message>
         </>
       )}
     </LedgerRecordPanel>
@@ -687,8 +841,8 @@ function IngestInner() {
       actions={!isAllScope(companyId) ? (
         <>
           {tab === 'ocr' && (
-            <Btn size="sm" variant="solid" onClick={runOcr} disabled={loading || !file}>
-              {loading ? '추출 중…' : 'OCR 추출'}
+            <Btn size="sm" variant="solid" onClick={runOcr} disabled={!ocrFiles.length}>
+              {ocrFiles.length > 1 ? `OCR 추출 ${ocrFiles.length}장` : 'OCR 추출'}
             </Btn>
           )}
           {tab === 'excel' && (
@@ -717,14 +871,27 @@ function IngestInner() {
       ) : (
         <>
           {tab === 'ocr' && (
-            <FileDrop
-              onFile={setFile}
-              file={file}
-              disabled={loading}
-              accept=".pdf,.jpg,.jpeg,.png,.webp"
-              hint={`${entity.source} (PDF·JPG·PNG)`}
-              note={loading ? 'OCR 추출 중…' : parsing ? '읽는 중…' : undefined}
-            />
+            <>
+              <FileDrop
+                multiple
+                onFiles={(files) => setOcrFiles((prev) => [...prev, ...Array.from(files)])}
+                accept=".pdf,.jpg,.jpeg,.png,.webp"
+                hint={`${entity.source || defaultDocKindForEntity(entityKey)} — 앞·뒤 등 여러 장 한 번에`}
+                note={ocrFiles.length ? `${ocrFiles.length}장 선택됨 — 한 건으로 묶어 OCR` : undefined}
+                style={ocrFiles.length ? { borderColor: 'var(--green-border)', background: 'var(--green-bg)' } : undefined}
+              />
+              {ocrFiles.length > 0 && (
+                <div style={{ fontSize: 12.5, color: C.mute, lineHeight: 1.6 }}>
+                  {ocrFiles.map((f, i) => (
+                    <div key={`${f.name}-${i}`}>{i + 1}장 · {f.name}</div>
+                  ))}
+                  <div style={{ marginTop: 6 }}>
+                    <Btn size="sm" variant="ghost" onClick={() => setOcrFiles([])}>선택 비우기</Btn>
+                  </div>
+                </div>
+              )}
+              <Message variant="info">여러 장은 한 문서 건으로 묶입니다. 진행은 상세패널의 장 목록에서 보입니다.</Message>
+            </>
           )}
           {tab === 'excel' && (
             <FileDrop
@@ -759,7 +926,7 @@ function IngestInner() {
   const pendingDetailPanel = sheetView === '대기' && selectedPending ? (
     <LedgerRecordPanel
       title={selectedPending.docKind}
-      identity={selectedPending.category}
+      identity={`${selectedPending.category}${selectedPending.pages.length ? ` · ${selectedPending.pages.length}장` : ''}`}
       statusBadge={<Badge tone={selectedPending.statusTone}>{selectedPending.statusLabel}</Badge>}
       row={selectedPending.record}
       cols={pendingDetailCols}
@@ -772,12 +939,75 @@ function IngestInner() {
             setSelectedPending(null);
             setPicked(null);
           }}>대기에서 제거</Btn>
-          <Btn size="sm" variant="solid" disabled={saving} onClick={() => { void saveRecords(); }}>
+          <Btn size="sm" variant="solid" disabled={saving || selectedPending.pages.some((p) => p.status === '분석중')} onClick={() => { void saveRecords(); }}>
             {saving ? '저장 중…' : records.length > 1 ? `전체 저장 ${records.length}건` : '저장'}
           </Btn>
         </>
       )}
     >
+      {/* 상세 최상단 = 장 목록 (§4-9). 스피너는 장 행 안만. */}
+      {selectedPending.pages.length > 0 && (
+        <div style={{ marginBottom: 14 }}>
+          <div style={{ fontSize: 12, fontWeight: 800, color: C.ink, marginBottom: 8 }}>
+            장 {selectedPending.pages.length}개
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4, border: `1px solid ${C.line}`, borderRadius: 'var(--radius)', overflow: 'hidden' }}>
+            {selectedPending.pages.map((page, index) => (
+              <div
+                key={page.id}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 8,
+                  padding: '8px 10px',
+                  borderTop: index ? `1px solid ${C.line}` : undefined,
+                  background: C.bg,
+                  minHeight: 40,
+                }}
+              >
+                <span style={{ fontSize: 12, fontWeight: 700, color: C.mute, width: 28, flexShrink: 0 }}>{index + 1}장</span>
+                <span style={{ flex: 1, minWidth: 0, fontSize: 12.5, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {page.fileName}
+                </span>
+                {page.status === '분석중' ? (
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, color: C.accent, fontWeight: 700 }}>
+                    <Spinner size={14} color={C.accent} /> 분석 중
+                  </span>
+                ) : (
+                  <Badge tone={pageStatusTone(page.status)}>{page.status}</Badge>
+                )}
+                <Btn size="sm" variant="ghost" iconOnly tip="열기" disabled={!page.file} onClick={() => openPageFile(page)}>
+                  <ExternalLink size={14} />
+                </Btn>
+                <Btn
+                  size="sm"
+                  variant="ghost"
+                  iconOnly
+                  tip="장 삭제"
+                  disabled={page.status === '분석중'}
+                  onClick={() => removePageFromPending(page.id)}
+                >
+                  <Trash2 size={14} />
+                </Btn>
+              </div>
+            ))}
+          </div>
+          {selectedPending.source === 'ocr' && entity.ocrType && (
+            <div style={{ marginTop: 10 }}>
+              <FileDrop
+                multiple
+                onFiles={(files) => { void addPagesToPending(files); }}
+                accept=".pdf,.jpg,.jpeg,.png,.webp"
+                hint="장 추가"
+                style={{ minHeight: 72, padding: '12px 10px' }}
+              />
+            </div>
+          )}
+          {selectedPending.pages.some((p) => p.error) && (
+            <Message variant="warning">
+              {selectedPending.pages.filter((p) => p.error).map((p) => `${p.fileName}: ${p.error}`).join(' · ')}
+            </Message>
+          )}
+        </div>
+      )}
       <div style={{ marginBottom: 12 }}>
         <TwoLineCell
           main={selectedPending.analysisSummary}
@@ -853,7 +1083,7 @@ function IngestInner() {
           <PillTabs
             size="sm"
             value={tab}
-            onChange={(k) => { setTab(k as Tab); setError(''); setFile(null); setPanelOpen(true); setSelectedPending(null); }}
+            onChange={(k) => { setTab(k as Tab); setError(''); setOcrFiles([]); setPanelOpen(true); setSelectedPending(null); }}
             tabs={methodTabs}
           />
         </>
@@ -922,10 +1152,20 @@ function IngestInner() {
         <LedgerActions aria-label="쓰기">
           <Btn
             size="sm"
-            variant={records.length ? 'ghost' : 'solid'}
-            onClick={() => { setUniversalOpen(true); setPanelOpen(false); setSelectedSaved(null); setSelectedPending(null); setStagedFiles([]); }}
+            variant={records.length && !universalOpen ? 'ghost' : 'solid'}
+            onClick={() => {
+              if (universalOpen) {
+                cancelUniversal();
+                return;
+              }
+              setUniversalOpen(true);
+              setPanelOpen(false);
+              setSelectedSaved(null);
+              setSelectedPending(null);
+              setStagedFiles([]);
+            }}
           >
-            <UploadCloud size={14} /> 업로드
+            <UploadCloud size={14} /> {universalOpen ? '취소' : '업로드'}
           </Btn>
           {records.length > 0 ? (
             <Btn
