@@ -349,6 +349,7 @@ export default function ManagementPage() {
       phone: String(m.phone || ''), email: String(m.email || ''),
       openDate: String(m.openDate || ''), taxOffice: String(m.taxOffice || ''),
       address: String(m.address || ''), businessAddress: String(m.businessAddress || ''),
+      registeredCount: m.registeredCount != null ? String(m.registeredCount) : '',
       ...Object.fromEntries(coAccounts.flatMap((a) => [
         [`acct:${a.id}:accountAlias`, a.accountAlias], [`acct:${a.id}:bankName`, a.bankName],
         [`acct:${a.id}:accountNumber`, a.accountNumber], [`acct:${a.id}:accountHolder`, a.accountHolder],
@@ -387,8 +388,12 @@ export default function ManagementPage() {
       }
       // 채널은 마스터 배열 — 빈 행(매칭 키 없는 행)은 버린다. 남으면 영영 안 맞는 채널이 쌓인다.
       const keep = (k: string, req: string) => chanRows(k).filter((r) => String(r[req] || '').trim());
+      // registeredCount 는 숫자다 — 폼은 문자열이라 여기서 되돌린다(안 하면 "12" 로 저장된다).
+      const regCount = String(master.registeredCount ?? '').trim();
+      delete (master as Record<string, unknown>).registeredCount;
       await updateManagedCompany(selectedCo.id, { label }, {
         ...master,
+        ...(regCount ? { registeredCount: Number(regCount) || 0 } : {}),
         // 차고지는 주소가 실체다 — 이름만 있고 주소 없는 행은 요건 근거가 못 된다.
         garages: chanRows('garages').filter((r) => String(r.address || '').trim()).map((r) => ({
           id: r.id || `gr_${r.address}`, name: r.name || '', address: r.address,
@@ -541,6 +546,24 @@ export default function ManagementPage() {
                  수정 잠금은 «기 등록이냐»가 아니라 «거래가 붙었냐»로 가른다 —
                  은행·계좌번호·예금주는 신원이라 거래가 붙은 뒤 바꾸면 과거 귀속이 흔들린다.
                  약칭·용도·메모는 라벨이라 언제나 열어둔다(자금거래 불변 규칙과 같은 논리). */
+              /* ★등록대수 — 관청 등록 대수 vs 실제 보유. 어긋나면 증차·감차 신청 대상이다.
+                 신청 «이력»(RegApplication)은 상태전이가 있는 워크플로라 여기 안 넣는다(AUDIT §6-3). */
+              module: 'vehicleReg', title: '등록대수', cols: [],
+              body: (
+                <KV editing={editing} form={form} onChange={set} rows={[
+                  ['관청 등록', 'registeredCount', selectedCo.master.registeredCount != null ? `${selectedCo.master.registeredCount}대` : ''],
+                  ['실제 보유', null, coKpi ? `${coKpi.totalVehicles}대` : LEDGER_EMPTY.dash],
+                  ['차이', null, (() => {
+                    const reg = Number(selectedCo.master.registeredCount);
+                    if (!Number.isFinite(reg) || !coKpi) return LEDGER_EMPTY.dash;
+                    const gap = coKpi.totalVehicles - reg;
+                    if (gap === 0) return <span style={{ color: C.mute }}>일치</span>;
+                    return <span style={{ color: C.warn }}>{gap > 0 ? `보유 초과 ${gap}대 — 증차 필요` : `등록 여유 ${-gap}대`}</span>;
+                  })()],
+                ]} />
+              ),
+            },
+            {
               /* ★차고지 — `/company/[id]` GarageModule 이식(AUDIT §6-2).
                  등록대수 요건의 근거라 법인 정보와 같은 화면에 있어야 한다. */
               module: 'garage', title: '차고지', cols: [], count: garageRows.length,
