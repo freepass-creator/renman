@@ -234,6 +234,8 @@ function WorkLedgerInner() {
   const workFilterMatchers = useMemo(() => ({
     // 세부(17종) — 대분류 탭으로 좁힌 뒤 더 좁히는 2단.
     category: eqFilter<WorkLedgerRow>((r) => String(r.group || '')),
+    // 급한 정도 — 「일정」을 분류 축에서 뺀 대신 이 축으로 거른다(긴급·높음·보통·낮음).
+    priority: eqFilter<WorkLedgerRow>((r) => String(r.priority || '')),
     status: eqFilter<WorkLedgerRow>((r) => r.status),
     assignee: eqFilter<WorkLedgerRow>((r) => r.assignee),
     source: eqFilter<WorkLedgerRow>((r) => r.source),
@@ -316,7 +318,7 @@ function WorkLedgerInner() {
   const workFilterDefs = WORK_FILTER_DEFS.filter((def) => (
     penaltyMode
       ? def.key === 'group' || def.key === 'penProcess' || def.key === 'penKind'
-      : def.key === 'group' || def.key === 'category' || def.key === 'status' || def.key === 'assignee' || def.key === 'source'
+      : def.key === 'group' || def.key === 'category' || def.key === 'priority' || def.key === 'status' || def.key === 'assignee' || def.key === 'source'
   ));
   const activeFilterValues = {
     ...detailFilters,
@@ -330,7 +332,7 @@ function WorkLedgerInner() {
     <>
     <LedgerFrame
       title="업무관리"
-      meta="일정·상담·정비·사고·과태료·문서와 처리 이력"
+      meta="자산·계약·자금·과태료·기타 · 담당·기한·상태"
       right={<LedgerActions aria-label="쓰기">
         <Btn
           size="sm"
@@ -409,6 +411,8 @@ function WorkLedgerInner() {
               category: (group === '전체'
                 ? [...WORK_DETAIL_CATEGORIES]
                 : [...(WORK_DIVISION_CATEGORIES[group] ?? [])]).map((c) => ({ value: c, label: c })),
+              // 우선순위 = work_item 엔티티 옵션과 같은 순서(급한 것부터).
+              priority: ['긴급', '높음', '보통', '낮음'].map((v) => ({ value: v, label: v })),
               status: statuses,
               assignee: assignees,
               source: sources.map((value) => ({ value, label: WORK_SOURCE_LABEL[value] })),

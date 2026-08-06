@@ -50,12 +50,12 @@ export function isWorkCategory(value: unknown): value is WorkCategory {
  *   메뉴(자산관리·계약관리·자금관리)와 같은 이름을 쓰므로 «이 업무가 어디 것인지»를 배울 필요가 없다.
  *   + 과태료(전용 화면·엔티티가 따로 있어도 한 축) + 일정 + 기타.
  *
- * ★「일정」의 경계 규칙: **대상이 붙는 예약은 그 대상 축으로 간다.**
- *   검사 예약 = 자산 · 수납 약속 = 자금 · 방문 상담 = 계약.
- *   「일정」축은 **대상 없는 일정**(회의·출장·사내 약속)만 담는다.
- *   이 규칙이 없으면 «차량 검사 예약»이 자산인지 일정인지 사람마다 갈려 17개 평면 시절로 돌아간다.
+ * ★「일정」은 축이 아니다(2026-08-06 재확정). 일정은 «무엇에 대한»이 아니라 «언제»다 —
+ *   대상 축과 섞으면 «차량 검사 예약»이 자산인지 일정인지 사람마다 갈린다.
+ *   기한은 `dueDate`(모든 축에 붙는 속성)가, **급한 정도는 `priority`(긴급·높음·보통·낮음)** 가 담당한다.
+ *   세부 「일정」 값은 남기되 「기타」 축에 둔다(대상 없는 사내 약속·회의).
  */
-export const WORK_DIVISIONS = ['자산', '계약', '자금', '일정', '과태료', '기타'] as const;
+export const WORK_DIVISIONS = ['자산', '계약', '자금', '과태료', '기타'] as const;
 
 export type WorkDivision = (typeof WORK_DIVISIONS)[number];
 
@@ -67,9 +67,8 @@ export const WORK_DIVISION_CATEGORIES: Record<WorkDivision, readonly WorkCategor
   자산: ['정비·수선', '사고', '검사', '보험', '입출고', '매각·처분', '세차', '부품교체'],
   계약: ['고객상담', '연락기록', '분쟁', '클레임'],
   자금: ['수납이슈', '자금'],
-  일정: ['일정'],
   과태료: ['과태료'],
-  기타: ['문서', '메모', '기타'],
+  기타: ['일정', '문서', '메모', '기타'],
 };
 
 /**
@@ -93,9 +92,8 @@ export const WORK_CATEGORIES_ACTIVE = [
   '입출고', '매각·처분',                  // 자산 — 실행(배차·처분). 담당·기한·진행이 붙는다
   '고객상담',                            // 계약 — 상담·연락·클레임·분쟁을 하나로 받는다
   '수납이슈', '자금',                     // 자금
-  '일정',                                // 일정
   '과태료',                              // 과태료
-  '문서', '메모', '기타',                 // 기타
+  '일정', '문서', '메모', '기타',          // 기타 — 「일정」은 축이 아니라 여기 세부(급한 정도는 priority)
 ] as const satisfies readonly WorkCategory[];
 
 const DIVISION_BY_CATEGORY = new Map<string, WorkDivision>(
@@ -120,9 +118,8 @@ export const WORK_DIVISION_REQUIRED: Record<WorkDivision, readonly string[]> = {
   자산: ['plate'],
   계약: ['contractKey'],
   자금: ['amount'],
-  일정: ['dueDate'],   // 대상 없는 일정이라 «언제»가 유일한 실체다. 날짜 없는 일정은 일정이 아니다.
   과태료: ['plate'],
-  기타: [],
+  기타: [],   // 사내 일정·문서·메모 — 대상이 없는 자유기록이라 강제하지 않는다
 };
 
 const REQUIRED_LABEL: Record<string, string> = {

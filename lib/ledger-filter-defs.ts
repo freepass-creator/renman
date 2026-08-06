@@ -84,6 +84,8 @@ export const WORK_FILTER_DEFS: LedgerFilterFieldDef[] = [
   { key: 'penProcess', label: '과태료상태' },
   { key: 'penKind', label: '과태료분류' },
   { key: 'status', label: '업무상태' },
+  // 「일정」을 분류 축에서 뺀 대가 — 급한 정도는 분류가 아니라 이 축이 담당한다(긴급·높음·보통·낮음).
+  { key: 'priority', label: '우선순위' },
   { key: 'assignee', label: '담당자', emptyLabel: '담당자 전체' },
   { key: 'source', label: '원천' },
 ];

@@ -1,5 +1,5 @@
 /**
- * 업무분류 2단 규격 (2026-08-06 사장님 확정) — 대분류 6축 = 대상 축.
+ * 업무분류 2단 규격 (2026-08-06 사장님 확정) — 대분류 5축 = 대상 축.
  *
  * 지키는 것:
  *  ① 세부 17종이 정확히 한 대분류에 들어간다(중복·누락 0) — 새 세부를 추가하고 매핑을 빠뜨리면 여기서 걸린다
@@ -14,9 +14,9 @@ import {
 import { WORK_GROUPS, parseWorkGroup, workRowInDivision } from '@/lib/work-ledger';
 import { workSectionsFor } from '@/lib/work-form-sections';
 
-describe('대분류 6축 — 원장과 같은 축', () => {
-  it('★축 이름이 원장·메뉴와 같다 — 자산·계약·자금 + 일정·과태료·기타', () => {
-    expect([...WORK_DIVISIONS]).toEqual(['자산', '계약', '자금', '일정', '과태료', '기타']);
+describe('대분류 5축 — 원장과 같은 축', () => {
+  it('★축 이름이 원장·메뉴와 같다 — 자산·계약·자금 + 과태료·기타', () => {
+    expect([...WORK_DIVISIONS]).toEqual(['자산', '계약', '자금', '과태료', '기타']);
   });
 
   it('★세부 17종이 정확히 한 축에 들어간다 — 누락·중복 없음', () => {
@@ -30,7 +30,7 @@ describe('대분류 6축 — 원장과 같은 축', () => {
     expect(workDivisionOf('사고')).toBe('자산');
     expect(workDivisionOf('연락기록')).toBe('계약');
     expect(workDivisionOf('수납이슈')).toBe('자금');
-    expect(workDivisionOf('일정')).toBe('일정');
+    expect(workDivisionOf('일정')).toBe('기타');
     expect(workDivisionOf('과태료')).toBe('과태료');
     expect(workDivisionOf('문서')).toBe('기타');
   });
@@ -57,9 +57,9 @@ describe('대분류 6축 — 원장과 같은 축', () => {
     expect(workDivisionOf(undefined)).toBe('기타');
   });
 
-  it('탭 목록 = 전체 + 6축 (세부 17개를 늘어놓지 않는다)', () => {
-    expect(WORK_GROUPS).toEqual(['전체', '자산', '계약', '자금', '일정', '과태료', '기타']);
-    expect(WORK_GROUPS).toHaveLength(7);
+  it('탭 목록 = 전체 + 5축 (세부 17개를 늘어놓지 않는다)', () => {
+    expect(WORK_GROUPS).toEqual(['전체', '자산', '계약', '자금', '과태료', '기타']);
+    expect(WORK_GROUPS).toHaveLength(6);
   });
 });
 
@@ -138,9 +138,9 @@ describe('대상별 필수 검증 — 대분류가 곧 대상이라 그 대상�
     expect(missingWorkRequirements('수납이슈', { amount: 390000 })).toEqual([]);
   });
 
-  it('일정은 기한 필수 — 대상 없는 일정이라 «언제»가 유일한 실체다', () => {
-    expect(missingWorkRequirements('일정', {})).toEqual(['기한']);
-    expect(missingWorkRequirements('일정', { dueDate: '2026-08-10' })).toEqual([]);
+  it('★「일정」은 축이 아니라 기타 세부 — 급한 정도는 priority 가 담당한다', () => {
+    expect(workDivisionOf('일정')).toBe('기타');
+    expect(missingWorkRequirements('일정', {})).toEqual([]);
   });
 
   it('과태료는 차량번호 필수 · 기타는 필수 없음(자유기록)', () => {
