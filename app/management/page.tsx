@@ -145,6 +145,8 @@ export default function ManagementPage() {
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState<Record<string, string>>({});
   const [docBusy, setDocBusy] = useState(false);
+  /** 새로 추가한 계좌 — 저장 때 한 번에 만든다. 계좌 만들러 /cash 로 나가지 않는다. */
+  const [newAccounts, setNewAccounts] = useState<Record<string, string>[]>([]);
   const [masterTick, setMasterTick] = useState(0);
 
   const { rows: accountRecords, loading: acctLoading, error: acctError } = useEntityList('bank_account');
@@ -314,6 +316,7 @@ export default function ManagementPage() {
     setChan({
       cards: asRows(m.cards), autoTransfers: asRows(m.autoTransfers), cardTerminals: asRows(m.cardTerminals),
     });
+    setNewAccounts([]);
     setEditing(true);
   }
 
@@ -342,6 +345,11 @@ export default function ManagementPage() {
         autoTransfers: keep('autoTransfers', 'cmsId'),
         cardTerminals: keep('cardTerminals', 'terminalId'),
       } as CompanyMasterInput);
+      // 새 계좌 — 계좌번호가 매칭 키다. 비어 있으면 만들지 않는다(영영 안 맞는 계좌가 된다).
+      const fresh = newAccounts.filter((r) => String(r.accountNumber || '').trim());
+      if (fresh.length) {
+        await getStore().save('bank_account', selectedCo.id, fresh.map((r) => ({ ...r, companyId: selectedCo.id })));
+      }
       for (const [id, patch] of acctPatch) {
         const before = coAccounts.find((a) => a.id === id);
         // 안 바뀐 계좌까지 쓰지 않는다 — 감사 트레일에 빈 변경이 쌓인다.
@@ -479,10 +487,27 @@ export default function ManagementPage() {
                  은행·계좌번호·예금주는 신원이라 거래가 붙은 뒤 바꾸면 과거 귀속이 흔들린다.
                  약칭·용도·메모는 라벨이라 언제나 열어둔다(자금거래 불변 규칙과 같은 논리). */
               title: '법인계좌', cols: [], count: coAccounts.length,
-              body: !coAccounts.length
-                ? <DetailEmpty>계좌 없음 — [계좌 등록]으로 먼저 만드세요. 계좌가 있어야 자금이 들어옵니다.</DetailEmpty>
+              body: !coAccounts.length && !editing
+                ? <DetailEmpty>계좌 없음 — [수정]에서 추가하세요. 계좌가 있어야 자금이 들어옵니다.</DetailEmpty>
                 : editing
                   ? <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                      {newAccounts.map((r, i) => (
+                        <div key={`new${i}`}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 0 4px 2px' }}>
+                            <span style={{ fontSize: 11.5, color: C.accent, fontWeight: 700 }}>새 계좌</span>
+                            <Btn size="sm" variant="ghost" onClick={() => setNewAccounts((a) => a.filter((_, j) => j !== i))}>삭제</Btn>
+                          </div>
+                          <KV editing form={r} onChange={(k, v) => setNewAccounts((a) => {
+                            const rows = [...a]; rows[i] = { ...rows[i], [k]: v }; return rows;
+                          })} rows={[
+                            ['약칭', 'accountAlias', r.accountAlias || ''],
+                            ['은행', 'bankName', r.bankName || ''],
+                            ['계좌번호 ★', 'accountNumber', r.accountNumber || ''],
+                            ['예금주', 'accountHolder', r.accountHolder || ''],
+                            ['용도', 'accountType', r.accountType || ''],
+                          ]} />
+                        </div>
+                      ))}
                       {coAccounts.map((a) => {
                         const locked = a.transactionCount > 0;
                         return (
@@ -501,6 +526,9 @@ export default function ManagementPage() {
                           </div>
                         );
                       })}
+                      <div>
+                        <Btn size="sm" variant="ghost" onClick={() => setNewAccounts((a) => [...a, {}])}>+ 계좌 추가</Btn>
+                      </div>
                     </div>
                   : <ExcelSheet rows={coAccounts} cols={ACCOUNT_BASIC_COLS} rowKey={(r) => r.id} />,
             },
@@ -574,7 +602,7 @@ export default function ManagementPage() {
           ) : (
             <>
               <Btn size="sm" variant="solid" onClick={startEdit}>수정</Btn>
-              <Btn size="sm" variant="ghost" href="/cash">계좌 등록</Btn>
+              
               <Btn size="sm" variant="ghost" onClick={() => openIngest('lease')}>임대차 담기</Btn>
             </>
           )}
