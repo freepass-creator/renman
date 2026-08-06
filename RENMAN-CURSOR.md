@@ -114,6 +114,8 @@ curl -s -o /dev/null -w "%{http_code}" http://localhost:6006/<route>   # 200
 
 | 날짜 | 작업자 | 내용 | 상태 |
 |---|---|---|---|
+| 2026-08-06 | Claude | **환경 완주**(Firebase 6종·Storage·Gemini·Admin키·hq권한 — 전부 실동작 확인) · **오픈 블로커 3건**(서류동선·등록차 실종·OCR 원본 미첨부) · **차량360 규격이식 8단계**(카드 전멸→표·상세패널 껍데기·KV 통일·전부펼치기) · OCR 모델 404 복구(`gemini-flash-latest`) · 미수=계약 기준 정정 · 업무분류 5축 · 자금일보/대시보드/운영현황 규격 | tsc0 · vitest 68파일 591건 · curl200 |
+| 2026-08-06 | → Cursor | **다음 작업 = 위 🔴버그 + 데이터센터 UI 5건.** 이 파일 맨 위 참조. 차량360 잔여는 `docs/VEHICLE360-SPEC.md` | 인계 |
 | 2026-08-06 | Cursor | **설정**: 빈 WorkbenchBar(기본 차량점프검색) 제거 · 계정에 로그아웃 행(+confirm) | tsc0 · curl200 |
 | 2026-08-06 | Cursor | **스텝 화살표 통일**: 자금일보 일자 `‹›`문자 → lucide ChevronL/R · PeriodBar·MonthCalendar stroke 2.2 · VehicleDetail `›`도 lucide | tsc0 · curl200 |
 | 2026-08-06 | Cursor | **열필터 전수**: FilterPop 금액·날짜·이율·빈값(—) · `pickCols` money/int/rate→sortNum 자동 · 계좌/업무/운영/일정/손익/홈outlook·cash xf·sortNum 보강 | tsc0 · curl200 |
