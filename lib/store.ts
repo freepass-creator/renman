@@ -23,6 +23,13 @@ import { withTimeout } from './async';
 /** 감사 트레일이 저장되는 내부 컬렉션 — ENTITIES엔 등록 안 함(인제스천/목록 오염 방지). */
 export const AUDIT_COLL = 'audit_logs';
 
+/* ★시스템 컬렉션 — 투입 엔티티가 아니라서 `/api/entities/[entity]`에 **없다**.
+   서버 라우트는 `Object.hasOwn(ENTITIES, entity)`로 걸러 404를 준다(route.ts:58,89).
+   그래도 서버부터 때리면 매 저장마다 404가 나고 «직접 경로로 전환» 경고가 콘솔을 덮어
+   진짜 실패가 묻힌다 — 감사 트레일이 안 남는 것처럼 보인 원인(2026-08-06).
+   이 둘은 append-only 규칙이 firestore.rules에서 이미 강제되므로 클라이언트 SDK로 바로 쓴다. */
+const SYSTEM_COLLS = new Set<string>([AUDIT_COLL, 'atomic_event']);
+
 export type SaveResult = { saved: number; duplicates: number; backend: string };
 
 export interface StoreAdapter {
@@ -224,7 +231,7 @@ class FirestoreAdapter implements StoreAdapter {
     // 브라우저에서 권한 실패를 기다렸다가 재시도하지 않고 인증된 서버 경로를 우선 사용한다.
     // ★서버 라우트는 요청당 500건 상한 → 청크로 나눠 보낸다. (전량 1회로 보내면 대량 임포트가
     //   항상 400을 받아 «검증 없는 직접 경로»로 새던 문제 — QA 적대검증 지적)
-    if (typeof window !== 'undefined' && pending.length > 0) {
+    if (typeof window !== 'undefined' && pending.length > 0 && !SYSTEM_COLLS.has(entityKey)) {
       /* ★서버는 요청(청크) 단위로 «마감월 섞이면 전량 거부»를 보장한다. 500건을 넘으면 앞선 청크는
          이미 저장된 뒤 뒤 청크가 거부돼 «부분 저장 + 전량 거부 메시지»가 된다.
          그래서 보내기 전에 여기서 한 번 선검사해 한 건이라도 마감월이면 아예 시작하지 않는다.
@@ -281,6 +288,8 @@ class FirestoreAdapter implements StoreAdapter {
       await Promise.all(commits);
     }
     } catch (error) {
+      // ★시스템 컬렉션엔 서버 경로가 없다 — 404를 «서버 저장 실패»로 덮어쓰면 진짜 사유(규칙 거부)가 사라진다.
+      if (SYSTEM_COLLS.has(entityKey)) throw error;
       console.warn(`Firestore save(${entityKey}) 직접 저장 실패 — 서버 인증 경로로 전환:`, (error as Error).message);
       const { apiAuthHeaders } = await import('./api-headers');
       const headers = await apiAuthHeaders();
