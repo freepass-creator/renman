@@ -234,6 +234,8 @@ export function workGroup(kind: unknown): WorkGroup {
   if (/검사/.test(value)) return '검사';
   if (/세차/.test(value)) return '세차';
   if (/부품교체/.test(value)) return '부품교체';
+  if (/입출고|배차|인수인계|탁송/.test(value)) return '입출고';
+  if (/매각|처분|폐차/.test(value)) return '매각·처분';
   if (/정비|수선|부품|오일|타이어/.test(value)) return '정비·수선';
   if (/사고|파손|보험접수/.test(value)) return '사고';
   if (/보험/.test(value)) return '보험';

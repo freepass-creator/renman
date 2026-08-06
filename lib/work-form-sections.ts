@@ -54,6 +54,16 @@ export const WORK_SECTIONS_BY_KIND: Record<WorkCreateKind, WorkFormSection[]> = 
     title: '정비', open: true,
     fields: ['maintType', 'vendor', 'amount', 'mileage', 'nextMaintDate', 'description'],
   }),
+  // 배차·인수인계 — 어디서 주고받는지(장소)·누가(탁송사)·그때 주행거리가 실무 기록이다.
+  '입출고': secs({
+    title: '입출고', open: true,
+    fields: ['dueDate', 'location', 'vendor', 'mileage', 'assigneeName', 'description'],
+  }),
+  // 매각·처분 — 매수인(거래처)·금액·주행거리. 처분손익은 자산관리가 계산한다(여기서 손롤 금지).
+  '매각·처분': secs({
+    title: '매각·처분', open: true,
+    fields: ['dueDate', 'counterparty', 'vendor', 'amount', 'mileage', 'assigneeName', 'description'],
+  }),
   '사고': secs(
     {
       title: '사고', open: true,

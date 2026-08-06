@@ -17,6 +17,9 @@ export const WORK_CATEGORIES = [
   '메모',
   '기타',
   '과태료',
+  // 2026-08-06 추가 — 실무자가 실제로 하는 자산 실행. 배차·처분은 담당·기한·진행상태가 붙는 일이다.
+  '입출고',
+  '매각·처분',
 ] as const;
 
 export type WorkCategory = (typeof WORK_CATEGORIES)[number];
@@ -61,7 +64,7 @@ export type WorkDivision = (typeof WORK_DIVISIONS)[number];
  * 옛 값(세차·부품교체·연락기록·클레임·분쟁)도 여기 남는다 — 매핑이 사라지면 과거 업무가 「기타」로 떨어진다.
  */
 export const WORK_DIVISION_CATEGORIES: Record<WorkDivision, readonly WorkCategory[]> = {
-  자산: ['정비·수선', '사고', '검사', '보험', '세차', '부품교체'],
+  자산: ['정비·수선', '사고', '검사', '보험', '입출고', '매각·처분', '세차', '부품교체'],
   계약: ['고객상담', '연락기록', '분쟁', '클레임'],
   자금: ['수납이슈', '자금'],
   일정: ['일정'],
@@ -82,6 +85,7 @@ export const WORK_DIVISION_CATEGORIES: Record<WorkDivision, readonly WorkCategor
  */
 export const WORK_CATEGORIES_ACTIVE = [
   '정비·수선', '사고', '검사', '보험',   // 자산 — 각각 전용 필드·만기관리가 다르다
+  '입출고', '매각·처분',                  // 자산 — 실행(배차·처분). 담당·기한·진행이 붙는다
   '고객상담',                            // 계약 — 상담·연락·클레임·분쟁을 하나로 받는다
   '수납이슈', '자금',                     // 자금
   '일정',                                // 일정

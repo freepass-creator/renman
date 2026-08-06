@@ -343,6 +343,8 @@ const WORK_KIND_DETAIL_DEFS: Record<WorkLedgerRow['group'], DetailSectionDef[]> 
   수납이슈: [{ title: '수납이슈', keys: ['paymentIssueType', 'expectedAmount', 'receivedAmount', 'nextActionDate'] }],
   분쟁: [{ title: '분쟁', keys: ['disputeType', 'counterparty', 'nextActionDate'] }],
   클레임: [{ title: '클레임', keys: ['claimType', 'callChannel', 'nextActionDate'] }],
+  입출고: [{ title: '입출고', keys: ['location', 'vendor', 'mileage'] }],
+  '매각·처분': [{ title: '매각·처분', keys: ['counterparty', 'vendor', 'mileage'] }],
   문서: [{ title: '문서', keys: ['docKind', 'docStatus'] }],
   메모: [],
   기타: [{ title: '처리정보 보충', keys: ['vendor'] }],
