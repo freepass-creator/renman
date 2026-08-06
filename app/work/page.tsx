@@ -14,7 +14,8 @@ import {
 import { useSession } from '@/lib/session';
 import { commitRemove, commitSave, commitUpdate } from '@/lib/commit';
 import { buildAgenda } from '@/lib/agenda';
-import { isSnoozed, reconcileDirectives, reschedulePatch, snoozeDate } from '@/lib/directives';
+import { agendaSeeds, isSnoozed, receivableSeeds, reconcileDirectives, reschedulePatch, snoozeDate } from '@/lib/directives';
+import { computeContractView } from '@/lib/contract-ops';
 import { NEED_COMPANY } from '@/lib/scope';
 import { toast } from '@/lib/toast';
 import { useIsMobile } from '@/lib/use-mobile';
@@ -137,7 +138,11 @@ function WorkLedgerInner() {
    * 기한변경·근거소멸 표식을 붙인다. 저장은 사람이 손댈 때만 일어난다(`lib/directives.ts` 참고).
    */
   const directives = useMemo(
-    () => reconcileDirectives(buildAgenda(contracts, vehicles, insurances, penalties), workItems),
+    () => reconcileDirectives([
+      ...agendaSeeds(buildAgenda(contracts, vehicles, insurances, penalties)),
+      // 미수 회수 — 단계(경고·시동제어·차량회수·내용증명·채권화)가 곧 지시다.
+      ...receivableSeeds(contracts.map((c) => computeContractView(c, TODAY)), TODAY),
+    ], workItems),
     [contracts, vehicles, insurances, penalties, workItems],
   );
 

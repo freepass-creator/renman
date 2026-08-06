@@ -11,7 +11,8 @@ import { todayKST } from '@/lib/contracts/dates';
 import { buildDirectiveLedgerRows, buildWorkItemLedgerRows, workAttentionRank, workDueSignal, workStatusTone, type WorkLedgerRow } from '@/lib/work-ledger';
 import { LEDGER_EMPTY } from '@/lib/ledger-empty';
 import { buildAgenda } from '@/lib/agenda';
-import { isSnoozed, reconcileDirectives } from '@/lib/directives';
+import { agendaSeeds, isSnoozed, receivableSeeds, reconcileDirectives } from '@/lib/directives';
+import { computeContractView } from '@/lib/contract-ops';
 import { commitSave } from '@/lib/commit';
 import { useSession } from '@/lib/session';
 import { NEED_COMPANY } from '@/lib/scope';
@@ -31,8 +32,11 @@ export default function MWork() {
   const today = todayKST();
   /** 웹과 같은 지시 엔진 — 자동 제안도 폰에서 보인다. 스누즈한 건 접어 둔다(모바일엔 펼치기 토글 없음). */
   const directives = useMemo(
-    () => reconcileDirectives(buildAgenda(contracts, vehicles, insurances, penalties), items),
-    [contracts, vehicles, insurances, penalties, items],
+    () => reconcileDirectives([
+      ...agendaSeeds(buildAgenda(contracts, vehicles, insurances, penalties)),
+      ...receivableSeeds(contracts.map((c) => computeContractView(c, today)), today),
+    ], items),
+    [contracts, vehicles, insurances, penalties, items, today],
   );
   const allRows = useMemo(
     () => [
