@@ -51,7 +51,9 @@ export function remainSpanLabel(d: number | null): string {
 const FL = {
   plate: { key: 'plate', label: LEDGER_LABEL.plate, pin: true, priority: 1 as const, render: (r) => r.plate || LEDGER_EMPTY.dash, text: (r) => r.plate },
   company: { key: 'company', label: LEDGER_LABEL.company, pin: true, priority: 2 as const, render: (r) => r.company || LEDGER_EMPTY.dash, text: (r) => r.company },
-  status: { key: 'status', label: '차량상태', priority: 1 as const, render: (r) => <Badge tone={toneBadge(r.tone)}>{r.status}</Badge>, text: (r) => r.status },
+  // ★운영현황·자산·정비는 같은 차량을 보는 원장이다 — 분류·상태를 다른 이름으로 부르지 않는다
+  //   (사장님 지시 2026-08-07 「운영현황도 같은 원장으로 봐야지」). 값도 같다: 운행·정비·사고.
+  status: { key: 'status', label: LEDGER_LABEL.assetStatus, priority: 1 as const, render: (r) => <Badge tone={toneBadge(r.tone)}>{r.status}</Badge>, text: (r) => r.status },
   loc: { key: 'loc', label: '현위치', priority: 3 as const, render: (r) => r.location || LEDGER_EMPTY.dash, text: (r) => r.location },
   car: { key: 'car', label: LEDGER_LABEL.carName, priority: 1 as const, render: (r) => r.carName || LEDGER_EMPTY.dash, text: (r) => r.carName },
   maker: { key: 'maker', label: LEDGER_LABEL.maker, render: (r) => r.maker || LEDGER_EMPTY.dash, text: (r) => r.maker },
@@ -128,7 +130,8 @@ const FL = {
     render: (r) => r.overdueDays > 0 ? <span style={{ color: r.overdueDays >= 90 ? C.danger : C.warn, fontWeight: 700 }}>{r.overdueDays}일</span> : LEDGER_EMPTY.dash,
     text: (r) => r.overdueDays,
   },
-  own: { key: 'own', label: '차량분류', priority: 2 as const, render: (r) => r.ownership || LEDGER_EMPTY.dash, text: (r) => r.ownership },
+  // r.ownership = 구매예정·보유중·처분예정·처분완료 = 자산 원장의 AssetLifecycle 과 같은 축.
+  own: { key: 'own', label: LEDGER_LABEL.lifecycle, priority: 2 as const, render: (r) => r.ownership || LEDGER_EMPTY.dash, text: (r) => r.ownership },
   util: { key: 'util', label: '가동', render: (r) => r.util || LEDGER_EMPTY.dash, text: (r) => r.util },
   loanStart: { key: 'loanStart', label: '할부시작', render: (r) => ymd(r.loanStart), text: (r) => r.loanStart },
   stage: {

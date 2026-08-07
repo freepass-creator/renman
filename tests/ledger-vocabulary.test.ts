@@ -115,6 +115,29 @@ describe('원장 어휘 정합', () => {
     expect(drift, drift.join('\n  ')).toEqual([]);
   });
 
+  /**
+   * 같은 «원장군» = 행 하나가 가리키는 대상이 같은 원장들.
+   * 운영현황·자산·정비는 셋 다 «차량 1대 = 1행»이다 — 같은 값을 다른 이름으로 부르면 안 된다.
+   * (리스크·업무·과태료·일정은 차량에 «붙은 사건»이 행이므로 분류·상태 축이 다르다 → 별개.)
+   * 사장님 지시 2026-08-07 「운영현황도 같은 원장으로 봐야지」 —
+   * 예전에는 운영현황만 「차량분류·차량상태」, 자산·정비는 「자산분류·자산상태」로 갈려 있었다.
+   */
+  it('차량 원장군(운영현황·자산·정비)은 분류·상태를 같은 이름으로 부른다', () => {
+    const VEHICLE_LEDGERS = ['운영현황', '자산', '정비'];
+    const picks = LEDGERS
+      .filter(([name]) => VEHICLE_LEDGERS.includes(name))
+      .map(([name, cols]) => {
+        const cls = cols.find((c) => /분류$/.test(labelOf(c)));
+        const st = cols.find((c) => /상태$/.test(labelOf(c)));
+        return { name, cls: cls ? labelOf(cls) : '', st: st ? labelOf(st) : '' };
+      });
+    expect(picks.length).toBe(VEHICLE_LEDGERS.length);
+    const classes = [...new Set(picks.map((p) => p.cls))];
+    const statuses = [...new Set(picks.map((p) => p.st))];
+    expect(classes, picks.map((p) => `${p.name}=「${p.cls}」`).join(' / ')).toHaveLength(1);
+    expect(statuses, picks.map((p) => `${p.name}=「${p.st}」`).join(' / ')).toHaveLength(1);
+  });
+
   it('사전에 죽은 항목이 없다 — 아무도 안 쓰는 용어는 지운다', () => {
     const used = new Set<string>();
     for (const [, cols] of LEDGERS) for (const col of cols) used.add(labelOf(col));

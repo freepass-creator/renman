@@ -2511,6 +2511,13 @@ kbd {
   text-overflow: ellipsis;
 }
 .ledger-toolbar__actions { flex: 0 0 auto; }
+/* 선택 액션바 — 기간 옆(필터줄). 선택이 없으면 렌더되지 않으므로 자리를 차지하지 않는다. */
+.ledger-toolbar__selection {
+  display: flex;
+  align-items: center;
+  flex: 0 0 auto;
+  min-width: 0;
+}
 .excel-sheet__load-more {
   width: 100%;
   min-height: 48px;
@@ -2591,12 +2598,12 @@ kbd {
   align-self: stretch;
 }
 
-/* Keep the sheet origin stable between the first and second click of a double-click.
-   Multi-select pages otherwise insert the action bar after click one and move the row. */
-.ledger-selection-slot {
-  min-height: 47px;
-  flex: 0 0 auto;
-}
+/* 선택 액션바는 표 위가 아니라 «필터줄»에 붙는다(.ledger-toolbar__selection).
+   예전에는 표 위에 두고 선택 0건일 때도 47px 를 비워 뒀는데 —
+     · 그 자리만큼 표 상단이 내려가 오른쪽 상세패널과 위아래 선이 어긋났고
+     · 그래도 더블클릭 두 번째가 다른 행에 떨어지는 문제는 자리 예약으로 겨우 덮고 있었다.
+   필터줄로 옮기면 표가 아예 안 움직이므로 둘 다 없어진다(사장님 지시 2026-08-07
+   「선택 이거는 기간 옆이나 어디 다른 데 표시해도 되잖아」). */
 /* 시트 안 표·빈상태·로딩이 패널과 같은 높이로 늘어나게 */
 .ledger-workspace__sheet > .excel-sheet,
 .ledger-workspace__sheet > [role='status'] {
@@ -2992,11 +2999,34 @@ kbd {
     flex-wrap: wrap;
     gap: 8px;
     width: 100%;
+    align-items: center;
   }
   .ledger-toolbar__filters > * { min-width: 0; flex: 0 0 auto; }
-  .ledger-toolbar__filters > :has(input[type='search']) { flex: 1 1 160px; }
+  /* 회사·필터는 고정 · 검색이 남는 가로를 채움(인라인 width:160 무시). */
+  .ledger-toolbar__filters > [data-ui='search'],
+  .ledger-toolbar__filters > :has(input[type='search']) {
+    flex: 1 1 0 !important;
+    width: auto !important;
+    min-width: 0 !important;
+    max-width: none !important;
+  }
   .ledger-toolbar__filters input { width: 100% !important; }
-  .ledger-toolbar__filters > .period-bar { flex: 1 0 100%; }
+  /* 기간은 filters가 아니라 period prop → 필터 패널(ledger-mobile-period). 툴바 한 줄 금지. */
+  .ledger-toolbar__filters > .period-bar { display: none; }
+  .ledger-mobile-period {
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg-card);
+  }
+  .ledger-mobile-period__label {
+    font-size: 12px;
+    font-weight: 800;
+    color: var(--text);
+    margin-bottom: 8px;
+  }
+  .ledger-mobile-period .period-bar {
+    width: 100%;
+  }
   .ledger-toolbar__stats {
     grid-column: 1 / -1;
     grid-row: 2;
