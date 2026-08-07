@@ -10,6 +10,7 @@ import { linkFleet } from './domain/model';
 import { dday, OUT } from './dashboard-consts';
 import { normPlate } from './plate';
 import { selectReceivables } from './snapshot/selectors';
+import { contractPeriodOverlaps } from './contracts/dates';
 
 export type DashboardInput = {
   contracts: EntityRecord[];
@@ -111,9 +112,9 @@ export function computeDashboard(input: DashboardInput, today: string) {
     if (cs.length < 2) continue;
     for (let i = 0; i < cs.length; i++) for (let j = i + 1; j < cs.length; j++) {
       const a = cs[i], b = cs[j];
-      const as = String(a.startDate || a.deliveredDate || ''), ae = String(a.endDate || '9999-12-31');
-      const bs = String(b.startDate || b.deliveredDate || ''), be = String(b.endDate || '9999-12-31');
-      if (as && bs && as <= be && bs <= ae) {
+      const as = String(a.startDate || a.deliveredDate || '');
+      const bs = String(b.startDate || b.deliveredDate || '');
+      if (contractPeriodOverlaps(a, b)) {
         doubleBooking.push({
           plate: p,
           companyId: String(a.companyId || b.companyId || ''),

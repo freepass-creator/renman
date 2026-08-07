@@ -34,3 +34,24 @@ export function monthsBetweenIso(from: string, to: string): number {
   if (b.getDate() < a.getDate()) m -= 1;
   return Math.max(0, m);
 }
+
+/**
+ * 두 계약의 대여기간이 겹치는가 — 같은 차량 이중배차 판정 SSOT.
+ * 시작일은 `startDate` 없으면 `deliveredDate`, 종료일 없으면 무기한(9999-12-31).
+ * ★운영 스냅샷(doubleBooking)과 계약서 투입 검사가 같은 규칙을 써야 한다 —
+ *   한쪽만 고치면 「투입 때는 통과, 대시보드에선 충돌」이 된다.
+ */
+export function contractPeriodOverlaps(a: ContractPeriodLike, b: ContractPeriodLike): boolean {
+  const as = String(a.startDate || a.deliveredDate || '');
+  const ae = String(a.endDate || '9999-12-31');
+  const bs = String(b.startDate || b.deliveredDate || '');
+  const be = String(b.endDate || '9999-12-31');
+  if (!as || !bs) return false;
+  return as <= be && bs <= ae;
+}
+
+export type ContractPeriodLike = {
+  startDate?: unknown;
+  deliveredDate?: unknown;
+  endDate?: unknown;
+};

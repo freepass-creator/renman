@@ -29,6 +29,7 @@ import {
 import { NotifyDialog } from '@/components/NotifyDialog';
 import { notifyRecipients } from '@/lib/notify/recipients';
 import { hydrateContractsWithDepositReceipts } from '@/lib/payments/deposit-receipts';
+import { ContractIntakePanel } from '@/components/contract/ContractIntakePanel';
 
 type RentalChip = '전체' | (typeof RENTAL_TYPES)[number];
 /** 계약범위 — 전체·진행·만기임박·미납·종료 (riskLabel·net·dday 판정). */
@@ -407,7 +408,16 @@ function ContractLedgerInner() {
           title="계약 생성"
           sections={CONTRACT_CREATE_SECTIONS}
           initial={{ status: '대기', paymentTiming: '선납' }}
-          fileIngest={{ label: '파일로 투입 (데이터센터)', onClick: () => openIngest('contract') }}
+          fileIngest={{
+            label: '계약서 업로드',
+            message: '계약서를 올리면 OCR로 임차인·차량·기간·요금을 읽어 계약을 만듭니다. 못 읽은 칸은 그 줄에서 수기로 채웁니다.',
+            render: ({ companyId: co }) => (
+              <ContractIntakePanel
+                companyId={co}
+                onDone={() => { setCreating(false); reload(); }}
+              />
+            ),
+          }}
           onClose={() => setCreating(false)}
         />
       ) : selected && editing ? (

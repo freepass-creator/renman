@@ -118,8 +118,17 @@ export function LedgerCreatePanel({
   kindGateways?: Record<string, LedgerKindGateway>;
   /** kindField 값 변경 콜백(탭 전환 등). */
   onKindChange?: (kind: string) => void;
-  /** 파일·OCR 대량 투입 진입(헤더 ⋯ 대신 [+생성] 패널). */
-  fileIngest?: { label: string; onClick: () => void };
+  /**
+   * 파일·OCR 투입([+생성] 패널 안).
+   *   `render` 가 있으면 **이 자리에서** OCR·저장한다(라우팅 없음 — 과태료·계약서 방식).
+   *   없으면 데이터센터로 보내는 버튼만 그린다.
+   */
+  fileIngest?: {
+    label: string;
+    onClick?: () => void;
+    message?: React.ReactNode;
+    render?: (ctx: { companyId: string }) => React.ReactNode;
+  };
   initial?: EntityRecord;
   /** 회사만으로도 저장하되 아래 상세 입력은 선택적으로 유지한다. */
   quick?: boolean;
@@ -316,7 +325,16 @@ export function LedgerCreatePanel({
           )
         )}
 
-        {fileIngest && !gateway && (
+        {fileIngest?.render && !gateway && (
+          <CreateSection title={fileIngest.label} initiallyOpen>
+            <div style={{ display: 'grid', gap: 8 }}>
+              {fileIngest.message != null ? <Message variant="info">{fileIngest.message}</Message> : null}
+              {fileIngest.render({ companyId: String(form.companyId || '') })}
+            </div>
+          </CreateSection>
+        )}
+
+        {fileIngest && !fileIngest.render && !gateway && (
           <Message variant="info">
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
               여러 건은 파일로 한 번에 담을 수 있습니다.
