@@ -3,28 +3,20 @@
  *   패널(/work) · 대량페이지(/penalty/upload) 동일 소비. 새 OCR·매칭 엔진 금지.
  */
 import { companyLabel } from '@/lib/companies';
+import {
+  type DocIntakeRow, type DocIntakeSpec, type DocIntakeVerdict,
+  isDocIntakeReady, makeDocIntakeRows, ocrDocFiles,
+} from '@/lib/doc-intake';
 import { saveIntake } from '@/lib/intake';
 import type { EntityRecord } from '@/lib/intake/entities';
-import { ocrBatch, mapOcrToEntity } from '@/lib/ocr-client';
-import type { CrosscheckResult } from '@/lib/ocr-crosscheck';
 import { matchPenalty } from '@/lib/penalty-match';
 import { normPlate } from '@/lib/plate';
 import { docPath, uploadDoc } from '@/lib/storage';
 
 export const PENALTY_OCR_MAX = 10;
 
-export type PenaltyIntakeStatus = 'pending' | 'done' | 'failed';
-
-export type PenaltyIntakeRow = {
-  id: string;
-  fileName: string;
-  file: File;
-  status: PenaltyIntakeStatus;
-  rec: EntityRecord;
-  ocrOriginal?: unknown;
-  crosscheck?: CrosscheckResult;
-  error?: string;
-};
+/** 행 모양은 공용 규격을 그대로 쓴다(lib/doc-intake). */
+export type PenaltyIntakeRow = DocIntakeRow;
 
 export type PenaltyMatchDerive = {
   renter: string | null;
@@ -32,37 +24,6 @@ export type PenaltyMatchDerive = {
   outOfRange: boolean;
   dup: boolean;
 };
-
-export function makePenaltyIntakeRows(files: File[], stamp = Date.now()): PenaltyIntakeRow[] {
-  return files.map((f, i) => ({
-    id: `pen-${stamp}-${i}`,
-    fileName: f.name,
-    file: f,
-    status: 'pending' as const,
-    rec: {},
-  }));
-}
-
-/** OCR 배치 실행 후 행 상태 갱신. */
-export async function ocrPenaltyFiles(
-  files: File[],
-  baseRows: PenaltyIntakeRow[],
-): Promise<PenaltyIntakeRow[]> {
-  const results = await ocrBatch(files, 'penalty');
-  return baseRows.map((row, i) => {
-    const res = results[i];
-    if (res?.ok && res.raw) {
-      return {
-        ...row,
-        status: 'done' as const,
-        rec: mapOcrToEntity('penalty', res.raw),
-        ocrOriginal: res.ocrOriginal,
-        crosscheck: res.crosscheck,
-      };
-    }
-    return { ...row, status: 'failed' as const, error: res?.error };
-  });
-}
 
 export function derivePenaltyMatch(
   rec: EntityRecord,
@@ -83,12 +44,6 @@ export function derivePenaltyMatch(
     outOfRange,
     dup,
   };
-}
-
-export function isPenaltyIntakeReady(row: PenaltyIntakeRow): boolean {
-  return !!String(row.rec.plate || '').trim()
-    && !!String(row.rec.violationDate || '').trim()
-    && Number(row.rec.amount) > 0;
 }
 
 export async function buildPenaltySaveRecords(
@@ -121,3 +76,47 @@ export async function savePenaltyRecords(companyId: string, records: EntityRecor
 export function penaltySavedToast(count: number, companyId: string): string {
   return `과태료 ${count}건 등록 · ${companyLabel(companyId)}`;
 }
+
+/** 문서 투입 공용 패널 규격 — 화면은 components/ui/doc-intake-panel 하나. */
+export const PENALTY_INTAKE_SPEC: DocIntakeSpec = {
+  entityKey: 'penalty',
+  ocrType: 'penalty',
+  max: PENALTY_OCR_MAX,
+  hint: '고지서 이미지·PDF · 여러 장',
+  refEntities: ['contract', 'penalty'],
+  missing: (rec) => {
+    const miss: string[] = [];
+    if (!String(rec.plate || '').trim()) miss.push('차량번호');
+    if (!String(rec.violationDate || '').trim()) miss.push('위반일');
+    if (!(Number(rec.amount) > 0)) miss.push('금액');
+    return miss;
+  },
+  derive: (rec, refs) => {
+    const m = derivePenaltyMatch(rec, refs[0] || [], refs[1] || []);
+    const badges: DocIntakeVerdict['badges'] = [];
+    if (m.renter) badges.push({ t: `임차인 ${m.renter}`, tone: 'green' });
+    if (m.outOfRange) badges.push({ t: '계약기간 밖', tone: 'amber' });
+    return { dup: m.dup, badges };
+  },
+  manual: [
+    { key: 'plate', label: '차량번호', placeholder: '12가3456' },
+    { key: 'violationDate', label: '위반일', type: 'date' },
+    { key: 'amount', label: '금액', placeholder: '0' },
+  ],
+  summary: (rec) => [String(rec.plate || '').trim(), String(rec.violationDate || '').trim()].filter(Boolean).join(' · '),
+  build: (rows, companyId, refs) =>
+    buildPenaltySaveRecords(rows, companyId, (rec) => derivePenaltyMatch(rec, refs[0] || [], refs[1] || [])),
+  save: savePenaltyRecords,
+  savedToast: penaltySavedToast,
+  saveLabel: (n) => `과태료 ${n}건 등록`,
+  incompleteNote: (n) => `미완 ${n}건은 차번·위반일·금액을 수기 입력해야 등록됩니다.`,
+};
+
+/* ── 대량 업로드 페이지(/penalty/upload) 용 얇은 위임 ──
+   패널과 대량페이지가 서로 다른 구현을 갖지 않도록 공용(lib/doc-intake)으로 넘긴다. */
+export const makePenaltyIntakeRows = (files: File[], stamp?: number) =>
+  makeDocIntakeRows(files, 'penalty', stamp);
+export const ocrPenaltyFiles = (files: File[], baseRows: PenaltyIntakeRow[]) =>
+  ocrDocFiles(PENALTY_INTAKE_SPEC, files, baseRows);
+export const isPenaltyIntakeReady = (row: PenaltyIntakeRow) =>
+  isDocIntakeReady(PENALTY_INTAKE_SPEC, row);

@@ -9,8 +9,7 @@ import { companyLabel } from '@/lib/companies';
 import { contractPeriodOverlaps } from '@/lib/contracts/dates';
 import { saveIntake } from '@/lib/intake';
 import type { EntityRecord } from '@/lib/intake/entities';
-import { ocrBatch, mapOcrToEntity } from '@/lib/ocr-client';
-import type { CrosscheckResult } from '@/lib/ocr-crosscheck';
+import type { DocIntakeRow, DocIntakeSpec, DocIntakeVerdict } from '@/lib/doc-intake';
 import { findVehicleByPlate, normPlate } from '@/lib/plate';
 import { docPath, uploadDoc } from '@/lib/storage';
 
@@ -18,18 +17,8 @@ import { docPath, uploadDoc } from '@/lib/storage';
 export const CONTRACT_OCR_TYPE = 'rental_contract';
 export const CONTRACT_OCR_MAX = 10;
 
-export type ContractIntakeStatus = 'pending' | 'done' | 'failed';
-
-export type ContractIntakeRow = {
-  id: string;
-  fileName: string;
-  file: File;
-  status: ContractIntakeStatus;
-  rec: EntityRecord;
-  ocrOriginal?: unknown;
-  crosscheck?: CrosscheckResult;
-  error?: string;
-};
+/** 행 모양은 공용 규격을 그대로 쓴다(lib/doc-intake). */
+export type ContractIntakeRow = DocIntakeRow;
 
 export type ContractMatchDerive = {
   /** 차량 원장에서 찾은 차명. 못 찾으면 null. */
@@ -41,37 +30,6 @@ export type ContractMatchDerive = {
   /** 같은 차량의 기간이 겹치는 기존 계약(이중배차). 있으면 계약자명. */
   overlapWith: string | null;
 };
-
-export function makeContractIntakeRows(files: File[], stamp = Date.now()): ContractIntakeRow[] {
-  return files.map((f, i) => ({
-    id: `ctr-${stamp}-${i}`,
-    fileName: f.name,
-    file: f,
-    status: 'pending' as const,
-    rec: {},
-  }));
-}
-
-/** OCR 배치 실행 후 행 상태 갱신. */
-export async function ocrContractFiles(
-  files: File[],
-  baseRows: ContractIntakeRow[],
-): Promise<ContractIntakeRow[]> {
-  const results = await ocrBatch(files, CONTRACT_OCR_TYPE);
-  return baseRows.map((row, i) => {
-    const res = results[i];
-    if (res?.ok && res.raw) {
-      return {
-        ...row,
-        status: 'done' as const,
-        rec: mapOcrToEntity('contract', res.raw),
-        ocrOriginal: res.ocrOriginal,
-        crosscheck: res.crosscheck,
-      };
-    }
-    return { ...row, status: 'failed' as const, error: res?.error };
-  });
-}
 
 export function deriveContractMatch(
   rec: EntityRecord,
@@ -162,3 +120,32 @@ export async function saveContractRecords(companyId: string, records: EntityReco
 export function contractSavedToast(count: number, companyId: string): string {
   return `계약 ${count}건 등록 · ${companyLabel(companyId)}`;
 }
+
+/** 문서 투입 공용 패널 규격 — 화면은 components/ui/doc-intake-panel 하나. */
+export const CONTRACT_INTAKE_SPEC: DocIntakeSpec = {
+  entityKey: 'contract',
+  ocrType: CONTRACT_OCR_TYPE,
+  max: CONTRACT_OCR_MAX,
+  hint: '계약서 이미지·PDF · 여러 장',
+  refEntities: ['vehicle', 'contract'],
+  missing: (rec) => contractIntakeMissing({ rec } as ContractIntakeRow),
+  derive: (rec, refs) => {
+    const m = deriveContractMatch(rec, refs[0] || [], refs[1] || []);
+    const badges: DocIntakeVerdict['badges'] = [];
+    if (m.overlapWith) badges.push({ t: `기간겹침 · ${m.overlapWith}`, tone: 'amber' });
+    if (m.ghostPlate) badges.push({ t: '차량원장 없음', tone: 'amber' });
+    return { dup: m.dup, badges };
+  },
+  manual: [
+    { key: 'contractorName', label: '임차인', placeholder: '홍길동' },
+    { key: 'plate', label: '차량번호', placeholder: '12가3456' },
+    { key: 'startDate', label: '시작일', type: 'date' },
+  ],
+  summary: (rec) => [String(rec.plate || '').trim(), String(rec.contractorName || '').trim()].filter(Boolean).join(' · '),
+  build: (rows, companyId, refs) =>
+    buildContractSaveRecords(rows, companyId, (rec) => deriveContractMatch(rec, refs[0] || [], refs[1] || [])),
+  save: saveContractRecords,
+  savedToast: contractSavedToast,
+  saveLabel: (n) => `계약 ${n}건 등록`,
+  incompleteNote: (n) => `미완 ${n}건은 임차인·차번·시작일을 수기 입력해야 등록됩니다.`,
+};

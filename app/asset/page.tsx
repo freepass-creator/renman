@@ -26,6 +26,8 @@ import {
   ASSET_FILTER_DEFS, countActiveFilters, emptyFilterValues, eqFilter, matchLedgerFilters,
 } from '@/lib/ledger-filter-defs';
 import { LEDGER_EMPTY } from '@/lib/ledger-empty';
+import { DocIntakePanel } from '@/components/ui/doc-intake-panel';
+import { VEHICLE_INTAKE_SPEC } from '@/lib/vehicle-intake';
 type AssetOwnershipScope = '보유자산' | '처분자산' | '전체자산';
 type AssetQuickFilter = '계약중' | '휴차' | '매각대기';
 type AllAssetQuickFilter = '보유' | '처분';
@@ -65,7 +67,7 @@ const ASSET_CREATE_SECTIONS: LedgerFormSection[] = [
 export default function AssetLedgerPage() {
   const mobile = useIsMobile();
   const { isOperator } = useSession();
-  const { data: [vehicles = [], contracts = [], history = []], loading, error: loadError } = useEntityLists(['vehicle', 'contract', 'history']);
+  const { data: [vehicles = [], contracts = [], history = []], loading, error: loadError, reload } = useEntityLists(['vehicle', 'contract', 'history']);
   const [q, setQ] = useState('');
   const [ownershipScope, setOwnershipScope] = useState<AssetOwnershipScope>('보유자산');
   const [quickFilter, setQuickFilter] = useState<AssetQuickFilter | null>(null);
@@ -356,7 +358,17 @@ export default function AssetLedgerPage() {
              '등록예정'이 되어 isVehicleHeld=false → **등록한 차가 운영현황에 아예 안 떴다.**
              실무자는 차를 넣고도 /status 에서 못 찾는다. 데이터센터 직접입력(상태 공란)과도
              결과가 달라 «어느 화면으로 넣었느냐»에 따라 차가 보였다 안 보였다 했다. */
-          fileIngest={{ label: '파일로 투입 (데이터센터)', onClick: () => openIngest('vehicle') }}
+          fileIngest={{
+            label: '등록증 업로드',
+            message: '자동차등록증을 올리면 OCR로 차번·차명·차대번호·제원을 읽어 차량을 등록합니다. 그 차번으로 걸린 계약이 있으면 「차량 원장 없음」 리스크가 함께 풀립니다.',
+            render: ({ companyId: co }) => (
+              <DocIntakePanel
+                spec={VEHICLE_INTAKE_SPEC}
+                companyId={co}
+                onDone={() => { setCreating(false); reload(); }}
+              />
+            ),
+          }}
           onClose={() => setCreating(false)}
         />
       ) : selected && editing ? (

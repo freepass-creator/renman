@@ -30,7 +30,8 @@ import {
   type PenaltyKind, type PenaltyProcess, type PenaltyWorkRow,
 } from '@/lib/penalty-work';
 import { LEDGER_EMPTY } from '@/lib/ledger-empty';
-import { PenaltyIntakePanel } from '@/components/work/PenaltyIntakePanel';
+import { DocIntakePanel } from '@/components/ui/doc-intake-panel';
+import { PENALTY_INTAKE_SPEC } from '@/lib/penalty-intake';
 import { latestDateOf } from '@/lib/ledger-stats';
 import { TODAY } from '@/lib/dashboard-consts';
 import { WORK_SECTIONS_BY_KIND, workSectionsFor } from '@/lib/work-form-sections';
@@ -574,7 +575,8 @@ function WorkLedgerInner() {
               sectionTitle: '고지서 업로드',
               message: '고지서 파일을 올리면 OCR로 위반일시·차량을 읽어 계약(임차인)을 자동 매칭합니다. 등록 후 과태료 목록에 반영됩니다.',
               render: ({ companyId: co }) => (
-                <PenaltyIntakePanel
+                <DocIntakePanel
+                  spec={PENALTY_INTAKE_SPEC}
                   companyId={co}
                   onDone={() => {
                     setCreating(false);

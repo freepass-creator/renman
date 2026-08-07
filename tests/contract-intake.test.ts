@@ -12,9 +12,9 @@ import {
   contractIntakeMissing,
   deriveContractMatch,
   isContractIntakeReady,
-  makeContractIntakeRows,
   type ContractIntakeRow,
 } from '@/lib/contract-intake';
+import { makeDocIntakeRows } from '@/lib/doc-intake';
 import { contractPeriodOverlaps } from '@/lib/contracts/dates';
 import { ENTITIES } from '@/lib/intake/entities';
 
@@ -129,7 +129,7 @@ describe('저장 레코드', () => {
 
   it('행 id 는 파일마다 다르다 — 같은 이름 파일을 여러 장 올려도 안 뭉친다', () => {
     const files = [{ name: 'a.pdf' }, { name: 'a.pdf' }] as File[];
-    const ids = makeContractIntakeRows(files, 1).map((r) => r.id);
+    const ids = makeDocIntakeRows(files, 'contract', 1).map((r) => r.id);
     expect(new Set(ids).size).toBe(2);
   });
 });
@@ -137,7 +137,8 @@ describe('저장 레코드', () => {
 describe('계약관리에서 닿는다', () => {
   it('계약 생성 패널이 계약서 업로드를 인라인으로 그린다 — 데이터센터로 내보내지 않는다', () => {
     const page = readFileSync(join(process.cwd(), 'app/contract/page.tsx'), 'utf8');
-    expect(page).toContain('ContractIntakePanel');
+    expect(page).toContain('CONTRACT_INTAKE_SPEC');
+    expect(page).toContain('DocIntakePanel');
     expect(page).toContain("label: '계약서 업로드'");
     expect(page).toContain('render:');
   });
