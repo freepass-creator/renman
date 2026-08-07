@@ -6,6 +6,7 @@
 import { Badge, type SheetCol } from '@/components/ui';
 import { companyLabel } from '@/lib/companies';
 import { LEDGER_EMPTY } from '@/lib/ledger-empty';
+import { LEDGER_LABEL } from './ledger-labels';
 
 export type StaffKind = '본사' | '법인' | '권한미부여';
 export type StaffLiveStatus = '정상' | '정지' | '미로그인' | '계정없음';
@@ -44,7 +45,7 @@ function statusTone(s: StaffLiveStatus): 'green' | 'red' | 'amber' | 'gray' {
 
 export const STAFF_COLS: SheetCol<StaffSheetRow>[] = [
   {
-    key: 'company', label: '회사명', priority: 1,
+    key: 'company', label: LEDGER_LABEL.company, priority: 1,
     render: (r) => r.company || LEDGER_EMPTY.dash,
     text: (r) => r.company,
   },

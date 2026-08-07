@@ -61,12 +61,12 @@ const CATALOG: SheetCol<ReceivableRow>[] = [
     text: (r) => r.v.net,
   },
   {
-    key: 'overdueDays', label: '연체일', priority: 1, align: 'r', sortNum: true, xf: 'int',
+    key: 'overdueDays', label: LEDGER_LABEL.overdueDays, priority: 1, align: 'r', sortNum: true, xf: 'int',
     render: (r) => <span style={{ color: r.v.overdueDays >= 30 ? C.danger : C.warn, fontWeight: 700 }}>{r.v.overdueDays}일</span>,
     text: (r) => r.v.overdueDays,
   },
   {
-    key: 'unpaidCount', label: '미납회차', priority: 1, align: 'r', sortNum: true, xf: 'int',
+    key: 'unpaidCount', label: LEDGER_LABEL.unpaidCount, priority: 1, align: 'r', sortNum: true, xf: 'int',
     render: (r) => `${r.v.count}회`,
     text: (r) => r.v.count,
   },
@@ -91,12 +91,12 @@ const CATALOG: SheetCol<ReceivableRow>[] = [
     text: (r) => String(r.rec.contractorPhone || ''),
   },
   {
-    key: 'period', label: '계약기간', priority: 2,
+    key: 'period', label: LEDGER_LABEL.term, priority: 2,
     render: (r) => `${r.v.startDate || LEDGER_EMPTY.dash} ~ ${r.v.endDate || LEDGER_EMPTY.dash}`,
     text: (r) => `${r.v.startDate || ''} ${r.v.endDate || ''}`,
   },
   {
-    key: 'monthlyRent', label: '월대여료', priority: 2, align: 'r', sortNum: true, xf: 'money',
+    key: 'monthlyRent', label: LEDGER_LABEL.monthlyRent, priority: 2, align: 'r', sortNum: true, xf: 'money',
     render: (r) => r.v.monthlyRent ? money(r.v.monthlyRent) : LEDGER_EMPTY.dash,
     text: (r) => r.v.monthlyRent,
   },
@@ -116,7 +116,7 @@ const CATALOG: SheetCol<ReceivableRow>[] = [
     text: (r) => String(r.rec.noticeSentDate || '미발송'),
   },
   {
-    key: 'engine', label: '시동제어', priority: 2,
+    key: 'engine', label: LEDGER_LABEL.engineControl, priority: 2,
     render: (r) => r.rec.engineDisabled
       ? (r.v.ended ? <span style={{ color: C.danger, fontWeight: 700 }}>종료 후 잔존</span> : `적용중 ${String(r.rec.engineDisabledAt || '').slice(0, 10)}`)
       : (r.v.ended ? '대상 아님' : '미적용'),

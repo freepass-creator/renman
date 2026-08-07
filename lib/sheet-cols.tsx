@@ -49,32 +49,34 @@ export function remainSpanLabel(d: number | null): string {
   return parts.length ? parts.join(' ') : '0일';
 }
 const FL = {
-  plate: { key: 'plate', label: '차량번호', pin: true, priority: 1 as const, render: (r) => r.plate || LEDGER_EMPTY.dash, text: (r) => r.plate },
-  company: { key: 'company', label: '회사명', pin: true, priority: 2 as const, render: (r) => r.company || LEDGER_EMPTY.dash, text: (r) => r.company },
+  plate: { key: 'plate', label: LEDGER_LABEL.plate, pin: true, priority: 1 as const, render: (r) => r.plate || LEDGER_EMPTY.dash, text: (r) => r.plate },
+  company: { key: 'company', label: LEDGER_LABEL.company, pin: true, priority: 2 as const, render: (r) => r.company || LEDGER_EMPTY.dash, text: (r) => r.company },
   status: { key: 'status', label: '차량상태', priority: 1 as const, render: (r) => <Badge tone={toneBadge(r.tone)}>{r.status}</Badge>, text: (r) => r.status },
   loc: { key: 'loc', label: '현위치', priority: 3 as const, render: (r) => r.location || LEDGER_EMPTY.dash, text: (r) => r.location },
-  car: { key: 'car', label: '차명', priority: 1 as const, render: (r) => r.carName || LEDGER_EMPTY.dash, text: (r) => r.carName },
-  maker: { key: 'maker', label: '제조사', render: (r) => r.maker || LEDGER_EMPTY.dash, text: (r) => r.maker },
-  sub: { key: 'sub', label: '세부모델', render: (r) => r.subModel || LEDGER_EMPTY.dash, text: (r) => r.subModel },
-  year: { key: 'year', label: '연식', render: (r) => r.year || LEDGER_EMPTY.dash, text: (r) => r.year },
-  vin: { key: 'vin', label: '차대번호', render: (r) => r.vin || LEDGER_EMPTY.dash, text: (r) => r.vin },
-  acqDate: { key: 'acqDate', label: '취득일', render: (r) => ymd(r.acqDate), text: (r) => r.acqDate },
-  acqPrice: { key: 'acqPrice', label: '취득가', align: 'r', sortNum: true, xf: 'money' as const, render: (r) => money0(r.acqPrice), text: (r) => r.acqPrice },
+  car: { key: 'car', label: LEDGER_LABEL.carName, priority: 1 as const, render: (r) => r.carName || LEDGER_EMPTY.dash, text: (r) => r.carName },
+  maker: { key: 'maker', label: LEDGER_LABEL.maker, render: (r) => r.maker || LEDGER_EMPTY.dash, text: (r) => r.maker },
+  sub: { key: 'sub', label: LEDGER_LABEL.subModel, render: (r) => r.subModel || LEDGER_EMPTY.dash, text: (r) => r.subModel },
+  year: { key: 'year', label: LEDGER_LABEL.modelYear, render: (r) => r.year || LEDGER_EMPTY.dash, text: (r) => r.year },
+  vin: { key: 'vin', label: LEDGER_LABEL.vin, render: (r) => r.vin || LEDGER_EMPTY.dash, text: (r) => r.vin },
+  acqDate: { key: 'acqDate', label: LEDGER_LABEL.acqDate, render: (r) => ymd(r.acqDate), text: (r) => r.acqDate },
+  acqPrice: { key: 'acqPrice', label: LEDGER_LABEL.acqPrice, align: 'r', sortNum: true, xf: 'money' as const, render: (r) => money0(r.acqPrice), text: (r) => r.acqPrice },
   inspect: { key: 'inspect', label: '검사만기', priority: 3 as const, render: (r) => ddayCell(r.inspectionTo), text: (r) => r.inspectionTo },
   gps: { key: 'gps', label: 'GPS', render: (r) => r.gps || LEDGER_EMPTY.dash, text: (r) => r.gps },
   loanCo: { key: 'loanCo', label: '할부사', render: (r) => r.loanCompany || LEDGER_EMPTY.dash, text: (r) => r.loanCompany },
-  loanAmt: { key: 'loanAmt', label: '할부원금', align: 'r', sortNum: true, xf: 'money' as const, render: (r) => money0(r.loanPrincipal), text: (r) => r.loanPrincipal },
-  loanRate: { key: 'loanRate', label: '이율', align: 'r', sortNum: true, xf: 'rate' as const, render: (r) => r.loanRate ? `${(r.loanRate * 100).toFixed(1)}%` : LEDGER_EMPTY.dash, text: (r) => r.loanRate },
-  loanMon: { key: 'loanMon', label: '할부개월', align: 'r', sortNum: true, xf: 'int' as const, render: (r) => r.loanMonths || LEDGER_EMPTY.dash, text: (r) => r.loanMonths },
+  loanAmt: { key: 'loanAmt', label: LEDGER_LABEL.loanPrincipal, align: 'r', sortNum: true, xf: 'money' as const, render: (r) => money0(r.loanPrincipal), text: (r) => r.loanPrincipal },
+  loanRate: { key: 'loanRate', label: LEDGER_LABEL.loanRate, align: 'r', sortNum: true, xf: 'rate' as const, render: (r) => r.loanRate ? `${(r.loanRate * 100).toFixed(1)}%` : LEDGER_EMPTY.dash, text: (r) => r.loanRate },
+  loanMon: { key: 'loanMon', label: LEDGER_LABEL.loanMonths, align: 'r', sortNum: true, xf: 'int' as const, render: (r) => r.loanMonths || LEDGER_EMPTY.dash, text: (r) => r.loanMonths },
   cust: { key: 'cust', label: '사용처', priority: 1 as const, render: (r) => r.customer || LEDGER_EMPTY.none, text: (r) => r.customer },
-  term: { key: 'term', label: '계약기간', align: 'r', sortNum: true, xf: 'int' as const, render: (r) => r.termMonths ? `${r.termMonths}개월` : LEDGER_EMPTY.dash, text: (r) => r.termMonths },
-  phone: { key: 'phone', label: '연락처', priority: 2 as const, render: (r) => r.phone || LEDGER_EMPTY.dash, text: (r) => r.phone },
+  term: { key: 'term', label: LEDGER_LABEL.term, align: 'r', sortNum: true, xf: 'int' as const, render: (r) => r.termMonths ? `${r.termMonths}개월` : LEDGER_EMPTY.dash, text: (r) => r.termMonths },
+  phone: { key: 'phone', label: LEDGER_LABEL.phone, priority: 2 as const, render: (r) => r.phone || LEDGER_EMPTY.dash, text: (r) => r.phone },
   rent: { key: 'rent', label: '대여료', align: 'r', priority: 2 as const, sortNum: true, xf: 'money' as const, render: (r) => money0(r.rent), text: (r) => r.rent },
   dep: { key: 'dep', label: '보증금', align: 'r', priority: 3 as const, sortNum: true, xf: 'money' as const, render: (r) => money0(r.deposit), text: (r) => r.deposit },
   start: { key: 'start', label: '시작', render: (r) => ymd(r.start), text: (r) => r.start },
   end: { key: 'end', label: '만기', priority: 2 as const, render: (r) => ymd(r.end), text: (r) => r.end },
   dday: {
-    key: 'dday', label: '반납까지', align: 'r', sortNum: true, xf: 'int' as const,
+    // ★key 를 returnDday 로 둔다 — 이 칸은 «반납»까지의 날수만 다룬다.
+    //   리스크·일정의 일반 D-day(LEDGER_LABEL.dday)와 다른 것이므로 key 도 달라야 한다.
+    key: 'returnDday', label: '반납까지', align: 'r', sortNum: true, xf: 'int' as const,
     render: (r) => {
       if (r.dday == null) return LEDGER_EMPTY.dash;
       const tip = remainSpanLabel(r.dday);
@@ -86,8 +88,8 @@ const FL = {
     },
     text: (r) => r.dday ?? '',
   },
-  insurer: { key: 'insurer', label: '보험사', render: (r) => r.insurer || LEDGER_EMPTY.dash, text: (r) => r.insurer },
-  insEnd: { key: 'insEnd', label: '보험만기', priority: 3 as const, render: (r) => ddayCell(r.insEnd), text: (r) => r.insEnd },
+  insurer: { key: 'insurer', label: LEDGER_LABEL.insurer, render: (r) => r.insurer || LEDGER_EMPTY.dash, text: (r) => r.insurer },
+  insEnd: { key: 'insEnd', label: LEDGER_LABEL.insuranceExpiry, priority: 3 as const, render: (r) => ddayCell(r.insEnd), text: (r) => r.insEnd },
   insPrem: { key: 'insPrem', label: '보험료', align: 'r', sortNum: true, xf: 'money' as const, render: (r) => money0(r.insPremium), text: (r) => r.insPremium },
   net: {
     key: 'net', label: '미수합계', align: 'r', priority: 1 as const, sortNum: true, xf: 'money' as const,
@@ -117,7 +119,7 @@ const FL = {
     text: (r) => r.endedNet,
   },
   contractState: {
-    key: 'contractState', label: '계약상태', align: 'c', priority: 2 as const,
+    key: 'contractState', label: LEDGER_LABEL.contractState, align: 'c', priority: 2 as const,
     render: (r) => <Badge tone={r.contractState === '계약유지' ? 'green' : r.contractState === '계약예정' ? 'amber' : 'gray'}>{r.contractState}</Badge>,
     text: (r) => r.contractState,
   },
@@ -159,12 +161,12 @@ const FL = {
   },
   // 결제일 · 납부시기 — 한 셀에 합치지 않음(각각 열).
   paymentDay: {
-    key: 'paymentDay', label: '결제일', align: 'c', priority: 3 as const,
+    key: 'paymentDay', label: LEDGER_LABEL.paymentDay, align: 'c', priority: 3 as const,
     render: (r) => (r.paymentDay ? `${r.paymentDay}일` : LEDGER_EMPTY.dash),
     text: (r) => (r.paymentDay ? `${r.paymentDay}일` : ''),
   },
   paymentTiming: {
-    key: 'paymentTiming', label: '납부시기', align: 'c',
+    key: 'paymentTiming', label: LEDGER_LABEL.paymentTiming, align: 'c',
     render: (r) => {
       if (!r.paymentDay && !r.paymentTiming) return LEDGER_EMPTY.dash;
       const t = paymentTimingOf(r.paymentTiming);
@@ -186,12 +188,12 @@ const FL = {
     text: (r) => r.rentalType,
   },
   mileage: {
-    key: 'mileage', label: '주행거리', align: 'r', priority: 4 as const, sortNum: true, xf: 'int' as const,
+    key: 'mileage', label: LEDGER_LABEL.mileage, align: 'r', priority: 4 as const, sortNum: true, xf: 'int' as const,
     render: (r) => (r.mileage ? `${r.mileage.toLocaleString('ko-KR')}km` : LEDGER_EMPTY.dash),
     text: (r) => r.mileage,
   },
   contractNo: {
-    key: 'contractNo', label: '계약번호',
+    key: 'contractNo', label: LEDGER_LABEL.contractNo,
     render: (r) => r.contractNo || LEDGER_EMPTY.dash,
     text: (r) => r.contractNo,
   },
@@ -199,7 +201,7 @@ const FL = {
 
 /** 기본 = 자산기본(차번·법인·상태·차명·연식) + 계약조건 + 수납/리스크. 한 셀 한 값 · 자리 고정.
  *  정렬 배정 — 가운데(짧은값·날짜·배지)=CENTER · 금액은 FL align'r' 유지. */
-const CENTER_ALIGN = new Set(['company', 'status', 'contractState', 'year', 'term', 'start', 'end', 'dday', 'od', 'stage', 'warn', 'own', 'util', 'phone', 'gps', 'acqDate', 'loanMon', 'loanStart', 'insurer', 'insEnd', 'loanCo', 'inspect', 'paymentDay', 'paymentTiming', 'round', 'rentalType']);
+const CENTER_ALIGN = new Set(['company', 'status', 'contractState', 'year', 'term', 'start', 'end', 'returnDday', 'od', 'stage', 'warn', 'own', 'util', 'phone', 'gps', 'acqDate', 'loanMon', 'loanStart', 'insurer', 'insEnd', 'loanCo', 'inspect', 'paymentDay', 'paymentTiming', 'round', 'rentalType']);
 const alignCols = (cols: SheetCol<FleetRow>[]): SheetCol<FleetRow>[] =>
   cols.map((c) => (CENTER_ALIGN.has(c.key) ? { ...c, align: 'c' as const } : c));
 
@@ -225,7 +227,7 @@ export const FLEET_SHEET_KEYS: SheetViewKeys = {
   all: [
     'company', 'plate', 'car', 'own', 'status', 'contractState',
     'cust', 'loc', 'phone', 'maker', 'sub', 'year',
-    'rentalType', 'term', 'start', 'end', 'dep', 'rent', 'paymentDay', 'paymentTiming', 'round', 'dday',
+    'rentalType', 'term', 'start', 'end', 'dep', 'rent', 'paymentDay', 'paymentTiming', 'round', 'returnDday',
     'maintainedNet', 'od', 'stage', 'warn', 'note',
     'util', 'mileage', 'contractNo',
     'vin', 'acqDate', 'acqPrice', 'gps',
@@ -241,7 +243,7 @@ export const FLEET_EXPANDED_COLS = _fleetViews.expanded;
 /** 운영현황 세부패널 — 섹션 사전(lib/detail-sections)에서 «쓸 섹션»만 고른다. */
 export const FLEET_DETAIL_DEFS: DetailSectionDef[] = sectionDefs({
   '차량·상태': ['company', 'plate', 'status', 'maker', 'sub', 'year', 'car', 'loc', 'own', 'util', 'mileage', 'contractNo'],
-  '계약': ['contractState', 'cust', 'phone', 'rentalType', 'term', 'start', 'end', 'dep', 'rent', 'paymentDay', 'paymentTiming', 'round', 'dday'],
+  '계약': ['contractState', 'cust', 'phone', 'rentalType', 'term', 'start', 'end', 'dep', 'rent', 'paymentDay', 'paymentTiming', 'round', 'returnDday'],
   '수납·리스크': ['maintainedNet', 'od', 'stage', 'warn', 'note'],
   '취득': ['vin', 'acqDate', 'acqPrice', 'inspect'],
   // ★금융과 보험은 다른 주제다 — 예전 「금융·보험」 한 섹션을 사장님 지시로 분리(2026-08-07).

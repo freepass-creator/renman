@@ -71,7 +71,7 @@ function detailNum(key: string, label: string, suffix = ''): SheetCol<WorkLedger
 }
 
 const WORK_COL_CATALOG: SheetCol<WorkLedgerRow>[] = [
-  { key: 'company', label: '회사명', pin: true, priority: 2, render: (r) => r.company || LEDGER_EMPTY.dash, text: (r) => r.company },
+  { key: 'company', label: LEDGER_LABEL.company, pin: true, priority: 2, render: (r) => r.company || LEDGER_EMPTY.dash, text: (r) => r.company },
   {
     key: 'kind', label: LEDGER_LABEL.workCategory, pin: true, priority: 1,
     render: (r) => <KindCell kind={r.kind} />,
@@ -91,7 +91,7 @@ const WORK_COL_CATALOG: SheetCol<WorkLedgerRow>[] = [
     text: (r) => (r.autoFlag ? `${r.status} ${r.autoFlag}` : r.status),
   },
   {
-    key: 'plate', label: '차량번호', priority: 1, pin: true,
+    key: 'plate', label: LEDGER_LABEL.plate, priority: 1, pin: true,
     // 표에서는 2줄 셀 금지 — 차명은 별도 「차명」 컬럼.
     render: (r) => (r.plate
       ? <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 700 }}>{r.plate}</span>
@@ -99,12 +99,12 @@ const WORK_COL_CATALOG: SheetCol<WorkLedgerRow>[] = [
     text: (r) => r.plate || '',
   },
   {
-    key: 'carName', label: '차명', priority: 2,
+    key: 'carName', label: LEDGER_LABEL.carName, priority: 2,
     render: (r) => r.carName || LEDGER_EMPTY.dash,
     text: (r) => r.carName || '',
   },
   {
-    key: 'contractor', label: '계약자', priority: 1,
+    key: 'contractor', label: LEDGER_LABEL.contractor, priority: 1,
     render: (r) => {
       const name = String(r.customerName || '').trim();
       if (!name) return <span style={{ color: C.mute }}>{LEDGER_EMPTY.none}</span>;
@@ -115,7 +115,7 @@ const WORK_COL_CATALOG: SheetCol<WorkLedgerRow>[] = [
   { key: 'rentalType', label: LEDGER_LABEL.rentalType, priority: 2, render: (r) => r.rentalType || LEDGER_EMPTY.dash, text: (r) => r.rentalType || '' },
   { key: 'title', label: '업무내용', priority: 1, render: (r) => r.title || LEDGER_EMPTY.dash, text: (r) => r.title },
   {
-    key: 'contractNo', label: '계약번호', priority: 1,
+    key: 'contractNo', label: LEDGER_LABEL.contractNo, priority: 1,
     render: (r) => r.contractNo || LEDGER_EMPTY.dash,
     text: (r) => r.contractNo || '',
   },
@@ -150,7 +150,7 @@ const WORK_COL_CATALOG: SheetCol<WorkLedgerRow>[] = [
     text: (r) => r.updatedAt,
   },
   {
-    key: 'due', label: '기한', priority: 1,
+    key: 'due', label: LEDGER_LABEL.due, priority: 1,
     render: (r) => {
       if (!r.dueDate) return LEDGER_EMPTY.dash;
       const signal = workDueSignal(r.dueDate, r.status, TODAY);
@@ -159,7 +159,7 @@ const WORK_COL_CATALOG: SheetCol<WorkLedgerRow>[] = [
     },
     text: (r) => r.dueDate,
   },
-  { key: 'amount', label: '금액', align: 'r', sortNum: true, xf: 'money', render: (r) => (r.amount ? money(r.amount) : LEDGER_EMPTY.dash), text: (r) => r.amount || '' },
+  { key: 'amount', label: LEDGER_LABEL.amount, align: 'r', sortNum: true, xf: 'money', render: (r) => (r.amount ? money(r.amount) : LEDGER_EMPTY.dash), text: (r) => r.amount || '' },
   { key: 'source', label: '원천', render: (r) => WORK_SOURCE_LABEL[r.source], text: (r) => r.source },
 ];
 
@@ -175,7 +175,7 @@ const WORK_KIND_DETAIL_COLS: SheetCol<WorkLedgerRow>[] = [
   detailStr('repairInDate', '입고일'),
   detailStr('repairOutDate', '출고예정일'),
   detailStr('rentalCar', '대차'),
-  detailStr('insuranceCompany', '보험사'),
+  detailStr('insuranceCompany', LEDGER_LABEL.insurer),
   detailStr('insuranceNo', '접수번호'),
   detailStr('otherCar', '상대 차량번호'),
   detailStr('otherInsurance', '상대 보험사'),
@@ -187,7 +187,7 @@ const WORK_KIND_DETAIL_COLS: SheetCol<WorkLedgerRow>[] = [
   detailStr('nextActionDate', '다음조치일'),
   detailStr('description', '상세내용'),
   detailStr('vendor', '업체/거래처'),
-  detailNum('mileage', '주행거리', 'km'),
+  detailNum('mileage', LEDGER_LABEL.mileage, 'km'),
   // 정비 2
   detailStr('maintType', '정비유형'),
   detailStr('nextMaintDate', '다음정비예정'),
@@ -277,9 +277,9 @@ const INBOX_DETAIL_CATALOG: SheetCol<WorkLedgerRow>[] = [
 
 const PENALTY_COL_CATALOG: SheetCol<WorkLedgerRow>[] = [
   { key: 'violationDate', label: '위반일', pin: true, priority: 1, render: (r) => r.violationDate || LEDGER_EMPTY.dash, text: (r) => r.violationDate || '' },
-  { key: 'plate', label: '차량번호', pin: true, priority: 1, render: (r) => r.plate || LEDGER_EMPTY.dash, text: (r) => r.plate || '' },
+  { key: 'plate', label: LEDGER_LABEL.plate, pin: true, priority: 1, render: (r) => r.plate || LEDGER_EMPTY.dash, text: (r) => r.plate || '' },
   {
-    key: 'amount', label: '금액', align: 'r', priority: 1, sortNum: true, xf: 'money',
+    key: 'amount', label: LEDGER_LABEL.amount, align: 'r', priority: 1, sortNum: true, xf: 'money',
     render: (r) => (r.amount ? <span style={{ color: C.warn, fontWeight: 700 }}>{money(r.amount)}</span> : LEDGER_EMPTY.dash),
     text: (r) => r.amount || '',
   },
@@ -291,8 +291,8 @@ const PENALTY_COL_CATALOG: SheetCol<WorkLedgerRow>[] = [
   },
   { key: 'ptype', label: '과태료분류', priority: 2, render: (r) => r.penaltyKind || LEDGER_EMPTY.dash, text: (r) => r.penaltyKind || '' },
   { key: 'title', label: '위반내용', priority: 2, render: (r) => r.title || LEDGER_EMPTY.dash, text: (r) => r.title },
-  { key: 'company', label: '회사명', priority: 2, render: (r) => r.company || LEDGER_EMPTY.dash, text: (r) => r.company },
-  { key: 'due', label: '납기', priority: 2, render: (r) => r.dueDate || LEDGER_EMPTY.dash, text: (r) => r.dueDate },
+  { key: 'company', label: LEDGER_LABEL.company, priority: 2, render: (r) => r.company || LEDGER_EMPTY.dash, text: (r) => r.company },
+  { key: 'due', label: LEDGER_LABEL.due, priority: 2, render: (r) => r.dueDate || LEDGER_EMPTY.dash, text: (r) => r.dueDate },
 ];
 
 /** 상세 전용 — 시트 basic에 안 넣음. */

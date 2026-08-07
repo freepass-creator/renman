@@ -14,6 +14,7 @@ import { ddayLabel, type RiskSheetRow } from './risk-ledger';
 import { buildSheetViews, buildDetailSections, type DetailSectionDef, type SheetViewKeys } from './ledger-ext';
 import { sectionDefs } from './detail-sections';
 import { LEDGER_EMPTY } from './ledger-empty';
+import { LEDGER_LABEL } from './ledger-labels';
 
 const toneColor = (tone: RiskSheetRow['tone']) => (
   tone === 'danger' ? C.danger : tone === 'warn' ? C.warn : tone === 'brand' ? C.brand : C.mute
@@ -21,7 +22,7 @@ const toneColor = (tone: RiskSheetRow['tone']) => (
 
 const CATALOG: SheetCol<RiskSheetRow>[] = [
   {
-    key: 'company', label: '회사명', pin: true, priority: 2,
+    key: 'company', label: LEDGER_LABEL.company, pin: true, priority: 2,
     render: (r) => r.company || LEDGER_EMPTY.dash,
     text: (r) => r.company,
   },
@@ -39,14 +40,14 @@ const CATALOG: SheetCol<RiskSheetRow>[] = [
   {
     // 표에서는 «2줄 셀»을 쓰지 않는다 — 행 높이가 고정(--ledger-row-h)이고 조밀해야 읽힌다.
     //   차명은 별도 「차명」 컬럼이 담당한다(기본뷰 편입).
-    key: 'plate', label: '차량번호', priority: 1, pin: true,
+    key: 'plate', label: LEDGER_LABEL.plate, priority: 1, pin: true,
     render: (r) => (r.plate
       ? <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 700 }}>{r.plate}</span>
       : <span style={{ color: C.mute }}>{LEDGER_EMPTY.dash}</span>),
     text: (r) => r.plate,
   },
   {
-    key: 'customer', label: '계약자', priority: 1,
+    key: 'customer', label: LEDGER_LABEL.contractor, priority: 1,
     render: (r) => r.customer || LEDGER_EMPTY.none,
     text: (r) => r.customer,
   },
@@ -57,39 +58,39 @@ const CATALOG: SheetCol<RiskSheetRow>[] = [
     text: (r) => r.subject,
   },
   {
-    key: 'phone', label: '연락처', priority: 1,
+    key: 'phone', label: LEDGER_LABEL.phone, priority: 1,
     render: (r) => r.phone || LEDGER_EMPTY.dash,
     text: (r) => r.phone,
   },
   {
-    key: 'carName', label: '차명', priority: 2,
+    key: 'carName', label: LEDGER_LABEL.carName, priority: 2,
     render: (r) => r.carName || LEDGER_EMPTY.dash,
     text: (r) => r.carName,
   },
   {
     // ★한 칸 한 원자 — 기한은 «날짜»만. D-day·연체일은 각자 칸이 있다.
-    key: 'due', label: '기한', priority: 1, align: 'c',
+    key: 'due', label: LEDGER_LABEL.due, priority: 1, align: 'c',
     render: (r) => (r.dueDate
       ? <span style={{ fontFamily: 'var(--font-mono)' }}>{r.dueDate}</span>
       : <span style={{ color: C.mute }}>{LEDGER_EMPTY.dash}</span>),
     text: (r) => r.dueDate,
   },
   {
-    key: 'dday', label: 'D-day', priority: 1, align: 'c', sortNum: true,
+    key: 'dday', label: LEDGER_LABEL.dday, priority: 1, align: 'c', sortNum: true,
     render: (r) => (r.dday == null
       ? <span style={{ color: C.mute }}>{LEDGER_EMPTY.dash}</span>
       : <span style={{ fontWeight: 700, color: toneColor(r.tone) }}>{ddayLabel(r.dday)}</span>),
     text: (r) => (r.dday == null ? '' : r.dday),
   },
   {
-    key: 'overdueDays', label: '연체일', priority: 1, align: 'r', sortNum: true, xf: 'int',
+    key: 'overdueDays', label: LEDGER_LABEL.overdueDays, priority: 1, align: 'r', sortNum: true, xf: 'int',
     render: (r) => (r.overdueDays > 0
       ? <span style={{ color: C.danger, fontWeight: 700 }}>{r.overdueDays}일</span>
       : LEDGER_EMPTY.dash),
     text: (r) => r.overdueDays,
   },
   {
-    key: 'amount', label: '금액', priority: 1, align: 'r', sortNum: true, xf: 'money',
+    key: 'amount', label: LEDGER_LABEL.amount, priority: 1, align: 'r', sortNum: true, xf: 'money',
     render: (r) => (r.amount > 0
       ? <span style={{ color: C.danger, fontWeight: 700 }}>{money(r.amount)}</span>
       : LEDGER_EMPTY.dash),
