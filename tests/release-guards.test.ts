@@ -18,7 +18,8 @@ describe('출시 차단 회귀 가드', () => {
     // 2026-08-06 자금일보 원장 규격 재작성에서 apply() → applyMatches(). 가드의 뜻(쓰기 직전 재검사)은 그대로다.
     const body = functionBody('app/payments/page.tsx', 'async function applyMatches()', 'async function applyCms');
     const duplicateGuard = body.indexOf('findDuplicateCashPayment({ ...crec, _payments: existing }, r.tx)');
-    const write = body.indexOf('await commitAll([');
+    // 2026-08-07 되돌리기 부착으로 commitAll → commitAllCompensated. 가드의 뜻은 그대로.
+    const write = body.indexOf('await commitAllCompensated([');
     expect(duplicateGuard).toBeGreaterThanOrEqual(0);
     expect(write).toBeGreaterThan(duplicateGuard);
     expect(body).toContain('duplicateSkipped++');

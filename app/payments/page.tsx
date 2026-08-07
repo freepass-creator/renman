@@ -31,7 +31,7 @@ import { lockReason } from '@/lib/finance/period-lock';
 import { safeRun } from '@/lib/safe-update';
 import { useBusyAction } from '@/lib/use-busy-action';
 import { resolveWriteCompany, NEED_COMPANY } from '@/lib/scope';
-import { commitUpdate, commitAll } from '@/lib/commit';
+import { commitUpdate, commitAll, commitAllCompensated } from '@/lib/commit';
 import {
   LedgerFrame, LedgerFilterButton, LedgerFilterPanel, LedgerFilterFields, LedgerActiveFilters,
   LedgerRecordPanel, LedgerPanelFooter, LedgerSelectionBar,
@@ -288,17 +288,23 @@ export default function PaymentsPage() {
         if (findDuplicateCashPayment({ ...crec, _payments: existing }, r.tx)) { duplicateSkipped++; skipped++; continue; }
         if (!resolveWriteCompany(companyId, crec) || !resolveWriteCompany(companyId, trec)) { skipped++; continue; }
         const newPayments = [...existing, { seq: r.candidate.scheduleSeq, date: r.tx.txDate, amount: r.tx.amount, source: '계좌', txId: r.tx.id }];
-        /* ★순서 = bank_tx 먼저, 계약(_payments) 나중. commitAll은 트랜잭션이 아니므로 부분 실패가
+        /* ★순서 = bank_tx 먼저, 계약(_payments) 나중. 트랜잭션이 아니므로 부분 실패가
            «복구 가능한» 쪽으로 끝나야 한다. 계약 먼저면 «수납은 들어갔는데 입금은 미매칭» =
-           해제 버튼이 없어 영구 고아(미수도 잘못 깎임). bank_tx 먼저면 해제로 되돌릴 수 있다. */
+           해제 버튼이 없어 영구 고아(미수도 잘못 깎임). bank_tx 먼저면 해제로 되돌릴 수 있다.
+           ★거기에 되돌리기(undo)를 붙였다 — 계약 쓰기가 실패하면 bank_tx 매칭을 자동 해제한다.
+           되돌리기 패치 = 「귀속만 되돌리고 1차 분류(계정과목)는 보존」 = 해제 버튼과 같은 규칙. */
         const ok = await safeRun(async () => {
-          await commitAll([
+          await commitAllCompensated([
             {
               entity: 'bank_tx', sessionCompanyId: companyId, rec: trec, key: String(trec._key),
               patch: {
                 matchedContractId: ckey, matchedScheduleSeq: r.candidate.scheduleSeq, matchedAt: new Date().toISOString(),
                 matchedKind: 'receivable',
                 subject: '대여료수입', category: '대여료수입', matchProposalState: '', matchProposalReason: '', matchProposalCount: 0,
+              },
+              undo: {
+                matchedContractId: '', matchedScheduleSeq: '', matchedScheduleAllocations: [],
+                matchedUnappliedAmount: 0, matchedAt: '', matchedKind: '',
               },
             },
             { entity: 'contract', sessionCompanyId: companyId, rec: crec, key: ckey, patch: { _payments: newPayments } },

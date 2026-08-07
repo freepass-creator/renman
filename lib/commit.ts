@@ -96,6 +96,7 @@ export async function commitRemove(args: CommitRemoveArgs): Promise<{ companyId:
 /**
  * 다중 엔티티 순차 커밋. Firestore 트랜잭션은 아님 — 실패 시 앞선 쓰기는 남을 수 있음.
  * 입금매칭(계약+_bank_tx)처럼 짝 쓰기에 사용.
+ * ★되돌림이 필요한 짝 쓰기는 `commitAllCompensated` 를 쓸 것.
  */
 export async function commitAll(ops: CommitUpdateArgs[]): Promise<{ companyIds: string[] }> {
   const companyIds: string[] = [];
@@ -104,4 +105,57 @@ export async function commitAll(ops: CommitUpdateArgs[]): Promise<{ companyIds: 
     companyIds.push(companyId);
   }
   return { companyIds };
+}
+
+/**
+ * 되돌리기를 붙인 다중 커밋 — 중간에 실패하면 **이미 적용된 것을 역순으로 되돌린다.**
+ *
+ * ## 왜 필요한가 (P0-4)
+ *   `commitAll` 은 트랜잭션이 아니다. 입금매칭은 bank_tx 와 계약을 함께 고치는데,
+ *   두 번째에서 실패하면 「입금은 매칭됐는데 수납은 안 들어간」 반쪽 상태가 남는다.
+ *   지금은 «순서»로만 완화하고 있다(복구 가능한 쪽이 먼저). 그건 사람이 손으로
+ *   되돌릴 수 있다는 뜻이지 되돌아간다는 뜻이 아니다.
+ *
+ * ## 왜 «범용 되돌리기»가 아닌가
+ *   건드린 키를 이전 값으로 복원하는 방식은 **틀린다.** 매칭 해제의 정답은
+ *   「귀속만 되돌리고 1차 분류(계정과목)는 보존」이다 — 도메인 판단이다.
+ *   그래서 되돌리기 패치는 **각 op 이 직접 들고 온다**(`undo`).
+ *   `undo` 가 없는 op 은 되돌리지 않는다(되돌릴 필요가 없거나, 되돌리면 안 되는 것).
+ *
+ * ## 되돌리기도 실패하면
+ *   삼키지 않는다. 원래 오류에 되돌리기 실패를 붙여 던진다 —
+ *   반쪽 상태가 남았다는 사실이 화면까지 올라와야 한다.
+ */
+export type CompensatedOp = CommitUpdateArgs & {
+  /** 이 op 이 적용된 뒤 실패했을 때 되돌릴 패치. 없으면 되돌리지 않는다. */
+  undo?: EntityRecord;
+};
+
+export async function commitAllCompensated(ops: CompensatedOp[]): Promise<{ companyIds: string[] }> {
+  const companyIds: string[] = [];
+  const applied: CompensatedOp[] = [];
+  try {
+    for (const op of ops) {
+      const { companyId } = await commitUpdate(op);
+      companyIds.push(companyId);
+      applied.push(op);
+    }
+    return { companyIds };
+  } catch (error) {
+    const failures: string[] = [];
+    for (const op of [...applied].reverse()) {
+      if (!op.undo) continue;
+      try {
+        // 되돌리기도 감사로그에 남는다 — 원인 op 과 같은 source 로(사람이 한 일의 되돌림이므로).
+        await commitUpdate({ ...op, patch: op.undo });
+      } catch (undoError) {
+        failures.push(`${op.entity}/${op.key}: ${(undoError as Error).message}`);
+      }
+    }
+    if (failures.length) {
+      const detail = failures.join(' / ');
+      throw new Error(`${(error as Error).message} — 되돌리기도 실패해 반쪽 상태가 남았습니다: ${detail}`);
+    }
+    throw error;
+  }
 }
