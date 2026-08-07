@@ -12,6 +12,7 @@ import { type FleetRow } from './sheet-rows';
 import { dday } from './dashboard-consts';
 import { AlertTriangle } from 'lucide-react';
 import { buildDetailSections, buildSheetViews, type DetailSectionDef, type SheetViewKeys } from './ledger-ext';
+import { sectionDefs } from './detail-sections';
 import { paymentTimingOf } from './schema/contract';
 import { LEDGER_EMPTY } from './ledger-empty';
 import { LEDGER_LABEL } from './ledger-labels';
@@ -237,29 +238,17 @@ const _fleetViews = buildSheetViews(FLEET_COL_CATALOG, FLEET_SHEET_KEYS);
 export const FLEET_BASIC_COLS = _fleetViews.basic;
 export const FLEET_EXPANDED_COLS = _fleetViews.expanded;
 
-export const FLEET_DETAIL_DEFS: DetailSectionDef[] = [
-  {
-    title: '차량·상태',
-    open: true,
-    keys: ['company', 'plate', 'status', 'maker', 'sub', 'year', 'car', 'loc', 'own', 'util', 'mileage', 'contractNo'],
-  },
-  {
-    title: '계약',
-    keys: ['contractState', 'cust', 'phone', 'rentalType', 'term', 'start', 'end', 'dep', 'rent', 'paymentDay', 'paymentTiming', 'round', 'dday'],
-  },
-  {
-    title: '수납·리스크',
-    keys: ['maintainedNet', 'od', 'stage', 'warn', 'note'],
-  },
-  {
-    title: '자산·취득',
-    keys: ['vin', 'acqDate', 'acqPrice', 'gps', 'inspect'],
-  },
-  {
-    title: '금융·보험',
-    keys: ['loanCo', 'loanAmt', 'loanRate', 'loanMon', 'loanStart', 'insurer', 'insEnd', 'insPrem'],
-  },
-];
+/** 운영현황 세부패널 — 섹션 사전(lib/detail-sections)에서 «쓸 섹션»만 고른다. */
+export const FLEET_DETAIL_DEFS: DetailSectionDef[] = sectionDefs({
+  '차량·상태': ['company', 'plate', 'status', 'maker', 'sub', 'year', 'car', 'loc', 'own', 'util', 'mileage', 'contractNo'],
+  '계약': ['contractState', 'cust', 'phone', 'rentalType', 'term', 'start', 'end', 'dep', 'rent', 'paymentDay', 'paymentTiming', 'round', 'dday'],
+  '수납·리스크': ['maintainedNet', 'od', 'stage', 'warn', 'note'],
+  '취득': ['vin', 'acqDate', 'acqPrice', 'inspect'],
+  // ★금융과 보험은 다른 주제다 — 예전 「금융·보험」 한 섹션을 사장님 지시로 분리(2026-08-07).
+  '금융': ['loanCo', 'loanAmt', 'loanRate', 'loanMon', 'loanStart'],
+  '보험': ['insurer', 'insEnd', 'insPrem'],
+  'GPS': ['gps'],
+});
 
 export const FLEET_DETAIL_SECTIONS = buildDetailSections(FLEET_EXPANDED_COLS, FLEET_DETAIL_DEFS);
 

@@ -11,7 +11,7 @@ import { FileWarning, HandCoins, MessageSquare } from 'lucide-react';
 import { TODAY } from '@/lib/dashboard-consts';
 import { useDashboardData } from '@/lib/use-dashboard-data';
 import { textMatch } from '@/lib/search-match';
-import { buildRiskSheetRows, countRiskSheetGroups, type RiskSheetGroup, type RiskSheetRow } from '@/lib/risk-ledger';
+import { buildRiskSheetRows, countRiskSheetGroups, ddayLabel, type RiskSheetGroup, type RiskSheetRow } from '@/lib/risk-ledger';
 import { RISK_BASIC_COLS, RISK_DETAIL_SECTIONS, RISK_EXPANDED_COLS } from '@/lib/risk-cols';
 import { LEDGER_EMPTY } from '@/lib/ledger-empty';
 import { latestDateOf } from '@/lib/ledger-stats';
@@ -72,7 +72,7 @@ function RiskLedgerInner() {
     [vehicles, contracts, insurances, penalties, history, bankTx],
   );
   const searched = useMemo(() => allRows.filter((r) =>
-    textMatch(q, r.company, r.group, r.kind, r.plate, r.customer, r.subject, r.carName, r.status, r.due),
+    textMatch(q, r.company, r.group, r.kind, r.plate, r.customer, r.subject, r.carName, r.status, r.dueDate),
   ), [allRows, q]);
   /* 필터 옵션 — 실제 데이터에서 수집한다(분류·상태 값을 바꿔도 필터가 따라오게).
      구분 필터가 걸려 있으면 그 구분 안의 분류·상태만 보여준다(빈 조합 선택 방지). */
@@ -80,6 +80,10 @@ function RiskLedgerInner() {
     const base = group === '전체' ? allRows : allRows.filter((r) => r.group === group);
     return [...new Set(base.map((r) => r.kind).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'ko'));
   }, [allRows, group]);
+  const companyOptions = useMemo(
+    () => [...new Set(allRows.map((r) => r.company).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'ko')),
+    [allRows],
+  );
   const statusOptions = useMemo(() => {
     const base = group === '전체' ? allRows : allRows.filter((r) => r.group === group);
     return [...new Set(base.map((r) => r.status).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'ko'));
@@ -87,6 +91,7 @@ function RiskLedgerInner() {
 
   const rows = useMemo(() => searched.filter((r) => {
     if (group !== '전체' && r.group !== group) return false;
+    if (detailFilters.company && r.company !== detailFilters.company) return false;
     if (detailFilters.kind && r.kind !== detailFilters.kind) return false;
     if (detailFilters.status && r.status !== detailFilters.status) return false;
     if (range.from || range.to) {
@@ -95,13 +100,13 @@ function RiskLedgerInner() {
       if (range.to && r.dueDate > range.to) return false;
     }
     return true;
-  }), [searched, group, detailFilters.kind, detailFilters.status, range.from, range.to]);
+  }), [searched, group, detailFilters.company, detailFilters.kind, detailFilters.status, range.from, range.to]);
 
   const rowIds = useMemo(() => rows.map((r) => r.id), [rows]);
   const rowSel = useRowSelection({ ids: rowIds, selection: sel });
   useCtrlASelectAll(rowSel, sel);
 
-  useEffect(() => { clearSel(); }, [group, q, range.from, range.to, detailFilters.kind, detailFilters.status, clearSel]);
+  useEffect(() => { clearSel(); }, [group, q, range.from, range.to, detailFilters.company, detailFilters.kind, detailFilters.status, clearSel]);
 
   // ?group= · ?open= — 지시 스트립·홈 딥링크.
   useEffect(() => {
@@ -240,7 +245,7 @@ function RiskLedgerInner() {
               placeholder="구분·차번·대상·차명·상태"
               value={q}
               onChange={(e) => setQ(e.target.value)}
-              style={{ width: mobile ? 160 : 280, flexShrink: 0 }}
+              style={{ width: mobile ? undefined : 280, flex: mobile ? 1 : undefined, minWidth: mobile ? 0 : undefined }}
             />
             <LedgerFilterButton open={filterOpen} count={filterCount} onClick={() => setFilterOpen((o) => !o)} />
             {!filterOpen && <LedgerActiveFilters
@@ -256,9 +261,9 @@ function RiskLedgerInner() {
               }}
               onClearAll={() => { setDetailFilters(emptyFilterValues(RISK_FILTER_DEFS)); setGroup('전체'); }}
             />}
-            <PeriodBar latest={latest || TODAY} initial="전체" size="sm" onRange={setRange} />
           </>
         )}
+        period={<PeriodBar latest={latest || TODAY} initial="전체" size="sm" onRange={setRange} />}
         filterPanel={filterOpen ? (
           <LedgerFilterPanel
             title="리스크 필터"
@@ -281,6 +286,7 @@ function RiskLedgerInner() {
                 setDetailFilters((prev) => ({ ...prev, [key]: value }));
               }}
               options={{
+                company: companyOptions,
                 group: RISK_GROUPS,
                 kind: kindOptions,
                 status: statusOptions,
@@ -317,9 +323,12 @@ function RiskLedgerInner() {
             plate,
             name: plate ? undefined : (customer || r.subject),
             carType: plate ? (customer || carName) : carName,
+            // 카드도 한 줄 한 원자 — 기한(날짜)·D-day·연체일을 한 칸에 이어 붙이지 않는다.
             fields: [
               ['리스크분류', r.kind],
-              ['기한', r.due],
+              ['기한', r.dueDate || LEDGER_EMPTY.dash],
+              ['D-day', ddayLabel(r.dday)],
+              ...(r.overdueDays > 0 ? [['연체일', `${r.overdueDays}일`] as [string, string]] : []),
             ],
             right: r.amount > 0 ? won(r.amount) : undefined,
           };

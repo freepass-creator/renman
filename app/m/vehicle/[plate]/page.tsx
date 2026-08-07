@@ -9,7 +9,7 @@ import { useEntityLists } from '@/lib/use-entity-lists';
 import { TODAY } from '@/lib/dashboard-consts';
 import { linkFleet } from '@/lib/domain/model';
 import { buildFleetRows } from '@/lib/sheet-rows';
-import { buildRiskSheetRows } from '@/lib/risk-ledger';
+import { buildRiskSheetRows, riskDueSub } from '@/lib/risk-ledger';
 import { buildWorkItemLedgerRows, workAttentionRank, workDueSignal, workStatusTone } from '@/lib/work-ledger';
 import { normPlate } from '@/lib/plate';
 import { buildMobileVehicleScope, scopeMobileVehicleRecords } from '@/lib/mobile-vehicle-scope';
@@ -123,7 +123,7 @@ export default function MVehicle() {
                 badgeTone={item.badgeTone}
                 name={item.kind}
                 meta={item.subject}
-                sub={item.due}
+                sub={riskDueSub(item)}
                 right={item.amount > 0 ? won(item.amount) : item.status}
                 rightTone={item.amount > 0 ? 'danger' : item.tone === 'warn' ? 'warn' : 'ink'}
               />

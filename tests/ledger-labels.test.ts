@@ -62,7 +62,7 @@ const PAGE_VIEWS = [
     'company', 'bank', 'holder', 'type', 'status', 'account', 'alias', 'totalIn', 'totalOut', 'currentBalance',
   ]],
   ['리스크', RISK_BASIC_COLS, RISK_EXPANDED_COLS, [
-    'company', 'plate', 'customer', 'kind', 'status', 'group', 'subject', 'due', 'amount', 'carName', 'phone',
+    'company', 'plate', 'customer', 'kind', 'status', 'group', 'subject', 'due', 'dday', 'amount', 'carName', 'phone',
   ]],
   ['미수', RECEIVABLE_BASIC_COLS, RECEIVABLE_EXPANDED_COLS, [
     'company', 'contractNo', 'customer', 'contractState', 'stage', 'plate', 'unpaid', 'overdueDays', 'unpaidCount', 'nextAction',

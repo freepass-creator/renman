@@ -96,6 +96,8 @@ export const WORK_FILTER_DEFS: LedgerFilterFieldDef[] = [
  *   옵션 값은 화면에서 실제 데이터로 수집하므로 분류값을 바꿔도 따라온다.
  */
 export const RISK_FILTER_DEFS: LedgerFilterFieldDef[] = [
+  // 여러 법인이 한 표에 섞여 나오는 원장이라 회사로 좁힐 수 있어야 한다(행문법 1번 칸).
+  { key: 'company', label: '회사명' },
   { key: 'group', label: '리스크구분' },
   { key: 'kind', label: '리스크분류' },
   { key: 'status', label: '리스크상태' },

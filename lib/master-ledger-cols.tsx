@@ -3,6 +3,7 @@ import type { AssetMasterRow, ContractMasterRow } from './master-ledgers';
 import {
   buildDetailSections, buildSheetViews, type DetailSectionDef, type SheetViewKeys,
 } from './ledger-ext';
+import { sectionDefs } from './detail-sections';
 import { paymentTimingOf } from './schema/contract';
 import { LEDGER_EMPTY } from './ledger-empty';
 import { LEDGER_LABEL } from './ledger-labels';
@@ -192,67 +193,33 @@ export const ASSET_MAINT_EXPANDED_COLS = _assetMaintViews.expanded;
  * 예: `자산 · 등록증정보 · ownerPhone`
  * 컬럼 정의가 없으면 위 ASSET_MASTER_EXPANDED_COLS에 ax() 먼저.
  */
-export const ASSET_DETAIL_DEFS: DetailSectionDef[] = [
-  {
-    title: '등록·상태',
-    open: true,
-    keys: ['company', 'assetCode', 'plate', 'lifecycle', 'status', 'carName', 'mileage'],
-  },
-  {
-    title: '등록증정보',
-    keys: [
+export const ASSET_DETAIL_DEFS: DetailSectionDef[] = sectionDefs({
+  '차량·상태': ['company', 'assetCode', 'plate', 'lifecycle', 'status', 'carName', 'mileage'],
+  '등록증': [
       'documentNo', 'certIssueDate', 'firstReg', 'vin', 'ownerName', 'ownerBizNo', 'useAddress',
       'vehicleType', 'usage', 'typeNumber', 'engineType', 'approvalNumber',
-      'inspectionFrom', 'inspectionTo', 'inspectionType',
-    ],
-  },
-  {
-    title: '제조·제원',
-    keys: [
-      'maker', 'modelLine', 'subModel', 'trim', 'variant', 'modelYear', 'yearMonth',
-      'fuel', 'displacement', 'ratedOutput', 'cylinders', 'driveType', 'transmission',
-      'exteriorColor', 'interiorColor', 'optionList',
-      'lengthMm', 'widthMm', 'heightMm', 'grossWeightKg', 'seats', 'maxLoadKg', 'fuelEfficiency',
-    ],
-  },
-  {
-    title: '취득정보',
-    keys: [
-      'supplier', 'purchasedDate', 'acquisitionDate', 'acquisitionPrice', 'consumerPrice',
-      'optionPrice', 'optionDiscount', 'taxExempt', 'dealerAgency', 'dealerContact', 'dealerPhone',
-    ],
-  },
-  {
-    title: '처분·매각',
-    keys: ['saleDate', 'salePrice', 'bookValue', 'disposalGainLoss'],
-  },
-  {
-    title: '매물',
-    keys: ['listRent', 'listDeposit', 'listTerm', 'insuranceIncluded'],
-  },
-  {
-    title: '금융·할부',
-    keys: [
-      'loanKind', 'loanCashOnly', 'loanCompany', 'loanMonths', 'loanPrincipal', 'loanRemainingPrincipal', 'loanRate', 'loanStartDate',
-    ],
-  },
-  {
-    title: '보험',
-    keys: ['insuranceCompany', 'insurancePolicyNo', 'insuranceExpiryDate'],
-  },
-  {
-    title: '세금',
-    keys: ['vehicleTaxDueDate', 'vehicleTaxPaidDate', 'vehicleTaxAmount'],
-  },
-  {
-    title: 'GPS',
-    keys: ['gpsProvider', 'gpsDeviceId', 'gpsInstalledDate', 'gpsControl'],
-  },
-  {
-    title: '수선·이력',
-    keys: ['maintCost', 'maintVsAvg', 'maintCount', 'maintLastDate', 'vehicle360Link'],
-  },
-];
+    'inspectionFrom', 'inspectionTo', 'inspectionType',
+  ],
+  '제조·제원': [
+    'maker', 'modelLine', 'subModel', 'trim', 'variant', 'modelYear', 'yearMonth',
+    'fuel', 'displacement', 'ratedOutput', 'cylinders', 'driveType', 'transmission',
+    'exteriorColor', 'interiorColor', 'optionList',
+    'lengthMm', 'widthMm', 'heightMm', 'grossWeightKg', 'seats', 'maxLoadKg', 'fuelEfficiency',
+  ],
+  '취득': [
+    'supplier', 'purchasedDate', 'acquisitionDate', 'acquisitionPrice', 'consumerPrice',
+    'optionPrice', 'optionDiscount', 'taxExempt', 'dealerAgency', 'dealerContact', 'dealerPhone',
+  ],
+  '처분·매각': ['saleDate', 'salePrice', 'bookValue', 'disposalGainLoss'],
+  '매물': ['listRent', 'listDeposit', 'listTerm', 'insuranceIncluded'],
+  '금융': [
+    'loanKind', 'loanCashOnly', 'loanCompany', 'loanMonths', 'loanPrincipal', 'loanRemainingPrincipal', 'loanRate', 'loanStartDate',
+  ],
+  '보험': ['insuranceCompany', 'insurancePolicyNo', 'insuranceExpiryDate'],
+  '세금': ['vehicleTaxDueDate', 'vehicleTaxPaidDate', 'vehicleTaxAmount'],
+  'GPS': ['gpsProvider', 'gpsDeviceId', 'gpsInstalledDate', 'gpsControl'],
+  '수선·이력': ['maintCost', 'maintVsAvg', 'maintCount', 'maintLastDate', 'vehicle360Link'],
+});
 
 export const ASSET_DETAIL_SECTIONS = buildDetailSections(ASSET_COL_CATALOG, ASSET_DETAIL_DEFS);
 
@@ -406,56 +373,35 @@ export const CONTRACT_MASTER_EXPANDED_COLS = _contractViews.expanded;
  * 계약 상세 — 필드 추가 요청 시 해당 섹션 keys에만 push.
  * 예: `계약 · 요금·납부 · discountRate`
  */
-export const CONTRACT_DETAIL_DEFS: DetailSectionDef[] = [
-  {
-    title: '계약 기본',
-    open: true,
-    keys: [
-      'company', 'contractNo', 'status', 'rentalType', 'plate', 'carName', 'contractDate', 'startDate', 'endDate', 'alert',
-    ],
-  },
-  {
-    title: '계약자',
-    keys: [
-      'contractorName', 'contractorPhone', 'contractorBirth', 'contractorLicenseNo', 'contractorLicenseExpiry', 'licenseType', 'contractorAddress',
-    ],
-  },
-  {
-    title: '기간·인도',
-    keys: [
-      'rentalMonths', 'deliveredDate', 'returnScheduledDate', 'returnedDate',
-      'pickupPlace', 'returnPlace', 'fuelOut', 'fuelIn',
-    ],
-  },
-  {
-    title: '주행',
-    keys: [
-      'annualMileageLimit', 'mileageOut', 'returnMileage',
-      'drivenKm', 'allowedKm', 'excessKm', 'overMileageRate', 'overMileageFee', 'overMileageBasis',
-    ],
-  },
-  {
-    title: '요금·납부',
-    keys: [
-      'monthlyRent', 'deposit', 'depositReceived', 'depositReceivedDate', 'reservationFee', 'paymentDay', 'paymentTiming', 'paymentMethod', 'net',
-      'lateFeeRate', 'earlyTerminationRate',
-    ],
-  },
-  {
-    title: '보험·특약',
-    keys: [
-      'cdw', 'deductible', 'superCover', 'driverAgeMin', 'driverAge', 'insuranceAge',
-      'additionalDrivers', 'withDriver',
-    ],
-  },
-  {
-    title: '미수·종료',
-    keys: [
-      'riskLabel', 'overdueDays', 'unpaidCount', 'sourceCarryUnpaid', 'reconciliationDelta',
-      'depositSettledDate', 'endReason',
-    ],
-  },
-];
+export const CONTRACT_DETAIL_DEFS: DetailSectionDef[] = sectionDefs({
+  '계약': [
+    'company', 'contractNo', 'status', 'rentalType', 'plate', 'carName', 'contractDate', 'startDate', 'endDate', 'alert',
+  ],
+  '계약자': [
+    'contractorName', 'contractorPhone', 'contractorBirth', 'contractorLicenseNo', 'contractorLicenseExpiry', 'licenseType', 'contractorAddress',
+  ],
+  '기간·인도': [
+    'rentalMonths', 'deliveredDate', 'returnScheduledDate', 'returnedDate',
+    'pickupPlace', 'returnPlace', 'fuelOut', 'fuelIn',
+  ],
+  '주행': [
+    'annualMileageLimit', 'mileageOut', 'returnMileage',
+    'drivenKm', 'allowedKm', 'excessKm', 'overMileageRate', 'overMileageFee', 'overMileageBasis',
+  ],
+  '요금·납부': [
+    'monthlyRent', 'deposit', 'depositReceived', 'depositReceivedDate', 'reservationFee', 'paymentDay', 'paymentTiming', 'paymentMethod', 'net',
+    'lateFeeRate', 'earlyTerminationRate',
+  ],
+  // 자차·연령 특약은 «보험» 주제다 — 자산·운영의 「보험」과 같은 이름·같은 자리.
+  '보험': [
+    'cdw', 'deductible', 'superCover', 'driverAgeMin', 'driverAge', 'insuranceAge',
+    'additionalDrivers', 'withDriver',
+  ],
+  '미수·종료': [
+    'riskLabel', 'overdueDays', 'unpaidCount', 'sourceCarryUnpaid', 'reconciliationDelta',
+    'depositSettledDate', 'endReason',
+  ],
+});
 
 export const CONTRACT_DETAIL_SECTIONS = buildDetailSections(CONTRACT_COL_CATALOG, CONTRACT_DETAIL_DEFS);
 

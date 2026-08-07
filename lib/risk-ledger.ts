@@ -39,8 +39,17 @@ export type RiskSheetRow = {
   subject: string;
   phone: string;
   carName: string;
-  due: string;
+  /**
+   * ★한 칸에 원자 하나 (사장님 확정 2026-08-07).
+   *   「기한」은 **날짜 하나**다. 예전에는 `D+968 · 2023-12-13` 처럼 두 값을 이어 붙이거나
+   *   「계약만 있고 차량 원장 없음」 같은 «사유 문장»까지 기한 칸에 들어가 칸이 의미를 잃었다.
+   *   D-day·연체일·사유는 각자 제 칸(dday / overdueDays / subject)으로 간다.
+   */
   dueDate: string;
+  /** D-day 원자 — 음수=경과. 표시는 ddayLabel. */
+  dday: number | null;
+  /** 연체일 원자 — 미납 행만. 0=연체 아님. */
+  overdueDays: number;
   amount: number;
   status: string;
   /** 미납 행 — 내용증명·시동 등 조치용. */
@@ -65,11 +74,34 @@ const GROUP_RANK: Record<RiskSheetGroup, number> = {
   미완료: 0, 미납: 1, 만기: 2, 휴차: 3,
 };
 
-function ddayLabel(d: number | null): string {
+export function ddayLabel(d: number | null): string {
   if (d == null) return LEDGER_EMPTY.dash;
   if (d < 0) return `D+${Math.abs(d)}`;
   if (d === 0) return 'D-Day';
   return `D-${d}`;
+}
+
+/**
+ * 일정 유래 행의 «리스크상태».
+ * ★「어김」·「임박」은 buildAgenda 내부 용어다 — 화면에 그대로 내보내면 «무엇이 어떻다는 건지»를
+ *   말해주지 않는다(사장님 지적 2026-08-07 «리스크 상태도 어김?? 이런거 말고»).
+ *   분류(kind)마다 실제로 어떤 상태인지로 바꾼다. 한 칸 한 값은 유지.
+ */
+export function agendaStatusLabel(kind: string, over: boolean): string {
+  if (kind === '검사만기') return over ? '검사 경과' : '검사 임박';
+  if (kind === '보험만기') return over ? '보험 만료' : '보험 임박';
+  if (kind === '세금 만기') return over ? '납기 경과' : '납기 임박';
+  if (kind === '과태료 기한') return over ? '납기 경과' : '납기 임박';
+  if (kind === '반납·만기') return over ? '반납 지연' : '반납 임박';
+  return over ? '기한 경과' : '기한 임박';
+}
+
+/** 홈 큐가 실어 오는 detail 이 «날짜»면 기한 칸으로, 아니면 기한 칸에 넣지 않는다. */
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+
+/** 모바일 카드 보조 한 줄 — 날짜가 있으면 날짜, 없으면 D-day. 둘을 이어 붙이지 않는다. */
+export function riskDueSub(r: Pick<RiskSheetRow, 'dueDate' | 'dday'>): string {
+  return r.dueDate || ddayLabel(r.dday);
 }
 
 function carNameOf(r: FleetRow): string {
@@ -92,7 +124,8 @@ function companyOf(fr?: Pick<FleetRow, 'companyId' | 'company'>, rec?: EntityRec
 function agendaSubject(kind: string, title: string): string {
   if (kind === '검사만기') return '정기검사 미필';
   if (kind === '세금 만기') return '자동차세 미납';
-  if (kind === '보험만기') return title ? `보험사 ${title}` : '보험 만기';
+  // 보험사명은 «사유»가 아니다 — 신원·부가정보(자산/차량360)에 있다. 여기는 걸린 이유만.
+  if (kind === '보험만기') return '보험 만기 도래';
   if (kind === '반납·만기') return '계약 만기·반납 대상';
   return title || LEDGER_EMPTY.dash;   // 과태료 위반내용 등은 그대로 유용
 }
@@ -158,11 +191,12 @@ export function buildRiskSheetRows(
       ...companyOf(r),
       plate: r.plate,
       customer: r.customer || LEDGER_EMPTY.none,
-      subject: `계약 만기 경과 · ${carNameOf(r)}`,
+      subject: '계약 만기 경과',
       phone: r.phone,
       carName: carNameOf(r),
-      due: `${ddayLabel(r.dday)} · ${r.end || LEDGER_EMPTY.dash}`,
       dueDate: (r.end || '').slice(0, 10),
+      dday: r.dday ?? null,
+      overdueDays: 0,
       amount: Math.max(0, r.net),
       status: '만기경과',
     }));
@@ -174,11 +208,12 @@ export function buildRiskSheetRows(
       ...companyOf(r),
       plate: r.plate,
       customer: r.customer || LEDGER_EMPTY.none,
-      subject: `${r.ownership} · ${carNameOf(r)}`,
+      subject: '차량 인도 대기',
       phone: r.phone,
       carName: carNameOf(r),
-      due: r.status || r.ownership,
       dueDate: (r.acqDate || r.start || '').slice(0, 10),
+      dday: null,
+      overdueDays: 0,
       amount: 0,
       status: r.ownership,
     }));
@@ -198,10 +233,11 @@ export function buildRiskSheetRows(
       subject: agendaSubject(a.kind, a.title),
       phone: phoneOf(fr),
       carName: fr ? carNameOf(fr) : LEDGER_EMPTY.dash,
-      due: `${ddayLabel(a.dday)} · ${a.date}`,
       dueDate: a.date,
+      dday: a.dday,
+      overdueDays: 0,
       amount: 0,
-      status: '어김',
+      status: agendaStatusLabel(a.kind, true),
     }));
   }
 
@@ -217,13 +253,13 @@ export function buildRiskSheetRows(
       ...companyOf(fr, v.rec),
       plate,
       customer: String(v.rec.contractorName || LEDGER_EMPTY.none),
-      subject: v.ended
-        ? `계약종료 후 미수 ${v.count}건`
-        : (v.overdueDays ? `대여료 ${v.count}회 미납 · ${v.overdueDays}일 연체` : `대여료 ${v.count}회 미납`),
+      // 연체일수는 「연체일」 칸이 담는다 — 사유 칸에 이어 붙이지 않는다.
+      subject: v.ended ? `계약종료 후 미수 ${v.count}건` : `대여료 ${v.count}회 미납`,
       phone: phoneOf(fr, String(v.rec.contractorPhone || '')),
       carName: fr ? carNameOf(fr) : String(v.rec.carName || LEDGER_EMPTY.dash),
-      due: v.overdueDays ? `${v.overdueDays}일 연체` : ddayLabel(v.dday),
       dueDate: String(v.rec.endDate || '').slice(0, 10),
+      dday: v.dday ?? null,
+      overdueDays: Number(v.overdueDays) || 0,
       amount: v.net,
       // 상태는 계약 종료 여부를 반복하지 않고 실제 회수 단계를 보여준다.
       status: collection.stage,
@@ -241,11 +277,12 @@ export function buildRiskSheetRows(
       ...companyOf(r),
       plate: r.plate,
       customer: r.customer || LEDGER_EMPTY.none,
-      subject: `계약 만기 임박 · ${carNameOf(r)}`,
+      subject: '계약 만기 임박',
       phone: r.phone,
       carName: carNameOf(r),
-      due: `${ddayLabel(r.dday)} · ${r.end || LEDGER_EMPTY.dash}`,
       dueDate: (r.end || '').slice(0, 10),
+      dday: r.dday ?? null,
+      overdueDays: 0,
       amount: Math.max(0, r.net),
       status: '만기임박',
     }));
@@ -265,10 +302,11 @@ export function buildRiskSheetRows(
       subject: agendaSubject(a.kind, a.title),
       phone: phoneOf(fr),
       carName: fr ? carNameOf(fr) : LEDGER_EMPTY.dash,
-      due: `${ddayLabel(a.dday)} · ${a.date}`,
       dueDate: a.date,
+      dday: a.dday,
+      overdueDays: 0,
       amount: 0,
-      status: '임박',
+      status: agendaStatusLabel(a.kind, false),
     }));
   }
 
@@ -279,6 +317,9 @@ export function buildRiskSheetRows(
     // 홈이 이미 목적지 id(미완료:…)를 쓰면 그대로, 아니면 업무 접두.
     const id = p.id.startsWith('미완료:') ? p.id : `미완료:업무:${p.id}`;
     const fr = p.plate ? byPlate.get(p.plate) : undefined;
+    // ★큐의 detail 은 «날짜»이기도 하고 «사유 문장»이기도 하다 — 섞인 채로 기한 칸에 넣으면
+    //   「계약만 있고 차량 원장 없음」이 기한으로 보인다. 날짜면 기한, 문장이면 리스크내용.
+    const isDate = ISO_DATE.test(p.detail || '');
     push(rowOf('미완료', {
       id,
       kind: p.kind,
@@ -288,11 +329,12 @@ export function buildRiskSheetRows(
       // ★자금미분류의 p.title은 «거래상대»이고 서류미첨부의 p.title은 «사유»다 — 둘 다 신원 칸이 아니다.
       //   차량으로 계약자를 찾을 수 있으면 그것만 신원에 넣고, 제목은 리스크내용으로 보낸다.
       customer: fr?.customer || LEDGER_EMPTY.none,
-      subject: p.title || LEDGER_EMPTY.dash,
+      subject: (!isDate && p.detail) || p.title || LEDGER_EMPTY.dash,
       phone: phoneOf(fr),
       carName: fr ? carNameOf(fr) : LEDGER_EMPTY.dash,
-      due: p.detail || LEDGER_EMPTY.dash,
-      dueDate: '',
+      dueDate: isDate ? p.detail : '',
+      dday: p.dday ?? null,
+      overdueDays: 0,
       amount: Math.max(0, p.amount),
       status: '미처리',
     }));
@@ -306,11 +348,12 @@ export function buildRiskSheetRows(
       ...companyOf(r),
       plate: r.plate,
       customer: r.customer || LEDGER_EMPTY.none,
-      subject: `휴차 · ${carNameOf(r)}`,
+      subject: '가동 없음',
       phone: r.phone,
       carName: carNameOf(r),
-      due: LEDGER_EMPTY.dash,
       dueDate: '',
+      dday: null,
+      overdueDays: 0,
       amount: Math.max(0, r.net),
       status: r.status || '휴차',
     }));

@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { TODAY } from '@/lib/dashboard-consts';
 import { useEntityLists } from '@/lib/use-entity-lists';
-import { buildRiskSheetRows, countRiskSheetGroups, type RiskSheetGroup } from '@/lib/risk-ledger';
+import { buildRiskSheetRows, countRiskSheetGroups, riskDueSub, type RiskSheetGroup } from '@/lib/risk-ledger';
 import { LEDGER_EMPTY } from '@/lib/ledger-empty';
 import { textMatch } from '@/lib/search-match';
 import { mobileVehicleHref } from '@/lib/mobile-routes';
@@ -29,7 +29,7 @@ export default function MRisk() {
   );
   const shown = useMemo(
     () => (group === '전체' ? rows : rows.filter((r) => r.group === group))
-      .filter((row) => textMatch(query, row.plate, row.customer, row.carName, row.subject, row.kind, row.status, row.due)),
+      .filter((row) => textMatch(query, row.plate, row.customer, row.carName, row.subject, row.kind, row.status, row.dueDate)),
     [rows, group, query],
   );
   const visible = shown.slice(0, limit);
@@ -74,7 +74,7 @@ export default function MRisk() {
                     plate={item.plate || undefined}
                     name={!item.plate ? item.kind : undefined}
                     meta={`${item.customer}${item.carName && item.carName !== LEDGER_EMPTY.dash ? ` · ${item.carName}` : ''}`}
-                    sub={item.due}
+                    sub={riskDueSub(item)}
                     right={item.amount > 0 ? `${item.amount.toLocaleString('ko-KR')}원` : item.status}
                     rightTone={item.amount > 0 ? 'danger' : item.tone === 'warn' ? 'warn' : 'ink'}
                     onClick={item.plate ? () => router.push(mobileVehicleHref(item.plate, item.companyId, item.group === '미납' ? 'unpaid' : '')) : undefined}

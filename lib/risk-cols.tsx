@@ -10,8 +10,9 @@
  */
 import React from 'react';
 import { Badge, money, C, type SheetCol } from '@/components/ui';
-import type { RiskSheetRow } from './risk-ledger';
+import { ddayLabel, type RiskSheetRow } from './risk-ledger';
 import { buildSheetViews, buildDetailSections, type DetailSectionDef, type SheetViewKeys } from './ledger-ext';
+import { sectionDefs } from './detail-sections';
 import { LEDGER_EMPTY } from './ledger-empty';
 
 const toneColor = (tone: RiskSheetRow['tone']) => (
@@ -66,9 +67,26 @@ const CATALOG: SheetCol<RiskSheetRow>[] = [
     text: (r) => r.carName,
   },
   {
+    // ★한 칸 한 원자 — 기한은 «날짜»만. D-day·연체일은 각자 칸이 있다.
     key: 'due', label: '기한', priority: 1, align: 'c',
-    render: (r) => <span style={{ fontWeight: 700, color: toneColor(r.tone) }}>{r.due || LEDGER_EMPTY.dash}</span>,
-    text: (r) => r.due,
+    render: (r) => (r.dueDate
+      ? <span style={{ fontFamily: 'var(--font-mono)' }}>{r.dueDate}</span>
+      : <span style={{ color: C.mute }}>{LEDGER_EMPTY.dash}</span>),
+    text: (r) => r.dueDate,
+  },
+  {
+    key: 'dday', label: 'D-day', priority: 1, align: 'c', sortNum: true,
+    render: (r) => (r.dday == null
+      ? <span style={{ color: C.mute }}>{LEDGER_EMPTY.dash}</span>
+      : <span style={{ fontWeight: 700, color: toneColor(r.tone) }}>{ddayLabel(r.dday)}</span>),
+    text: (r) => (r.dday == null ? '' : r.dday),
+  },
+  {
+    key: 'overdueDays', label: '연체일', priority: 1, align: 'r', sortNum: true, xf: 'int',
+    render: (r) => (r.overdueDays > 0
+      ? <span style={{ color: C.danger, fontWeight: 700 }}>{r.overdueDays}일</span>
+      : LEDGER_EMPTY.dash),
+    text: (r) => r.overdueDays,
   },
   {
     key: 'amount', label: '금액', priority: 1, align: 'r', sortNum: true, xf: 'money',
@@ -97,8 +115,8 @@ const CATALOG: SheetCol<RiskSheetRow>[] = [
  *   구분→분류→상태를 «연속 블록»으로 둬서 분류 바로 뒤에 상태가 오는 규격을 지킨다.
  */
 export const RISK_SHEET_KEYS: SheetViewKeys = {
-  basic: ['company', 'plate', 'customer', 'kind', 'status', 'group', 'subject', 'due', 'amount', 'carName', 'phone'],
-  all: ['company', 'plate', 'customer', 'kind', 'status', 'group', 'subject', 'due', 'amount', 'carName', 'phone'],
+  basic: ['company', 'plate', 'customer', 'kind', 'status', 'group', 'subject', 'due', 'dday', 'amount', 'carName', 'phone'],
+  all: ['company', 'plate', 'customer', 'kind', 'status', 'group', 'subject', 'due', 'dday', 'overdueDays', 'amount', 'carName', 'phone'],
 };
 
 const views = buildSheetViews(CATALOG, RISK_SHEET_KEYS);
@@ -106,16 +124,9 @@ export const RISK_BASIC_COLS = views.basic;
 export const RISK_EXPANDED_COLS = views.expanded;
 
 /** 리스크 상세 — `리스크 · {섹션} · ±key` */
-export const RISK_DETAIL_DEFS: DetailSectionDef[] = [
-  {
-    title: '신원·분류',
-    open: true,
-    keys: ['company', 'plate', 'customer', 'phone', 'subject', 'group', 'kind', 'status'],
-  },
-  {
-    title: '기한·금액',
-    keys: ['carName', 'due', 'amount'],
-  },
-];
+export const RISK_DETAIL_DEFS: DetailSectionDef[] = sectionDefs({
+  '신원·분류': ['company', 'plate', 'customer', 'phone', 'subject', 'group', 'kind', 'status'],
+  '기한·금액': ['carName', 'due', 'dday', 'overdueDays', 'amount'],
+});
 
 export const RISK_DETAIL_SECTIONS = buildDetailSections(RISK_EXPANDED_COLS, RISK_DETAIL_DEFS);
