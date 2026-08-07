@@ -37,16 +37,17 @@ const AGENDA_COL_CATALOG: SheetCol<AgendaItem>[] = [
     text: (r) => r.kind,
   },
   { key: 'plate', label: LEDGER_LABEL.plate, pin: true, render: (r) => r.plate || LEDGER_EMPTY.dash, text: (r) => r.plate },
-  { key: 'title', label: '내용', render: (r) => r.title || LEDGER_EMPTY.dash, text: (r) => r.title },
+  // 「X내용」 규격 + 상태 뒤 자리 — 리스크(리스크내용)·업무(업무내용)와 같은 성격·같은 자리.
+  { key: 'title', label: '일정내용', render: (r) => r.title || LEDGER_EMPTY.dash, text: (r) => r.title },
   { key: 'companyId', label: '회사ID', render: (r) => r.companyId || LEDGER_EMPTY.dash, text: (r) => r.companyId },
   { key: 'key', label: '키', render: (r) => r.key, text: (r) => r.key },
 ];
 
 export const AGENDA_SHEET_KEYS: SheetViewKeys = {
   // 기준 = 자산관리: 회사(1) · 식별자(2) · 이름(3) · 분류(4) · 상태(5) · 나머지
-  // 일정은 «차명» 칸이 없으므로 내용(차명·보험사·위반내용)이 이름 슬롯을 맡는다.
-  basic: ['company', 'plate', 'title', 'kind', 'status', 'date', 'dday'],
-  all: ['company', 'plate', 'title', 'kind', 'status', 'date', 'dday', 'companyId', 'key'],
+  // 일정은 «차명» 칸이 없어 신원 블록이 차량번호 하나다. 내용은 다른 원장과 같이 상태 뒤.
+  basic: ['company', 'plate', 'kind', 'status', 'title', 'date', 'dday'],
+  all: ['company', 'plate', 'kind', 'status', 'title', 'date', 'dday', 'companyId', 'key'],
 };
 
 const _agendaViews = buildSheetViews(AGENDA_COL_CATALOG, AGENDA_SHEET_KEYS);
