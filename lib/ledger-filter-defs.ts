@@ -50,7 +50,10 @@ export function eqFilter<T>(get: (row: T) => string): (row: T, value: string) =>
 export const ASSET_FILTER_DEFS: LedgerFilterFieldDef[] = [
   { key: 'pool', label: '자산범위' },
   { key: 'quick', label: '빠른필터' },
-  { key: 'status', label: '자산상태' },
+  // 기본보기 4·5번 칸은 반드시 필터에 있다 — 「보이는 축으로 거를 수 있어야 한다」.
+  //   자산범위(보유/처분)는 더 거친 묶음이라 자산분류(구매예정·보유중·처분예정·처분완료)를 대신하지 못한다.
+  { key: 'lifecycle', label: LEDGER_LABEL.lifecycle },
+  { key: 'status', label: LEDGER_LABEL.assetStatus },
   { key: 'maker', label: '제조사' },
 ];
 
@@ -67,13 +70,11 @@ export const CONTRACT_FILTER_DEFS: LedgerFilterFieldDef[] = [
 /** 운영현황 세부필터. */
 export const FLEET_FILTER_DEFS: LedgerFilterFieldDef[] = [
   { key: 'scope', label: '가동·리스크' },
+  // 기본보기 4·5번 칸 — 자산·정비 원장과 같은 축·같은 이름(차량 원장군).
+  { key: 'lifecycle', label: LEDGER_LABEL.lifecycle },
+  { key: 'status', label: LEDGER_LABEL.assetStatus },
   { key: 'contract', label: '계약' },
   { key: 'warn', label: '경고' },
-];
-
-/** 일정관리 세부필터. */
-export const AGENDA_FILTER_DEFS: LedgerFilterFieldDef[] = [
-  { key: 'kind', label: '일정분류' },
 ];
 
 /** 업무 세부필터. */
@@ -96,8 +97,6 @@ export const WORK_FILTER_DEFS: LedgerFilterFieldDef[] = [
  *   옵션 값은 화면에서 실제 데이터로 수집하므로 분류값을 바꿔도 따라온다.
  */
 export const RISK_FILTER_DEFS: LedgerFilterFieldDef[] = [
-  // 여러 법인이 한 표에 섞여 나오는 원장이라 회사로 좁힐 수 있어야 한다(행문법 1번 칸).
-  { key: 'company', label: '회사명' },
   { key: 'group', label: '리스크구분' },
   { key: 'kind', label: '리스크분류' },
   { key: 'status', label: '리스크상태' },

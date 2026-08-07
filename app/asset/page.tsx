@@ -134,6 +134,8 @@ export default function AssetLedgerPage() {
     [allRows, dateBasis],
   );
   const assetFilterMatchers = useMemo(() => ({
+    // 기본보기 4·5번 칸(자산분류·자산상태)은 반드시 걸러낼 수 있어야 한다.
+    lifecycle: eqFilter<AssetMasterRow>((r) => r.lifecycle),
     status: eqFilter<AssetMasterRow>((r) => r.status),
     maker: eqFilter<AssetMasterRow>((r) => r.maker),
   }), []);
@@ -149,6 +151,7 @@ export default function AssetLedgerPage() {
   }), [searchedRows, ownershipScope, quickFilter, fleet, allAssetQuickFilter, detailFilters, assetFilterMatchers, dateBasis, range.from, range.to]);
   const assetStatuses = useMemo(() => [...new Set(allRows.map((r) => r.status).filter(Boolean))].sort(), [allRows]);
   const assetMakers = useMemo(() => [...new Set(allRows.map((r) => r.maker).filter(Boolean))].sort(), [allRows]);
+  const assetLifecycles = useMemo(() => [...new Set(allRows.map((r) => r.lifecycle).filter(Boolean))].sort(), [allRows]);
   const { held, disposed, contracted, idle, salePending } = useMemo(
     () => summarizeAssetLedgerStats(searchedRows, fleet),
     [searchedRows, fleet],
@@ -190,7 +193,7 @@ export default function AssetLedgerPage() {
           placeholder="차량번호·VIN·차명·소유자·상태"
           value={q}
           onChange={(e) => setQ(e.target.value)}
-          style={{ width: mobile ? 160 : 280, flexShrink: 0 }}
+          style={{ width: mobile ? undefined : 280, flex: mobile ? 1 : undefined, minWidth: mobile ? 0 : undefined }}
         />
         <LedgerFilterButton open={filterOpen} count={filterCount} onClick={() => setFilterOpen((o) => !o)} />
         {!filterOpen && <LedgerActiveFilters
@@ -218,8 +221,8 @@ export default function AssetLedgerPage() {
             setDateBasis('취득일');
           }}
         />}
-        <PeriodBar latest={latest} initial="전체" size="sm" onRange={setRange} />
       </>}
+      period={<PeriodBar latest={latest} initial="전체" size="sm" onRange={setRange} />}
       filterPanel={filterOpen ? (
         <LedgerFilterPanel
           title="자산 필터"
@@ -269,6 +272,7 @@ export default function AssetLedgerPage() {
                 : ownershipScope === '전체자산'
                   ? [{ value: '보유', label: '보유' }, { value: '처분', label: '처분' }]
                   : [],
+              lifecycle: assetLifecycles,
               status: assetStatuses,
               maker: assetMakers,
             }}
