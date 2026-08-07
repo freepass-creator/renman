@@ -728,7 +728,7 @@ export default function PaymentsPage() {
           <Search
             size="sm" placeholder="상대·계좌·과목·내용" value={q}
             onChange={(e) => setQ(e.target.value)}
-            style={{ width: mobile ? 160 : 260, flexShrink: 0 }}
+            style={{ width: mobile ? undefined : 260, flex: mobile ? 1 : undefined, minWidth: mobile ? 0 : undefined }}
           />
           <LedgerFilterButton open={filterOpen} count={filterCount} onClick={() => setFilterOpen((o) => !o)} />
           {!filterOpen && (
@@ -738,9 +738,9 @@ export default function PaymentsPage() {
               onClearAll={resetFilters}
             />
           )}
-          {mode === '일보' ? dateStep : null}
         </>
       )}
+      period={mode === '일보' ? dateStep : null}
       filterPanel={filterOpen ? (
         <LedgerFilterPanel onReset={resetFilters} onClose={() => setFilterOpen(false)}>
           <LedgerFilterFields defs={JOURNAL_FILTER_DEFS} values={filterValues} onChange={onFilterChange} options={filterOptions} />

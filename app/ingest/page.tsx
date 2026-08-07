@@ -1134,7 +1134,6 @@ function IngestInner() {
           </> : <>
             대기 <b style={{ color: records.length ? C.warn : C.ink }}>{records.length}</b>
           </>}
-          {companyId ? <> · {companyLabel(companyId)}</> : null}
         </span>
       )}
       view={(

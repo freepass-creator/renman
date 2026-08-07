@@ -1,10 +1,8 @@
 'use client';
 import { useMemo } from 'react';
-import { useSession } from '@/lib/session';
 import { Page, Sec, Cards, Metric, won, C, PageLoading } from '@/components/ui';
 import { WorkbenchBar } from '@/components/WorkbenchBar';
 import { useCashHubNav } from '@/components/CashHubTabs';
-import { companyLabel } from '@/lib/companies';
 import { computeContractView } from '@/lib/contract-ops';
 import { selectReceivables } from '@/lib/snapshot/selectors';
 import { computeAssetLedgerEntry, summarizeLedger, vehicleRecordToAsset } from '@/lib/payments/asset-ledger';
@@ -30,7 +28,6 @@ function Row({ label, value, tone, strong, hint }: { label: string; value: numbe
 }
 
 export default function FinancialsPage() {
-  const { companyId, scopeAll } = useSession();
   const cashNav = useCashHubNav();
   const { data: [vs = [], cs = [], bank = []], loading } = useEntityLists(['vehicle', 'contract', 'bank_tx']);
 
@@ -72,7 +69,7 @@ export default function FinancialsPage() {
   }, [vs, cs, bank]);
 
   return (
-    <Page title="재무상태표" meta={`${scopeAll ? '전체 회사' : companyLabel(companyId)} · ${TODAY} 기준 · 계산값`} tools={<WorkbenchBar {...cashNav} />}>
+    <Page title="재무상태표" meta={`${TODAY} 기준 · 계산값`} tools={<WorkbenchBar {...cashNav} search={false} />}>
       {loading ? <PageLoading /> : <>
         <Sec id="f-summary" title="요약" desc="자산 = 부채 + 자본 (오늘 기준 · 계산값)">
           <Cards min={140} fit>

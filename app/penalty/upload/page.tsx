@@ -107,6 +107,7 @@ export default function PenaltyUploadPage() {
       noCompany
       tools={
         <WorkbenchBar
+          search={false}
           mid={<span style={{ fontSize: 12, color: C.faint, whiteSpace: 'nowrap' }}>{`${rows.length}건 · 분석완료 ${okCount} · 매칭 ${matchCount}${co ? ' · ' + companyLabel(co) : ''}`}</span>}
           actions={<>
             <Btn variant="ghost" href="/work?group=%EA%B3%BC%ED%83%9C%EB%A3%8C">← 과태료관리</Btn>

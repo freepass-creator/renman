@@ -232,7 +232,7 @@ function ContractLedgerInner() {
           placeholder="회사·계약번호·차량·계약자·상태·리스크·알람"
           value={q}
           onChange={(e) => setQ(e.target.value)}
-          style={{ width: mobile ? 160 : 280, flexShrink: 0 }}
+          style={{ width: mobile ? undefined : 280, flex: mobile ? 1 : undefined, minWidth: mobile ? 0 : undefined }}
         />
         <LedgerFilterButton open={filterOpen} count={filterCount} onClick={() => setFilterOpen((o) => !o)} />
         {!filterOpen && <LedgerActiveFilters
@@ -250,8 +250,8 @@ function ContractLedgerInner() {
             setDateBasis('계약일');
           }}
         />}
-        <PeriodBar key={sheetView} latest={latest} initial={isSchedule ? '월간' : '전체'} size="sm" onRange={setRange} />
       </>}
+      period={<PeriodBar key={sheetView} latest={latest} initial={isSchedule ? '월간' : '전체'} size="sm" onRange={setRange} />}
       filterPanel={filterOpen ? (
         <LedgerFilterPanel
           title={isSchedule ? '회차 필터' : '계약 필터'}

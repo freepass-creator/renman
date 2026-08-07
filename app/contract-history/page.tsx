@@ -23,7 +23,7 @@ const endKind = (c: EntityRecord): '만료' | '중도해지' | '기타' => {
 };
 
 export default function ContractHistoryPage() {
-  const { companyId, scopeAll } = useSession();
+  const { scopeAll } = useSession();
   const [plate, setPlate] = useState('');
   const [facets, setFacets] = useState<Set<string>>(new Set());
   const [q, setQ] = useState('');
@@ -63,7 +63,7 @@ export default function ContractHistoryPage() {
   return (
     <FacetPage
       title="지난 계약"
-      meta={`${plate ? plate : companyLabel(companyId)} · 종료 ${past.length}건`}
+      meta={`${plate ? `${plate} · ` : ''}종료 ${past.length}건`}
       tools={<WorkbenchBar
         search={{ value: q, onChange: setQ, placeholder: '손님·차량·사유' }}
         view={<IconSeg value={view} onChange={setView} options={[

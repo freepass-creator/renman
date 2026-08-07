@@ -9,7 +9,7 @@ import { useRouter } from 'next/navigation';
 import { useSession } from '@/lib/session';
 import { COMPANIES, ALL_COMPANIES, companyLabel } from '@/lib/companies';
 import { loadMaster } from '@/lib/company-master';
-import { Page, Btn, C, Input, TextArea, Select, PillTabs } from '@/components/ui';
+import { Page, Btn, C, Input, TextArea, Select, PillTabs, Message } from '@/components/ui';
 import { WorkbenchBar } from '@/components/WorkbenchBar';
 import { useIsMobile } from '@/lib/use-mobile';
 import { useEntityList } from '@/lib/use-entity-lists';
@@ -119,10 +119,11 @@ export default function DocIssuePage() {
 
   return (
     <Page
-      title="표준 문서 발급"
+      title="문서 발급"
       meta={template?.title || '재직·거래사실·입금확인·위임장'}
       tools={
         <WorkbenchBar
+          search={false}
           mid={<span style={{ fontSize: 11.5, color: C.faint, whiteSpace: 'nowrap' }}>문서번호 <b style={{ fontFamily: 'var(--font-mono)' }}>{docNo || '회사 선택 후 채번'}</b> · {fmtKDate(today())}</span>}
           actions={<>
             <Btn variant="ghost" href="/docs">← 발급 이력</Btn>
@@ -132,7 +133,7 @@ export default function DocIssuePage() {
         />
       }
     >
-      {err && <div style={{ fontSize: 12, color: C.danger, marginBottom: 10 }}>{err}</div>}
+      {err && <Message variant="danger">{err}</Message>}
       <div style={{ display: 'grid', gridTemplateColumns: mobile ? '1fr' : '300px 1fr', gap: 16, minHeight: 560 }}>
         {/* 좌측 입력 */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>

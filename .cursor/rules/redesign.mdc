@@ -21,7 +21,7 @@ alwaysApply: true
 
 ## 모바일 = `/m` 전문 트리 (웹 축소본 아님 ★)
 - **/m은 반응형 웹 축소가 아니라 «폰 전용 전문 페이지»다.** 데스크톱 표+더블클릭패널을 폰에 욱여넣지 말 것.
-- 하단 **5탭 고정**(홈·운영·리스크·입력·설정). 햄버거 없음. 셸=`components/m/{MTabBar,MHead,MBackBar}`. 상단=MHead(제목+3px 탭색).
+- 하단 **4탭 고정**(운영현황·리스크·업무관리·업로드). 설정·계정은 상단 햄버거(메뉴). 셸=`components/m/{MTabBar,MHead,MBackBar}`. 상단=MHead(제목+3px 탭색).
 - 목록 = `ObjRow`+`Rows`(`components/ui/obj-row.tsx`): 행마다 박스 금지(테두리는 Rows), **상태 신호=배지 색만**(행 배경·좌측점·세로선 금지), 행 안 버튼 금지(선택 체크박스만). 섹션 접기 가능.
 - 드릴인 = `/m/vehicle/[plate]`(Vehicle360 재사용). 탭루트=MTabBar / 스택=MBackBar(`app/m/layout.tsx`).
 - **데이터는 웹과 동일 도메인 SSOT**(`linkFleet`/`buildFleetRows`, 이후 master-ledgers) — /m 전용 데이터 로직 신설 금지.

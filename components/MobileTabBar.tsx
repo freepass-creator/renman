@@ -1,6 +1,6 @@
 'use client';
-// 모바일 하단 탭바 — 루트·스택목록 1차 네비. 뎁스(depth)에서는 SessionBar가 숨김(이전·액션=하단 액션바).
-//   고른 탭 = useMobileTabs SSOT (기본: 홈 · 마이 · 검색 · 업로드 · 설정).
+// 모바일 하단 탭바 — 루트 1차 네비. 뎁스(depth)에서는 SessionBar가 숨김(이전·액션=하단 액션바).
+//   기본 탭 = useMobileTabs SSOT (운영 · 리스크 · 업무 · 업로드). 설정=상단 햄버거.
 import { useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';

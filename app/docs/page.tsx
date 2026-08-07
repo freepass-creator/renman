@@ -36,7 +36,7 @@ function reprint(d: Doc) {
 }
 
 export default function DocsPage() {
-  const { companyId, scopeAll } = useSession();
+  const { scopeAll } = useSession();
   const { rows: raw, loading } = useEntityList('issued_doc');
   const rows = useMemo(
     () => (raw as Doc[]).slice().sort((a, b) => (b.issuedAt || '').localeCompare(a.issuedAt || '')),

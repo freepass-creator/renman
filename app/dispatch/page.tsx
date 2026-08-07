@@ -11,7 +11,6 @@ import { FacetPage, Sec, Cards, Metric, ObjCard, EmptyState, Btn, won, C, SPACE_
 import { FacetRail } from '@/components/FacetRail';
 import { WorkbenchBar } from '@/components/WorkbenchBar';
 import { WorkHubBack } from '@/components/WorkHubTabs';
-import { companyLabel } from '@/lib/companies';
 import { TODAY } from '@/lib/dashboard-consts';
 import { linkFleet, recommendNextRent, buildRentRecoCtx, type VehicleNode } from '@/lib/domain/model';
 import { textMatch } from '@/lib/search-match';
@@ -107,7 +106,7 @@ function IoCards({ rows, byPlate, openIo }: {
 }
 
 export default function DispatchPage() {
-  const { companyId, scopeAll } = useSession();
+  const { scopeAll } = useSession();
   const { data: [vs = [], cs = []], loading, reload } = useEntityLists(['vehicle', 'contract']);
   const [facets, setFacets] = useState<Set<string>>(new Set());
   const [q, setQ] = useState('');
@@ -184,7 +183,7 @@ export default function DispatchPage() {
   return (
     <FacetPage
       title="배차관리"
-      meta={`${scopeAll ? '전체 회사' : companyLabel(companyId)} · 출고·반납`}
+      meta="출고·반납"
       tools={
         <WorkbenchBar
           mid={<WorkHubBack />}

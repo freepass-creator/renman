@@ -1,11 +1,9 @@
 'use client';
 import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useSession } from '@/lib/session';
 import { Page, Sec, Cards, Metric, ExcelSheet, EmptyState, PeriodBar, won, C, PageLoading, type SheetCol } from '@/components/ui';
 import { WorkbenchBar } from '@/components/WorkbenchBar';
 import { useCashHubNav } from '@/components/CashHubTabs';
-import { companyLabel } from '@/lib/companies';
 import { buildCashLedger, aggregateBySubject, type SubjectAgg } from '@/lib/finance/cash-ledger';
 import { operatingProfit, operatingProfitTrend } from '@/lib/finance/operating-profit';
 import { summarizePnlSubjects } from '@/lib/finance/subject-summary';
@@ -16,7 +14,6 @@ import { useEntityList } from '@/lib/use-entity-lists';
 
 // 손익분석(경영·비즈니스 티어) — 영업손익(영업수입 − 영업비용) + 금융비용(할부이자) = 세전이익. 현금 기준.
 export default function PnlPage() {
-  const { companyId, scopeAll } = useSession();
   const router = useRouter();
   const cashNav = useCashHubNav();
   const { bank, card, loading: cashLoading } = useCashLedgerLists();
@@ -52,8 +49,8 @@ export default function PnlPage() {
   return (
     <Page
       title="손익분석"
-      meta={`${scopeAll ? '전체 회사' : companyLabel(companyId)}${range.from ? ` · ${range.from}~${range.to}` : ' · 전체'} · 현금 기준`}
-      tools={<WorkbenchBar {...cashNav} mid={<PeriodBar latest={latest} initial="월간" onRange={setRange} />} />}
+      meta={`${range.from ? `${range.from}~${range.to}` : '전체'} · 현금 기준`}
+      tools={<WorkbenchBar {...cashNav} search={false} mid={<PeriodBar latest={latest} initial="월간" onRange={setRange} />} />}
     >
       {loading ? <PageLoading /> : <>
         <Sec id="p-pl" title="손익" desc="영업손익(영업수입−영업비용) − 할부이자 = 세전이익 · 현금 기준">

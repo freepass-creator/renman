@@ -2511,6 +2511,13 @@ kbd {
   text-overflow: ellipsis;
 }
 .ledger-toolbar__actions { flex: 0 0 auto; }
+/* Search 는 자체 × 버튼(components/ui/controls)을 그린다. type="search" 가 붙으면서
+   WebKit 기본 취소버튼까지 같이 나와 ×가 두 개 겹쳤다 — 기본 것을 지운다. */
+input[type='search']::-webkit-search-cancel-button,
+input[type='search']::-webkit-search-decoration {
+  -webkit-appearance: none;
+  appearance: none;
+}
 /* 선택 액션바 — 기간 옆(필터줄). 선택이 없으면 렌더되지 않으므로 자리를 차지하지 않는다. */
 .ledger-toolbar__selection {
   display: flex;

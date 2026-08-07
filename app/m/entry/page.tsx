@@ -1,5 +1,5 @@
 'use client';
-/** 모바일 단건 입력 — 사진·메모 한 건만. 데이터센터·OCR·대량 투입은 웹 전용. */
+/** 모바일 단건 입력(업로드 탭) — 사진·메모 한 건만. 데이터센터·OCR·대량 투입은 웹 전용. */
 import { useState } from 'react';
 import { C, Message } from '@/components/ui';
 import { MHead } from '@/components/m/MHead';
@@ -10,7 +10,7 @@ export default function MEntry() {
   const reset = () => setFormKey((key) => key + 1);
   return (
     <>
-      <MHead title="단건 입력" sub="현장 메모 · 사진 · 문서 한 건" color="var(--indigo-text)" />
+      <MHead title="업로드" sub="현장 메모 · 사진 · 문서 한 건" color="var(--indigo-text)" />
       <div style={{ padding: '12px 14px 24px', display: 'flex', flexDirection: 'column', gap: 10 }}>
         <QuickInput key={formKey} onDone={reset} onCancel={reset} />
         <Message variant="info">

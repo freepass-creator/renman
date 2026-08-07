@@ -7,7 +7,8 @@
  *   클릭 = 행 선택 · 더블클릭 = 상세패널 열기 · 같은 행/패널 재더블클릭 = 닫기.
  *
  *   버튼 자리 (왼쪽→오른쪽):
- *     필터줄 = 회사(또는 companySlot) · 검색 · ☰필터 · 기간 ····· 지표 · 보기 · [+생성]
+ *     데스크톱 필터줄 = 회사(또는 companySlot) · 검색 · ☰필터 · 기간(period) ····· 지표 · 보기 · [+생성]
+ *     모바일 필터줄 = 회사 · 검색 · ☰필터 만 → 본문. 기간은 필터 패널 안(period prop).
  *     ※ ⋯도구 메뉴 없음. 대량액션=선택 액션바 · 투입=[+생성]패널 · 이동=좌측메뉴 · 개별=상세패널.
  *     내보내기 = 우클릭 컨텍스트 메뉴(`useSheetExport` + ContextMenu).
  *     필드 적은 원장 = `LedgerFilterSelects`로 상단 흡수(3분할 회피). 다수 필드는 좌측 `filterPanel`.
@@ -37,6 +38,7 @@ export function LedgerFrame<R>({
   onView, mobileCard,
   selectionBar,
   detail, sidePanel, filterPanel, panelWide,
+  period,
   icon,
 }: {
   title: string;
@@ -47,6 +49,12 @@ export function LedgerFrame<R>({
   tools?: ReactNode;
   hint?: ReactNode;
   filters?: ReactNode;
+  /**
+   * 기간(PeriodBar·일보 일자 등). 데스크톱=필터줄 · 모바일=필터 패널 안.
+   * filters에 넣지 말 것 — 모바일에 한 줄 더 생기며 규격 위반.
+   * 필터 닫혀도 마운트 유지(상태·onRange 유지).
+   */
+  period?: ReactNode;
   stats?: ReactNode;
   /** 기본/전체 열보기. 별도 view 선택기와 독립적으로 노출하며 showColView=false일 때만 생략한다. */
   colView?: LedgerColView;
@@ -157,6 +165,10 @@ export function LedgerFrame<R>({
     [colView, sheetCols],
   );
 
+  const filterOpen = filterPanel != null;
+  // 모바일 기간은 필터 안에만 보이지만, 닫혀 있어도 같은 자리에 마운트 유지(PeriodBar 상태 보존).
+  const showPeriodHost = mobile && period != null;
+
   // ERP: 제목·필터줄·패널 유지 · 표 자리만 PageLoading.
   return (
     <Page frame title={title} meta={meta} noCompany icon={icon}>
@@ -170,7 +182,13 @@ export function LedgerFrame<R>({
         <div className="ledger-toolbar__filters">
           {companySlot ?? <CompanyFilter size="sm" />}
           {filters}
+          {!mobile && period}
         </div>
+        {/* 선택 액션바 = **필터줄**(기간 옆). 표 위에 두면 안 된다 —
+            선택이 0건일 때도 자리를 비워 둬야 «선택하면 행이 밀리는» 문제를 피할 수 있고,
+            그 빈 자리(47px)만큼 표 상단이 우측 상세패널보다 내려가 위아래 선이 어긋났다.
+            여기로 오면 자리를 예약할 필요가 없어 정렬도 맞고 행도 안 밀린다(사장님 지시 2026-08-07). */}
+        {selectionBar != null && <div className="ledger-toolbar__selection">{selectionBar}</div>}
         {stats != null && <div className="ledger-toolbar__stats">{stats}</div>}
         <div className="ledger-toolbar__actions">
           {viewControl}
@@ -184,22 +202,24 @@ export function LedgerFrame<R>({
           className="ledger-workspace"
           data-panel={sidePanel != null ? 'open' : 'closed'}
           data-panel-wide={panelWide ? '1' : undefined}
-          data-filter={filterPanel != null ? 'open' : 'closed'}
+          data-filter={filterOpen ? 'open' : 'closed'}
         >
-          {filterPanel != null && (
-            <aside className="ledger-workspace__filter">
+          {(filterOpen || showPeriodHost) && (
+            <aside
+              className="ledger-workspace__filter"
+              style={filterOpen ? undefined : { display: 'none' }}
+              aria-hidden={filterOpen ? undefined : true}
+            >
+              {showPeriodHost && (
+                <div className="ledger-mobile-period">
+                  <div className="ledger-mobile-period__label">기간</div>
+                  {period}
+                </div>
+              )}
               {filterPanel}
             </aside>
           )}
           <div className="ledger-workspace__sheet">
-            {selectedKeys != null ? (
-              <div
-                className="ledger-selection-slot"
-                aria-hidden={selectionBar == null ? true : undefined}
-              >
-                {selectionBar}
-              </div>
-            ) : selectionBar}
             {loading ? (
               <PageLoading />
             ) : error ? (

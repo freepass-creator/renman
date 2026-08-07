@@ -303,7 +303,7 @@ export default function ReceivablesPage() {
               placeholder="고객·차량·계약·계약조건 이행"
               value={q}
               onChange={(event) => setQ(event.target.value)}
-              style={{ width: mobile ? 180 : 280, flexShrink: 0 }}
+              style={{ width: mobile ? undefined : 280, flex: mobile ? 1 : undefined, minWidth: mobile ? 0 : undefined }}
             />
             <LedgerFilterButton open={filterOpen} count={facets.size} onClick={() => setFilterOpen((open) => !open)} />
             {!filterOpen && <LedgerActiveFilterTags values={[...facets]} onClear={toggleFacet} onClearAll={resetFacets} />}

@@ -466,7 +466,9 @@ export function Search({ size = 'md', style, wrapStyle, ...rest }: Omit<React.In
   const { width, minWidth, maxWidth, flex, ...inputStyle } = (style || {}) as React.CSSProperties;
   const clearPad = mobile ? 28 : 22;
   return (
-    <div style={{
+    <div
+      data-ui="search"
+      style={{
       position: 'relative',
       display: 'inline-flex',
       alignItems: 'center',
@@ -484,6 +486,7 @@ export function Search({ size = 'md', style, wrapStyle, ...rest }: Omit<React.In
       <SearchIcon size={mobile ? 16 : 14} color={C.faint} style={{ flexShrink: 0 }} />
       <input
         {...rest}
+        type="search"
         style={{
           flex: 1,
           border: 'none',

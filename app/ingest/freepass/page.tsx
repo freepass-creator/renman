@@ -18,7 +18,7 @@ import { toast } from '@/lib/toast';
 type Row = { v: EntityRecord; product: Record<string, unknown>; plate: string; five: string };
 
 export default function FreepassSyncPage() {
-  const { companyId, scopeAll } = useSession();
+  const { scopeAll } = useSession();
   const { data: [vs = []], loading } = useEntityLists(['vehicle']);
   const [busy, setBusy] = useState(false);
 
@@ -48,7 +48,7 @@ export default function FreepassSyncPage() {
   return (
     <Page
       title="프리패스 상품 연동"
-      tools={<WorkbenchBar mid={<span style={{ fontSize: 12.5, color: C.faint, whiteSpace: 'nowrap' }}>{`${scopeAll ? '전체 회사' : companyLabel(companyId)} · 대상 ${rows.length}대 · 공급사 ${PROVIDER_CODE}`}</span>} />}
+      tools={<WorkbenchBar search={false} mid={<span style={{ fontSize: 12.5, color: C.faint, whiteSpace: 'nowrap' }}>{`대상 ${rows.length}대 · 공급사 ${PROVIDER_CODE}`}</span>} />}
     >
       {loading ? <PageLoading />
         : (

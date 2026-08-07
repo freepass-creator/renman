@@ -14,7 +14,7 @@ const AGING_COLORS = ['var(--green-text)', C.warn, C.warn, 'var(--red-text)'];
 
 // 경영 현황 = 경영진용 분석 화면(실무 콕핏과 분리). 가동률·미수 aging·부채·법인별 비교. 허브=홈과 동일(메뉴·탭).
 export default function ManagePage() {
-  const { companyId, scopeAll } = useSession();
+  const { scopeAll } = useSession();
   const cashNav = useCashHubNav();
   const { data: [contracts = [], vehicles = []], loading } = useEntityLists(['contract', 'vehicle']);
   const total = useMemo(() => computeKPI(contracts, vehicles, TODAY), [contracts, vehicles]);
@@ -22,7 +22,7 @@ export default function ManagePage() {
   const agingMax = Math.max(1, ...total.aging);
 
   return (
-    <Page title={`경영 현황 · ${scopeAll ? '전체 법인' : companyLabel(companyId)}`} tools={<WorkbenchBar {...cashNav} />}>
+    <Page title="경영 현황" tools={<WorkbenchBar {...cashNav} search={false} />}>
       {loading ? <PageLoading /> : <>
         <Sec id="m-kpi" title="핵심 지표">
           <Cards min={150}>

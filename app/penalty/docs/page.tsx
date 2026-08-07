@@ -11,11 +11,10 @@ import { Page, PageLoading, EmptyState, Btn } from '@/components/ui';
 import { WorkbenchBar } from '@/components/WorkbenchBar';
 import { WorkHubBack } from '@/components/WorkHubTabs';
 import { PenaltyDocs } from '@/components/PenaltyDocs';
-import { companyLabel } from '@/lib/companies';
 import { useEntityLists } from '@/lib/use-entity-lists';
 
 export default function PenaltyDocsPage() {
-  const { companyId, scopeAll } = useSession();
+  const { companyId } = useSession();
   const router = useRouter();
   const { data: [pens = [], cons = []], loading, reload } = useEntityLists(['penalty', 'contract']);
   // 실운전자(임차인)가 확인된 매칭만 문서 대상 — /penalty 버튼 카운트(rows.filter(r=>r.renter))와 동일 기준.
@@ -27,8 +26,8 @@ export default function PenaltyDocsPage() {
   return (
     <Page
       title="변경부과 공문"
-      meta={`${scopeAll ? '전체 회사' : companyLabel(companyId)} · 매칭 ${matched.length}건`}
-      tools={<WorkbenchBar mid={<WorkHubBack />}           actions={<Btn variant="ghost" href="/work?group=%EA%B3%BC%ED%83%9C%EB%A3%8C">← 과태료</Btn>} />}
+      meta={`매칭 ${matched.length}건`}
+      tools={<WorkbenchBar search={false} mid={<WorkHubBack />} actions={<Btn variant="ghost" href="/work?group=%EA%B3%BC%ED%83%9C%EB%A3%8C">← 과태료</Btn>} />}
     >
       {loading ? <PageLoading />
         : matched.length === 0 ? (

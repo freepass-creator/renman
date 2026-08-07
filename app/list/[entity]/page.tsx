@@ -1,12 +1,11 @@
 'use client';
 import { useParams, useRouter } from 'next/navigation';
-import { useSession } from '@/lib/session';
+import { useSession, roleLabel } from '@/lib/session';
 import { ENTITIES, type EntityRecord } from '@/lib/intake/entities';
 import { computeAssetLedgerEntry, vehicleRecordToAsset } from '@/lib/payments/asset-ledger';
 import { UploadCloud } from 'lucide-react';
 import { openIngest } from '@/lib/ui-bus';
 import { Page, Sec, Cards, Metric, DataTable, Btn, EmptyState, TextLink, won, C, Panel, LedgerActions, type Col, PageLoading } from '@/components/ui';
-import { WorkbenchBar } from '@/components/WorkbenchBar';
 import { companyLabel } from '@/lib/companies';
 import { TODAY } from '@/lib/dashboard-consts';
 import { useEntityList } from '@/lib/use-entity-lists';
@@ -23,10 +22,9 @@ export default function ListPage() {
   const params = useParams();
   const router = useRouter();
   const entityKey = String(params.entity);
-  const { companyId, user, scopeAll } = useSession();
+  const { user, scopeAll } = useSession();
   const entity = ENTITIES[entityKey];
   const { rows: records, loading } = useEntityList(entity ? entityKey : 'vehicle');
-  const scopeLabel = scopeAll ? '전체' : companyLabel(companyId);
 
   if (!entity) return <Page title={`알 수 없는 엔티티: ${entityKey}`}><EmptyState>존재하지 않는 데이터 종류입니다.</EmptyState></Page>;
 
@@ -39,7 +37,7 @@ export default function ListPage() {
   }
 
   const cols: Col<EntityRecord>[] = [
-    ...(scopeAll ? [{ key: '_co', label: '회사', render: (r: EntityRecord) => <span style={{ color: C.mute }}>{companyLabel(r.companyId)}</span> }] : []),
+    ...(scopeAll ? [{ key: '_co', label: '회사', render: (r: EntityRecord) => <span style={{ color: C.mute }}>{companyLabel(r.companyId)}</span> }] as Col<EntityRecord>[] : []),
     ...entity.fields.slice(0, 8).map((f) => ({
       key: f.key, label: f.label,
       render: (r: EntityRecord) => {

@@ -127,7 +127,8 @@ export default function ClassifyPage() {
           tabs={VIEWS.map((v) => ({ key: v, label: v }))}
           tab={view}
           onTab={(k) => setView(k as View)}
-          mid={<span style={{ fontSize: 12.5, color: C.faint, whiteSpace: 'nowrap' }}>{`${scopeAll ? '전체 회사' : companyLabel(companyId)} · 높음 ${stat.high} · 검토 ${stat.review} · 미매칭 ${stat.none} · 분류됨 ${stat.done}`}</span>}
+          mid={<span style={{ fontSize: 12.5, color: C.faint, whiteSpace: 'nowrap' }}>{`높음 ${stat.high} · 검토 ${stat.review} · 미매칭 ${stat.none} · 분류됨 ${stat.done}`}</span>}
+          search={false}
         />
       }
     >

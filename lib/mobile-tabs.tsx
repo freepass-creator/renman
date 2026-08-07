@@ -1,9 +1,8 @@
 'use client';
 /**
  * 모바일 하단탭 SSOT — 후보·기본값·사용자별 고르기.
- *   티어 = PAGE_IA / pageTier. 라이트 기본 = 홈·마이·자산·계약·설정.
- *   스탠다드+ 기본 = 홈·마이·업무·미수관리·설정. 그룹명「업무」= NAV_GROUPS.
- *   저장: localStorage jpk:mobile-tabs:<uid>.
+ *   기본 4탭 = 운영 · 리스크 · 업무 · 업로드. 설정·계정은 상단 햄버거(메뉴).
+ *   티어 = PAGE_IA / pageTier. 저장: localStorage jpk:mobile-tabs:<uid>.
  */
 import { useEffect, useMemo, useState } from 'react';
 import {
@@ -36,19 +35,19 @@ export type MobileTabDef = {
 
 export const MOBILE_TAB_DEFS: MobileTabDef[] = [
   { id: 'home', label: '대시보드', href: '/', icon: LayoutDashboard, match: (p) => p === '/', group: '허브', tier: pageTier('/') },
-  { id: 'status', label: '운영', href: '/status', icon: LayoutDashboard, match: (p) => p.startsWith('/status'), group: '허브', tier: pageTier('/status') },
+  { id: 'status', label: '운영현황', href: '/status', icon: LayoutDashboard, match: (p) => p.startsWith('/status'), group: '허브', tier: pageTier('/status') },
   { id: 'risk', label: '리스크', href: '/risk', icon: TriangleAlert, match: (p) => p.startsWith('/risk') || p.startsWith('/desk'), group: '허브', tier: pageTier('/risk') },
   { id: 'upload', label: '업로드', href: '/ingest', icon: Upload, match: (p) => p.startsWith('/ingest'), group: '허브', tier: pageTier('/ingest') },
   { id: 'asset', label: '자산', href: '/asset', icon: CarFront, match: (p) => p.startsWith('/asset'), group: '원장', tier: pageTier('/asset') },
   { id: 'contract', label: '계약', href: '/contract', icon: FileText, match: (p) => p.startsWith('/contract'), group: '원장', tier: pageTier('/contract') },
   { id: 'money', label: '자금', href: '/cash', icon: Wallet, match: (p) => p.startsWith('/cash'), group: '원장', tier: pageTier('/cash') },
-  { id: 'work', label: '업무', href: '/work', icon: ListTodo, match: (p) => p.startsWith('/work'), group: '원장', tier: pageTier('/work') },
+  { id: 'work', label: '업무관리', href: '/work', icon: ListTodo, match: (p) => p.startsWith('/work'), group: '원장', tier: pageTier('/work') },
 ];
 
 export const MOBILE_TAB_MAP: Record<string, MobileTabDef> = Object.fromEntries(MOBILE_TAB_DEFS.map((t) => [t.id, t]));
 
-/** 라이트 코어 — 홈·리스크·원장. */
-const PREFERRED_LIGHT: MobileTabId[] = ['home', 'risk', 'asset', 'contract', 'work'];
+/** 현장 루프 4탭 — 설정은 햄버거. */
+const PREFERRED_LIGHT: MobileTabId[] = ['status', 'risk', 'work', 'upload'];
 const PREFERRED_STANDARD: MobileTabId[] = PREFERRED_LIGHT;
 
 export const MAX_MOBILE_TABS = 5;
@@ -67,7 +66,7 @@ export function defaultMobileTabs(): MobileTabId[] {
 /** @deprecated defaultMobileTabs() 사용 */
 export const DEFAULT_MOBILE_TABS: MobileTabId[] = defaultMobileTabs();
 
-const STORE_PREFIX = 'jpk:mobile-tabs:';
+const STORE_PREFIX = 'jpk:mobile-tabs:v2:';
 
 function normalizeIds(raw: unknown): MobileTabId[] {
   if (!Array.isArray(raw)) return defaultMobileTabs();
@@ -138,7 +137,7 @@ export function MobileTabsSettings() {
   return (
     <div style={{ padding: '4px 0 6px' }}>
       <p style={{ fontSize: 12.5, color: C.mute, margin: '0 0 10px', lineHeight: 1.7 }}>
-        하단 탭을 최대 <b>{max}개</b>까지. 기본은 홈 · 마이 · 업무 · 미수관리 · 설정(스탠다드+). 담은 순서가 표시 순서입니다.
+        하단 탭을 최대 <b>{max}개</b>까지. 기본은 운영 · 리스크 · 업무 · 업로드. 설정·계정은 상단 메뉴(햄버거). 담은 순서가 표시 순서입니다.
       </p>
       <div style={{ display: 'flex', alignItems: 'center', gap: SPACE_M, marginBottom: 12, flexWrap: 'wrap' }}>
         <span style={{ fontSize: 12.5, color: C.faint }}>담은 탭 · {ids.length}/{max}</span>

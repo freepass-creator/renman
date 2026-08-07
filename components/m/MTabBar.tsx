@@ -1,23 +1,22 @@
 'use client';
-/** /m 하단 5탭 — 조회 중심 모바일 업무 흐름. 리스크는 홈에서 들어가는 스택 화면이다. */
+/** /m 하단 4탭 — 운영 · 리스크 · 업무 · 업로드. 설정·계정은 웹 햄버거(메뉴). */
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Home, LayoutGrid, ListTodo, SquarePen, Settings } from 'lucide-react';
+import { LayoutGrid, TriangleAlert, ListTodo, Upload } from 'lucide-react';
 import { C } from '@/components/ui';
 import { haptic } from '@/lib/haptics';
 
-export const TAB_ROOTS = ['/m', '/m/ops', '/m/work', '/m/entry', '/m/me'];
+export const TAB_ROOTS = ['/m/ops', '/m/risk', '/m/work', '/m/entry'];
 
 const TABS = [
-  { href: '/m', label: '홈', icon: Home, color: C.ok },
-  { href: '/m/ops', label: '운영', icon: LayoutGrid, color: C.brand },
-  { href: '/m/work', label: '업무', icon: ListTodo, color: C.warn },
-  { href: '/m/entry', label: '단건입력', icon: SquarePen, color: 'var(--indigo-text)' },
-  { href: '/m/me', label: '설정', icon: Settings, color: C.mute },
+  { href: '/m/ops', label: '운영현황', icon: LayoutGrid, color: C.brand },
+  { href: '/m/risk', label: '리스크', icon: TriangleAlert, color: C.danger },
+  { href: '/m/work', label: '업무관리', icon: ListTodo, color: C.warn },
+  { href: '/m/entry', label: '업로드', icon: Upload, color: 'var(--indigo-text)' },
 ] as const;
 
 function active(pathname: string, href: string) {
-  return href === '/m' ? pathname === '/m' : pathname === href || pathname.startsWith(href + '/');
+  return pathname === href || pathname.startsWith(href + '/');
 }
 
 export function MTabBar() {

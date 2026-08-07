@@ -1,7 +1,7 @@
 'use client';
 import { Fragment, useMemo, useState } from 'react';
 import { useSession } from '@/lib/session';
-import { companyLabel, companyShort } from '@/lib/companies';
+import { companyShort } from '@/lib/companies';
 import { looksLikePhone, looksLikeResident, maskPhone, maskResident, PII_MASKERS } from '@/lib/pii';
 import { ENTITIES } from '@/lib/intake/entities';
 import { AUDIT_ACTION_LABEL, type AuditLog } from '@/lib/audit';
@@ -60,7 +60,7 @@ export default function AuditPage() {
   return (
     <FacetPage
       title="감사 로그"
-      meta={`${scopeAll ? '전체 회사' : companyLabel(companyId)} · ${filtered.length}건`}
+      meta={`${filtered.length}건`}
       tools={<WorkbenchBar search={{ value: q, onChange: setQ, placeholder: '요약·행위자·대상' }} actions={<Btn variant="ghost" onClick={reload}>새로고침</Btn>} />}
       rail={!loading ? <FacetRail groups={groups} facets={facets} onToggle={toggleFacet} onReset={resetFacets} /> : null}
     >

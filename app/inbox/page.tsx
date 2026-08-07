@@ -182,7 +182,7 @@ export default function InboxPage() {
 
   return (
     <Page title={mobile ? MOBILE_CAPTURE_TITLE : DATA_CENTER_QUEUE_TITLE} meta={`${user.name} · 대기 ${pending.length} · 처리완료 ${processed.length}`}
-      tools={<WorkbenchBar mid={<WorkHubBack />} />}>
+      tools={<WorkbenchBar search={false} mid={<WorkHubBack />} />}>
       <Sec title={mobile ? '촬영·업로드' : '원본 추가'} desc={mobile ? '현장에서 먼저 수집하고 데이터센터에서 이어서 처리' : '원본을 먼저 보관하고 차량·계약·자금에 연결'}>
         <input ref={camRef} type="file" accept="image/*" capture="environment" style={{ display: 'none' }} onChange={(e) => { const f = e.target.files?.[0]; if (f) upload(f, '사진'); e.currentTarget.value = ''; }} />
         <input ref={fileRef} type="file" accept="image/*,application/pdf" style={{ display: 'none' }} onChange={(e) => { const f = e.target.files?.[0]; if (f) upload(f, '문서'); e.currentTarget.value = ''; }} />

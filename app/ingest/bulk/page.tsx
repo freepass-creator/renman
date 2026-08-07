@@ -203,7 +203,7 @@ export default function BulkMatchPage() {
   return (
     <Page
       title="대량 자동매칭"
-      tools={<WorkbenchBar actions={
+      tools={<WorkbenchBar search={false} actions={
         <IconSeg showLabels value={kind} onChange={(k) => { setKind(k as DocKind); reset(); }} options={[
           { key: 'vehicle', label: '등록증', icon: <Car size={15} /> },
           { key: 'insurance', label: '보험증권', icon: <ShieldCheck size={15} /> },

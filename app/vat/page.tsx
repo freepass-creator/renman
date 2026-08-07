@@ -1,10 +1,8 @@
 'use client';
 import { useMemo, useState } from 'react';
-import { useSession } from '@/lib/session';
 import { FacetPage, Sec, Cards, Metric, DataTable, EmptyState, PeriodBar, won, C, PageLoading, type Col } from '@/components/ui';
 import { WorkbenchBar } from '@/components/WorkbenchBar';
 import { useCashHubNav } from '@/components/CashHubTabs';
-import { companyLabel } from '@/lib/companies';
 import { buildCashLedger, aggregateBySubject, type SubjectAgg } from '@/lib/finance/cash-ledger';
 import { summarizeVatSubjects } from '@/lib/finance/subject-summary';
 import { useCashLedgerLists } from '@/lib/use-cash-ledger-lists';
@@ -14,7 +12,6 @@ import { latestDateOf } from '@/lib/ledger-stats';
 //   부가세 = 공급대가 × 10/110 (입출금액에 부가세 내포 가정). 면세(보험·급여·세금)·거래외(보증금·이체) 제외.
 //   분기 단위(부가세 신고 주기). 기간=공용 PeriodBar.
 export default function VatPage() {
-  const { companyId, scopeAll } = useSession();
   const cashNav = useCashHubNav();
   const { bank, card, loading } = useCashLedgerLists();
   const [range, setRange] = useState<{ from: string; to: string }>({ from: '', to: '' });
@@ -37,8 +34,8 @@ export default function VatPage() {
   return (
     <FacetPage
       title="부가세"
-      meta={`${scopeAll ? '전체 회사' : companyLabel(companyId)}${range.from ? ` · ${range.from}~${range.to}` : ' · 전체'} · 현금기준 추정`}
-      tools={<WorkbenchBar {...cashNav} mid={<PeriodBar latest={latest} initial="분기" onRange={setRange} />} />}
+      meta={`${range.from ? `${range.from}~${range.to}` : '전체'} · 현금기준 추정`}
+      tools={<WorkbenchBar {...cashNav} search={false} mid={<PeriodBar latest={latest} initial="분기" onRange={setRange} />} />}
     >
       {loading ? <PageLoading /> : <>
         <Sec title="부가세 요약" desc="매출세액 − 매입세액 = 납부/환급 · 현금기준 추정(세금계산서 대사 전)">

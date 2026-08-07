@@ -213,6 +213,11 @@ curl -s -o /dev/null -w "%{http_code}" http://localhost:6006/<route>   # 200
 
 | 날짜 | 작업자 | 내용 | 상태 |
 |---|---|---|---|
+| 2026-08-07 | Cursor | **운영현황 기간 제거**: 현재 보유 스냅샷이라 PeriodBar·range 필터 불필요 — `/status`에서 삭제 | tsc0 · curl200 |
+| 2026-08-07 | Cursor | **모바일 하단 4탭**: 운영현황·리스크·업무관리·업로드. 설정=햄버거. `/m`·`MobileTabBar` 기본 동기 · 탭저장 v2 · `/m`→`/m/ops` | tsc0 · curl200 |
+| 2026-08-07 | Cursor | **모바일 검색폭**: 필터줄 검색이 회사~필터 사이 가로 꽉 채움(`data-ui=search`+flex) · `Search type=search` · 인라인 width:160 제거 | tsc0 · curl200 |
+| 2026-08-07 | Cursor | **모바일 기간→필터 안**: `LedgerFrame period` prop · 데스크톱=필터줄 · 모바일=필터패널(닫아도 마운트 유지) · 원장·자금일보 dateStep 이전 · filters 안 PeriodBar 제거 | tsc0 · curl200 |
+| 2026-08-07 | Cursor | **UI 크롬 일관성**: 빈/의도없는 WorkbenchBar 기본차량검색 제거(`search={false}` 또는 tools 삭제) · meta·stats 회사스코프 중복 제거(CompanyFilter와 겹침) · 정합성 EmptyState `ok` · 문서발급 오류=`Message` · 법인상세 제목「법인관리」 | tsc0 · curl200 |
 | 2026-08-07 | → **다음 세션 시작점** | ① **실데이터 올려보기**(`/admin` 회사등록 → `/dev/data` 비우기 → `/ingest` 자금일보 = 1,794건 들어와야 함). ⚠ **`C:\dev\jpkerp6-마이그레이션\` 이 지금 비어 있다** — G드라이브 카톡 백업에서 xlsx를 다시 복사해야 한다 ② 자금일보 화면이 계정과목·차량번호·임차인 3열을 쓰는지 확인 ③ 아래 «판단 3건» ④ 자동업무 실화면 확인(§ 아래) | 대기 |
 | 2026-08-07 | Claude | **증차·감차 신청 = 업무**(AUDIT §6-3 사장님 확정 — 「증차신청은 업무, 공문·근태·공지는 별개」). 세부 `증차·감차` 신설(자산 축) · ⚠**차량번호 면제**(대상이 법인·아직 없는 차) · 상태 준비=대기/접수=진행/**승인·반려=완료**(반려도 끝난 것 — 보류면 영원히 열림) · 법인 패널 「등록대수·증차신청」 읽기표+그자리 등록 · 옛 `master.regApplications` **1회 이관 버튼**(`workId=regapp:{id}` 이라 재실행 안전) · SSOT `lib/company-reg-apps.ts`. **공문 대장은 법인 속성 그대로** | tsc0 · vitest 76p/679 · /management·/work·/company 200 |
 | 2026-08-07 | Claude | **표 틀고정 = 가로스크롤 + 첫 열 고정**(AUDIT §4-3 결정·반영, 전 원장 공통). `excel-sheet--fit` 열 숨김(p4→p3→p2 컨테이너 쿼리) **폐기** — 열이 조용히 사라지던 것. 표 최소폭 = 열수×`EXCEL_COL_MIN`(92). **틀고정은 첫 `pin` 하나만**(회사명·구분·차량번호 셋 다 `left:0`이라 겹쳐 있었다) · `pin` 없으면 고정 안 함 · `SheetCol.priority` **deprecated**(동작 없음, 열 구성은 `pickCols` 명시목록). **⚠ 육안 확인 필요 — 커서 오더** | tsc0 · vitest 75p/669 · 6원장 200 |

@@ -10,13 +10,12 @@ import { ENTITIES, type EntityRecord } from '@/lib/intake/entities';
 import { FacetPage, Sec, Cards, Metric, EmptyState, Badge, RISK_TONE, SevTag, ExcelSheet, won, C, type SheetCol, PageLoading } from '@/components/ui';
 import { FacetRail } from '@/components/FacetRail';
 import { WorkbenchBar } from '@/components/WorkbenchBar';
-import { companyLabel, companyShort } from '@/lib/companies';
+import { companyShort } from '@/lib/companies';
 import { openCar } from '@/lib/ui-bus';
 import { scanRisks } from '@/lib/risk-ops';
 import { selectReceivables } from '@/lib/snapshot/selectors';
 import { riskKindMatch } from '@/lib/lens-filters';
 import { textMatch } from '@/lib/search-match';
-import { CheckCircle2 } from 'lucide-react';
 import { TODAY, dday } from '@/lib/dashboard-consts';
 import { useEntityLists } from '@/lib/use-entity-lists';
 import { crossCheckDocuments } from '@/lib/integrity/doc-crosscheck';
@@ -212,7 +211,7 @@ function IntegrityInner() {
   return (
     <FacetPage
       title="정합성"
-      meta={`${scopeAll ? '전체 회사' : companyLabel(companyId)} · ${items.length}건 · 컴플 ${compCount}`}
+      meta={`${items.length}건 · 컴플 ${compCount}`}
       tools={<WorkbenchBar search={{ value: q, onChange: setQ, placeholder: '대상·내용·종류' }} stat={<span role="status" aria-live="polite" style={{ fontSize: 13, fontWeight: 800, color: loading ? C.mute : highCount ? C.danger : C.ok, whiteSpace: 'nowrap' }}>{loading ? '검사 중' : `위험 ${highCount}`}</span>} />}
       rail={!loading ? <FacetRail lensKey="정합성" facets={facets} onToggle={toggleFacet} onReset={resetFacets} counts={counts} /> : null}
     >
@@ -227,7 +226,7 @@ function IntegrityInner() {
       </Sec>
       <Sec id="i-list" title="상세 목록" n={shown.length}>
         {loading ? <PageLoading />
-          : items.length === 0 ? <EmptyState><span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: C.ok, fontWeight: 700 }}><CheckCircle2 size={15} /> 이상 없음 — 정합성 모두 일치</span></EmptyState>
+          : items.length === 0 ? <EmptyState variant="ok">이상 없음 — 정합성 모두 일치</EmptyState>
           : shown.length === 0 ? <EmptyState>해당 항목 없음</EmptyState>
           : (
             <ExcelSheet

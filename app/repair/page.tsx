@@ -11,7 +11,6 @@ import { FacetRail } from '@/components/FacetRail';
 import { WorkbenchBar } from '@/components/WorkbenchBar';
 import { WorkHubBack } from '@/components/WorkHubTabs';
 import { openIngest, openLog } from '@/lib/ui-bus';
-import { companyLabel } from '@/lib/companies';
 import { useSecOrder } from '@/lib/use-sec-order';
 
 const REPAIR_SECS = ['s-repair', 'a-other'] as const;
@@ -19,7 +18,7 @@ const EMPTY = new Set<string>();
 const LABEL_TO_SEC: Record<string, string> = { '정비·사고': 's-repair', '기타상태': 'a-other' };
 
 export default function RepairPage() {
-  const { companyId, scopeAll } = useSession();
+  const { scopeAll } = useSession();
   const { D, contracts, vehicles, insurances, history, bankTx, penalties, inbox, loading } = useDashboardData();
   const ctx = useMemo(
     () => buildSectionCtx({ D, contracts, history, bankTx, scopeAll, vehicles, insurances, penalties, inbox }),
@@ -42,11 +41,11 @@ export default function RepairPage() {
   return (
     <FacetPage
       title="차량수선"
-      meta={`${scopeAll ? '전체 회사' : companyLabel(companyId)} · 정비·사고`}
+      meta={`정비·사고`}
       tools={
         <WorkbenchBar
           mid={<WorkHubBack />}
-          search
+          search={false}
           actions={
             <span style={{ display: 'inline-flex', gap: SPACE_M, flexWrap: 'wrap' }}>
               <Btn variant="ghost" onClick={() => openLog()}>메모</Btn>

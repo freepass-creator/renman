@@ -545,7 +545,7 @@ export default function ManagementPage() {
           placeholder="법인·대표·사업자"
           value={q}
           onChange={(e) => setQ(e.target.value)}
-          style={{ width: mobile ? 160 : 280, flexShrink: 0 }}
+          style={{ width: mobile ? undefined : 280, flex: mobile ? 1 : undefined, minWidth: mobile ? 0 : undefined }}
         />
       )}
       stats={(

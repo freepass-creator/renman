@@ -99,7 +99,7 @@ function SearchInner() {
         : hits.length === 0 ? <EmptyState>“{term.trim()}” 결과 없음</EmptyState>
         : (
           <>
-            <Sec title="요약" desc={`${scopeAll ? '전체 회사' : companyLabel(companyId)} · ${hits.length}건`}>
+            <Sec title="요약" desc={`${hits.length}건`}>
               <Cards min={128} fit>
                 <Metric label="전체 결과" value={`${hits.length}건`} tone="ok" />
                 {Object.entries(byEntity).map(([ek, n]) => <Metric key={ek} label={ENTITIES[ek]?.label || ek} value={`${n}건`} />)}

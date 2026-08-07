@@ -440,7 +440,7 @@ function WorkLedgerInner() {
           placeholder={penaltyMode ? '차번·실운전자·위반·상태' : '구분·차량·계약자·내용·상태·담당자'}
           value={q}
           onChange={(e) => setQ(e.target.value)}
-          style={{ width: mobile ? 160 : 280, flexShrink: 0 }}
+          style={{ width: mobile ? undefined : 280, flex: mobile ? 1 : undefined, minWidth: mobile ? 0 : undefined }}
         />
         <LedgerFilterButton open={filterOpen} count={filterCount} onClick={() => setFilterOpen((o) => !o)} />
         {!filterOpen && <LedgerActiveFilters
@@ -459,13 +459,13 @@ function WorkLedgerInner() {
             setGroupAndUrl('전체');
           }}
         />}
-        <PeriodBar latest={latest} initial="전체" size="sm" onRange={setRange} />
         {!penaltyMode && (
           <Btn size="sm" variant={showSnoozed ? 'solid' : 'ghost'} aria-pressed={showSnoozed} onClick={() => setShowSnoozed((v) => !v)}>
             <Clock size={14} /> 미룬 일
           </Btn>
         )}
       </>}
+      period={<PeriodBar latest={latest} initial="전체" size="sm" onRange={setRange} />}
       filterPanel={filterOpen ? (
         <LedgerFilterPanel
           title="업무 필터"
