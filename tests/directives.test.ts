@@ -17,7 +17,7 @@ const TODAY = '2026-08-07';
 function agenda(over: Partial<AgendaItem> = {}): AgendaItem {
   return {
     key: 'k', date: '2026-09-01', dday: 25, kind: '검사만기', status: '예정',
-    plate: '12가3456', title: '아반떼', companyId: 'switchplan', company: '스위치', tone: 'green',
+    plate: '12가3456', carName: '아반떼', title: '아반떼', companyId: 'switchplan', company: '스위치', tone: 'green',
     refKey: 'veh_1',
     ...over,
   };

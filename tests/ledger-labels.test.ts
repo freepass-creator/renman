@@ -35,17 +35,17 @@ const PAGE_VIEWS = [
     'company', 'plate', 'carName', 'lifecycle', 'status', 'maintCost', 'maintVsAvg', 'maintCount', 'maintLastDate', 'mileage',
   ]],
   ['계약', CONTRACT_MASTER_BASIC_COLS, CONTRACT_MASTER_EXPANDED_COLS, [
-    'company', 'contractNo', 'contractorName', 'rentalType', 'status', 'plate', 'carName', 'contractorPhone', 'startDate', 'endDate',
+    'company', 'plate', 'carName', 'rentalType', 'status', 'contractNo', 'contractorName', 'contractorPhone', 'startDate', 'endDate',
     'rentalMonths', 'monthlyRent', 'deposit', 'paymentDay', 'paymentTiming', 'unpaidCount', 'overdueDays', 'net', 'riskLabel',
   ]],
   ['계약 회차', SCHEDULE_LEDGER_COLS, SCHEDULE_LEDGER_ALL_COLS, [
-    'company', 'contractNo', 'contractorName', 'kind', 'status', 'plate', 'seq', 'dueDate', 'charge', 'paid', 'balance', 'overdueDays',
+    'company', 'plate', 'carName', 'kind', 'status', 'contractNo', 'contractorName', 'seq', 'dueDate', 'charge', 'paid', 'balance', 'overdueDays',
   ]],
   ['업무', WORK_BASIC_COLS, WORK_ALL_COLS, [
-    'company', 'plate', 'contractor', 'kind', 'status', 'priority', 'title', 'carName', 'contractNo', 'workDate', 'due', 'assignee',
+    'company', 'plate', 'carName', 'kind', 'status', 'contractor', 'priority', 'title', 'contractNo', 'workDate', 'due', 'assignee',
   ]],
   ['과태료', PENALTY_BASIC_COLS, PENALTY_ALL_COLS, [
-    'company', 'plate', 'driver', 'ptype', 'status', 'title', 'violationDate', 'amount',
+    'company', 'plate', 'carName', 'ptype', 'status', 'driver', 'title', 'violationDate', 'amount',
   ]],
   ['운영', FLEET_BASIC_COLS, FLEET_EXPANDED_COLS, [
     'company', 'plate', 'car', 'own', 'status', 'contractState', 'cust', 'loc', 'phone', 'rent', 'dep', 'paymentDay', 'round',
@@ -62,10 +62,10 @@ const PAGE_VIEWS = [
     'company', 'bank', 'holder', 'type', 'status', 'account', 'alias', 'totalIn', 'totalOut', 'currentBalance',
   ]],
   ['리스크', RISK_BASIC_COLS, RISK_EXPANDED_COLS, [
-    'company', 'plate', 'customer', 'kind', 'status', 'group', 'subject', 'due', 'dday', 'amount', 'carName', 'phone',
+    'company', 'plate', 'carName', 'kind', 'status', 'customer', 'group', 'subject', 'due', 'dday', 'amount', 'phone',
   ]],
   ['미수', RECEIVABLE_BASIC_COLS, RECEIVABLE_EXPANDED_COLS, [
-    'company', 'contractNo', 'customer', 'contractState', 'stage', 'plate', 'unpaid', 'overdueDays', 'unpaidCount', 'nextAction',
+    'company', 'plate', 'carName', 'contractState', 'stage', 'contractNo', 'customer', 'unpaid', 'overdueDays', 'unpaidCount', 'nextAction',
   ]],
 ] as const;
 

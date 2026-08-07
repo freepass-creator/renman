@@ -22,7 +22,7 @@ function MSearchInner() {
 
   return (
     <>
-      <MHead title="조회" sub={q ? `${total}건` : '차량 · 계약 · 업무'} color={C.ok} />
+      <MHead title="조회" sub={q ? `${total}건` : '차량 · 계약 · 업무'} color={C.ok} search={false} />
       <div style={{ padding: '12px 14px 24px', display: 'flex', flexDirection: 'column', gap: 12 }}>
         <Search
           autoFocus

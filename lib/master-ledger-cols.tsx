@@ -342,16 +342,16 @@ const CONTRACT_COL_CATALOG: SheetCol<ContractMasterRow>[] = [
 
 /** 계약 엑셀 열 — `계약 · 엑셀기본|엑셀전체 · +|-key` @see lib/ledger-ext.ts */
 export const CONTRACT_SHEET_KEYS: SheetViewKeys = {
-  // 회사·계약번호·계약자·연락처·차·차명·대여형태·상태·시작·종료·기간·월대여·보증·결제·납부시기·미납회차·연체·미수·리스크
+  // 앞 5칸 고정(회사명·차량번호·차명·계약분류·계약상태) → 계약번호·계약자·연락처 → 나머지
   basic: [
-    'company', 'contractNo', 'contractorName', 'rentalType', 'status',
-    'plate', 'carName', 'contractorPhone',
+    'company', 'plate', 'carName', 'rentalType', 'status',
+    'contractNo', 'contractorName', 'contractorPhone',
     'startDate', 'endDate', 'rentalMonths', 'monthlyRent', 'deposit', 'paymentDay', 'paymentTiming',
     'unpaidCount', 'overdueDays', 'net', 'riskLabel',
   ],
   all: [
-    'company', 'contractNo', 'contractorName', 'rentalType', 'status',
-    'plate', 'carName', 'contractorPhone', 'contractDate', 'startDate', 'endDate',
+    'company', 'plate', 'carName', 'rentalType', 'status',
+    'contractNo', 'contractorName', 'contractorPhone', 'contractDate', 'startDate', 'endDate',
     'monthlyRent', 'deposit', 'depositReceived', 'depositReceivedDate', 'paymentDay', 'paymentTiming', 'paymentMethod', 'riskLabel', 'net', 'alert',
     'contractorBirth', 'contractorLicenseNo', 'contractorLicenseExpiry', 'licenseType', 'contractorAddress',
     'rentalMonths', 'annualMileageLimit', 'mileageOut', 'returnMileage', 'overMileageRate',
@@ -425,6 +425,8 @@ const SCHEDULE_COL_CATALOG: SheetCol<ScheduleLedgerRow>[] = [
   { key: 'contractNo', label: LEDGER_LABEL.contractNo, priority: 1, render: (r) => dash(r.contractNo), text: (r) => r.contractNo },
   { key: 'contractorName', label: LEDGER_LABEL.contractor, priority: 1, render: (r) => r.contractorName || LEDGER_EMPTY.none, text: (r) => r.contractorName },
   { key: 'plate', label: LEDGER_LABEL.plate, priority: 1, render: (r) => r.plate || LEDGER_EMPTY.unassigned, text: (r) => r.plate },
+  // 행문법 3번 칸 — 전 원장 공통 「회사명·차량번호·차명·분류·상태」(사장님 확정 2026-08-07).
+  { key: 'carName', label: LEDGER_LABEL.carName, priority: 2, render: (r) => r.carName || LEDGER_EMPTY.dash, text: (r) => r.carName },
   {
     key: 'seq', label: '회차', align: 'c', priority: 1,
     render: (r) => `${r.seq}/${r.seqTotal}`,
@@ -456,8 +458,8 @@ const SCHEDULE_COL_CATALOG: SheetCol<ScheduleLedgerRow>[] = [
 
 export const SCHEDULE_SHEET_KEYS: SheetViewKeys = {
   // 열 순서 기준 = 자산관리: 회사(1) · 식별자(2) · 이름(3) · 분류(4) · 상태(5) · 나머지
-  basic: ['company', 'contractNo', 'contractorName', 'kind', 'status', 'plate', 'seq', 'dueDate', 'charge', 'paid', 'balance', 'overdueDays'],
-  all: ['company', 'contractNo', 'contractorName', 'kind', 'status', 'plate', 'seq', 'dueDate', 'charge', 'discount', 'paid', 'balance', 'overdueDays', 'paidAt', 'method'],
+  basic: ['company', 'plate', 'carName', 'kind', 'status', 'contractNo', 'contractorName', 'seq', 'dueDate', 'charge', 'paid', 'balance', 'overdueDays'],
+  all: ['company', 'plate', 'carName', 'kind', 'status', 'contractNo', 'contractorName', 'seq', 'dueDate', 'charge', 'discount', 'paid', 'balance', 'overdueDays', 'paidAt', 'method'],
 };
 
 const _scheduleViews = buildSheetViews(SCHEDULE_COL_CATALOG, SCHEDULE_SHEET_KEYS);

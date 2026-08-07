@@ -87,6 +87,7 @@ describe('UI 공용 원자 규격', () => {
   it('모바일은 업무·단건입력을 전용 경로로 제공하고 웹 데이터센터로 보내지 않는다', () => {
     const tabBar = readFileSync(join(root, 'components/m/MTabBar.tsx'), 'utf8');
     const home = readFileSync(join(root, 'app/m/page.tsx'), 'utf8');
+    const head = readFileSync(join(root, 'components/m/MHead.tsx'), 'utf8');
     const entry = readFileSync(join(root, 'app/m/entry/page.tsx'), 'utf8');
     const work = readFileSync(join(root, 'app/m/work/page.tsx'), 'utf8');
     const workDetail = readFileSync(join(root, 'app/m/work/[id]/page.tsx'), 'utf8');
@@ -96,9 +97,18 @@ describe('UI 공용 원자 규격', () => {
     const workNew = readFileSync(join(root, 'app/m/work/new/page.tsx'), 'utf8');
 
     expect(tabBar).toContain("href: '/m/work'");
-    expect(tabBar).not.toContain("href: '/m/risk', label: '리스크'");
-    expect(home).toContain("router.push(t ? `/m/search?q=");
-    expect(home).toContain("new Set(['/risk', '/status', '/work'])");
+    // 2026-08-07 모바일 하단탭 재설계 — 5탭(홈·운영·업무·단건입력·설정) → 4탭(운영현황·리스크·업무관리·업로드).
+    // 리스크가 탭으로 올라왔다(예전엔 홈에서 들어가는 스택 화면). 설정·계정은 상단 햄버거.
+    expect(tabBar).toContain("href: '/m/risk'");
+    expect(tabBar).not.toContain("href: '/m/me'");
+    // 탭 루트와 TABS 목록은 같은 집합이어야 한다 — 어긋나면 그 탭에서 하단바가 사라진다(app/m/layout).
+    const roots = tabBar.match(/TAB_ROOTS = \[([^\]]*)\]/)?.[1] || '';
+    for (const href of tabBar.match(/href: '(\/m[^']*)'/g) || []) {
+      expect(roots).toContain(href.replace("href: ", ""));
+    }
+    // /m 은 4탭 재설계로 운영 탭 리다이렉트가 됐다 — 검색 입구는 헤더(MHead)가 맡는다.
+    expect(home).toContain("router.replace('/m/ops')");
+    expect(head).toContain('href="/m/search"');
     expect(entry).toContain('<QuickInput');
     expect(entry).not.toMatch(/router\.push\(['"]\/(?:ingest|inbox)/);
     expect(work).toContain('buildWorkItemLedgerRows');

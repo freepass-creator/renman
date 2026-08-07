@@ -21,6 +21,8 @@ export type AgendaItem = {
   kind: AgendaKind;
   status: AgendaStatus;
   plate: string;
+  /** 차명 — 행문법 3번 칸(전 원장 공통 「회사명·차량번호·차명·분류·상태」). 차량 원장에서 붙인다. */
+  carName: string;
   title: string;
   companyId: string;
   company: string;
@@ -58,6 +60,12 @@ export function buildAgenda(
   penalties: EntityRecord[],
 ): AgendaItem[] {
   const items: AgendaItem[] = [];
+  // 차명은 일정 자체가 갖고 있지 않다 — 차량번호로 한 번만 색인해 두고 붙인다.
+  const carNameByPlate = new Map<string, string>();
+  for (const v of vehicles) {
+    const plate = String(v.plate || '');
+    if (plate && !carNameByPlate.has(plate)) carNameByPlate.set(plate, String(v.carName || v.model || ''));
+  }
   const push = (
     date: unknown, kind: AgendaKind, plate: string, title: string, companyId: string, key: string,
     extra?: { refKey?: string; amount?: number },
@@ -73,6 +81,7 @@ export function buildAgenda(
       kind,
       status,
       plate,
+      carName: carNameByPlate.get(plate) || '',
       title,
       companyId,
       company: companyShort(companyId),

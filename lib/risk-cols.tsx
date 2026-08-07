@@ -116,8 +116,8 @@ const CATALOG: SheetCol<RiskSheetRow>[] = [
  *   구분→분류→상태를 «연속 블록»으로 둬서 분류 바로 뒤에 상태가 오는 규격을 지킨다.
  */
 export const RISK_SHEET_KEYS: SheetViewKeys = {
-  basic: ['company', 'plate', 'customer', 'kind', 'status', 'group', 'subject', 'due', 'dday', 'amount', 'carName', 'phone'],
-  all: ['company', 'plate', 'customer', 'kind', 'status', 'group', 'subject', 'due', 'dday', 'overdueDays', 'amount', 'carName', 'phone'],
+  basic: ['company', 'plate', 'carName', 'kind', 'status', 'customer', 'group', 'subject', 'due', 'dday', 'amount', 'phone'],
+  all: ['company', 'plate', 'carName', 'kind', 'status', 'customer', 'group', 'subject', 'due', 'dday', 'overdueDays', 'amount', 'phone'],
 };
 
 const views = buildSheetViews(CATALOG, RISK_SHEET_KEYS);

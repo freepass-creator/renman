@@ -294,6 +294,8 @@ const PENALTY_COL_CATALOG: SheetCol<WorkLedgerRow>[] = [
   // ★pin 필수 — 틀고정은 «첫 번째 pin 열» 하나만 left:0 으로 붙는다(excel-sheet).
   //   회사명이 1번 칸인데 pin 이 없으면 고정되는 건 그다음 pin 열(plate)이라
   //   가로로 밀 때 차량번호가 회사명 위를 덮는다. 다른 원장은 전부 company 가 pin 이다.
+  // 행문법 3번 칸 — 전 원장 공통 「회사명·차량번호·차명·분류·상태」(사장님 확정 2026-08-07).
+  { key: 'carName', label: LEDGER_LABEL.carName, render: (r) => r.carName || LEDGER_EMPTY.dash, text: (r) => r.carName || '' },
   { key: 'company', label: LEDGER_LABEL.company, pin: true, priority: 2, render: (r) => r.company || LEDGER_EMPTY.dash, text: (r) => r.company },
   { key: 'due', label: LEDGER_LABEL.due, priority: 2, render: (r) => r.dueDate || LEDGER_EMPTY.dash, text: (r) => r.dueDate },
 ];
@@ -313,7 +315,7 @@ const PENALTY_DETAIL_CATALOG: SheetCol<WorkLedgerRow>[] = [
 ];
 
 export const WORK_SHEET_KEYS: SheetViewKeys = {
-  basic: ['company', 'plate', 'contractor', 'kind', 'status', 'priority', 'title', 'carName', 'contractNo', 'workDate', 'due', 'assignee'],
+  basic: ['company', 'plate', 'carName', 'kind', 'status', 'contractor', 'priority', 'title', 'contractNo', 'workDate', 'due', 'assignee'],
   all: [
     'company', 'plate', 'contractor', 'kind', 'status', 'priority', 'title', 'carName', 'rentalType', 'contractNo', 'workDate',
     'assignee', 'created', 'updated', 'due', 'amount', 'source',
@@ -321,8 +323,8 @@ export const WORK_SHEET_KEYS: SheetViewKeys = {
 };
 
 export const PENALTY_SHEET_KEYS: SheetViewKeys = {
-  basic: ['company', 'plate', 'driver', 'ptype', 'status', 'title', 'violationDate', 'amount'],
-  all: ['company', 'plate', 'driver', 'ptype', 'status', 'title', 'violationDate', 'amount', 'due'],
+  basic: ['company', 'plate', 'carName', 'ptype', 'status', 'driver', 'title', 'violationDate', 'amount'],
+  all: ['company', 'plate', 'carName', 'ptype', 'status', 'driver', 'title', 'violationDate', 'amount', 'due'],
 };
 
 const _workViews = buildSheetViews(WORK_COL_CATALOG, WORK_SHEET_KEYS);

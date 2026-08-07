@@ -22,26 +22,37 @@ import { AGENDA_BASIC_COLS } from '@/lib/agenda-cols';
 import { STAFF_COLS } from '@/lib/staff-cols';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
-const LEDGERS: Array<[string, SheetCol<any>[]]> = [
-  ['운영현황', FLEET_BASIC_COLS],
-  ['자산', ASSET_MASTER_BASIC_COLS],
-  ['정비', ASSET_MAINT_BASIC_COLS],
-  ['계약', CONTRACT_MASTER_BASIC_COLS],
-  ['회차', SCHEDULE_LEDGER_COLS],
-  ['리스크', RISK_BASIC_COLS],
-  ['미수', RECEIVABLE_BASIC_COLS],
-  ['업무', WORK_BASIC_COLS],
-  ['과태료', PENALTY_BASIC_COLS],
-  ['일정', AGENDA_BASIC_COLS],
-  ['임직원', STAFF_COLS],
+/** [이름, 기본보기 열, 차량 원장인가] — 임직원만 차량을 다루지 않는다. */
+const LEDGERS: Array<[string, SheetCol<any>[], boolean]> = [
+  ['운영현황', FLEET_BASIC_COLS, true],
+  ['자산', ASSET_MASTER_BASIC_COLS, true],
+  ['정비', ASSET_MAINT_BASIC_COLS, true],
+  ['계약', CONTRACT_MASTER_BASIC_COLS, true],
+  ['회차', SCHEDULE_LEDGER_COLS, true],
+  ['리스크', RISK_BASIC_COLS, true],
+  ['미수', RECEIVABLE_BASIC_COLS, true],
+  ['업무', WORK_BASIC_COLS, true],
+  ['과태료', PENALTY_BASIC_COLS, true],
+  ['일정', AGENDA_BASIC_COLS, true],
+    // 임직원은 차량 원장이 아니다 — 2·3번은 이름·이메일(그 원장의 신원).
+  ['임직원', STAFF_COLS, false],
 ];
 
 const labelOf = (c: SheetCol<any>) => (typeof c.label === 'string' ? c.label : '');
 
 describe('행문법', () => {
-  it.each(LEDGERS)('%s 기본보기가 행문법을 지킨다', (name, cols) => {
-    const bad = checkRowGrammar(cols);
+  it.each(LEDGERS)('%s 기본보기가 행문법을 지킨다', (name, cols, isVehicle) => {
+    const bad = checkRowGrammar(cols, isVehicle);
     expect(bad, `${name}:\n  ${bad.join('\n  ')}\n  실제 순서: ${cols.map((c) => labelOf(c)).join(' · ')}`).toEqual([]);
+  });
+
+  it('앞 5칸은 어느 차량 원장에서나 「회사명·차량번호·차명·X분류·X상태」다', () => {
+    for (const [name, cols, isVehicle] of LEDGERS) {
+      if (!isVehicle) continue;
+      expect([labelOf(cols[0]), labelOf(cols[1]), labelOf(cols[2])], name).toEqual(['회사명', '차량번호', '차명']);
+      expect(CLASS_LABEL.test(labelOf(cols[3])), `${name}: 4번=${labelOf(cols[3])}`).toBe(true);
+      expect(STATUS_LABEL.test(labelOf(cols[4])), `${name}: 5번=${labelOf(cols[4])}`).toBe(true);
+    }
   });
 
   it('1번 칸은 어느 원장에서나 회사명이다', () => {

@@ -56,6 +56,12 @@ const CATALOG: SheetCol<ReceivableRow>[] = [
     text: (r) => String(r.rec.plate || ''),
   },
   {
+  // 행문법 3번 칸 — 전 원장 공통 「회사명·차량번호·차명·분류·상태」(사장님 확정 2026-08-07).
+    key: 'carName', label: LEDGER_LABEL.carName, priority: 2,
+    render: (r) => String(r.rec.carName || LEDGER_EMPTY.dash),
+    text: (r) => String(r.rec.carName || ''),
+  },
+  {
     key: 'unpaid', label: '미수금', priority: 1, align: 'r', sortNum: true, xf: 'money',
     render: (r) => <span style={{ color: C.danger, fontWeight: 800 }}>{money(r.v.net)}</span>,
     text: (r) => r.v.net,
@@ -135,8 +141,8 @@ const CATALOG: SheetCol<ReceivableRow>[] = [
 ];
 
 export const RECEIVABLE_SHEET_KEYS: SheetViewKeys = {
-  basic: ['company', 'contractNo', 'customer', 'contractState', 'stage', 'plate', 'unpaid', 'overdueDays', 'unpaidCount', 'nextAction'],
-  all: ['company', 'contractNo', 'customer', 'contractState', 'stage', 'plate', 'unpaid', 'overdueDays', 'unpaidCount', 'nextAction', 'contractTerms', 'phone', 'period', 'monthlyRent', 'gross', 'paid', 'notice', 'engine', 'lastContact', 'contactMemo'],
+  basic: ['company', 'plate', 'carName', 'contractState', 'stage', 'contractNo', 'customer', 'unpaid', 'overdueDays', 'unpaidCount', 'nextAction'],
+  all: ['company', 'plate', 'carName', 'contractState', 'stage', 'contractNo', 'customer', 'unpaid', 'overdueDays', 'unpaidCount', 'nextAction', 'contractTerms', 'phone', 'period', 'monthlyRent', 'gross', 'paid', 'notice', 'engine', 'lastContact', 'contactMemo'],
 };
 
 const views = buildSheetViews(CATALOG, RECEIVABLE_SHEET_KEYS);
