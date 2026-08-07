@@ -94,7 +94,8 @@ export function loginAge(lastSignInAt: string, today = new Date()): { days: numb
   const t = Date.parse(lastSignInAt);
   if (!Number.isFinite(t)) return { days: null, label: '기록없음' };
   const days = Math.floor((today.getTime() - t) / 86_400_000);
-  const ymd = new Date(t).toISOString().slice(0, 10);
+  // ★KST 로 자른다 — UTC 로 자르면 KST 00~09시 로그인이 「어제」로 표시된다.
+  const ymd = new Date(t + 9 * 3_600_000).toISOString().slice(0, 10);
   if (days <= 0) return { days: 0, label: `${ymd} · 오늘` };
   return { days, label: `${ymd} · D+${days}` };
 }

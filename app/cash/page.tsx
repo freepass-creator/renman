@@ -27,7 +27,7 @@ import { useEntityList, useEntityLists } from '@/lib/use-entity-lists';
 import { textMatch } from '@/lib/search-match';
 import { notifySaved, openIngest, openCar, openPayments } from '@/lib/ui-bus';
 import { companyDisplay } from '@/lib/companies';
-import { TODAY } from '@/lib/dashboard-consts';
+import { TODAY, todayKST } from '@/lib/dashboard-consts';
 import { periodRange } from '@/lib/finance/period';
 import { type EntityRecord } from '@/lib/intake/entities';
 import {
@@ -965,7 +965,7 @@ export default function CashLedgerPage() {
             placeholder="회사·예정일·근거·대상·상태"
             value={q}
             onChange={(event) => setQ(event.target.value)}
-            style={{ width: mobile ? 160 : 280, flexShrink: 0 }}
+            style={{ width: mobile ? undefined : 280, flex: mobile ? 1 : undefined, minWidth: mobile ? 0 : undefined }}
           />
           <Select
             size="sm"
@@ -1041,7 +1041,7 @@ export default function CashLedgerPage() {
             placeholder="회사·은행·계좌번호·계좌명·등록자"
             value={q}
             onChange={(event) => setQ(event.target.value)}
-            style={{ width: mobile ? 160 : 280, flexShrink: 0 }}
+            style={{ width: mobile ? undefined : 280, flex: mobile ? 1 : undefined, minWidth: mobile ? 0 : undefined }}
           />
           <LedgerFilterButton open={filterOpen} count={cashFilterCount} onClick={() => setFilterOpen((o) => !o)} />
           {!filterOpen && (
@@ -1051,8 +1051,8 @@ export default function CashLedgerPage() {
               onClearAll={() => cashFilterDefs.forEach((d) => onCashFilterChange(d.key, ''))}
             />
           )}
-          <PeriodBar latest={latest} initial="월간" size="sm" onRange={onRange} />
         </>}
+        period={<PeriodBar latest={latest} initial="월간" size="sm" onRange={onRange} />}
         filterPanel={cashFilterPanel}
         stats={<span style={{ fontSize: 12.5, color: C.mute }}>전체 <b>{accountTotal}</b> · 사용중 <b style={{ color: C.ok }}>{activeAccounts}</b></span>}
         loading={accountLoading}
@@ -1168,12 +1168,12 @@ export default function CashLedgerPage() {
             placeholder="회사·계좌·상대·과목·내용"
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            style={{ width: mobile ? 160 : 280, flexShrink: 0 }}
+            style={{ width: mobile ? undefined : 280, flex: mobile ? 1 : undefined, minWidth: mobile ? 0 : undefined }}
           />
           <LedgerFilterButton open={filterOpen} count={cashFilterCount} onClick={() => setFilterOpen((o) => !o)} />
-          <PeriodBar latest={latest} initial="월간" size="sm" onRange={onRange} />
         </>
       }
+      period={<PeriodBar latest={latest} initial="월간" size="sm" onRange={onRange} />}
       filterPanel={cashFilterPanel}
       hint={
         rowMore > 0 ? (
@@ -1234,7 +1234,8 @@ export default function CashLedgerPage() {
           entityKey={singleKind === '법인카드' ? 'card_tx' : 'bank_tx'}
           title={`${singleKind} 단건 입력`}
           sections={singleKind === '법인카드' ? CARD_TX_CREATE_SECTIONS : CASH_TX_CREATE_SECTIONS}
-          initial={{ txDate: new Date().toISOString().slice(0, 10), entryDirection: '입금', method: singleKind === 'CMS' ? 'CMS' : '계좌' }}
+          // ★거래일 기본값은 KST(todayKST) — UTC toISOString 은 KST 00~09시에 «어제»를 채운다.
+          initial={{ txDate: todayKST(), entryDirection: '입금', method: singleKind === 'CMS' ? 'CMS' : '계좌' }}
           prepareRecord={(record) => {
             if (singleKind === '법인카드') return record;
             const { entryDirection, entryAmount, ...stored } = record;

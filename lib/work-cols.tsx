@@ -291,7 +291,10 @@ const PENALTY_COL_CATALOG: SheetCol<WorkLedgerRow>[] = [
   },
   { key: 'ptype', label: '과태료분류', priority: 2, render: (r) => r.penaltyKind || LEDGER_EMPTY.dash, text: (r) => r.penaltyKind || '' },
   { key: 'title', label: '위반내용', priority: 2, render: (r) => r.title || LEDGER_EMPTY.dash, text: (r) => r.title },
-  { key: 'company', label: LEDGER_LABEL.company, priority: 2, render: (r) => r.company || LEDGER_EMPTY.dash, text: (r) => r.company },
+  // ★pin 필수 — 틀고정은 «첫 번째 pin 열» 하나만 left:0 으로 붙는다(excel-sheet).
+  //   회사명이 1번 칸인데 pin 이 없으면 고정되는 건 그다음 pin 열(plate)이라
+  //   가로로 밀 때 차량번호가 회사명 위를 덮는다. 다른 원장은 전부 company 가 pin 이다.
+  { key: 'company', label: LEDGER_LABEL.company, pin: true, priority: 2, render: (r) => r.company || LEDGER_EMPTY.dash, text: (r) => r.company },
   { key: 'due', label: LEDGER_LABEL.due, priority: 2, render: (r) => r.dueDate || LEDGER_EMPTY.dash, text: (r) => r.dueDate },
 ];
 
