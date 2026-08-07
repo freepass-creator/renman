@@ -2,6 +2,7 @@
 import * as XLSX from 'xlsx';
 import { ENTITIES, type EntityRecord } from './entities';
 import { parseTxFile } from './parse-tx';
+import { coerceRecords } from './coerce';
 
 export function downloadXlsxTemplate(entityKey: string): void {
   const entity = ENTITIES[entityKey];
@@ -40,5 +41,6 @@ export async function parseSpreadsheet(entityKey: string, file: File): Promise<E
     });
     if (Object.keys(record).length) records.push(record);
   }
-  return records;
+  // ★raw:false 로 읽으므로 셀 «서식 그대로»(「1,234,000」)가 들어온다 — 반드시 타입대로 정규화.
+  return coerceRecords(entityKey, records);
 }

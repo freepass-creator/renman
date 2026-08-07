@@ -45,7 +45,8 @@ function statusTone(s: StaffLiveStatus): 'green' | 'red' | 'amber' | 'gray' {
 
 export const STAFF_COLS: SheetCol<StaffSheetRow>[] = [
   {
-    key: 'company', label: LEDGER_LABEL.company, priority: 1,
+    // 다른 원장과 같이 1번 칸을 고정한다 — 가로로 밀 때 «누구 행인지»를 잃지 않게.
+    key: 'company', label: LEDGER_LABEL.company, pin: true, priority: 1,
     render: (r) => r.company || LEDGER_EMPTY.dash,
     text: (r) => r.company,
   },

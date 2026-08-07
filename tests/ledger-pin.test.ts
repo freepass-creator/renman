@@ -18,6 +18,7 @@ import { RISK_BASIC_COLS, RISK_EXPANDED_COLS } from '@/lib/risk-cols';
 import { RECEIVABLE_BASIC_COLS, RECEIVABLE_EXPANDED_COLS } from '@/lib/receivables-cols';
 import { WORK_BASIC_COLS, WORK_ALL_COLS, PENALTY_BASIC_COLS, PENALTY_ALL_COLS } from '@/lib/work-cols';
 import { AGENDA_BASIC_COLS, AGENDA_EXPANDED_COLS } from '@/lib/agenda-cols';
+import { STAFF_COLS } from '@/lib/staff-cols';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 const VIEWS: Array<[string, SheetCol<any>[]]> = [
@@ -30,6 +31,7 @@ const VIEWS: Array<[string, SheetCol<any>[]]> = [
   ['업무.기본', WORK_BASIC_COLS], ['업무.전체', WORK_ALL_COLS],
   ['과태료.기본', PENALTY_BASIC_COLS], ['과태료.전체', PENALTY_ALL_COLS],
   ['일정.기본', AGENDA_BASIC_COLS], ['일정.전체', AGENDA_EXPANDED_COLS],
+  ['임직원', STAFF_COLS],
 ];
 
 describe('원장 틀고정', () => {

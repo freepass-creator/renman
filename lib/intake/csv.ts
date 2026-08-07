@@ -1,5 +1,6 @@
 /** 엑셀(CSV) 인제스천 — 엔티티 스키마에서 템플릿 생성 + 업로드 파싱. (XLSX 라이브러리는 추후) */
 import { ENTITIES, type EntityRecord } from './entities';
+import { coerceRecords } from './coerce';
 
 function splitCsvLine(line: string): string[] {
   const out: string[] = [];
@@ -50,7 +51,8 @@ export function parseCsv(entityKey: string, text: string): EntityRecord[] {
     });
     if (Object.keys(rec).length) records.push(rec);
   }
-  return records;
+  // 문자열로 들어온 금액·날짜를 타입대로 정규화(엑셀과 같은 규칙).
+  return coerceRecords(entityKey, records);
 }
 
 export function downloadText(filename: string, text: string, mime = 'text/csv;charset=utf-8') {
