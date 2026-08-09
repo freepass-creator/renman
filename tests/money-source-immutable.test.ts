@@ -110,3 +110,32 @@ describe('firestore.rules ↔ 클라 목록 동기화', () => {
     expect(rules).toMatch(/`memo` 는 일부러 제외/);
   });
 });
+
+/**
+ * ★claim 없는 계정 차단 (2026-08-09).
+ * 자가 가입으로 만든 계정은 systemRole 이 없어 myCompany() 가 null 이다.
+ * tenantOK 에 `companyId is string` 이 없으면 companyId 가 없는 문서에서 null == null 로 통과한다.
+ * 공개 API 키가 클라 번들에 있으므로 화면 없이도 계정을 만들 수 있다 — 규칙이 유일한 경계다.
+ */
+describe('claim 없는 계정 차단', () => {
+  const storageRules = readFileSync(join(process.cwd(), 'storage.rules'), 'utf8');
+
+  it.each([['firestore.rules', rules], ['storage.rules', storageRules]])(
+    '%s 의 tenantOK 는 companyId 가 문자열일 때만 소속을 인정한다',
+    (_name, src) => {
+      const fn = src.match(/function tenantOK\(companyId\)\s*\{([\s\S]*?)\n\s*\}/)?.[1] ?? '';
+      expect(fn, 'tenantOK 를 못 찾았다').not.toBe('');
+      expect(fn).toContain('companyId is string');
+    },
+  );
+
+  it('내부 컬렉션(_ 접두)은 업무 컬렉션에서 제외된다', () => {
+    const fn = rules.match(/function businessColl\(coll\)\s*\{([\s\S]*?)\n\s*\}/)?.[1] ?? '';
+    expect(fn).toContain("!coll.matches('_.*')");
+  });
+
+  it('스토리지 원본 삭제는 본사만 — 증빙이 사라지면 감사 추적이 끊긴다', () => {
+    expect(storageRules).toMatch(/allow delete: if isHQ\(\);/);
+    expect(storageRules).not.toMatch(/allow write: if isSignedIn/);
+  });
+});

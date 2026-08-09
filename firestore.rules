@@ -13,7 +13,19 @@ service cloud.firestore {
         ? request.auth.token.companyId
         : null;
     }
-    function tenantOK(companyId) { return isHQ() || (isSignedIn() && myCompany() == companyId); }
+    /**
+     * ★companyId 가 «문자열일 때만» 소속 판정을 한다.
+     *   빠뜨리면: 자가 가입(createUserWithEmailAndPassword)으로 만든 **claim 없는** 계정은
+     *   myCompany() 가 null 이므로, companyId 가 없는 문서에 대해 null == null 로 통과한다.
+     *   공개 API 키는 클라 번들에 박혀 있으므로 화면 없이도 계정을 만들 수 있다 —
+     *   즉 businessColl 목록에 빠진 내부 컬렉션은 누구나 읽고 고칠 수 있었다.
+     *   (2026-08-09 실측: 운영에 그런 문서 1건 `_conntest`. 나머지 31건은 명시 규칙이 막고 있었다.)
+     *   businessColl 이 «제외 목록»이라 새 내부 컬렉션이 생길 때마다 같은 구멍이 다시 난다 →
+     *   여기서 원천 차단한다.
+     */
+    function tenantOK(companyId) {
+      return isHQ() || (isSignedIn() && companyId is string && myCompany() == companyId);
+    }
     // ★ 민감 컬렉션 — 범용 규칙에서 반드시 제외. 각자의 명시 match만 지배(범용 OR 우회로 권한승격 차단).
     //   users: role 자기승격 방지 · period_locks: 마감 우회 방지 · audit_logs: 위변조 방지
     //   · company_master: 대외문서에 인쇄되는 법인 신원 위조 방지
@@ -32,7 +44,8 @@ service cloud.firestore {
         && coll != 'period_locks'
         && coll != 'audit_logs'
         && coll != 'migration'
-        && coll != '_api_rate_limits';
+        && coll != '_api_rate_limits'
+        && !coll.matches('_.*');   // 내부용(_conntest 등)은 업무 컬렉션이 아니다
     }
 
     // 서버 Admin 전용. 클라이언트는 조회·변조할 수 없다.

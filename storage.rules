@@ -13,12 +13,16 @@ service firebase.storage {
         : null;
     }
     function tenantOK(companyId) {
-      return isHQ() || (isSignedIn() && myCompany() == companyId);
+      // Firestore 규칙과 동일 — companyId 가 문자열일 때만 소속 판정(claim 없는 계정 차단).
+      return isHQ() || (isSignedIn() && companyId is string && myCompany() == companyId);
     }
 
     match /docs/{companyId}/{allPaths=**} {
       allow read: if isSignedIn() && tenantOK(companyId);
-      allow write: if isSignedIn() && tenantOK(companyId)
+      // 원본 삭제는 본사만 — Firestore 와 같은 규칙(일반 삭제는 soft-delete, 하드삭제는 HQ).
+      //   증빙 원본이 사라지면 감사 추적이 끊긴다. 교체는 같은 경로 덮어쓰기(update)로 된다.
+      allow delete: if isHQ();
+      allow create, update: if isSignedIn() && tenantOK(companyId)
         && request.resource.size > 0
         && request.resource.size <= 20 * 1024 * 1024
         && request.resource.contentType.matches('image/(jpeg|png|webp)|application/pdf');
