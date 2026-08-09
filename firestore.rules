@@ -43,7 +43,7 @@ service cloud.firestore {
         && coll != 'company_registry'
         && coll != 'period_locks'
         && coll != 'audit_logs'
-        && coll != 'migration'
+        && !coll.matches('migration.*')   // migration · migration_baselines · migration_acceptances
         && coll != '_api_rate_limits'
         && !coll.matches('_.*');   // 내부용(_conntest 등)은 업무 컬렉션이 아니다
     }
@@ -62,9 +62,13 @@ service cloud.firestore {
     //   승인은 «서버가 Firestore 실물을 세어 기준선과 대조했다»는 사실이다. 클라이언트가 쓸 수 있으면
     //   그 사실을 지어낼 수 있고(로컬 반영을 승인된 것으로 위장), 오픈 판단이 위조된 기록 위에 선다.
     //   읽기도 막는다 — 기대치·실제치가 곧 회사별 규모 정보다.
-    match /migration/{docId} {
-      allow read, write: if false;
-    }
+    //   ★막는 방법 = businessColl 에서 `migration*` 접두를 제외하는 것.
+    //     규칙은 «허용»만 하고 거부하지 않으므로, 어느 match 도 열어 주지 않으면 그것이 차단이다.
+    //     예전에 `match /migration/{docId} { allow read,write: if false }` 를 뒀는데
+    //     ① 그 블록 자체는 아무것도 막지 못하고 ② 실제 컬렉션 이름은
+    //     `migration_baselines`·`migration_acceptances` 라 businessColl 의 `!= 'migration'` 을
+    //     빠져나가 범용 규칙에 그대로 노출돼 있었다(2026-08-09 실측 · 원본 덤프 2.7MB).
+    //     이름이 바뀌어도 새지 않도록 접두로 맞춘다.
 
     match /users/{uid} {
       allow read: if isSignedIn() && (request.auth.uid == uid || isHQ());

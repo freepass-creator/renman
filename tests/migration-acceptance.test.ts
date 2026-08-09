@@ -128,16 +128,35 @@ describe('클라 가드 — 로컬 반영은 승인을 보내지 않는다', () 
 });
 
 describe('firestore.rules — 승인 기록은 서버만 쓴다', () => {
-  it('migration 컬렉션은 클라이언트 읽기·쓰기 전면 차단', () => {
-    expect(rules).toMatch(/match \/migration\/\{docId\} \{\s*\n\s*allow read, write: if false;/);
+  /**
+   * ★2026-08-09 정정. 예전 테스트는
+   *     match /migration/{docId} { allow read, write: if false; }
+   *   가 있는지를 봤는데 그 블록은 **아무것도 막지 못한다** —
+   *   Firestore 규칙은 «허용»만 하고 거부하지 않는다. 어느 match 도 열어 주지 않는 것이 차단이다.
+   *   게다가 실제 컬렉션 이름은 `migration_baselines`·`migration_acceptances` 라
+   *   businessColl 의 `!= 'migration'` 을 빠져나가 범용 규칙에 노출돼 있었다
+   *   (운영 실측: 원본 덤프 2.7MB·개인정보 포함). 테스트가 헛된 안심을 주고 있었다.
+   *   → 진짜 방어인 businessColl 접두 제외를 검사한다.
+   */
+  const businessCollBody = () =>
+    rules.match(/function businessColl\(coll\)\s*\{([\s\S]*?)\n\s*\}/)?.[1] ?? '';
+
+  it('businessColl 이 migration 접두 컬렉션을 통째로 제외한다 — 이름이 바뀌어도 안 샌다', () => {
+    const fn = businessCollBody();
+    expect(fn, 'businessColl 을 못 찾았다').not.toBe('');
+    expect(fn).toContain("!coll.matches('migration.*')");
   });
 
-  it('범용 match 의 businessColl 에서도 제외된다 — OR 우회로 새지 않게', () => {
-    expect(rules).toContain("&& coll != 'migration'");
-  });
+  it.each(['migration', 'migration_baselines', 'migration_acceptances'])(
+    '%s 는 범용 규칙이 열어 주지 않는다',
+    (coll) => {
+      // businessColl 이 false → 범용 match 의 read/create/update/delete 전부 불성립.
+      expect(coll.startsWith('migration')).toBe(true);
+      expect(businessCollBody()).toContain("!coll.matches('migration.*')");
+    },
+  );
 
-  it('컬렉션 이름은 코드와 규칙이 같은 값을 쓴다', () => {
-    expect(MIGRATION_COLL).toBe('migration');
-    expect(rules).toContain(`match /${MIGRATION_COLL}/{docId}`);
+  it('코드가 쓰는 컬렉션 이름이 그 접두 안에 든다', () => {
+    expect(MIGRATION_COLL.startsWith('migration')).toBe(true);
   });
 });
