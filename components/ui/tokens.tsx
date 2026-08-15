@@ -13,7 +13,14 @@ export const C = {
   danger: 'var(--red-text)', ok: 'var(--green-text)', warn: 'var(--orange-text)', violet: 'var(--purple-text)', accent: 'var(--text-link)',
   brand: 'var(--brand)', taupe: 'var(--text-sub)', taupeBg: 'var(--bg-card)', taupeLine: 'var(--border)',
 };
-export const R = 4; // = --radius (jpkerp5 표준 4px)
+/** 컨트롤 라운드 = --radius. 카드는 R_CARD. (docs/DESIGN-2026-08 §3-2) */
+export const R = 6;
+/** 카드·패널·시트 라운드 = --radius-card. */
+export const R_CARD = 10;
+/** 「지금 챙길 그 숫자」 하나만 크게 — 위계 SSOT. (§3-1) */
+export const DISPLAY_FS = 'var(--text-display)';
+/** 간격 4의 배수 6단계 — 임의 숫자 금지. (§3-5) */
+export const SP = { 1: 4, 2: 8, 3: 12, 4: 16, 5: 24, 6: 32 } as const;
 export const NUM = "var(--font-mono)";
 
 /** 엑셀 트리/CMS 하위행 들여쓰기 단위(px). 매직넘버 금지. */

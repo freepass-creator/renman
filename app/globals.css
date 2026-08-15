@@ -21,6 +21,13 @@
   --text-lg:   14px;   /* 페이지 타이틀·중요 액션 */
   --text-xl:   16px;   /* 메인 헤딩 */
   --text-2xl:  18px;   /* 페이지 헤더 (page-header-title) */
+  /* ★위계 — 「지금 챙길 그 숫자」 하나만 크게. 나머지는 조밀하게 둔다.
+     예전엔 10~18px 안에 전부 몰려 있어 무엇이 중요한지 눈이 못 골랐다. */
+  --text-display: 28px;
+
+  /* 간격 — 4의 배수 6단계. 임의 숫자 금지(docs/DESIGN-2026-08 §3-5). */
+  --space-1: 4px;  --space-2: 8px;  --space-3: 12px;
+  --space-4: 16px; --space-5: 24px; --space-6: 32px;
 
   /* ─── 폰트 weight 정책 ─── */
   --fw-normal:   400;
@@ -71,11 +78,13 @@
   --focus-ring: rgba(43, 86, 198, 0.18);
 
   /* Accent palette — 저채도 상태색 · 대비↑ */
-  --red-bg:    #fdf5f4;  --red-text:    #cf3b38;  --red-border:    #f0c9c7;
-  --danger-tint: #fdf5f4; /* 긴급 행 배경 틴트 (미납·사고·만기경과) */
-  --orange-bg: #fbf6ee;  --orange-text: #c07d1c;  --orange-border: #efd9b0;
-  --amber-bg:  #fbf8e8;  --amber-text:  #c07d1c;  --amber-border:  #efe4b0;
-  --green-bg:  #f0f6f2;  --green-text:  #3f7d54;  --green-border:  #c5dccb;
+  /* 신호색 — 베이지가 섞여 «바랜 인쇄물» 느낌이던 것을 맑게 올렸다(DESIGN §3-4).
+     배경은 옅게, 글자는 진하게 — 대비로 읽히게 하고 배경으로 시끄럽게 하지 않는다. */
+  --red-bg:    #fef2f2;  --red-text:    #c2312e;  --red-border:    #fbd5d5;
+  --danger-tint: #fef2f2; /* 긴급 행 배경 틴트 (미납·사고·만기경과) */
+  --orange-bg: #fff7ed;  --orange-text: #b45309;  --orange-border: #fcd9a8;
+  --amber-bg:  #fffbeb;  --amber-text:  #b45309;  --amber-border:  #fbe6a2;
+  --green-bg:  #f0fdf4;  --green-text:  #15803d;  --green-border:  #bbe7c8;
   --blue-bg:   #eef2fb;  --blue-text:   #2b56c6;  --blue-border:   #c9d5f0;
   --indigo-bg: #eef2ff;  --indigo-text: #4338ca;  --indigo-border: #c7d2fe;
   --purple-bg: #f7f3fb;  --purple-text: #7e22ce;  --purple-border: #e4d5f0;
@@ -88,13 +97,14 @@
   --alert-green-bg:  var(--green-bg);  --alert-green-text:  var(--green-text);  --alert-green-border:  var(--green-border);
   --alert-blue-bg:   var(--blue-bg);   --alert-blue-text:   var(--blue-text);   --alert-blue-border:   var(--blue-border);
 
-  /* Sizing — 4px 표준 미세 라운드 (B 정책).
-     모든 카드/버튼/입력 통일. 배지·카운트 = --radius-badge. */
-  --radius-sm: 3px;
-  --radius:    4px;
-  --radius-badge: 5px;
-  --radius-md: 6px;
-  --radius-lg: 8px;
+  /* Sizing — 도구형 라운드 (docs/DESIGN-2026-08 §3-2).
+     컨트롤 6 · 카드 10. 4px 은 2015년대 웹 느낌이라 6으로 올렸다. */
+  --radius-sm: 4px;
+  --radius:    6px;     /* 버튼·입력·배지 */
+  --radius-badge: 6px;
+  --radius-md: 8px;
+  --radius-lg: 10px;
+  --radius-card: 10px;  /* 카드·패널·시트 */
   --radius-pill: 999px;
 
   /* v6 컨트롤 규격 — 기본 32 / 칩·sm 28. (레거시 26 폐기) */
@@ -3110,4 +3120,101 @@ input[type='search']::-webkit-search-decoration {
     grid-template-columns: minmax(0, 1fr);
     grid-template-rows: minmax(260px, 1fr) minmax(240px, .85fr);
   }
+}
+
+/* ── 데스크톱 셸 (erp-design 좌레일) — 색·치수 = CSS 변수만 ── */
+:root { --rm-rail-w: 204px; }
+html[data-rm-rail='collapsed'] { --rm-rail-w: 64px; }
+html[data-rm-rail='off'] { --rm-rail-w: 0px; }
+
+.rm-rail {
+  position: fixed;
+  top: 0; left: 0; bottom: 0;
+  z-index: 85;
+  display: flex;
+  flex-direction: column;
+  width: var(--rm-rail-w);
+  overflow: hidden;
+  background: var(--bg-card);
+  border-right: 1px solid var(--border);
+}
+html[data-rm-rail='off'] .rm-rail { display: none; }
+
+.rm-rail__brand {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 8px;
+  height: var(--fp-bar-h);
+  padding: 0 14px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text-main);
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.rm-rail__mark {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 25px;
+  height: 25px;
+  border-radius: var(--radius);
+  color: var(--text-inverse);
+  background: var(--brand);
+}
+.rm-rail__nav {
+  flex: 1;
+  padding: 12px 10px;
+  overflow: auto;
+}
+.rm-rail__label {
+  padding: 8px 10px 6px;
+  color: var(--text-weak);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+.rm-rail__item {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  height: 38px;
+  padding: 0 10px;
+  border-radius: var(--radius);
+  color: var(--text-sub);
+  font-size: 12px;
+  text-decoration: none;
+}
+.rm-rail__item:hover { color: var(--text-main); background: var(--bg-sunken); }
+.rm-rail__item.is-active {
+  color: var(--brand);
+  background: var(--brand-bg);
+  font-weight: 700;
+}
+.rm-rail__foot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 10px;
+  border-top: 1px solid var(--border);
+  color: var(--text-weak);
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+html[data-rm-rail='collapsed'] .rm-rail__text,
+html[data-rm-rail='collapsed'] .rm-rail__label { display: none; }
+html[data-rm-rail='collapsed'] .rm-rail__brand { justify-content: center; padding: 0; }
+html[data-rm-rail='collapsed'] .rm-rail__item { justify-content: center; padding: 0; }
+html[data-rm-rail='collapsed'] .rm-rail__foot { justify-content: center; padding: 12px 0; }
+
+.rm-shell-top,
+.rm-shell-dock { left: var(--rm-rail-w) !important; }
+
+@media (max-width: 759px) {
+  :root { --rm-rail-w: 0px; }
+  .rm-rail { display: none; }
+  .rm-shell-top, .rm-shell-dock { left: 0 !important; }
 }
