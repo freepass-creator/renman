@@ -53,10 +53,10 @@ export const PAGE_IA: PageIA[] = [
   { href: '/risk', label: '리스크관리', role: 'hub', layer: 'mixed', tier: '라이트', view: 'risk-ledger · LedgerFrame · 미완료·미납·만기·휴차', grab: 'none', grabHow: '—' },
   { href: '/work', label: '업무관리', role: 'work', layer: 'event', tier: '라이트', view: '정비·일정·과태료·상담 통합', grab: 'context', grabHow: '행·생성' },
   { href: '/payments', label: '자금일보', role: 'work', layer: 'event', tier: '라이트', view: '원장 일별 가공 · 분류·증빙·계약매칭·일마감', grab: 'none', grabHow: '분류·연결·마감' },
-  { href: '/ingest', label: DATA_CENTER_TITLE, role: 'input', layer: 'mixed', tier: '라이트', view: '원본 투입·분석·연결·반영', grab: 'batch', grabHow: '담기' },
+  { href: '/ingest', label: DATA_CENTER_TITLE, role: 'input', layer: 'mixed', tier: '라이트', view: '원본 투입·분석·연결·반영', grab: 'batch', grabHow: '파일 먼저 · OCR·엑셀·직접' },
 
   // ── 원장 ──
-  { href: '/asset', label: '자산관리', role: 'view', layer: 'ledger', tier: '라이트', assetKind: 'physical', view: '차량 1대=1행 · 더블클릭 상세패널', grab: 'both', grabHow: '생성·패널수정 · 데이터센터' },
+  { href: '/asset', label: '자산관리', role: 'view', layer: 'ledger', tier: '라이트', assetKind: 'physical', view: '차량 1대=1행 · 더블클릭 상세패널', grab: 'both', grabHow: '생성·패널수정' },
   { href: '/contract', label: '계약관리', role: 'view', layer: 'ledger', tier: '라이트', assetKind: 'contract', view: '계약 1건=1행 · 더블클릭 상세패널', grab: 'both', grabHow: '생성·패널수정' },
   { href: '/cash', label: '자금관리', role: 'view', layer: 'ledger', tier: '라이트', assetKind: 'cash', view: '계좌·카드·자동이체 Cash-in/out · 묶음 1차 분류·대사', grab: 'batch', grabHow: '단건·대량 입력 · 담기' },
 
@@ -173,24 +173,33 @@ export const ERP_MENU_TREE: ErpMenuNode[] = [
 ];
 
 /** 햄버거/사이드 렌더러용. ERP_MENU_TREE와 라벨·href·그룹 순서 동기. */
+/**
+ * ★2026-08-09 사장님 확정 — 앱은 3개다(docs/DESIGN-2026-08 §1).
+ *
+ *   1) 업무조회   뭐가 문제고 뭘 해야 하나   — 들어오면 여기
+ *   2) 데이터센터  정확히 어떤 건들인가      — 원장 모음
+ *   3) 자료올리기  새 자료를 어떻게 넣나     — 문서·엑셀·수기 투입
+ *
+ * 근거: 「원장은 제대로만 돌면 볼 필요가 없다.」 그래서 입구는 원장이 아니라 할 일이고,
+ *   원장은 «확인하러 갈 때» 가는 곳으로 내린다.
+ * 360(차량·계약·손님 상세)은 탭이 아니다 — 어디서든 대상을 누르면 열리는 상세면.
+ * 페이지는 그대로 두고 «묶는 방식»만 바꿨다. href 변경 없음.
+ */
 export const NAV_GROUPS: NavGroup[] = [
-  { title: '', items: [
-    { href: '/', label: '대시보드', icon: LayoutDashboard, tier: '라이트' },
-  ] },
-  // ★2026-08-05 사장님 지시: 운영현황+리스크 한 세트 / 업무+자금일보+데이터센터 한 세트.
-  { title: '현황', items: [
-    { href: '/status', label: '운영현황', icon: LayoutDashboard, tier: '라이트' },
+  { title: '업무조회', items: [
+    { href: '/', label: '할 일', icon: LayoutDashboard, tier: '라이트' },
+    { href: '/work', label: '업무관리', icon: ListTodo, tier: '라이트' },
     { href: '/risk', label: '리스크관리', icon: TriangleAlert, tier: '라이트' },
   ] },
-  { title: '처리', items: [
-    { href: '/work', label: '업무관리', icon: ListTodo, tier: '라이트' },
-    { href: '/payments', label: '자금일보', icon: ArrowLeftRight, tier: '라이트' },
-    { href: '/ingest', label: DATA_CENTER_TITLE, icon: Upload, tier: '라이트' },
-  ] },
-  { title: '원장', items: [
+  { title: DATA_CENTER_TITLE, items: [
+    { href: '/status', label: '운영현황', icon: LayoutDashboard, tier: '라이트' },
     { href: '/asset', label: '자산관리', icon: CarFront, tier: '라이트' },
     { href: '/contract', label: '계약관리', icon: FileText, tier: '라이트' },
     { href: '/cash', label: '자금관리', icon: Wallet, tier: '라이트' },
+    { href: '/payments', label: '자금일보', icon: ArrowLeftRight, tier: '라이트' },
+  ] },
+  { title: '자료올리기', items: [
+    { href: '/ingest', label: '자료올리기', icon: Upload, tier: '라이트' },
   ] },
   { title: '하단', items: [
     { href: '/management', label: '경영관리', icon: Building2, tier: '라이트' },

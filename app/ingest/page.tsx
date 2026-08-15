@@ -1,13 +1,13 @@
 'use client';
 /**
- * 데이터관리 — 전 엔티티 투입구 (OCR·엑셀·직접).
+ * 데이터관리 — 전 엔티티 투입구. 메뉴 진입=파일 먼저(무엇이든 올리기). OCR·엑셀·직접은 종류 선택 후.
  * LedgerFrame 공용 셸 + body(시트) + sidePanel(투입/상세). 엔진(saveIntake·OCR·xlsx) 유지.
  *
  * 표 = 문서종류·카테고리·분석요약(원장 행문법). 엔티티 필드는 우측 패널.
  */
 import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { DATA_CENTER_TITLE, processingAttentionRank, summarizeProcessingQueue } from '@/lib/data-center-terms';
+import { processingAttentionRank, summarizeProcessingQueue } from '@/lib/data-center-terms';
 import { uploadToInbox } from '@/lib/inbox-upload';
 import { uploadDoc, docPath } from '@/lib/storage';
 import { pushDocVersion } from '@/lib/docs';
@@ -46,6 +46,7 @@ import {
 import {
   DOC_KINDS, decodeIntakePick, docVersionType, encodeIntakePick, entitiesWithoutDocKind,
 } from '@/lib/doc-kinds';
+import RebornHeader from '@/app/sheet/reborn/_components/RebornHeader';
 
 export const dynamic = 'force-dynamic';
 
@@ -115,8 +116,12 @@ function IngestInner() {
   const activeOcrType = pick.ocrType;
   const [saving, setSaving] = useState(false);
   const [sheetView, setSheetView] = useState<SheetView>('대기');
-  const [panelOpen, setPanelOpen] = useState(true);
-  const [universalOpen, setUniversalOpen] = useState(false);
+  /** 메뉴로 들어오면 파일 먼저. `?type=`·`?plate=` 딥링크만 OCR/직접 투입 패널. */
+  const typeQ = sp.get('type');
+  const plateQ = sp.get('plate');
+  const typedIntake = Boolean(typeQ || plateQ);
+  const [panelOpen, setPanelOpen] = useState(typedIntake);
+  const [universalOpen, setUniversalOpen] = useState(!typedIntake);
   const [universalBusy, setUniversalBusy] = useState(false);
   const [stagedFiles, setStagedFiles] = useState<File[]>([]);
   const { rows: savedList, loading: savedLoading, reload: reloadSaved } = useEntityList(entityKey);
@@ -154,6 +159,13 @@ function IngestInner() {
   useEffect(() => {
     if (tab === 'ocr' && !activeOcrType) setTab('excel');
   }, [tab, activeOcrType]);
+
+  useEffect(() => {
+    if (typeQ || plateQ) {
+      setUniversalOpen(false);
+      setPanelOpen(true);
+    }
+  }, [typeQ, plateQ]);
 
   useEffect(() => {
     if (sheetView === '저장본') reloadSaved();
@@ -1076,8 +1088,8 @@ function IngestInner() {
 
   return (
     <LedgerFrame
-      title={DATA_CENTER_TITLE}
-      meta="원본 투입 · 분석 · 연결 · 원장 반영"
+      title="자료올리기"
+      meta="원본 접수 · AI 분석 · 데이터 연결"
       showColView={false}
       filters={(
         <>
@@ -1229,8 +1241,11 @@ function IngestInner() {
 
 export default function IngestPage() {
   return (
-    <Suspense fallback={<PageLoading />}>
-      <IngestInner />
-    </Suspense>
+    <>
+      <RebornHeader active="upload" />
+      <Suspense fallback={<PageLoading />}>
+        <IngestInner />
+      </Suspense>
+    </>
   );
 }

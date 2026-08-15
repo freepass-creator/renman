@@ -21,7 +21,7 @@
  */
 import { type EntityRecord } from '../intake/entities';
 import { computeContractView, type ContractView } from '../contract-ops';
-import { normPlate } from '../plate';
+import { normPlate, scopedPlateKey } from '../plate';
 import { OUT, VEHICLE_REPAIR, VEHICLE_BUY_PLAN, VEHICLE_REG_PLAN, VEHICLE_DISPOSE_PLAN } from './status';
 import { customerKey } from '../customers';
 
@@ -106,6 +106,8 @@ export type Fleet = {
   vehicles: VehicleNode[];
   byPlate: Map<string, VehicleNode>;         // 번호판(정규화) → 차량 노드
   activeByPlate: Map<string, ContractNode>;  // 번호판 → 현재 운행 계약
+  byCompanyPlate: Map<string, VehicleNode>;  // 법인+번호판 → 차량 노드(전체 법인 안전 조인)
+  activeByCompanyPlate: Map<string, ContractNode>;
 };
 
 /** 원자 연결 — 차량·계약을 번호판(normPlate)으로 잇고, 손님·가동·채권을 계약에서 파생. 전 페이지 SSOT.
@@ -115,18 +117,31 @@ export function linkFleet(vehicles: EntityRecord[], contracts: EntityRecord[], t
     const view = views?.[i] ?? computeContractView(c, today);
     return { ...classifyContract(view), view, plate: normPlate(c.plate), customer: String(c.contractorName || '') };
   });
-  const activeByPlate = new Map<string, ContractNode>();
-  const histByPlate = new Map<string, ContractNode[]>();
+  const activeByCompanyPlate = new Map<string, ContractNode>();
+  const histByCompanyPlate = new Map<string, ContractNode[]>();
   for (const n of cNodes) {
-    const arr = histByPlate.get(n.plate); if (arr) arr.push(n); else histByPlate.set(n.plate, [n]);
-    if (n.phase === '운행') activeByPlate.set(n.plate, n);
+    const key = scopedPlateKey(n.view.rec.companyId, n.plate);
+    const arr = histByCompanyPlate.get(key); if (arr) arr.push(n); else histByCompanyPlate.set(key, [n]);
+    if (n.phase === '운행') activeByCompanyPlate.set(key, n);
   }
   const vNodes: VehicleNode[] = vehicles.map((veh) => {
     const p = normPlate(veh.plate);
-    const active = activeByPlate.get(p) ?? null;
-    return { ...classifyVehicle(veh, !!active), veh, plate: p, activeContract: active, contracts: histByPlate.get(p) ?? [] };
+    const key = scopedPlateKey(veh.companyId, p);
+    const active = activeByCompanyPlate.get(key) ?? null;
+    return { ...classifyVehicle(veh, !!active), veh, plate: p, activeContract: active, contracts: histByCompanyPlate.get(key) ?? [] };
   });
-  return { contracts: cNodes, vehicles: vNodes, byPlate: new Map(vNodes.map((n) => [n.plate, n])), activeByPlate };
+  const byPlate = new Map<string, VehicleNode>();
+  const activeByPlate = new Map<string, ContractNode>();
+  for (const node of vNodes) if (!byPlate.has(node.plate)) byPlate.set(node.plate, node);
+  for (const node of cNodes) if (node.phase === '운행' && !activeByPlate.has(node.plate)) activeByPlate.set(node.plate, node);
+  return {
+    contracts: cNodes,
+    vehicles: vNodes,
+    byPlate,
+    activeByPlate,
+    byCompanyPlate: new Map(vNodes.map((node) => [scopedPlateKey(node.veh.companyId, node.plate), node])),
+    activeByCompanyPlate,
+  };
 }
 
 /* ─────────────── 손님 = 계약의 사람-뷰 (계약을 사람 기준으로 묶음) ─────────────── */

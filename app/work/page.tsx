@@ -38,7 +38,7 @@ import { WORK_SECTIONS_BY_KIND, workSectionsFor } from '@/lib/work-form-sections
 import { PenaltyBucketPanel } from '@/components/work/PenaltyBucketPanel';
 import {
   WORK_GROUPS, WORK_SOURCE_LABEL, WORK_DETAIL_CATEGORIES, workRowInDivision,
-  buildDirectiveLedgerRows, buildWorkItemLedgerRows, carNameOf, contractMeta, inboxWorkStatus, normalizeWorkStatus, parseWorkGroup, summarizeWorkLedgerRows, workGroup,
+  buildDirectiveLedgerRows, buildWorkItemLedgerRows, carNameOf, contractMeta, historyWorkDueDate, inboxWorkStatus, normalizeWorkStatus, parseWorkGroup, summarizeWorkLedgerRows, workGroup,
   workAttentionRank, workDueSignal,
   type WorkGroupFilter, type WorkLedgerRow, type WorkSource, type WorkStatus,
 } from '@/lib/work-ledger';
@@ -179,7 +179,7 @@ function WorkLedgerInner() {
         workDate: createdAt.slice(0, 10),
         createdAt,
         updatedAt,
-        dueDate: String(r.dueDate || r.date || '').slice(0, 10),
+        dueDate: historyWorkDueDate(r),
         status,
         assignee: String(r.author || r.assignee || ''),
         amount: Number(r.cost || r.amount) || 0,

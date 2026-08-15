@@ -8,7 +8,7 @@ import { checkCompliance } from './compliance';
 import { matchDriver } from './penalty-reassign';
 import { linkFleet } from './domain/model';
 import { dday, OUT } from './dashboard-consts';
-import { normPlate } from './plate';
+import { normPlate, scopedPlateKey } from './plate';
 import { selectReceivables } from './snapshot/selectors';
 import { contractPeriodOverlaps } from './contracts/dates';
 
@@ -27,25 +27,25 @@ export function computeDashboard(input: DashboardInput, today: string) {
   const views = contracts.map((c) => computeContractView(c, today));
   const fleet = linkFleet(vehicles, contracts, today, views);
   const activeByPlate = new Map<string, ReturnType<typeof computeContractView>>();
-  for (const v of views) if (v.status === '운행') activeByPlate.set(normPlate(v.rec.plate), v);
+  for (const v of views) if (v.status === '운행') activeByPlate.set(scopedPlateKey(v.rec.companyId, v.rec.plate), v);
   const risks = scanRisks(contracts, today, views);
   // 행 표시용 status — 차량 원문 status 우선, 없으면 계약 폴백(구매대기 등 할 일 판별용)
-  const statusOf = (v: EntityRecord) => String(v.status || '') || (activeByPlate.has(normPlate(v.plate)) ? '운행' : '대기');
+  const statusOf = (v: EntityRecord) => String(v.status || '') || (activeByPlate.has(scopedPlateKey(v.companyId, v.plate)) ? '운행' : '대기');
 
-  const rows = vehicles.map((v) => ({ v, av: activeByPlate.get(normPlate(v.plate)) || null, status: statusOf(v) }));
+  const rows = vehicles.map((v) => ({ v, av: activeByPlate.get(scopedPlateKey(v.companyId, v.plate)) || null, status: statusOf(v) }));
   // 가동·보유 집계 = linkFleet/classifyVehicle SSOT (자산현황·경영 KPI와 동일)
   const heldNodes = fleet.vehicles.filter((n) => n.ownership !== '처분완료');
   const runningNodes = heldNodes.filter((n) => n.utilization === '운행');
   const idleNodes = heldNodes.filter((n) => n.utilization === '휴차');
   const soldNodes = fleet.vehicles.filter((n) => n.ownership === '처분완료');
   const util = heldNodes.length ? Math.round((runningNodes.length / heldNodes.length) * 100) : 0;
-  const runningPlates = new Set(runningNodes.map((n) => n.plate));
-  const idlePlates = new Set(idleNodes.map((n) => n.plate));
-  const soldPlates = new Set(soldNodes.map((n) => n.plate));
+  const runningPlates = new Set(runningNodes.map((n) => scopedPlateKey(n.veh.companyId, n.plate)));
+  const idlePlates = new Set(idleNodes.map((n) => scopedPlateKey(n.veh.companyId, n.plate)));
+  const soldPlates = new Set(soldNodes.map((n) => scopedPlateKey(n.veh.companyId, n.plate)));
   const inFleet = rows.filter((r) => !OUT.has(r.status));
-  const running = rows.filter((r) => runningPlates.has(normPlate(r.v.plate)));
-  const idleCars = rows.filter((r) => idlePlates.has(normPlate(r.v.plate)));
-  const soldRows = rows.filter((r) => soldPlates.has(normPlate(r.v.plate)));
+  const running = rows.filter((r) => runningPlates.has(scopedPlateKey(r.v.companyId, r.v.plate)));
+  const idleCars = rows.filter((r) => idlePlates.has(scopedPlateKey(r.v.companyId, r.v.plate)));
+  const soldRows = rows.filter((r) => soldPlates.has(scopedPlateKey(r.v.companyId, r.v.plate)));
   const recv = selectReceivables(contracts, today);
   const totalUnpaid = recv.total;
 
@@ -92,9 +92,9 @@ export function computeDashboard(input: DashboardInput, today: string) {
   ];
   const repair = rows.filter((r) => ['정비', '사고'].includes(r.status));
   const insMismatch = risks.flatMap((r) => r.flags.filter((f) => f.kind === '보험불일치').map((f) => ({ rec: r.rec, detail: f.detail })));
-  const vehByPlate = new Map(vehicles.map((vv) => [normPlate(vv.plate), vv]));
+  const vehByPlate = new Map(vehicles.map((vv) => [scopedPlateKey(vv.companyId, vv.plate), vv]));
   const compliance = views.filter((v) => v.status === '운행')
-    .map((v) => ({ rec: v.rec, flags: checkCompliance(v.rec, vehByPlate.get(normPlate(v.rec.plate)) || null, today) }))
+    .map((v) => ({ rec: v.rec, flags: checkCompliance(v.rec, vehByPlate.get(scopedPlateKey(v.rec.companyId, v.rec.plate)) || null, today) }))
     .filter((x) => x.flags.length > 0)
     .sort((a, b) => (b.flags.some((f) => f.severity === 'high') ? 1 : 0) - (a.flags.some((f) => f.severity === 'high') ? 1 : 0));
   const penaltyPending = penalties.filter((p) => !['변경부과완료', '종결'].includes(String(p.reassignStatus || ''))).map((p) => ({ rec: p, driver: matchDriver(p, contracts, vehicles) }));
@@ -102,13 +102,13 @@ export function computeDashboard(input: DashboardInput, today: string) {
   const cByPlate = new Map<string, EntityRecord[]>();
   for (const c of contracts) {
     if (c.returnedDate) continue;
-    const p = normPlate(c.plate);
+    const p = scopedPlateKey(c.companyId, c.plate);
     if (!p) continue;
     const cur = cByPlate.get(p);
     if (cur) cur.push(c); else cByPlate.set(p, [c]);
   }
   const doubleBooking: { plate: string; companyId: string; detail: string }[] = [];
-  for (const [p, cs] of cByPlate) {
+  for (const [, cs] of cByPlate) {
     if (cs.length < 2) continue;
     for (let i = 0; i < cs.length; i++) for (let j = i + 1; j < cs.length; j++) {
       const a = cs[i], b = cs[j];
@@ -116,7 +116,7 @@ export function computeDashboard(input: DashboardInput, today: string) {
       const bs = String(b.startDate || b.deliveredDate || '');
       if (contractPeriodOverlaps(a, b)) {
         doubleBooking.push({
-          plate: p,
+          plate: normPlate(a.plate),
           companyId: String(a.companyId || b.companyId || ''),
           detail: `${a.contractorName || '?'}(${as}~) ↔ ${b.contractorName || '?'}(${bs}~)`,
         });
@@ -136,13 +136,14 @@ export function computeDashboard(input: DashboardInput, today: string) {
   const unmatchedTx = bankTx.filter((t) => !t.category || String(t.category) === '(미분류)');
   /* 계약만 있고 차량 등록증이 없는 차 — «회사»를 함께 나른다(리스크원장의 회사 칸이 비지 않게).
      같은 번호가 여러 계약에 있으면 처음 만난 계약의 회사를 쓴다. */
-  const ghostMap = new Map<string, string>();
+  const ghostMap = new Map<string, { plate: string; companyId: string }>();
   for (const c of contracts) {
     const plate = String(c.plate || '');
-    if (!plate || vehByPlate.has(normPlate(plate))) continue;
-    if (!ghostMap.has(plate)) ghostMap.set(plate, String(c.companyId || ''));
+    const key = scopedPlateKey(c.companyId, plate);
+    if (!plate || vehByPlate.has(key)) continue;
+    if (!ghostMap.has(key)) ghostMap.set(key, { plate, companyId: String(c.companyId || '') });
   }
-  const ghostPlates = Array.from(ghostMap, ([plate, companyId]) => ({ plate, companyId }));
+  const ghostPlates = Array.from(ghostMap.values());
 
   // 헤드라인 스냅샷 — "반영" 요약이 읽는 값(같은 계산). 보유/전체/매각/운행/미수/자금.
   // v5 migrate-switchplan 사전점검 대응: 전체구매(자산)·현보유·매각·운행중차량·운행중계약·반납·할부·미수(액/건)·자금건수.

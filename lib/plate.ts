@@ -12,6 +12,11 @@ export function normPlate(s?: unknown): string {
   return t.replace(/\s+/g, '').replace(/O/gi, '0').replace(/I/gi, '1').replace(/[^0-9가-힣]/g, '');
 }
 
+/** 전체 법인 조회에서도 같은 번호판이 서로 섞이지 않게 만드는 조인 키. */
+export function scopedPlateKey(companyId?: unknown, plate?: unknown): string {
+  return `${String(companyId || '__legacy__').trim()}::${normPlate(plate)}`;
+}
+
 /** 정규 차량번호인가 — `\d{2,3}[가-힣]\d{4}` (임판·빈값 제외). */
 export function isNormalPlate(plate?: unknown): boolean {
   const k = normPlate(plate);

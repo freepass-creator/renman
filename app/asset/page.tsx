@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { FileText, Pencil, Plus, UploadCloud, X } from 'lucide-react';
+import { FileText, Pencil, Plus, X } from 'lucide-react';
 import { assetMasterRow, type AssetMasterRow } from '@/lib/master-ledgers';
 import {
   ASSET_DETAIL_SECTIONS, ASSET_MASTER_BASIC_COLS, ASSET_MASTER_EXPANDED_COLS,
@@ -19,9 +19,9 @@ import { useIsMobile } from '@/lib/use-mobile';
 import { useSession } from '@/lib/session';
 import { TODAY } from '@/lib/dashboard-consts';
 import { linkFleet, type Fleet } from '@/lib/domain/model';
-import { normPlate } from '@/lib/plate';
+import { scopedPlateKey } from '@/lib/plate';
 import { latestDateOf, summarizeAssetLedgerStats } from '@/lib/ledger-stats';
-import { openCar, openIngest } from '@/lib/ui-bus';
+import { openCar } from '@/lib/ui-bus';
 import {
   ASSET_FILTER_DEFS, countActiveFilters, emptyFilterValues, eqFilter, matchLedgerFilters,
 } from '@/lib/ledger-filter-defs';
@@ -47,7 +47,7 @@ function matchesOwnership(row: AssetMasterRow, scope: AssetOwnershipScope): bool
 /** 가동·처분예정 = linkFleet(ownership·utilization) SSOT — status 원장과 동일. */
 function matchesQuickFilter(row: AssetMasterRow, filter: AssetQuickFilter | null, fleet: Fleet): boolean {
   if (!filter) return true;
-  const node = fleet.byPlate.get(normPlate(row.plate));
+  const node = fleet.byCompanyPlate.get(scopedPlateKey(row.companyId, row.plate));
   if (!node) return false;
   if (filter === '계약중') return node.ownership === '보유중' && node.utilization === '운행';
   if (filter === '휴차') return node.ownership === '보유중' && node.utilization === '휴차';
@@ -315,9 +315,9 @@ export default function AssetLedgerPage() {
       loading={loading}
       error={loadError}
       empty={<>
-        등록된 자산이 없습니다. 등록증은 데이터센터에서 담으세요.
+        등록된 자산이 없습니다. 자산 생성에서 등록증을 올리세요.
         <div style={{ marginTop: 14, display: 'flex', justifyContent: 'center', gap: 8 }}>
-          <Btn size="sm" variant="ghost" onClick={() => openIngest('vehicle')}><UploadCloud size={14} /> 데이터센터</Btn>
+          <Btn size="sm" variant="ghost" onClick={() => { setSelected(null); setEditing(false); setCreating(true); }}><Plus size={14} /> 자산 생성</Btn>
         </div>
       </>}
       cols={sheetCols}

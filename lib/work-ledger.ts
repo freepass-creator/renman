@@ -245,6 +245,22 @@ export type WorkDueSignal = {
   days: number | null;
 };
 
+/**
+ * 이력이 업무원장에 실릴 때 쓰는 기한.
+ * 빠른기록 «다음 할 일»은 `nextDate`에 들어가고, 기록일(`date`)은 기한이 아니다.
+ */
+export function historyWorkDueDate(record: EntityRecord): string {
+  return String(record.nextDate || record.dueDate || '').slice(0, 10);
+}
+
+/** 빠른기록 후속 기한. 날짜가 없으면 업무 기한이 안 생긴다. */
+export function activityFollowUpFields(follow: boolean, nextDate: string): { nextDate: string; dueDate: string } | null {
+  if (!follow) return { nextDate: '', dueDate: '' };
+  const due = String(nextDate || '').trim().slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(due)) return null;
+  return { nextDate: due, dueDate: due };
+}
+
 /** 업무상태와 기한을 분리해 표시한다. 기한경과를 업무상태로 덮어쓰지 않는다. */
 export function workDueSignal(dueDate: string, status: string, today: string): WorkDueSignal {
   if (/완료|종결|보류|취소/.test(status)) return { state: '종결', label: '', days: null };

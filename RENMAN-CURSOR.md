@@ -213,6 +213,11 @@ curl -s -o /dev/null -w "%{http_code}" http://localhost:6006/<route>   # 200
 
 | 날짜 | 작업자 | 내용 | 상태 |
 |---|---|---|---|
+| 2026-08-13 | Cursor | **빠른기록 후속=업무 기한**: `nextDate`를 `dueDate`로도 저장 · 업무원장은 기록일 말고 후속일을 기한으로 봄 | tsc0 · curl /work 200 |
+| 2026-08-13 | Cursor | **입력 입구 정리**: 웹 단건=`QuickInput` 호스트(톱바·⌘K) · `/ingest` 메뉴=파일 먼저 · 자산/계약 빈화면은 생성패널(등록증·계약서 인라인) — 데이터센터로 안 보냄 | tsc0 · curl / /ingest 200 |
+| 2026-08-13 | Cursor | **홈 라벨=엔진**: 휴차·계약유지 미수·할 일·미점검(`/risk`) · 교차검증 로딩 0 위장 제거 · 레일 접힘 `useLayoutEffect` · `/vehicle/` 톱바 제목 | tsc0 · curl / 200 |
+| 2026-08-13 | Cursor | **데스크톱 햄버거 제거**: 접기/펼치기는 레일 하단 `IconBtn`(PanelLeft)만. 모바일 햄버거는 유지 | tsc0 · curl / 200 |
+| 2026-08-13 | Cursor | **UI 재작성 1슬라이스**: 변행 reborn/Surface 폐기 · 데스크톱 좌레일=`NAV_GROUPS` · 홈=erp-design HomeView · 원장 LedgerFrame 유지 | tsc0 · curl / /asset /status /work 200 |
 | 2026-08-07 | Cursor | **운영현황 기간 제거**: 현재 보유 스냅샷이라 PeriodBar·range 필터 불필요 — `/status`에서 삭제 | tsc0 · curl200 |
 | 2026-08-07 | Cursor | **모바일 하단 4탭**: 운영현황·리스크·업무관리·업로드. 설정=햄버거. `/m`·`MobileTabBar` 기본 동기 · 탭저장 v2 · `/m`→`/m/ops` | tsc0 · curl200 |
 | 2026-08-07 | Cursor | **모바일 검색폭**: 필터줄 검색이 회사~필터 사이 가로 꽉 채움(`data-ui=search`+flex) · `Search type=search` · 인라인 width:160 제거 | tsc0 · curl200 |

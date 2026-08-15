@@ -6,6 +6,7 @@ import { resolveWriteCompany, NEED_COMPANY } from '@/lib/scope';
 import { Btn, Checkbox, Input, TextArea, PillTabs, C } from '@/components/ui';
 import { todayKST } from '@/lib/contracts/dates'; // KST 기준 오늘
 import { toastError } from '@/lib/toast'; // 손롤 alert 금지 — 공용 토스트로 통일(confirm.tsx 원칙)
+import { activityFollowUpFields } from '@/lib/work-ledger';
 
 export type QuickLogCtx = { plate?: string; customer?: string; contractNo?: string; companyId?: string };
 
@@ -41,12 +42,14 @@ export function QuickLogForm({ ctx, onDone, onCancel, autoFocus = true, style }:
   async function save() {
     if (!text.trim()) return;
     if (!target) { toastError(NEED_COMPANY); return; }
+    const followFields = activityFollowUpFields(follow, nextDate);
+    if (follow && !followFields) { toastError('다음 할 일 날짜를 넣으세요'); return; }
     setSaving(true);
     try {
       await saveIntake('history', target, [{
         plate: ctx.plate || '', category: kind, title: text.trim(), date: today(),
         author: user.name, customer: ctx.customer || '', contractNo: ctx.contractNo || '',
-        nextDate: follow ? nextDate : '', companyId: target, _kind: 'activity',
+        ...(followFields || {}), companyId: target, _kind: 'activity',
       }]);
       onDone();
     } finally { setSaving(false); }
@@ -68,7 +71,7 @@ export function QuickLogForm({ ctx, onDone, onCancel, autoFocus = true, style }:
       </div>
       {follow && <Input type="date" value={nextDate} onChange={(e) => setNextDate(e.target.value)} style={{ display: 'block', marginTop: 8 }} />}
       <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 12, flexWrap: 'wrap' }}>
-        <Btn onClick={save} disabled={saving || !text.trim()}>{saving ? '저장 중…' : '저장'}</Btn>
+        <Btn onClick={save} disabled={saving || !text.trim() || (follow && !nextDate)}>{saving ? '저장 중…' : '저장'}</Btn>
         <Btn variant="ghost" onClick={onCancel}>취소</Btn>
         <span style={{ flex: 1 }} />
         <span style={{ fontSize: 11.5, color: C.faint }}>{user.name} · {today()}</span>

@@ -5,7 +5,7 @@ import { useSession } from '@/lib/session';
 import { getStore } from '@/lib/store';
 import { type EntityRecord } from '@/lib/intake/entities';
 import { matchVehicles } from '@/lib/search-match';
-import { openCar, openIngest } from '@/lib/ui-bus';
+import { openCar, openIngest, openQuickInput } from '@/lib/ui-bus';
 import { WORK_PAGES } from '@/lib/work-hub';
 import { tierIncludes } from '@/lib/tier';
 import { Car, LayoutGrid, Plus, Search, type LucideIcon } from 'lucide-react';
@@ -53,6 +53,7 @@ export function CommandPalette() {
       run: () => { setOpen(false); router.push(p.href); },
     }));
     const cmds: Item[] = [
+      { Icon: Plus, label: '빠른 입력', sub: '차번 · 메모 · 사진 한 건', run: () => { setOpen(false); openQuickInput(); } },
       { Icon: Plus, label: '차량 입력', sub: '자동차등록증', run: () => { setOpen(false); openIngest('vehicle'); } },
       { Icon: Plus, label: '계약 입력', sub: '렌탈·구독 계약서', run: () => { setOpen(false); openIngest('contract'); } },
       { Icon: Plus, label: '보험 입력', sub: '보험증권', run: () => { setOpen(false); openIngest('insurance'); } },

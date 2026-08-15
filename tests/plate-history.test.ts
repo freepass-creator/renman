@@ -6,7 +6,7 @@
  *   재투입 시 같은 차가 2대로 갈라진다. 오픈 후에는 수동 병합밖에 없어 사실상 복구 불가.
  */
 import { describe, test, expect } from 'vitest';
-import { vehicleMatchesPlate, findVehicleByPlate, normPlate, plateAliasesOf, plateAliasesFor, inPlateAliases } from '@/lib/plate';
+import { vehicleMatchesPlate, findVehicleByPlate, normPlate, plateAliasesOf, plateAliasesFor, inPlateAliases, scopedPlateKey } from '@/lib/plate';
 
 /** lib/store.ts carryPlateHistory 와 동일 규약(승계 결과 형태)을 검증용으로 재현. */
 function carry(before: Record<string, unknown>, patch: Record<string, unknown>): Record<string, unknown> {
@@ -20,6 +20,10 @@ function carry(before: Record<string, unknown>, patch: Record<string, unknown>):
 }
 
 describe('차량번호 변경 이력 승계', () => {
+  test('전체 법인 조인 키는 같은 번호판도 법인별로 분리한다', () => {
+    expect(scopedPlateKey('A', '12가 3456')).toBe('A::12가3456');
+    expect(scopedPlateKey('A', '12가3456')).not.toBe(scopedPlateKey('B', '12가3456'));
+  });
   test('임판 → 정식번호: 옛 번호가 이력에 쌓인다', () => {
     const before = { plate: '01가1234' };
     expect(carry(before, { plate: '123가4567' })).toEqual({ plateHistory: ['01가1234'] });

@@ -136,6 +136,7 @@ describe('UI 공용 원자 규격', () => {
     const sessionBar = readFileSync(join(root, 'components/SessionBar.tsx'), 'utf8');
     expect(sessionBar).toContain('if (customMobileShell)');
     expect(sessionBar).toContain("document.body.style.paddingTop = '0px'");
+    expect(sessionBar).toContain("document.body.style.paddingLeft = '0px'");
     expect(sessionBar).toContain("document.body.style.paddingBottom = '0px'");
   });
 

@@ -59,6 +59,11 @@ export const openPrintDoc = (
 ) =>
   window.dispatchEvent(new CustomEvent('jpk:print-doc', { detail: { type, plate, ...(extra || {}) } }));
 export const openCommand = () => window.dispatchEvent(new Event('jpk:command'));
+/** 웹 단건 입력 — 차번 + 메모·사진. 대량·OCR·엑셀은 openIngest. */
+export const openQuickInput = () => {
+  if (typeof window === 'undefined') return;
+  window.dispatchEvent(new Event('jpk:quick-input'));
+};
 // 신규 담기 = 팝업 아닌 «데이터센터 페이지»로 이동(규격 통일·SPA push). type=엔티티, plate=프리필.
 export const openIngest = (type?: string, plate?: string) => {
   if (typeof window === 'undefined') return;

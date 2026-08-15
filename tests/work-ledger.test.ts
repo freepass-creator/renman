@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildWorkItemLedgerRows, inboxWorkStatus, summarizeWorkLedgerRows, workAttentionRank, workDueSignal, workGroup, type WorkLedgerRow } from '@/lib/work-ledger';
+import { buildWorkItemLedgerRows, historyWorkDueDate, activityFollowUpFields, inboxWorkStatus, summarizeWorkLedgerRows, workAttentionRank, workDueSignal, workGroup, type WorkLedgerRow } from '@/lib/work-ledger';
 import { workDetailSectionsFor } from '@/lib/work-cols';
 import { WORK_CATEGORIES } from '@/lib/work-taxonomy';
 import { WORK_SECTIONS_BY_KIND } from '@/lib/work-form-sections';
@@ -40,6 +40,15 @@ describe('수집함 → 업무 원장 상태', () => {
       { ...base, id: '3', status: '완료' },
     ] satisfies WorkLedgerRow[];
     expect(summarizeWorkLedgerRows(rows, '2026-08-03')).toEqual({ total: 3, inProgress: 2, unmatched: 0, unassigned: 1, overdue: 0 });
+  });
+
+  it('이력 후속일은 기록일이 아니라 nextDate·dueDate를 기한으로 본다', () => {
+    expect(historyWorkDueDate({ date: '2026-08-01', nextDate: '2026-08-20' })).toBe('2026-08-20');
+    expect(historyWorkDueDate({ date: '2026-08-01', dueDate: '2026-08-15' })).toBe('2026-08-15');
+    expect(historyWorkDueDate({ date: '2026-08-01' })).toBe('');
+    expect(activityFollowUpFields(false, '2026-08-20')).toEqual({ nextDate: '', dueDate: '' });
+    expect(activityFollowUpFields(true, '')).toBeNull();
+    expect(activityFollowUpFields(true, '2026-08-20')).toEqual({ nextDate: '2026-08-20', dueDate: '2026-08-20' });
   });
 
   it('업무상태를 덮지 않고 기한경과·오늘·임박 신호를 별도로 계산한다', () => {

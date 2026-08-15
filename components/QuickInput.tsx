@@ -3,7 +3,7 @@
  * 빠른입력 — 차번 검색·선택 후 요약(회사·차번·차종·계약상태) + 아래 텍스트·파일.
  *   웹: 입력 옆 요약 · 모바일: 입력 아래 요약. 텍스트|파일 = 웹 좌우 · 모바일 상하.
  */
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { X } from 'lucide-react';
 import { useSession } from '@/lib/session';
 import { getStore } from '@/lib/store';
@@ -16,7 +16,7 @@ import { resolveWriteCompany, NEED_COMPANY } from '@/lib/scope';
 import { todayKST } from '@/lib/contracts/dates';
 import { toast } from '@/lib/toast';
 import FileDrop from '@/components/FileDrop';
-import { Btn, Input, TextArea, Badge, C, SPACE_M } from '@/components/ui';
+import { Btn, Input, TextArea, Badge, C, SPACE_M, Modal } from '@/components/ui';
 import { companyDisplay, companyTone } from '@/lib/companies';
 import { useIsMobile } from '@/lib/use-mobile';
 
@@ -33,7 +33,7 @@ function contractStatus(plate: string, veh: EntityRecord | undefined, contracts:
   return '휴차';
 }
 
-export function QuickInput({ onDone, onCancel }: { onDone: () => void; onCancel: () => void }) {
+export function QuickInput({ onDone, onCancel, style }: { onDone: () => void; onCancel: () => void; style?: CSSProperties }) {
   const { user, companyId } = useSession();
   const mobile = useIsMobile();
   const [q, setQ] = useState('');
@@ -126,6 +126,7 @@ export function QuickInput({ onDone, onCancel }: { onDone: () => void; onCancel:
     <div style={{
       border: `1px solid ${C.line}`, borderRadius: 'var(--radius)', background: C.card,
       padding: '12px 14px', boxSizing: 'border-box',
+      ...style,
     }}>
       <div ref={wrap} style={{ marginBottom: 10 }}>
         <div style={{
@@ -225,5 +226,27 @@ export function QuickInput({ onDone, onCancel }: { onDone: () => void; onCancel:
         <Btn size="sm" variant="ghost" onClick={onCancel}>취소</Btn>
       </div>
     </div>
+  );
+}
+
+/** 웹 전역 단건 입력 — 'jpk:quick-input'. 폼은 QuickInput 단일 출처. 모바일 업로드 탭은 같은 폼을 인라인. */
+export function QuickInputHost() {
+  const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    function on() { setOpen(true); }
+    window.addEventListener('jpk:quick-input', on);
+    return () => window.removeEventListener('jpk:quick-input', on);
+  }, []);
+
+  if (!open) return null;
+  return (
+    <Modal title="빠른 입력" meta="차번 선택 후 메모·사진" onClose={() => setOpen(false)} width={640}>
+      <QuickInput
+        onDone={() => setOpen(false)}
+        onCancel={() => setOpen(false)}
+        style={{ border: 'none', background: 'none', padding: 0 }}
+      />
+    </Modal>
   );
 }

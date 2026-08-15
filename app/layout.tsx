@@ -1,14 +1,6 @@
 import './globals.css';
 import type { Metadata } from 'next';
-import { SessionProvider } from '@/lib/session';
-import { AppBarProvider } from '@/lib/appbar';
-import { ConfirmProvider } from '@/components/ui/confirm';
-import TopBar from '@/components/SessionBar';
-import { CommandPalette } from '@/components/CommandPalette';
-import { CarDrawer } from '@/components/CarDrawer';
-import { PrintHost } from '@/components/PrintHost';
-import { QuickLogHost } from '@/components/QuickLog';
-import ToastHost from '@/components/ToastHost';
+import AppShell from '@/components/AppShell';
 
 export const metadata: Metadata = {
   title: 'renman · 렌터카매니저',
@@ -23,19 +15,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
       </head>
       <body style={{ margin: 0, minHeight: '100vh', background: 'var(--bg-page)' }}>
-        <SessionProvider>
-          <AppBarProvider>
-            <ConfirmProvider>
-              <TopBar />
-              <div style={{ minHeight: 'calc(100vh - var(--fp-bar-h) - var(--fp-dock-h, 0px))' }}>{children}</div>
-              <CommandPalette />
-              <CarDrawer />
-              <PrintHost />
-              <QuickLogHost />
-              <ToastHost />
-            </ConfirmProvider>
-          </AppBarProvider>
-        </SessionProvider>
+        <AppShell>{children}</AppShell>
       </body>
     </html>
   );

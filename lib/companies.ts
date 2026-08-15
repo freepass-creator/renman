@@ -9,6 +9,8 @@
  */
 export type CompanyDef = { id: string; label: string; short?: string };
 export const ALL_COMPANIES = '__ALL__';
+/** 현재 렌터카 운영 대시보드의 관리 법인. 플랫폼/위탁 법인은 별도 업무 범위다. */
+export const RENTAL_COMPANY_IDS = ['switchplan', 'prime'] as const;
 
 export const DEFAULT_COMPANY_DEFS: CompanyDef[] = [
   { id: 'switchplan', label: '스위치플랜', short: '스위치' },

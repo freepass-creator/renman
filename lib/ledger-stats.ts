@@ -1,7 +1,7 @@
 /** 원장 통계 배지 SSOT — 페이지 `.filter().length` / `.reduce()` 손롤 금지. */
 import { isVehicleHeld, type Fleet } from '@/lib/domain/model';
 import { type AssetMasterRow, type ContractMasterRow } from '@/lib/master-ledgers';
-import { normPlate } from '@/lib/plate';
+import { scopedPlateKey } from '@/lib/plate';
 import { selectReceivables } from '@/lib/snapshot/selectors';
 import { dday } from '@/lib/dashboard-consts';
 import type { FleetRow } from '@/lib/sheet-rows';
@@ -21,7 +21,7 @@ export function summarizeAssetLedgerStats(rows: AssetMasterRow[], fleet: Fleet):
   let held = 0, disposed = 0, contracted = 0, idle = 0, salePending = 0;
   for (const r of rows) {
     if (r.disposed) disposed++; else held++;
-    const n = fleet.byPlate.get(normPlate(r.plate));
+    const n = fleet.byCompanyPlate.get(scopedPlateKey(r.companyId, r.plate));
     if (!n) continue;
     if (n.ownership === '보유중' && n.utilization === '운행') contracted++;
     else if (n.ownership === '보유중' && n.utilization === '휴차') idle++;

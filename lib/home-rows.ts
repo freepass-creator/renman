@@ -110,7 +110,7 @@ export function buildHomePendingRows(D: Dashboard): HomeQueueRow[] {
       kind: '서류미첨부',
       plate,
       title: '등록증 없음',
-      detail: '계약만 있고 차량 원장 없음',
+      detail: '계약만 있고 차량 정보 없음',
       dday: null,
       amount: 0,
     });

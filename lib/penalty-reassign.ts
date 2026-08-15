@@ -27,9 +27,12 @@ export function matchDriver(
   const vdate = String(penalty.violationDate || '').slice(0, 10);
   if (!plate || !/^\d{4}-\d{2}-\d{2}/.test(vdate)) return null;
   const day = vdate.slice(0, 10);
-  const aliases = vehicles?.length ? plateAliasesFor(vehicles, penalty.plate) : null;
+  const companyId = String(penalty.companyId || '');
+  const scopedVehicles = companyId ? vehicles?.filter((vehicle) => String(vehicle.companyId || '') === companyId) : vehicles;
+  const aliases = scopedVehicles?.length ? plateAliasesFor(scopedVehicles, penalty.plate) : null;
   const samePlate = (p: unknown) => (aliases ? inPlateAliases(aliases, p) : normPlate(p) === plate);
   const cands = contracts
+    .filter((c) => !companyId || String(c.companyId || '') === companyId)
     .filter((c) => samePlate(c.plate))
     .filter((c) => {
       const start = String(c.startDate || c.deliveredDate || c.contractDate || '').slice(0, 10);

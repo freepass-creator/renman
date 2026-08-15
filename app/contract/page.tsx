@@ -1,7 +1,7 @@
 'use client';
 
 import { Suspense, useEffect, useMemo, useState } from 'react';
-import { CircleDollarSign, Pencil, Plus, UploadCloud, X } from 'lucide-react';
+import { CircleDollarSign, Pencil, Plus, X } from 'lucide-react';
 import { useSearchParams } from 'next/navigation';
 import { TODAY, dday } from '@/lib/dashboard-consts';
 import { contractMasterRow } from '@/lib/master-ledgers';
@@ -15,7 +15,7 @@ import {
 } from '@/components/ui';
 import { useIsMobile } from '@/lib/use-mobile';
 import { useSession } from '@/lib/session';
-import { openIngest, openReceivables } from '@/lib/ui-bus';
+import { openReceivables } from '@/lib/ui-bus';
 import { sendNoticeCert } from '@/lib/docs/send-notice';
 import {
   CONTRACT_FILTER_DEFS, countActiveFilters, emptyFilterValues, eqFilter, matchLedgerFilters,
@@ -343,9 +343,9 @@ function ContractLedgerInner() {
       empty={isSchedule
         ? '해당 기간에 도래하는 회차 없음'
         : <>
-          등록된 계약이 없습니다. 계약서는 데이터센터에 먼저 담으세요.
+          등록된 계약이 없습니다. 계약 생성에서 계약서를 올리세요.
           <div style={{ marginTop: 14, display: 'flex', justifyContent: 'center', gap: 8 }}>
-            <Btn size="sm" variant="ghost" onClick={() => openIngest('contract')}><UploadCloud size={14} /> 데이터센터</Btn>
+            <Btn size="sm" variant="ghost" onClick={() => { setSelected(null); setEditing(false); setCreating(true); }}><Plus size={14} /> 계약 생성</Btn>
           </div>
         </>}
       cols={frameCols as typeof CONTRACT_MASTER_BASIC_COLS}

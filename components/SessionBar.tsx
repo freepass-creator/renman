@@ -1,8 +1,8 @@
 'use client';
-import { useState, useEffect, type CSSProperties } from 'react';
+import { useState, useEffect, useLayoutEffect, type CSSProperties } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { ChevronLeft, Menu, X, LayoutDashboard } from 'lucide-react';
+import { ChevronLeft, Menu, PanelLeft, PanelLeftClose, Plus, X, LayoutDashboard } from 'lucide-react';
 import { useSession, roleLabel } from '@/lib/session';
 import { useAppBarSlots } from '@/lib/appbar';
 import { useIsMobile } from '@/lib/use-mobile';
@@ -10,9 +10,10 @@ import { MobileTabBar } from '@/components/MobileTabBar';
 import { MobileActionBar } from '@/components/MobileActionBar';
 import { haptic } from '@/lib/haptics';
 import { C, SCRIM, ctrlH, IconBtn } from '@/components/ui';
-import { NAV_GROUPS } from '@/lib/nav';
+import { NAV_GROUPS, PAGE_IA } from '@/lib/nav';
 import { tierIncludes } from '@/lib/tier';
 import { TopSearch } from '@/components/TopSearch';
+import { openQuickInput } from '@/lib/ui-bus';
 
 // 상단 좌측 브랜드 = 이 ERP를 쓰는 운영사(테넌트) 이름. 임시 하드코딩 — 추후 로그인 유저의 소속회사로.
 const OPERATOR_BRAND = 'teamjpk';
@@ -25,38 +26,72 @@ const navGroups = (isOperator: boolean, mobile = false) => NAV_GROUPS
   .map((g) => ({ ...g, items: g.items.filter((it) => tierIncludes(it.tier ?? '라이트') && (!it.hqOnly || isOperator) && (!it.devOnly || process.env.NODE_ENV !== 'production') && !(mobile && it.webOnly)) }))
   .filter((g) => g.items.length > 0);
 
-function NavMenu() {
-  const [open, setOpen] = useState(false);
+function navActive(href: string, path: string) {
+  if (href === '/') return path === '/';
+  return path === href || path.startsWith(`${href}/`);
+}
+
+function currentLabel(path: string): string {
+  let best: { href: string; label: string } | undefined;
+  for (const g of NAV_GROUPS) {
+    for (const it of g.items) {
+      if (it.href === '/') {
+        if (path === '/') return it.label;
+        continue;
+      }
+      if (path === it.href || path.startsWith(`${it.href}/`)) {
+        if (!best || it.href.length > best.href.length) best = it;
+      }
+    }
+  }
+  if (best) return best.label;
+  let iaBest: { href: string; label: string } | undefined;
+  for (const p of PAGE_IA) {
+    const stem = p.href.replace(/\[.*?\]/g, '').replace(/\/$/, '') || '/';
+    const match = p.href.includes('[')
+      ? path === stem || path.startsWith(`${stem}/`)
+      : path === p.href;
+    if (!match) continue;
+    if (!iaBest || stem.length > iaBest.href.length) iaBest = { href: stem, label: p.label.replace(/\(딥링크\)$/, '') };
+  }
+  return iaBest?.label || '';
+}
+
+function DesktopRail({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => void }) {
   const { isOperator } = useSession();
-  const line = 'var(--border)', ink = 'var(--text-main)', mute = 'var(--text-sub)', weak = 'var(--text-weak)';
+  const pathname = usePathname();
+  const groups = navGroups(isOperator);
   return (
-    <div style={{ position: 'relative' }}>
-      <IconBtn title="메뉴" active={open} onClick={() => setOpen((o) => !o)}>
-        <Menu size={17} />
-      </IconBtn>
-      {open && (<>
-        <div onClick={() => setOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 44 }} />
-        <div style={{ position: 'absolute', left: 0, top: 'calc(100% + 4px)', width: 220, background: C.taupeBg, border: `1px solid ${line}`, borderRadius: 'var(--radius)', boxShadow: 'var(--shadow-lg)', zIndex: 45, overflow: 'hidden' }}>
-          {navGroups(isOperator).map((g, gi) => (
-            <div key={gi} style={{ borderTop: gi ? `1px solid ${line}` : 'none', padding: '5px 0' }}>
-              {g.title && <div style={{ fontSize: 11, color: weak, fontWeight: 700, padding: '3px 13px', letterSpacing: '0.02em' }}>{g.title}</div>}
-              {g.items.map((it) => (
-                <Link key={it.href} href={it.href} onClick={() => setOpen(false)}
-                  style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 13px', fontSize: 12.5, color: ink, textDecoration: 'none' }}
-                  onMouseEnter={(e) => (e.currentTarget.style.background = C.hover)}
-                  onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}>
-                  <it.icon size={14} color={mute} /> {it.label}
-                </Link>
-              ))}
-            </div>
-          ))}
-          {/* 배포 버전 — 메뉴 하단(erp4식). 배포 확인용. APP_VERSION SSOT. */}
-          <div style={{ borderTop: `1px solid ${line}`, padding: '7px 14px', fontSize: 11, color: weak, fontFamily: 'var(--font-mono)', letterSpacing: '0.02em' }}>
-            {OPERATOR_BRAND} · v{APP_VERSION}
+    <aside className="rm-rail" aria-label="주 메뉴">
+      <Link href="/" className="rm-rail__brand" title={OPERATOR_BRAND}>
+        <span className="rm-rail__mark"><LayoutDashboard size={14} /></span>
+        <span className="rm-rail__text">{OPERATOR_BRAND}</span>
+      </Link>
+      <nav className="rm-rail__nav">
+        {groups.map((g, gi) => (
+          <div key={gi}>
+            {g.title ? <div className="rm-rail__label">{g.title}</div> : null}
+            {g.items.map((it) => (
+              <Link
+                key={it.href}
+                href={it.href}
+                title={collapsed ? it.label : undefined}
+                className={`rm-rail__item${navActive(it.href, pathname) ? ' is-active' : ''}`}
+              >
+                <it.icon size={16} />
+                <span className="rm-rail__text">{it.label}</span>
+              </Link>
+            ))}
           </div>
-        </div>
-      </>)}
-    </div>
+        ))}
+      </nav>
+      <div className="rm-rail__foot">
+        <IconBtn title={collapsed ? '메뉴 펼치기' : '메뉴 접기'} onClick={onToggle}>
+          {collapsed ? <PanelLeft size={16} /> : <PanelLeftClose size={16} />}
+        </IconBtn>
+        <span className="rm-rail__text">{OPERATOR_BRAND} · v{APP_VERSION}</span>
+      </div>
+    </aside>
   );
 }
 
@@ -103,12 +138,29 @@ export default function TopBar() {
   const pathname = usePathname();
   const router = useRouter();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [railCollapsed, setRailCollapsed] = useState(false);
   const customMobileShell = pathname === '/m' || pathname.startsWith('/m/') || pathname === '/dev/preview';
   // 모바일 크롬 SSOT — 허브=메뉴·탭 / 뎁스=상단 제목(ERP4 TopBar) · 하단 이전+액션(탭 숨김).
   const depth = !!slots.depth;
   const showBottom = !!(slots.back || slots.actions);
   const showActionBar = !!(slots.back || slots.actions || slots.depth);   // 모바일 하단 액션바(이전+주액션)
   useEffect(() => { setMenuOpen(false); }, [pathname]);
+  useLayoutEffect(() => {
+    try { setRailCollapsed(localStorage.getItem('jpk:rail') === '1'); } catch { /* noop */ }
+  }, []);
+  useLayoutEffect(() => {
+    document.documentElement.setAttribute(
+      'data-rm-rail',
+      customMobileShell || mobile ? 'off' : (railCollapsed ? 'collapsed' : 'on'),
+    );
+  }, [customMobileShell, mobile, railCollapsed]);
+  const toggleRail = () => {
+    setRailCollapsed((prev) => {
+      const next = !prev;
+      try { localStorage.setItem('jpk:rail', next ? '1' : '0'); } catch { /* noop */ }
+      return next;
+    });
+  };
   useEffect(() => {
     // Menu links mount only after the popover opens, so their default prefetch starts too late.
     // Warm the four primary ledgers up front to prevent the previous page lingering on navigation.
@@ -118,10 +170,12 @@ export default function TopBar() {
     if (customMobileShell) {
       // /m은 자체 상·하단 셸을 가진다. 렌더가 null이어도 웹 TopBar 여백을 남기지 않는다.
       document.body.style.paddingTop = '0px';
+      document.body.style.paddingLeft = '0px';
       document.body.style.paddingBottom = '0px';
       document.documentElement.style.setProperty('--fp-dock-h', '0px');
       return () => {
         document.body.style.paddingTop = '';
+        document.body.style.paddingLeft = '';
         document.body.style.paddingBottom = '';
         document.documentElement.style.setProperty('--fp-dock-h', '0px');
       };
@@ -129,6 +183,7 @@ export default function TopBar() {
     // 상단바=fixed(웹·모바일) → body paddingTop으로 본문 시작 맞춤.
     // 웹 뎁스: 하단 이전/홈 바 높이 → --fp-dock-h (Page frame이 빼서 페이지 스크롤 방지).
     document.body.style.paddingTop = 'var(--fp-bar-h)';
+    document.body.style.paddingLeft = mobile ? '' : 'var(--rm-rail-w)';
     const dock = showBottom ? 'calc(var(--fp-bar-h) + 8px)' : '0px';
     document.documentElement.style.setProperty('--fp-dock-h', mobile ? '0px' : dock);
     document.body.style.paddingBottom = mobile
@@ -138,6 +193,7 @@ export default function TopBar() {
       : (showBottom ? dock : '');
     return () => {
       document.body.style.paddingTop = '';
+      document.body.style.paddingLeft = '';
       document.body.style.paddingBottom = '';
       document.documentElement.style.setProperty('--fp-dock-h', '0px');
     };
@@ -148,7 +204,7 @@ export default function TopBar() {
   const bh = ctrlH(false);
   const barBtn: CSSProperties = { display: 'inline-flex', alignItems: 'center', gap: 4, height: bh, boxSizing: 'border-box', padding: '0 12px', border: `1px solid ${line}`, borderRadius: 'var(--radius)', background: C.taupeBg, cursor: 'pointer', fontSize: 12.5, fontWeight: 600, color: ink, textDecoration: 'none' };
 
-  // /m(모바일 전용 트리)·/dev/preview(모바일 미리보기)는 웹 크롬 없이 — 자체/프레임 셸만. 웹 상단바 숨김.
+  // /m·/dev/preview는 자체 셸만 사용 — 웹 상단바·레일·모바일 메뉴 숨김.
   if (customMobileShell) return null;
 
   if (mobile) {
@@ -193,16 +249,21 @@ export default function TopBar() {
 
   return (
     <>
-      <div style={{
-        display: 'flex', alignItems: 'center', gap: 10,
-        padding: '0 16px', background: C.taupeBg, borderBottom: `1px solid ${line}`,
-        position: 'fixed', top: 0, left: 0, right: 0, zIndex: 80,
-        height: 'var(--fp-bar-h)', boxSizing: 'border-box',
-      }}>
-        <NavMenu />
-        <Link href="/" style={{ fontSize: 15, fontWeight: 800, letterSpacing: '-0.03em', color: ink, textDecoration: 'none' }}>{OPERATOR_BRAND}</Link>{/* SPA 이동 — 구 <a>는 전체 앱 재부팅(캐시 소실) */}
-        {/* 가운데 = 전역 검색(검색 전용 인라인 타입어헤드 — 창 안 뜨고 밑에 결과 바로). */}
+      <DesktopRail collapsed={railCollapsed} onToggle={toggleRail} />
+      <div
+        className="rm-shell-top"
+        style={{
+          display: 'flex', alignItems: 'center', gap: 10,
+          padding: '0 16px', background: C.taupeBg, borderBottom: `1px solid ${line}`,
+          position: 'fixed', top: 0, right: 0, zIndex: 80,
+          height: 'var(--fp-bar-h)', boxSizing: 'border-box',
+        }}
+      >
+        <span style={{ fontSize: 12, fontWeight: 700, color: mute, whiteSpace: 'nowrap' }}>{currentLabel(pathname)}</span>
         <TopSearch />
+        <IconBtn title="빠른 입력" onClick={openQuickInput}>
+          <Plus size={16} />
+        </IconBtn>
         <span style={{ fontSize: 12, color: mute, fontWeight: 600, marginRight: 2, fontVariantNumeric: 'tabular-nums' }}>{todayLabel}</span>
         <div style={{ display: 'inline-flex', alignItems: 'baseline', gap: 6, paddingLeft: 2, whiteSpace: 'nowrap' }} title={user.email}>
           <span style={{ fontSize: 12.5, fontWeight: 700, color: ink }}>{user.name}</span>
@@ -210,7 +271,7 @@ export default function TopBar() {
         </div>
       </div>
       {showBottom && (
-        <div style={{ position: 'fixed', left: 0, right: 0, bottom: 0, zIndex: 55, background: C.taupeBg, borderTop: `1px solid ${line}`, boxShadow: 'var(--shadow-sm)' }}>
+        <div className="rm-shell-dock" style={{ position: 'fixed', right: 0, bottom: 0, zIndex: 55, background: C.taupeBg, borderTop: `1px solid ${line}`, boxShadow: 'var(--shadow-sm)' }}>
           <div style={{ maxWidth: slots.contentMax ?? 1480, margin: '0 auto', padding: `8px ${slots.contentPad ?? 20}px`, display: 'flex', alignItems: 'center', gap: 8, boxSizing: 'border-box' }}>
             <button onClick={goBack} title="이전" style={barBtn}><ChevronLeft size={15} /> 이전</button>
             <Link href="/" title="대시보드" style={barBtn}><LayoutDashboard size={15} /> 대시보드</Link>

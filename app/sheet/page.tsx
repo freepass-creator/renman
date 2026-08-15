@@ -1,6 +1,5 @@
-import { redirect } from 'next/navigation';
+import SheetWorkspace from './SheetWorkspace';
 
-/** 레거시 운영원장 → 자산관리 */
-export default function SheetRedirect() {
-  redirect('/asset');
+export default function SheetPage() {
+  return <SheetWorkspace />;
 }

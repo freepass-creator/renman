@@ -11,7 +11,7 @@ import { storageReady } from '@/lib/storage';
 import { uploadToInbox } from '@/lib/inbox-upload';
 import { openCar, openCustomer, openFinance } from '@/lib/ui-bus';
 import { toast } from '@/lib/toast';
-import { normPlate } from '@/lib/plate';
+import { scopedPlateKey } from '@/lib/plate';
 import { pushDocVersion } from '@/lib/docs';
 import { linkFleet } from '@/lib/domain/model';
 import { customerKey } from '@/lib/customers';
@@ -144,7 +144,7 @@ export default function InboxPage() {
     ];
     if (target === 'vehicle') {
       const fleet = linkFleet(vs, cs, TODAY);
-      const active = fleet.activeByPlate.get(normPlate(targetRec.plate));
+      const active = fleet.activeByCompanyPlate.get(scopedPlateKey(targetRec.companyId, targetRec.plate));
       if (active?.view.rec._key) {
         const crec = active.view.rec;
         if (resolveWriteCompany(companyId, crec)) {
