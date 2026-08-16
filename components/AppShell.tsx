@@ -17,11 +17,16 @@ export default function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const standaloneSheet = pathname === '/sheet' || pathname.startsWith('/sheet/');
   const standaloneUpload = pathname === '/ingest';
+  /* ★홈은 «검색창 하나»다 — 상단바·사이드레일·메뉴버튼을 그리지 않는다.
+     사장님 지시 2026-08-09 「사이드바 이런거 메뉴버튼 이런거 없어. 그냥 구글 검색창 방식.」
+     메뉴로 «어디로 갈지» 고르게 하면 사용자가 ERP 분류를 먼저 배워야 한다.
+     찾을 것을 치면 거기로 간다. 저장·확인·알림 엔진은 그대로 유지한다. */
+  const standaloneHome = pathname === '/';
 
   // 새 시트 UI는 기존 앱 셸과 분리하되, 인증·회사 스코프·ERP 저장 엔진은 그대로 쓴다.
   if (standaloneSheet) return <SessionProvider>{children}</SessionProvider>;
-  // 새 업무 공간의 자료 투입구. 기존 전역 메뉴만 제외하고 저장·확인·알림 엔진은 유지한다.
-  if (standaloneUpload) return (
+  // 홈·자료올리기 — 전역 메뉴만 제외하고 저장·확인·알림 엔진은 유지한다.
+  if (standaloneHome || standaloneUpload) return (
     <SessionProvider>
       <AppBarProvider>
         <ConfirmProvider>
