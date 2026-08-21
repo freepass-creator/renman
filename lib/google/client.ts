@@ -24,6 +24,8 @@ function loadServiceAccountKey(): Record<string, unknown> | null {
 
 const SCOPES_BY_SERVICE = {
   drive: ['https://www.googleapis.com/auth/drive'],
+  // 2026-08-21 업무 관제 — 업무내비게이션·원장 시트를 읽고 쓴다
+  sheets:   ['https://www.googleapis.com/auth/spreadsheets'],
 } as const;
 export type GoogleService = keyof typeof SCOPES_BY_SERVICE;
 
@@ -46,6 +48,11 @@ export function getDriveClient(impersonateUser?: string) {
 }
 
 /** 연동 가능 상태 빠른 체크(env만 본다). */
+/** 시트 클라이언트 — 업무 관제가 쓴다 */
+export function getSheetsClient(impersonateUser?: string) {
+  return google.sheets({ version: 'v4', auth: buildJwtClient('sheets', impersonateUser) });
+}
+
 export function workspaceConfigured(): { ok: boolean; missing: string[] } {
   const missing: string[] = [];
   if (!process.env.GOOGLE_SERVICE_ACCOUNT_KEY) missing.push('GOOGLE_SERVICE_ACCOUNT_KEY');

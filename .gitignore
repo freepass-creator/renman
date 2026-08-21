@@ -31,3 +31,7 @@ tools/_tmp*
 # 루트 민감/사무 문서 — 절대 커밋 금지
 /*.pdf
 /*.xlsx
+
+# 서비스계정 키 — 절대 커밋하지 않는다
+*firebase-adminsdk*.json
+*service-account*.json
