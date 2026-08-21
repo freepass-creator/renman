@@ -13,17 +13,21 @@
 import { useCallback, useEffect, useMemo, useState, useTransition } from 'react';
 import { watchAuth, type FbUser } from '@/lib/firebase/auth';
 import { firebaseReady } from '@/lib/firebase/client';
-import { 이름추정 } from '@/lib/work/people';
+import { 이름추정, 대표인가 } from '@/lib/work/people';
 import type { 할일 } from '@/lib/work/sheet';
-import { 업무가져오기, 업무처리 } from '@/lib/work/actions';
+import { 업무가져오기, 업무처리, 사람별건수 } from '@/lib/work/actions';
 import { Login } from '@/components/Login';
 
-type 갈래 = '내 업무' | '전체 업무';
+// 대표(2026-08-21): 「로그인하면 내 업무랑 전체 업무가 보이게 하면 되잖아」
+//                   「나는 다른 직원들 거 다 보여야지」
+// → 직원은 내 업무 / 전체 업무 둘. 대표는 여기에 «사람별» 이 붙고 기본이 전체다.
+type 갈래 = string;   // '내 업무' | '전체 업무' | 사람 이름
 
 export default function Home() {
   const [user, setUser] = useState<FbUser | undefined>(undefined);   // undefined = 아직 모름
   const [갈래보기, 갈래쓰기] = useState<갈래>('내 업무');
   const [목록, 목록쓰기] = useState<할일[] | null>(null);
+  const [사람들셈, 사람들셈쓰기] = useState<{ 이름: string; 건수: number; 먼저: number }[]>([]);
   const [고침, 고치기] = useState(0);
 
   useEffect(() => {
@@ -32,12 +36,25 @@ export default function Home() {
   }, []);
 
   const 나 = useMemo(() => 이름추정(user?.email), [user]);
+  const 대표 = useMemo(() => 대표인가(user?.email), [user]);
+
+  // 대표는 전체가 기본이다
+  useEffect(() => { if (대표) 갈래쓰기('전체 업무'); }, [대표]);
+
+  // 대표만 사람별 건수를 본다
+  useEffect(() => {
+    if (!대표 || !user) return;
+    let 살아있음 = true;
+    사람별건수().then((r) => { if (살아있음) 사람들셈쓰기(r); }).catch(() => {});
+    return () => { 살아있음 = false; };
+  }, [대표, user, 고침]);
 
   useEffect(() => {
     if (user === undefined || user === null) return;
     let 살아있음 = true;
     목록쓰기(null);
-    업무가져오기(갈래보기 === '내 업무' ? 나 : undefined)
+    const 누구 = 갈래보기 === '전체 업무' ? undefined : 갈래보기 === '내 업무' ? 나 : 갈래보기;
+    업무가져오기(누구)
       .then((r) => { if (살아있음) 목록쓰기(r); })
       .catch(() => { if (살아있음) 목록쓰기([]); });
     return () => { 살아있음 = false; };
@@ -56,13 +73,17 @@ export default function Home() {
         <div className="flex items-baseline gap-2.5 px-4 pt-3.5">
           <strong className="text-[17px]">할 일</strong>
           <span className="text-sm text-neutral-500">{나}</span>
+          <a href="/upload" className="text-sm text-blue-600 dark:text-blue-400">올리기</a>
           <span className="ml-auto text-sm">
             <b>{목록?.length ?? '–'}</b>건
             {급한것 > 0 && <span className="ml-2 text-orange-600 dark:text-orange-400">먼저 {급한것}</span>}
           </span>
         </div>
-        <div className="flex gap-1 px-3 pb-1 pt-2.5">
-          {(['내 업무', '전체 업무'] as 갈래[]).map((g) => (
+        <div className="flex gap-1 overflow-x-auto px-3 pb-1 pt-2.5">
+          {(대표
+            ? ['전체 업무', '내 업무', ...사람들셈.map((p) => p.이름).filter((n) => n !== 나)]
+            : ['내 업무', '전체 업무']
+          ).map((g) => (
             <button
               key={g}
               onClick={() => 갈래쓰기(g)}
@@ -73,11 +94,36 @@ export default function Home() {
                   : 'text-neutral-500')
               }
             >
-              {g}
+              <span className="whitespace-nowrap">
+                {g}
+                {대표 && (() => {
+                  const c = 사람들셈.find((p) => p.이름 === g);
+                  if (!c) return null;
+                  return <span className="ml-1.5 text-[12.5px] font-normal opacity-70">{c.건수}</span>;
+                })()}
+              </span>
             </button>
           ))}
         </div>
       </header>
+
+      {대표 && 갈래보기 === '전체 업무' && 사람들셈.length > 0 && (
+        <div className="grid gap-1.5 px-3 pt-3">
+          {사람들셈.map((p) => (
+            <button
+              key={p.이름}
+              onClick={() => 갈래쓰기(p.이름)}
+              className="flex items-center gap-2.5 rounded-lg border border-neutral-200 bg-white px-3.5 py-2.5 text-left dark:border-neutral-800 dark:bg-neutral-900"
+            >
+              <span className="text-[14.5px] font-semibold">{p.이름}</span>
+              <span className="ml-auto text-[13.5px] text-neutral-500">{p.건수}건</span>
+              {p.먼저 > 0 && (
+                <span className="text-[13px] text-orange-600 dark:text-orange-400">먼저 {p.먼저}</span>
+              )}
+            </button>
+          ))}
+        </div>
+      )}
 
       {목록 === null ? (
         <중앙>가져오는 중…</중앙>
