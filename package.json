@@ -6,7 +6,7 @@
     "node": ">=22"
   },
   "scripts": {
-    "dev": "next dev --turbo -p 6006",
+    "dev": "next dev -p 6006",
     "build": "next build",
     "start": "next start -p 6006",
     "typecheck": "tsc --noEmit",
@@ -29,7 +29,8 @@
     "restore:run": "node --experimental-strip-types scripts/firestore-managed-restore.mts --execute",
     "deploy:preflight": "npm run security:secrets && npm run security:audit && npm run open:scan && node --experimental-strip-types scripts/deploy-preflight.mts",
     "release:preflight": "npm run deploy:preflight && npm run backup:preflight && npm run open:check",
-    "deploy:rules": "npm run deploy:preflight && firebase deploy --only firestore:rules,storage --project renman-dd0a2"
+    "deploy:rules": "npm run deploy:preflight && firebase deploy --only firestore:rules,storage --project renman-dd0a2",
+    "dev:turbo": "next dev --turbo -p 6006"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",
