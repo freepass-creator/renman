@@ -10,7 +10,7 @@ import {
   X,
 } from 'lucide-react';
 import Link from 'next/link';
-import { useEffect, useMemo, useState } from 'react';
+import { type Dispatch, type Ref, type SetStateAction, useEffect, useMemo, useRef, useState } from 'react';
 import { companyLabel, RENTAL_COMPANY_IDS } from '@/lib/companies';
 import { TODAY } from '@/lib/dashboard-consts';
 import { buildHomePendingRows, buildHomeRiskRows, buildHomeUpcomingRows, hrefForTodayRow, type HomeQueueRow } from '@/lib/home-rows';
@@ -33,6 +33,7 @@ import { buildWorkItemLedgerRows, workDueSignal } from '@/lib/work-ledger';
 import { SheetButton, SheetSelect } from '@/components/ui/sheet-controls';
 import RebornHeader from './_components/RebornHeader';
 import styles from './simple.module.css';
+import nextStyles from './workspace-next.module.css';
 
 type TodoFilter = 'all' | 'company' | 'customer';
 type TodoCategoryFilter = 'all' | TaskCategory;
@@ -154,7 +155,18 @@ function statusRank(status: string): number {
   return 3;
 }
 
-export default function SimpleRentalManager() {
+function taskInstruction(item: TodoItem): string {
+  const action = todoActionLabel(item).replace(/[.。]$/, '').trim();
+  if (/올리기$/.test(action)) return `${action} 후 분석·연결 결과를 확인하세요`;
+  if (/요청$/.test(action)) return `${action}하고 완료 여부를 확인하세요`;
+  if (/배정$/.test(action)) return `${action}하고 배차 상태를 확인하세요`;
+  if (/연결$/.test(action)) return `${action}하고 연결 결과를 확인하세요`;
+  if (/확인$/.test(action)) return `${action}하고 결과를 기록하세요`;
+  if (/처리$/.test(action)) return `${action}하고 처리 결과를 기록하세요`;
+  return `${action}을 완료하고 결과를 기록하세요`;
+}
+
+export default function SimpleRentalManager({ variant = 'current' }: { variant?: 'current' | 'next' }) {
   const { D, bankTx, contracts, vehicles, inbox, workItems, loading, error } = useDashboardData(RENTAL_COMPANY_IDS);
   const [query, setQuery] = useState('');
   const [todoFilter, setTodoFilter] = useState<TodoFilter>('all');
@@ -163,6 +175,18 @@ export default function SimpleRentalManager() {
   const [assigneeFilter, setAssigneeFilter] = useState('all');
   const [todoSort, setTodoSort] = useState<TodoSort>('urgency');
   const [filterOpen, setFilterOpen] = useState(false);
+  const searchRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const focusSearch = (event: KeyboardEvent) => {
+      if (event.key.toLowerCase() !== 'k' || (!event.ctrlKey && !event.metaKey)) return;
+      event.preventDefault();
+      searchRef.current?.focus();
+      searchRef.current?.select();
+    };
+    window.addEventListener('keydown', focusSearch);
+    return () => window.removeEventListener('keydown', focusSearch);
+  }, []);
 
   useEffect(() => {
     if (!filterOpen) return;
@@ -320,9 +344,9 @@ export default function SimpleRentalManager() {
   }, [assigneeFilter, categoryFilter, statusFilter, todoFilter, todoSort, todos]);
 
   const searchedTodos = useMemo(() => {
-    if (!query.trim()) return visibleTodos;
-    return visibleTodos.filter((item) => matches([item.kind, item.status, item.action, item.title, item.detail, item.assignee, TODO_CATEGORY_LABEL[item.category]], query));
-  }, [query, visibleTodos]);
+    if (!query.trim()) return [];
+    return todos.filter((item) => matches([item.kind, item.status, item.action, item.title, item.detail, item.assignee, TODO_CATEGORY_LABEL[item.category]], query));
+  }, [query, todos]);
 
   const searchRows = useMemo<SearchRow[]>(() => {
     if (!query.trim()) return [];
@@ -417,40 +441,94 @@ export default function SimpleRentalManager() {
     return { carry, currentCharge, currentPaid, balance, rate, hasData: monthBankTx.length > 0 };
   }, [D.overduePay, D.rows, D.summary.misuTotal, bankTx]);
 
+  const averageIdleDays = useMemo(() => {
+    const values = D.idleCars
+      .map(({ v }) => daysSince(v.idleSince || v.statusChangedAt || v.updatedAt))
+      .filter((value): value is number => value != null);
+    return values.length ? Math.round(values.reduce((sum, value) => sum + value, 0) / values.length) : null;
+  }, [D.idleCars]);
+
+  if (variant === 'next') {
+    return <RentalWorkspaceNext
+      query={query}
+      setQuery={setQuery}
+      searchRef={searchRef}
+      loading={loading}
+      error={error}
+      todos={todos}
+      visibleTodos={visibleTodos}
+      searchedTodos={searchedTodos}
+      searchRows={searchRows}
+      todoFilter={todoFilter}
+      setTodoFilter={setTodoFilter}
+      categoryFilter={categoryFilter}
+      setCategoryFilter={setCategoryFilter}
+      statusFilter={statusFilter}
+      setStatusFilter={setStatusFilter}
+      assigneeFilter={assigneeFilter}
+      setAssigneeFilter={setAssigneeFilter}
+      todoSort={todoSort}
+      setTodoSort={setTodoSort}
+      filterOpen={filterOpen}
+      setFilterOpen={setFilterOpen}
+      todoCounts={todoCounts}
+      statusOptions={statusOptions}
+      assigneeOptions={assigneeOptions}
+      companyTodoCount={companyTodoCount}
+      customerTodoCount={customerTodoCount}
+      activeFilterCount={activeFilterCount}
+      collectionSummary={collectionSummary}
+      utilization={D.summary.util}
+      running={D.summary.running}
+      held={D.summary.held}
+      idle={D.summary.idle}
+      averageIdleDays={averageIdleDays}
+      onOpen={openTodo}
+    />;
+  }
+
   return <div className={styles.app}>
     <RebornHeader active="work" />
 
     <main className={styles.main}>
-      <section className={styles.hero}>
-        <div className={styles.toolbar}>
-          <label className={styles.search}>
-            <Search size={20} aria-hidden="true" />
-            <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="차량번호, 고객, 계약번호 검색" aria-label="업무 통합 검색" />
-            {query ? <SheetButton onClick={() => setQuery('')} aria-label="검색어 지우기"><X size={18} /></SheetButton> : null}
-          </label>
-          <div className={styles.metricChips} aria-label="운영 요약">
-            <span className={styles.metricChip}><small>전체</small><strong>{todos.length}건</strong></span>
-            <span className={styles.metricChip} title={`운행 ${D.summary.running}대 · 전체 ${D.summary.held}대 · 휴차 ${D.summary.idle}대`}><small>가동률</small><strong>{D.summary.util}%</strong></span>
-            <span className={`${styles.metricChip} ${collectionSummary.balance > 0 ? styles.metricChipDanger : ''}`} title={collectionSummary.hasData ? `미수율 ${collectionSummary.rate}% · 당월 수금 ${compactMoney(collectionSummary.currentPaid)}` : '수금자료 확인 필요'}><small>미수</small><strong>{compactMoney(collectionSummary.balance)}</strong></span>
+      <section className={styles.commandDeck} aria-label="검색과 운영 현황">
+        <label className={styles.commandSearch}>
+          <Search size={20} aria-hidden="true" />
+          <input ref={searchRef} value={query} onChange={(event) => setQuery(event.target.value)} placeholder="차량번호, 고객, 계약번호를 입력하세요" aria-label="업무 통합 검색" />
+          {query ? <SheetButton onClick={() => setQuery('')} aria-label="검색어 지우기"><X size={18} /></SheetButton> : <kbd className={styles.searchHint}>Ctrl K</kbd>}
+        </label>
+        <div className={styles.workMetrics} aria-label="운영 현황">
+          <div>
+            <span>가동</span><strong>{D.summary.util}<small>%</small></strong>
+            <em>{D.summary.running}/{D.summary.held}대 · 휴차 {D.summary.idle}대 <span className={styles.metricSecondary}>· 평균 {averageIdleDays == null ? '미산정' : `${averageIdleDays}일`}</span></em>
+          </div>
+          <div className={collectionSummary.hasData && collectionSummary.balance > 0 ? styles.metricDanger : undefined}>
+            <span>미수</span><strong>{collectionSummary.hasData ? collectionSummary.rate : '—'}{collectionSummary.hasData ? <small>%</small> : null}</strong>
+            <em>{compactMoney(collectionSummary.balance)} · {collectionSummary.hasData ? `당월 수금 ${compactMoney(collectionSummary.currentPaid)}` : '입금자료 미수집'}</em>
+          </div>
+        </div>
+      </section>
+
+      {loading ? <div className={styles.stateMessage}><Loader2 size={19} className={styles.spin} />불러오는 중</div> : null}
+      {!loading && error ? <div className={styles.error}><AlertTriangle size={18} />{error}</div> : null}
+
+      {!loading && !error && !query.trim() ? <section className={styles.todoSection} aria-label="업무 목록">
+        <div className={styles.scopeBar}>
+          <div className={styles.ownerSwitch} role="group" aria-label="처리 주체 선택">
+            <TodoFilterButton active={todoFilter === 'all'} label="전체" count={todos.length} onClick={() => setTodoFilter('all')} />
+            <TodoFilterButton active={todoFilter === 'company'} label="내부 처리" count={companyTodoCount} onClick={() => setTodoFilter('company')} />
+            <TodoFilterButton active={todoFilter === 'customer'} label="고객 이행" count={customerTodoCount} onClick={() => setTodoFilter('customer')} />
           </div>
           <div className={styles.filterWrap}>
             <SheetButton className={`${styles.filterToggle} ${activeFilterCount ? styles.filterToggleActive : ''}`} onClick={() => setFilterOpen((open) => !open)} aria-expanded={filterOpen} aria-controls="work-filter-panel">
-              <ListFilter size={17} />필터{activeFilterCount ? <b>{activeFilterCount}</b> : null}
+              <ListFilter size={18} />상세 필터{activeFilterCount ? <b>{activeFilterCount}</b> : null}
             </SheetButton>
-            {filterOpen ? <div className={styles.filterPopover} id="work-filter-panel" role="dialog" aria-label="업무 필터와 정렬">
-              <div className={styles.filterPopoverHead}><strong>필터·정렬</strong><SheetButton onClick={() => { setTodoFilter('all'); setCategoryFilter('all'); setStatusFilter('all'); setAssigneeFilter('all'); setTodoSort('urgency'); }}>초기화</SheetButton></div>
-              <div className={styles.filterGroup}>
-                <span>책임 구분</span>
-                <div className={styles.todoFilters}>
-                  <TodoFilterButton active={todoFilter === 'all'} label="전체" count={todos.length} onClick={() => setTodoFilter('all')} />
-                  <TodoFilterButton active={todoFilter === 'company'} label="우리 처리" count={companyTodoCount} onClick={() => setTodoFilter('company')} />
-                  <TodoFilterButton active={todoFilter === 'customer'} label="고객 이행" count={customerTodoCount} onClick={() => setTodoFilter('customer')} />
-                </div>
-              </div>
+            {filterOpen ? <div className={styles.filterPopover} id="work-filter-panel" role="region" aria-label="업무 필터와 정렬">
+              <div className={styles.filterPopoverHead}><strong>업무 필터</strong><SheetButton onClick={() => { setTodoFilter('all'); setCategoryFilter('all'); setStatusFilter('all'); setAssigneeFilter('all'); setTodoSort('urgency'); }}>모두 초기화</SheetButton></div>
               <div className={styles.filterGroup}>
                 <span>업무 종류</span>
                 <div className={styles.categoryFilters}>
-                  {TODO_CATEGORY_OPTIONS.map((option) => <SheetButton key={option.key} className={categoryFilter === option.key ? styles.categoryFilterActive : undefined} onClick={() => setCategoryFilter(option.key)}>{option.label}<small>{option.key === 'all' ? todos.length : todoCounts.categories[option.key]}</small></SheetButton>)}
+                  {TODO_CATEGORY_OPTIONS.map((option) => <SheetButton key={option.key} className={categoryFilter === option.key ? styles.categoryFilterActive : undefined} aria-pressed={categoryFilter === option.key} onClick={() => setCategoryFilter(option.key)}>{option.label}<small>{option.key === 'all' ? todos.length : todoCounts.categories[option.key]}</small></SheetButton>)}
                 </div>
               </div>
               <div className={styles.filterSelectGrid}>
@@ -461,22 +539,16 @@ export default function SimpleRentalManager() {
             </div> : null}
           </div>
         </div>
-      </section>
-
-      {loading ? <div className={styles.stateMessage}><Loader2 size={19} className={styles.spin} />불러오는 중</div> : null}
-      {!loading && error ? <div className={styles.error}><AlertTriangle size={18} />{error}</div> : null}
-
-      {!loading && !error && !query.trim() ? <section className={styles.todoSection}>
-        <div className={styles.sectionHeader}>
-          <div className={styles.sectionTitle}><h1>처리할 업무</h1><span>{visibleTodos.length}건</span></div>
-        </div>
         <TodoTable items={visibleTodos} onOpen={openTodo} />
       </section> : null}
 
       {!loading && !error && query.trim() ? <section className={styles.results}>
-        <div className={styles.sectionTitle}><h1>검색 결과</h1><span>업무 {searchedTodos.length}건 · 차량 {searchRows.length}대</span></div>
+        <div className={styles.pageBar}>
+          <div className={styles.pageTitle}><h1>검색 결과</h1></div>
+          <div className={styles.resultCount}>업무 {searchedTodos.length}건 · 차량 {searchRows.length}대</div>
+        </div>
         {searchedTodos.length ? <TodoTable items={searchedTodos} onOpen={openTodo} /> : null}
-        {searchRows.length ? <div className={styles.resultSubTitle}>차량 정보</div> : null}
+        {searchRows.length ? <div className={styles.resultSubTitle}>차량·계약</div> : null}
         {searchRows.length ? <div className={styles.resultList}>
           {searchRows.map((row, index) => {
             const company = text(row.vehicle.companyId, '');
@@ -499,31 +571,222 @@ export default function SimpleRentalManager() {
 }
 
 function TodoFilterButton({ active, label, count, onClick }: { active: boolean; label: string; count: number; onClick: () => void }) {
-  return <SheetButton className={`${styles.todoFilter} ${active ? styles.todoFilterActive : ''}`} onClick={onClick}><span>{label}</span><strong>{count}건</strong></SheetButton>;
+  return <SheetButton className={`${styles.todoFilter} ${active ? styles.todoFilterActive : ''}`} aria-pressed={active} onClick={onClick}><span>{label}</span><strong>{count}</strong></SheetButton>;
 }
 
 function TodoTable({ items, onOpen }: { items: TodoItem[]; onOpen: (item: TodoItem) => void }) {
   return <div className={styles.todoList}>
-    <div className={styles.todoHead} aria-hidden="true"><span>우선</span><span>구분</span><span>상태</span><span>처리할 일</span><span>대상</span><span>문제·기한</span><span>담당자</span><span>근거</span></div>
+    <div className={styles.todoHead} aria-hidden="true"><span>우선순위</span><span>해야 할 일</span><span>대상</span><span>기한·담당자</span><span>근거</span></div>
     {items.map((item) => {
       const evidenceHref = safeEvidenceHref(item.evidenceHref);
       const dueLabel = taskDueLabel(item.dueDate, item.dday);
       return <div key={item.id} className={styles.todoRow}>
-        <SheetButton className={styles.todoRowMain} onClick={() => onOpen(item)} disabled={!item.plate && !item.href} aria-label={`${todoActionLabel(item)} · ${item.title}`}>
-          <span className={`${styles.todoPriority} ${item.priority === 1 ? styles.todoPriorityHigh : item.priority === 2 ? styles.todoPriorityMedium : ''}`}>{taskPriorityLabel(item.priority)}</span>
-          <span className={`${styles.todoType} ${item.owner === 'customer' ? styles.todoTypeCustomer : ''}`}>{item.owner === 'company' ? '우리' : '고객'}·{TODO_CATEGORY_LABEL[item.category]}</span>
-          <span className={`${styles.todoStatus} ${/연체|기한경과|긴급|오류/.test(item.status) ? styles.todoStatusDanger : /오늘|임박|확인필요|미배정/.test(item.status) ? styles.todoStatusWarning : /진행/.test(item.status) ? styles.todoStatusProgress : ''}`}>{item.status}</span>
-          <span className={styles.todoTask}><strong>{todoActionLabel(item)}</strong></span>
-          <span className={styles.todoTarget}><strong>{item.title}</strong></span>
-          <span className={styles.todoDetail}><span>{item.detail}</span>{dueLabel ? <small>{dueLabel}</small> : null}</span>
-          <span className={`${styles.todoAssignee} ${item.assignee ? '' : styles.todoAssigneeEmpty}`}>{item.assignee || '미배정'}</span>
+        <SheetButton className={styles.todoRowMain} onClick={() => onOpen(item)} disabled={!item.plate && !item.href} aria-label={`${taskPriorityLabel(item.priority)} · ${item.owner === 'company' ? '내부 처리' : '고객 이행'} · ${TODO_CATEGORY_LABEL[item.category]} ${item.status} · ${todoActionLabel(item)} · ${item.title} · ${dueLabel || '기한 미지정'} · ${item.assignee || '담당 미배정'}`}>
+          <span className={`${styles.todoPriority} ${item.priority === 1 ? styles.todoPriorityHigh : item.priority === 2 ? styles.todoPriorityMedium : ''}`}><strong>{taskPriorityLabel(item.priority)}</strong><small>{item.owner === 'company' ? '내부 처리' : '고객 이행'}</small></span>
+          <span className={styles.todoInstruction}>
+            <small><b>{TODO_CATEGORY_LABEL[item.category]}</b><i>·</i>{item.status}</small>
+            <strong>{taskInstruction(item)}</strong>
+            <span>{item.detail}</span>
+          </span>
+          <span className={styles.todoTarget}><small>대상</small><strong>{item.title}</strong><span>{item.kind}</span></span>
+          <span className={styles.todoAssignment}><strong>{dueLabel || '기한 미지정'}</strong><small className={item.assignee ? '' : styles.todoAssigneeEmpty}>{item.assignee || '담당 미배정'}</small></span>
+          <ChevronRight size={20} aria-hidden="true" />
         </SheetButton>
         {evidenceHref ? evidenceHref.startsWith('/')
-          ? <Link className={styles.todoEvidence} href={evidenceHref}>{item.evidenceLabel || '보기'}</Link>
-          : <a className={styles.todoEvidence} href={evidenceHref} target="_blank" rel="noreferrer">{item.evidenceLabel || '원문'}</a>
+          ? <Link className={styles.todoEvidence} href={evidenceHref} aria-label={`${item.title} · ${item.evidenceLabel || '보기'}`}>{item.evidenceLabel || '보기'}</Link>
+          : <a className={styles.todoEvidence} href={evidenceHref} target="_blank" rel="noreferrer" aria-label={`${item.title} · ${item.evidenceLabel || '원문'}`}>{item.evidenceLabel || '원문'}</a>
           : <span className={styles.todoEvidenceEmpty}>—</span>}
       </div>;
     })}
     {!items.length ? <div className={styles.empty}>조건에 맞는 업무가 없습니다.</div> : null}
+  </div>;
+}
+
+type RentalWorkspaceNextProps = {
+  query: string;
+  setQuery: (value: string) => void;
+  searchRef: Ref<HTMLInputElement>;
+  loading: boolean;
+  error: string | null;
+  todos: TodoItem[];
+  visibleTodos: TodoItem[];
+  searchedTodos: TodoItem[];
+  searchRows: SearchRow[];
+  todoFilter: TodoFilter;
+  setTodoFilter: (value: TodoFilter) => void;
+  categoryFilter: TodoCategoryFilter;
+  setCategoryFilter: (value: TodoCategoryFilter) => void;
+  statusFilter: string;
+  setStatusFilter: (value: string) => void;
+  assigneeFilter: string;
+  setAssigneeFilter: (value: string) => void;
+  todoSort: TodoSort;
+  setTodoSort: (value: TodoSort) => void;
+  filterOpen: boolean;
+  setFilterOpen: Dispatch<SetStateAction<boolean>>;
+  todoCounts: {
+    owners: { company: number; customer: number };
+    categories: Record<TaskCategory, number>;
+    assignees: Map<string, number>;
+    statuses: Map<string, number>;
+  };
+  statusOptions: string[];
+  assigneeOptions: string[];
+  companyTodoCount: number;
+  customerTodoCount: number;
+  activeFilterCount: number;
+  collectionSummary: { carry: number; currentCharge: number; currentPaid: number; balance: number; rate: number; hasData: boolean };
+  utilization: number;
+  running: number;
+  held: number;
+  idle: number;
+  averageIdleDays: number | null;
+  onOpen: (item: TodoItem) => void;
+};
+
+function RentalWorkspaceNext(props: RentalWorkspaceNextProps) {
+  const {
+    query, setQuery, searchRef, loading, error, todos, visibleTodos, searchedTodos, searchRows,
+    todoFilter, setTodoFilter, categoryFilter, setCategoryFilter, statusFilter, setStatusFilter,
+    assigneeFilter, setAssigneeFilter, todoSort, setTodoSort, filterOpen, setFilterOpen,
+    todoCounts, statusOptions, assigneeOptions, companyTodoCount, customerTodoCount,
+    activeFilterCount, collectionSummary, utilization, running, held, idle, averageIdleDays, onOpen,
+  } = props;
+  const searching = Boolean(query.trim());
+  const resultCount = searchedTodos.length + searchRows.length;
+
+  return <div className={nextStyles.app}>
+    <header className={nextStyles.header}>
+      <div className={nextStyles.tenant}>
+        <span className={nextStyles.tenantMark} aria-hidden="true" />
+        <span><strong>WORKSPACE</strong><small>스위치플랜 + 프라임구독</small></span>
+      </div>
+      <nav className={nextStyles.primaryNav} aria-label="주요 메뉴">
+        <Link href="/sheet/reborn/next" className={nextStyles.primaryActive} aria-current="page">업무</Link>
+        <Link href="/sheet/reborn/ledgers">데이터센터</Link>
+        <Link href="/ingest">자료올리기</Link>
+      </nav>
+      <label className={nextStyles.headerSearch}>
+        <Search size={18} aria-hidden="true" />
+        <input ref={searchRef} value={query} onChange={(event) => setQuery(event.target.value)} placeholder="차량번호, 고객, 계약번호 검색" aria-label="신형 업무 통합 검색" />
+        {query ? <SheetButton onClick={() => setQuery('')} aria-label="검색어 지우기"><X size={16} /></SheetButton> : <kbd>Ctrl K</kbd>}
+      </label>
+    </header>
+
+    <main className={nextStyles.main}>
+      <section className={nextStyles.signalStrip} aria-label="핵심 운영 현황">
+        <div className={nextStyles.signalItem}>
+          <span>가동률</span><strong>{utilization}%</strong>
+          <small>{running}/{held}대 운행 · 휴차 {idle}대{averageIdleDays == null ? '' : ` · 평균 ${averageIdleDays}일`}</small>
+        </div>
+        <div className={`${nextStyles.signalItem} ${collectionSummary.balance > 0 ? nextStyles.signalRisk : ''}`}>
+          <span>미수율</span><strong>{collectionSummary.hasData ? `${collectionSummary.rate}%` : '—'}</strong>
+          <small>{compactMoney(collectionSummary.balance)} · {collectionSummary.hasData ? `당월 수금 ${compactMoney(collectionSummary.currentPaid)}` : '입금자료 미수집'}</small>
+        </div>
+        <div className={nextStyles.signalContext}>
+          <span>업무 {todos.length}건</span>
+          <i aria-hidden="true" />
+          <span>내부 {companyTodoCount}</span>
+          <i aria-hidden="true" />
+          <span>고객 {customerTodoCount}</span>
+        </div>
+      </section>
+
+      {loading ? <div className={nextStyles.state}><Loader2 size={20} className={nextStyles.spin} />데이터를 정리하고 있습니다</div> : null}
+      {!loading && error ? <div className={nextStyles.error}><AlertTriangle size={18} />{error}</div> : null}
+
+      {!loading && !error ? <section className={nextStyles.inbox} aria-label={searching ? '검색 결과' : '처리 업무'}>
+        <div className={nextStyles.queueBar}>
+          <div className={nextStyles.queueIdentity}>
+            <span>{searching ? '검색 결과' : '처리 필요'}</span>
+            <strong>{searching ? resultCount : visibleTodos.length}</strong>
+          </div>
+          {!searching ? <div className={nextStyles.scopeTabs} role="group" aria-label="처리 주체">
+            <NextScopeButton active={todoFilter === 'all'} label="전체" count={todos.length} onClick={() => setTodoFilter('all')} />
+            <NextScopeButton active={todoFilter === 'company'} label="내부 처리" count={companyTodoCount} onClick={() => setTodoFilter('company')} />
+            <NextScopeButton active={todoFilter === 'customer'} label="고객 이행" count={customerTodoCount} onClick={() => setTodoFilter('customer')} />
+          </div> : <span className={nextStyles.searchTerm}>“{query.trim()}”</span>}
+          {!searching ? <div className={nextStyles.nextFilterWrap}>
+            <SheetButton className={`${nextStyles.filterButton} ${activeFilterCount ? nextStyles.filterButtonActive : ''}`} onClick={() => setFilterOpen((open) => !open)} aria-label="업무 필터" aria-expanded={filterOpen} aria-controls="next-work-filter-panel">
+              <ListFilter size={17} /><span>필터</span>{activeFilterCount ? <b>{activeFilterCount}</b> : null}
+            </SheetButton>
+            {filterOpen ? <div className={nextStyles.filterPanel} id="next-work-filter-panel" role="region" aria-label="신형 업무 필터">
+              <div className={nextStyles.filterPanelHead}>
+                <strong>업무 필터</strong>
+                <span>
+                  <SheetButton onClick={() => { setTodoFilter('all'); setCategoryFilter('all'); setStatusFilter('all'); setAssigneeFilter('all'); setTodoSort('urgency'); }}>초기화</SheetButton>
+                  <SheetButton onClick={() => setFilterOpen(false)} aria-label="필터 닫기"><X size={16} /></SheetButton>
+                </span>
+              </div>
+              <div className={nextStyles.categoryGrid}>
+                {TODO_CATEGORY_OPTIONS.map((option) => <SheetButton key={option.key} className={categoryFilter === option.key ? nextStyles.categoryActive : undefined} aria-pressed={categoryFilter === option.key} onClick={() => setCategoryFilter(option.key)}><span>{option.label}</span><small>{option.key === 'all' ? todos.length : todoCounts.categories[option.key]}</small></SheetButton>)}
+              </div>
+              <div className={nextStyles.selectGrid}>
+                <label><span>상태</span><SheetSelect value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}><option value="all">전체</option>{statusOptions.map((status) => <option key={status} value={status}>{status} ({todoCounts.statuses.get(status) || 0})</option>)}</SheetSelect></label>
+                <label><span>담당자</span><SheetSelect value={assigneeFilter} onChange={(event) => setAssigneeFilter(event.target.value)}><option value="all">전체</option>{assigneeOptions.map((assignee) => <option key={assignee} value={assignee === '미배정' ? 'unassigned' : assignee}>{assignee} ({todoCounts.assignees.get(assignee) || 0})</option>)}</SheetSelect></label>
+                <label><span>정렬</span><SheetSelect value={todoSort} onChange={(event) => setTodoSort(event.target.value as TodoSort)}><option value="urgency">긴급순</option><option value="assignee">담당자순</option><option value="category">분류순</option></SheetSelect></label>
+              </div>
+            </div> : null}
+          </div> : <SheetButton className={nextStyles.searchClear} onClick={() => setQuery('')}>검색 닫기</SheetButton>}
+        </div>
+
+        {searching
+          ? <NextSearchResults items={searchedTodos} vehicles={searchRows} onOpen={onOpen} />
+          : <NextQueueList items={visibleTodos} onOpen={onOpen} />}
+      </section> : null}
+    </main>
+  </div>;
+}
+
+function NextScopeButton({ active, label, count, onClick }: { active: boolean; label: string; count: number; onClick: () => void }) {
+  return <SheetButton className={active ? nextStyles.scopeActive : undefined} aria-pressed={active} onClick={onClick}><span>{label}</span><small>{count}</small></SheetButton>;
+}
+
+function NextQueueList({ items, onOpen }: { items: TodoItem[]; onOpen: (item: TodoItem) => void }) {
+  return <div className={nextStyles.queueList}>
+    {items.map((item) => {
+      const dueLabel = taskDueLabel(item.dueDate, item.dday) || '기한 미지정';
+      const evidenceHref = safeEvidenceHref(item.evidenceHref);
+      return <article key={item.id} className={nextStyles.queueRow}>
+        <SheetButton className={nextStyles.queueMain} onClick={() => onOpen(item)} disabled={!item.plate && !item.href} aria-label={`${taskInstruction(item)} · ${item.title} · ${dueLabel}`}>
+          <span className={`${nextStyles.priority} ${item.priority === 1 ? nextStyles.priorityHigh : item.priority === 2 ? nextStyles.priorityMedium : ''}`}>
+            <i aria-hidden="true" /><strong>{taskPriorityLabel(item.priority)}</strong><small>{item.owner === 'company' ? '내부' : '고객'}</small>
+          </span>
+          <span className={nextStyles.queueAction}>
+            <small><b>{TODO_CATEGORY_LABEL[item.category]}</b><i>·</i>{item.status}</small>
+            <strong>{taskInstruction(item)}</strong>
+            <span>{item.detail}</span>
+          </span>
+          <span className={nextStyles.queueTarget}><small>대상</small><strong>{item.title}</strong><span>{item.kind}</span></span>
+          <span className={nextStyles.queueDue}><small>기한 · 담당</small><strong>{dueLabel}</strong><span>{item.assignee || '미배정'}</span></span>
+          <ChevronRight size={18} aria-hidden="true" />
+        </SheetButton>
+        {evidenceHref ? evidenceHref.startsWith('/')
+          ? <Link className={nextStyles.evidence} href={evidenceHref}>{item.evidenceLabel || '근거'}</Link>
+          : <a className={nextStyles.evidence} href={evidenceHref} target="_blank" rel="noreferrer">{item.evidenceLabel || '원문'}</a>
+          : <span className={nextStyles.evidenceEmpty}>—</span>}
+      </article>;
+    })}
+    {!items.length ? <div className={nextStyles.empty}>조건에 맞는 업무가 없습니다.</div> : null}
+  </div>;
+}
+
+function NextSearchResults({ items, vehicles, onOpen }: { items: TodoItem[]; vehicles: SearchRow[]; onOpen: (item: TodoItem) => void }) {
+  return <div className={nextStyles.searchResults}>
+    {items.length ? <NextQueueList items={items} onOpen={onOpen} /> : null}
+    {vehicles.length ? <div className={nextStyles.vehicleResults}>
+      {vehicles.map((row, index) => {
+        const company = text(row.vehicle.companyId, '');
+        const href = `/sheet/reborn/vehicle/${encodeURIComponent(row.plate)}${company ? `?company=${encodeURIComponent(company)}` : ''}`;
+        return <Link key={`${row.plate}:${index}`} className={nextStyles.vehicleResult} href={href}>
+          <CarFront size={18} aria-hidden="true" />
+          <span><strong>{row.plate}</strong><small>{text(row.vehicle.carName, '차종 미확인')} · {companyLabel(row.vehicle.companyId || '')}</small></span>
+          <span><strong>{text(row.contract?.contractorName, '활성 계약 없음')}</strong><small>{text(row.contract?.contractNo)}</small></span>
+          <span><strong>{row.state}</strong><small>{row.debt > 0 ? `${row.debtCount || 1}건 · ${compactMoney(row.debt)}` : '미수 없음'}</small></span>
+          <ChevronRight size={17} aria-hidden="true" />
+        </Link>;
+      })}
+    </div> : null}
+    {!items.length && !vehicles.length ? <div className={nextStyles.empty}>검색 결과가 없습니다.</div> : null}
   </div>;
 }

@@ -74,7 +74,7 @@ export const PAGE_IA: PageIA[] = [
   { href: '/search', label: '찾기', role: 'hub', layer: 'mixed', tier: '라이트', view: '상단 검색 전체결과 · 점프용(상세 IA 아님)', grab: 'none', grabHow: '—' },
 
   // ── 레거시 리다이렉트 ──
-  { href: '/sheet', label: '운영원장→자산', role: 'view', layer: 'ledger', tier: '라이트', view: 'redirect /asset', grab: 'none', grabHow: '—' },
+  { href: '/sheet', label: '구 운영원장→할 일 확인', role: 'view', layer: 'mixed', tier: '라이트', view: 'redirect /sheet/reborn', grab: 'none', grabHow: '—' },
   { href: '/finance', label: '재무현황→자금', role: 'view', layer: 'ledger', tier: '라이트', view: 'redirect /cash', grab: 'none', grabHow: '—' },
   { href: '/ops', label: '마이페이지→대시보드', role: 'hub', layer: 'mixed', tier: '라이트', view: 'redirect /', grab: 'none', grabHow: '—' },
   { href: '/desk', label: '일정관리→리스크', role: 'view', layer: 'event', tier: '라이트', view: 'redirect /risk', grab: 'none', grabHow: '—' },

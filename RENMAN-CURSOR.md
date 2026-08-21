@@ -213,6 +213,10 @@ curl -s -o /dev/null -w "%{http_code}" http://localhost:6006/<route>   # 200
 
 | 날짜 | 작업자 | 내용 | 상태 |
 |---|---|---|---|
+| 2026-08-18 | Claude | **홈 = 「업무」 목록+수행창 구현**(design/home-inbox/SPEC.md v3.1): `app/page.tsx` 2-pane · `lib/home-work.ts`(시간축·근거키·실체화 결합, 순수) · `components/home/*`(HomeTopBar·HomeList·WorkPane·DevLayoutToggle) · 완료/접수/연기/이관 = commitSave(work_item, workId=근거키) · 수행창 탭 수행|차량360(Vehicle360 embed) · 모바일 = 목록→수행창 페이지 · 개발 스위치(우하단, `?layout=mobile|web|auto`) · `tests/home-work.test.ts` 7 · ui-consistency 10 | tsc0 · vitest 17 · curl / 200 |
+| 2026-08-16 | Cursor | **홈 구분=미수·차량·재무**(리스크 미완료/만기 안 씀) · 보험만기/만료 같은 말 한 칸 | tsc0 · curl / 200 |
+| 2026-08-16 | Cursor | **홈 할 일 행**: 구분=그룹헤더 · 분류=배지 · 담당=work_item · 문제/할 일=fields 분리 · 40건 캡 제거 | tsc0 · curl / 200 |
+| 2026-08-16 | Cursor | **상단바 지표 한 줄**: 가동률=D.util · 미수율=selectReceivables.rate · 타일 아님 | tsc0 |
 | 2026-08-13 | Cursor | **빠른기록 후속=업무 기한**: `nextDate`를 `dueDate`로도 저장 · 업무원장은 기록일 말고 후속일을 기한으로 봄 | tsc0 · curl /work 200 |
 | 2026-08-13 | Cursor | **입력 입구 정리**: 웹 단건=`QuickInput` 호스트(톱바·⌘K) · `/ingest` 메뉴=파일 먼저 · 자산/계약 빈화면은 생성패널(등록증·계약서 인라인) — 데이터센터로 안 보냄 | tsc0 · curl / /ingest 200 |
 | 2026-08-13 | Cursor | **홈 라벨=엔진**: 휴차·계약유지 미수·할 일·미점검(`/risk`) · 교차검증 로딩 0 위장 제거 · 레일 접힘 `useLayoutEffect` · `/vehicle/` 톱바 제목 | tsc0 · curl / 200 |

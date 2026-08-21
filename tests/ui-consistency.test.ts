@@ -26,7 +26,6 @@ const nativeButtonExceptions = new Set([
   'app/audit/page.tsx',
   'app/error.tsx',
   'app/global-error.tsx',
-  'app/page.tsx',
   'components/FacetRail.tsx',
   'components/InfoDoc.tsx',
   'components/m/MBackBar.tsx',

@@ -22,15 +22,19 @@ export default function AppShell({ children }: { children: ReactNode }) {
      메뉴로 «어디로 갈지» 고르게 하면 사용자가 ERP 분류를 먼저 배워야 한다.
      찾을 것을 치면 거기로 간다. 저장·확인·알림 엔진은 그대로 유지한다. */
   const standaloneHome = pathname === '/';
+  const standalone360 = pathname.startsWith('/vehicle/');
 
   // 새 시트 UI는 기존 앱 셸과 분리하되, 인증·회사 스코프·ERP 저장 엔진은 그대로 쓴다.
   if (standaloneSheet) return <SessionProvider>{children}</SessionProvider>;
-  // 홈·자료올리기 — 전역 메뉴만 제외하고 저장·확인·알림 엔진은 유지한다.
-  if (standaloneHome || standaloneUpload) return (
+  // 홈·360·자료올리기 — 전역 메뉴만 제외. 360은 인쇄·빠른기록이 필요해서 호스트를 같이 둔다.
+  if (standaloneHome || standaloneUpload || standalone360) return (
     <SessionProvider>
       <AppBarProvider>
         <ConfirmProvider>
           {children}
+          <PrintHost />
+          <QuickLogHost />
+          <QuickInputHost />
           <ToastHost />
         </ConfirmProvider>
       </AppBarProvider>

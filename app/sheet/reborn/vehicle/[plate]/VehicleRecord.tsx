@@ -161,7 +161,7 @@ export default function VehicleRecord({ plate, companyId }: Props) {
     const resolved = [...unique.values()].sort((left, right) => right.at.localeCompare(left.at));
     const has = (pattern: RegExp) => resolved.some((item) => pattern.test(`${item.kind} ${item.label}`));
     if (!has(/등록증/)) resolved.push({ id: 'missing-reg', kind: '필수', label: '자동차등록증', at: '미첨부', url: '', missing: true });
-    if (!has(/계약서/)) resolved.push({ id: 'missing-contract', kind: '필수', label: '계약서', at: '미첨부', url: '', missing: true });
+    if (vehicleContracts.length > 0 && !has(/계약서/)) resolved.push({ id: 'missing-contract', kind: '필수', label: '계약서', at: '미첨부', url: '', missing: true });
     if (!has(/보험|증권/)) resolved.push({ id: 'missing-ins', kind: '필수', label: '보험증권', at: '미첨부', url: '', missing: true });
     return resolved;
   }, [vehicle, vehicleContracts, vehicleHistories, vehicleInbox, vehicleInsurances, vehiclePenalties]);
@@ -180,8 +180,8 @@ export default function VehicleRecord({ plate, companyId }: Props) {
     return items.filter((item) => item.at).sort((left, right) => right.at.localeCompare(left.at));
   }, [contractRows, schedules, vehicleBankTx, vehicleHistories, vehiclePenalties, vehicleWork]);
 
-  if (loading) return <div className={styles.recordsApp}><div className={styles.recordState}><Loader2 size={19} className={styles.spin} />차량 정보를 연결하는 중</div></div>;
-  if (error) return <div className={styles.recordsApp}><div className={styles.detailNarrow}><div className={styles.recordError}>{error}</div></div></div>;
+  if (loading) return <div className={styles.recordsApp}><RebornHeader active="data" /><div className={styles.recordState}><Loader2 size={19} className={styles.spin} />차량 정보를 연결하는 중</div></div>;
+  if (error) return <div className={styles.recordsApp}><RebornHeader active="data" /><div className={styles.detailNarrow}><Link href="/sheet/reborn/ledgers" className={styles.backLink}><ArrowLeft size={17} />데이터센터</Link><div className={styles.recordError}>{error}</div></div></div>;
   if (!vehicle && !vehicleContracts.length) return <div className={styles.recordsApp}><RebornHeader active="data" /><div className={styles.detailNarrow}><Link href="/sheet/reborn/ledgers" className={styles.backLink}><ArrowLeft size={17} />데이터센터</Link><div className={styles.recordEmpty}>차량 또는 계약을 찾을 수 없습니다.</div></div></div>;
 
   const status = vehicle ? text(vehicle.status, currentContract ? '운행' : '휴차') : '차량정보 없음';
@@ -194,20 +194,16 @@ export default function VehicleRecord({ plate, companyId }: Props) {
 
   return <div className={styles.recordsApp}>
     <RebornHeader active="data" />
-    <div className={styles.recordHeader}>
-      <Link href="/sheet/reborn/ledgers" className={styles.backLink}><ArrowLeft size={17} />데이터센터</Link>
-      <strong>{canonicalPlate}</strong>
-      <Link href="/sheet/reborn" className={styles.headerMeta}>업무조회</Link>
-    </div>
 
     <main className={`${styles.recordsMain} ${styles.vehicleMain}`}>
       <div className={styles.vehicleTitle}>
         <div>
-          <span>{companyLabel(scope.companyId)} · {status}</span>
+          <Link href="/sheet/reborn/ledgers" className={styles.backLink}><ArrowLeft size={17} />데이터센터</Link>
+          <span className={styles.vehicleEyebrow}>VEHICLE 360 · {companyLabel(scope.companyId)} · {status}</span>
           <h1>{canonicalPlate}</h1>
           <p>{text(vehicle?.carName || vehicle?.model, '차종 미등록')} · {text(vehicle?.vin, '차대번호 미등록')}</p>
         </div>
-        <Link href={`/ingest?plate=${encodeURIComponent(canonicalPlate)}`} className={styles.uploadAction}><FileUp size={16} />자료올리기</Link>
+        <Link href={`/ingest?plate=${encodeURIComponent(canonicalPlate)}`} className={styles.uploadAction}><FileUp size={16} />자료 연결</Link>
       </div>
 
       <section className={styles.vehicleSummary} aria-label="차량 요약">
@@ -220,7 +216,7 @@ export default function VehicleRecord({ plate, companyId }: Props) {
       </section>
 
       <nav className={styles.detailNav} aria-label="차량 상세 구역">
-        <a href="#vehicle-now">현재</a><a href="#vehicle-contracts">계약·수납</a><a href="#vehicle-asset">자산·보험</a><a href="#vehicle-history">이력</a><a href="#vehicle-documents">서류</a>
+        <a href="#vehicle-now">현재 확인</a><a href="#vehicle-contracts">계약·수납</a><a href="#vehicle-asset">자산·보험</a><a href="#vehicle-history">통합 이력</a><a href="#vehicle-documents">원본 자료</a>
       </nav>
 
       <section id="vehicle-now" className={styles.detailSection}>

@@ -1,5 +1,5 @@
-import SheetWorkspace from './SheetWorkspace';
+import { redirect } from 'next/navigation';
 
 export default function SheetPage() {
-  return <SheetWorkspace />;
+  redirect('/sheet/reborn');
 }

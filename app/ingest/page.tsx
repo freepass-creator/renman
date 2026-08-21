@@ -47,6 +47,7 @@ import {
   DOC_KINDS, decodeIntakePick, docVersionType, encodeIntakePick, entitiesWithoutDocKind,
 } from '@/lib/doc-kinds';
 import RebornHeader from '@/app/sheet/reborn/_components/RebornHeader';
+import uploadStyles from './reborn-upload.module.css';
 
 export const dynamic = 'force-dynamic';
 
@@ -1241,11 +1242,11 @@ function IngestInner() {
 
 export default function IngestPage() {
   return (
-    <>
+    <div className={uploadStyles.uploadApp}>
       <RebornHeader active="upload" />
       <Suspense fallback={<PageLoading />}>
         <IngestInner />
       </Suspense>
-    </>
+    </div>
   );
 }
