@@ -192,3 +192,11 @@ export async function 차량원장(차량번호: string) {
   돈.sort((a, b) => b.날.localeCompare(a.날));
   return { 차량번호: 차, 행위: 행위.slice(0, 60), 돈: 돈.slice(0, 60) };
 }
+
+/** 오늘 원장에 남은 행위 수 — 직원이 오늘 무엇을 얼마나 했나 */
+export async function 오늘행위수(오늘: string): Promise<number> {
+  const api = getSheetsClient(대행());
+  const r = await api.spreadsheets.values.get({ spreadsheetId: 원장, range: `'운영'!D:D` });
+  const v = (r.data.values || []) as string[][];
+  return v.slice(1).filter((x) => String(x[0] ?? '').startsWith(오늘)).length;
+}
