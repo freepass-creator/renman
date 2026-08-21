@@ -11,7 +11,12 @@
 import { google } from 'googleapis';
 
 function loadServiceAccountKey(): Record<string, unknown> | null {
-  const raw = process.env.GOOGLE_SERVICE_ACCOUNT_KEY;
+  let raw = process.env.GOOGLE_SERVICE_ACCOUNT_KEY;
+  // 로컬에서는 파일 경로로도 준다 (GOOGLE_APPLICATION_CREDENTIALS).
+  // vercel env pull 이 민감값을 가려 놓으면 env 가 비는데, 그때 파일이 있으면 그걸 쓴다.
+  if ((!raw || raw.length < 40) && process.env.GOOGLE_APPLICATION_CREDENTIALS) {
+    try { raw = require('node:fs').readFileSync(process.env.GOOGLE_APPLICATION_CREDENTIALS, 'utf-8'); } catch { /* 없으면 넘어간다 */ }
+  }
   if (!raw) return null;
   try {
     if (!raw.trim().startsWith('{')) return JSON.parse(Buffer.from(raw, 'base64').toString('utf-8'));

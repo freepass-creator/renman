@@ -16,20 +16,8 @@ const 할일탭 = '해야 할 일';
 
 const 대행 = () => process.env.GOOGLE_IMPERSONATE_USER || 'pyh@teamjpk.com';
 
-export type 할일 = {
-  행: number;
-  완료: boolean;
-  순서: string;
-  회사명: string;
-  업무분류: string;
-  담당: string;
-  업무내용: string;
-  업무페이지: string;
-  업무페이지이름: string;
-  백데이터: string;
-  백데이터이름: string;
-  담당자의견: string;
-};
+export type { 할일 } from './types';
+import type { 할일 } from './types';
 
 /** `=HYPERLINK("주소","이름")` 에서 주소와 이름을 뽑는다 */
 function 링크풀기(f: string): { url: string; name: string } {
@@ -106,4 +94,101 @@ export async function 할일쓰기(행: number, { 완료, 의견 }: { 완료?: b
       ]] },
     });
   } catch { /* 원장 기록이 실패해도 직원 작업은 살린다 */ }
+}
+
+/** 한 건을 처리했다 — 운영 원장에 «행위» 한 줄.
+ *  대표(2026-08-21): 「각각 처리하고 후속 뭘 했다고 남겨야지」
+ *  이 한 줄이 나중에 짝(독촉 → 입금·회수)을 닫는 근거가 된다.
+ */
+export async function 행위남기기(입력: {
+  회사: string; 차량번호: string; 이름: string;
+  업무분류: string; 결과: string; 메모: string; 누가: string;
+}) {
+  const api = getSheetsClient(대행());
+  const 이제 = new Date(Date.now() + 9 * 36e5).toISOString().slice(0, 16).replace('T', ' ');
+  const 법인 = 입력.회사.startsWith('스위치') ? 'SW'
+    : 입력.회사.startsWith('프라임') ? 'PR'
+    : 입력.회사.startsWith('프리패스') ? 'FP'
+    : 입력.회사.startsWith('손오공') ? 'SO' : 'CO';
+
+  // 무슨 «행위» 인지 — 독촉은 통화, 자료는 수령
+  const [분류, 종류] = /독촉|회수|미납|통화/.test(입력.업무분류)
+    ? ['고객응대', '통화']
+    : ['업무', '오더완료'];
+
+  const cur = await api.spreadsheets.values.get({ spreadsheetId: 원장, range: `'운영'!A:A` });
+  const 끝 = (cur.data.values || []).length + 1;
+
+  await api.spreadsheets.values.update({
+    spreadsheetId: 원장, range: `'운영'!A${끝}`, valueInputOption: 'RAW',
+    requestBody: {
+      values: [[
+        `EV-${이제.slice(0, 10).replace(/-/g, '')}-${String(끝).padStart(5, '0')}`,
+        '',                       // 묶음ID — 돈이 붙으면 그때 잇는다
+        이제.slice(0, 10),        // 발생시각
+        이제,                     // 기록시각
+        법인, 분류, 종류,
+        '차량;고객',
+        `${입력.차량번호};${입력.이름}`,
+        입력.이름,
+        '', '',                   // 상태전·상태후
+        `업무=${입력.업무분류};결과=${입력.결과}${입력.메모 ? `;메모=${입력.메모.slice(0, 200)}` : ''}`,
+        '렌터카매니저에서 처리',
+        입력.누가, '성공', '',
+      ]],
+    },
+  });
+  return { ok: true as const, 행: 끝 };
+}
+
+/** 차 한 대의 원장 — 그 차에 무슨 일이 있었나.
+ *  대표(2026-08-21): 「차량 데이터 확인하려고 하면 그거 원장 확인하게 해주기 이거 erp 네 뭐....」
+ */
+export async function 차량원장(차량번호: string) {
+  const api = getSheetsClient(대행());
+  const 차 = 차량번호.replace(/\s+/g, '');
+
+  const [운영, 자금] = await Promise.all([
+    api.spreadsheets.values.get({ spreadsheetId: 원장, range: `'운영'!A1:Q5000` }).catch(() => null),
+    api.spreadsheets.values.get({ spreadsheetId: 원장, range: `'자금'!A1:P8000` }).catch(() => null),
+  ]);
+
+  const 행위: { 날: string; 무엇: string; 상대: string; 속성: string; 근거: string }[] = [];
+  const v = (운영?.data.values || []) as string[][];
+  if (v.length > 1) {
+    const h = v[0].map((x) => String(x ?? '').trim());
+    const i = (n: string) => h.indexOf(n);
+    for (const r of v.slice(1)) {
+      if (!String(r[i('대상ID')] ?? '').replace(/\s+/g, '').includes(차)) continue;
+      행위.push({
+        날: String(r[i('발생시각')] ?? '').slice(0, 10),
+        무엇: `${r[i('분류')] ?? ''}/${r[i('종류')] ?? ''}`,
+        상대: String(r[i('상대')] ?? ''),
+        속성: String(r[i('속성')] ?? ''),
+        근거: String(r[i('근거')] ?? ''),
+      });
+    }
+  }
+
+  const 돈: { 날: string; 입출: string; 금액: number; 적요: string; 상대: string }[] = [];
+  const w = (자금?.data.values || []) as string[][];
+  if (w.length > 1) {
+    const h = w[0].map((x) => String(x ?? '').trim());
+    const i = (n: string) => h.indexOf(n);
+    for (const r of w.slice(1)) {
+      const 글 = `${r[i('적요')] ?? ''} ${r[i('상대')] ?? ''}`.replace(/\s+/g, '');
+      if (!글.includes(차)) continue;
+      돈.push({
+        날: String(r[i('거래일시')] ?? '').slice(0, 10),
+        입출: String(r[i('입출')] ?? ''),
+        금액: Number(String(r[i('금액')] ?? '').replace(/[^0-9.-]/g, '')) || 0,
+        적요: String(r[i('적요')] ?? ''),
+        상대: String(r[i('상대')] ?? ''),
+      });
+    }
+  }
+
+  행위.sort((a, b) => b.날.localeCompare(a.날));
+  돈.sort((a, b) => b.날.localeCompare(a.날));
+  return { 차량번호: 차, 행위: 행위.slice(0, 60), 돈: 돈.slice(0, 60) };
 }

@@ -1,237 +1,274 @@
 'use client';
 /**
- * 렌터카매니저 — 홈은 「오늘 할 일」이다.
+ * 렌터카매니저 — 업무함.
  *
- * 대표(2026-08-21):
- *   「이제 이거를 그냥 erp 처럼 ai 랑 쓸 수 있게 erp 화면 간단하게 구성해볼까?
- *    직원들한테 여기서 체크하고 링크 주고 이런 식으로??」
- *   「그래 이게 erp 다 이제....」 / 「핸드폰으로도 확인하기 쉽게 해주고」
- *   「로그인하면 «내 업무»랑 «전체 업무»가 보이게 하면 되잖아」
+ * 대표(2026-08-21): 「이 정도 디자인은 나와줘야지」 (목업 제공)
+ *                   「그 화면을 보고 세부내역 같은 거 보면서 해야지」
+ *                   「독촉 5건이면 그걸 누르면 독촉 5건에 대한 업무가 나와서
+ *                    각각 처리하고 후속 뭘 했다고 남겨야지」
  *
- * 뒤는 시트(정본) · 앞은 이 화면. 직원이 손대는 칸은 «의견»과 «완료» 둘뿐이다.
+ * 그래서 화면은 세 걸음이다:
+ *   ① 오더 목록 — 「스위치플랜 미납고객 독촉 65건」
+ *   ② 대상 목록 — 그 65명이 한 줄씩
+ *   ③ 한 건 처리 — 전화하고, 무엇을 했는지 남기고, 닫는다
  */
-import { useCallback, useEffect, useMemo, useState, useTransition } from 'react';
-import { watchAuth, type FbUser } from '@/lib/firebase/auth';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { watchAuth, signOutUser, type FbUser } from '@/lib/firebase/auth';
 import { firebaseReady } from '@/lib/firebase/client';
 import { 이름추정, 대표인가 } from '@/lib/work/people';
-import type { 할일 } from '@/lib/work/sheet';
-import { 업무가져오기, 업무처리, 사람별건수 } from '@/lib/work/actions';
+import type { 할일, 사람셈 } from '@/lib/work/types';
+import { 업무가져오기, 사람별건수, 지표 } from '@/lib/work/actions';
 import { Login } from '@/components/Login';
+import { OrderDetail } from '@/components/OrderDetail';
 
-// 대표(2026-08-21): 「로그인하면 내 업무랑 전체 업무가 보이게 하면 되잖아」
-//                   「나는 다른 직원들 거 다 보여야지」
-// → 직원은 내 업무 / 전체 업무 둘. 대표는 여기에 «사람별» 이 붙고 기본이 전체다.
-type 갈래 = string;   // '내 업무' | '전체 업무' | 사람 이름
+type 지표항목 = { 이름: string; 값: string; 곁?: string; 위험?: boolean };
+
+const 오늘글 = () => {
+  const d = new Date();
+  const 요일 = ['일', '월', '화', '수', '목', '금', '토'][d.getDay()];
+  return `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')} (${요일})`;
+};
 
 export default function Home() {
-  const [user, setUser] = useState<FbUser | undefined>(undefined);   // undefined = 아직 모름
-  const [갈래보기, 갈래쓰기] = useState<갈래>('내 업무');
+  const [user, setUser] = useState<FbUser | undefined>(undefined);
+  const [갈래, 갈래쓰기] = useState('내 업무');
+  const [찾기, 찾기쓰기] = useState('');
   const [목록, 목록쓰기] = useState<할일[] | null>(null);
-  const [사람들셈, 사람들셈쓰기] = useState<{ 이름: string; 건수: number; 먼저: number }[]>([]);
+  const [사람들, 사람들쓰기] = useState<사람셈[]>([]);
+  const [칸, 칸쓰기] = useState<지표항목[]>([]);
+  const [고른것, 고르기] = useState<할일 | null>(null);
   const [고침, 고치기] = useState(0);
+  const [알림, 알림쓰기] = useState('');
 
   useEffect(() => {
     if (!firebaseReady()) { setUser(null); return; }
-    return watchAuth(setUser);
+    let 왔다 = false;
+    const 시계 = setTimeout(() => { if (!왔다) setUser(null); }, 3000);
+    let 끄기 = () => {};
+    try { 끄기 = watchAuth((u) => { 왔다 = true; clearTimeout(시계); setUser(u); }); }
+    catch { 왔다 = true; clearTimeout(시계); setUser(null); }
+    return () => { clearTimeout(시계); 끄기(); };
   }, []);
 
   const 나 = useMemo(() => 이름추정(user?.email), [user]);
   const 대표 = useMemo(() => 대표인가(user?.email), [user]);
 
-  // 대표는 전체가 기본이다
-  useEffect(() => { if (대표) 갈래쓰기('전체 업무'); }, [대표]);
+  useEffect(() => { if (대표) 갈래쓰기('전체'); }, [대표]);
 
-  // 대표만 사람별 건수를 본다
   useEffect(() => {
-    if (!대표 || !user) return;
-    let 살아있음 = true;
-    사람별건수().then((r) => { if (살아있음) 사람들셈쓰기(r); }).catch(() => {});
-    return () => { 살아있음 = false; };
-  }, [대표, user, 고침]);
+    if (!user) return;
+    let 산다 = true;
+    지표().then((r) => { if (산다) 칸쓰기(r); }).catch(() => {});
+    if (대표) 사람별건수().then((r) => { if (산다) 사람들쓰기(r); }).catch(() => {});
+    return () => { 산다 = false; };
+  }, [user, 대표, 고침]);
 
   useEffect(() => {
     if (user === undefined || user === null) return;
-    let 살아있음 = true;
+    let 산다 = true;
     목록쓰기(null);
-    const 누구 = 갈래보기 === '전체 업무' ? undefined : 갈래보기 === '내 업무' ? 나 : 갈래보기;
+    const 누구 = 갈래 === '전체' ? undefined : 갈래 === '내 업무' ? 나 : 갈래;
     업무가져오기(누구)
-      .then((r) => { if (살아있음) 목록쓰기(r); })
-      .catch(() => { if (살아있음) 목록쓰기([]); });
-    return () => { 살아있음 = false; };
-  }, [user, 갈래보기, 나, 고침]);
+      .then((r) => { if (산다) 목록쓰기(r); })
+      .catch(() => { if (산다) 목록쓰기([]); });
+    return () => { 산다 = false; };
+  }, [user, 갈래, 나, 고침]);
 
-  const 빼기 = useCallback((행: number) => 목록쓰기((p) => (p ?? []).filter((x) => x.행 !== 행)), []);
+  const 알리기 = useCallback((글: string) => {
+    알림쓰기(글);
+    setTimeout(() => 알림쓰기(''), 1800);
+  }, []);
 
   if (user === undefined) return <중앙>불러오는 중…</중앙>;
   if (user === null) return <Login />;
 
-  const 급한것 = (목록 ?? []).filter((t) => t.순서.startsWith('1')).length;
+  const q = 찾기.trim().toLowerCase();
+  const 보일것 = (목록 ?? []).filter((t) =>
+    !q || [t.업무분류, t.업무내용, t.회사명, t.담당, t.담당자의견].join(' ').toLowerCase().includes(q));
+  const 지연수 = 보일것.filter((t) => t.순서.startsWith('1')).length;
+  const 탭들 = 대표 ? ['전체', '내 업무', ...사람들.map((p) => p.이름).filter((n) => n !== 나)] : ['내 업무', '전체'];
 
   return (
-    <main className="mx-auto w-full max-w-[760px] pb-20">
-      <header className="sticky top-0 z-10 border-b border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-900">
-        <div className="flex items-baseline gap-2.5 px-4 pt-3.5">
-          <strong className="text-[17px]">할 일</strong>
-          <span className="text-sm text-neutral-500">{나}</span>
-          <a href="/upload" className="text-sm text-blue-600 dark:text-blue-400">올리기</a>
-          <span className="ml-auto text-sm">
-            <b>{목록?.length ?? '–'}</b>건
-            {급한것 > 0 && <span className="ml-2 text-orange-600 dark:text-orange-400">먼저 {급한것}</span>}
-          </span>
-        </div>
-        <div className="flex gap-1 overflow-x-auto px-3 pb-1 pt-2.5">
-          {(대표
-            ? ['전체 업무', '내 업무', ...사람들셈.map((p) => p.이름).filter((n) => n !== 나)]
-            : ['내 업무', '전체 업무']
-          ).map((g) => (
-            <button
-              key={g}
-              onClick={() => 갈래쓰기(g)}
-              className={
-                'rounded-t-lg px-3.5 py-2 text-[14.5px] ' +
-                (갈래보기 === g
-                  ? 'border-b-2 border-blue-600 font-bold text-blue-600 dark:border-blue-400 dark:text-blue-400'
-                  : 'text-neutral-500')
-              }
-            >
-              <span className="whitespace-nowrap">
-                {g}
-                {대표 && (() => {
-                  const c = 사람들셈.find((p) => p.이름 === g);
-                  if (!c) return null;
-                  return <span className="ml-1.5 text-[12.5px] font-normal opacity-70">{c.건수}</span>;
-                })()}
-              </span>
-            </button>
-          ))}
+    <div className="flex min-h-dvh flex-col">
+      <header className="sticky top-0 z-30 border-b border-slate-800 bg-slate-900 text-white shadow-md">
+        <div className="mx-auto flex max-w-3xl items-center justify-between gap-3 px-4 py-2.5">
+          <div className="flex items-center gap-2.5">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg border border-indigo-400/30 bg-indigo-600 text-[10px] font-bold tracking-widest">
+              ERP
+            </div>
+            <div>
+              <div className="flex items-center gap-1.5">
+                <h1 className="text-[13px] font-bold tracking-tight text-slate-100">{나} 님 업무함</h1>
+                {대표 && (
+                  <span className="rounded border border-indigo-800/80 bg-indigo-950 px-1.5 py-0.5 text-[10px] font-bold text-indigo-300">
+                    전체 열람
+                  </span>
+                )}
+              </div>
+              <p className="mt-0.5 text-[10px] font-medium leading-none text-slate-400">{오늘글()}</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <a href="/upload" className="rounded-lg border border-slate-700/80 bg-slate-800/90 px-2.5 py-1.5 text-[11px] font-semibold text-slate-200">
+              올리기
+            </a>
+            <button onClick={() => 고치기((n) => n + 1)} className="text-[11px] text-slate-400">새로 읽기</button>
+            <button onClick={() => signOutUser()} className="text-[11px] text-slate-400">나가기</button>
+          </div>
         </div>
       </header>
 
-      {대표 && 갈래보기 === '전체 업무' && 사람들셈.length > 0 && (
-        <div className="grid gap-1.5 px-3 pt-3">
-          {사람들셈.map((p) => (
-            <button
-              key={p.이름}
-              onClick={() => 갈래쓰기(p.이름)}
-              className="flex items-center gap-2.5 rounded-lg border border-neutral-200 bg-white px-3.5 py-2.5 text-left dark:border-neutral-800 dark:bg-neutral-900"
-            >
-              <span className="text-[14.5px] font-semibold">{p.이름}</span>
-              <span className="ml-auto text-[13.5px] text-neutral-500">{p.건수}건</span>
-              {p.먼저 > 0 && (
-                <span className="text-[13px] text-orange-600 dark:text-orange-400">먼저 {p.먼저}</span>
-              )}
-            </button>
+      <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-2.5 px-3 py-3 sm:px-4">
+        <div className="grid grid-cols-4 gap-1.5">
+          {칸.map((k) => (
+            <div key={k.이름} className="rounded-xl border border-slate-200/90 bg-white px-2.5 py-2 shadow-xxs">
+              <div className="text-[10px] font-bold text-slate-400">{k.이름}</div>
+              <div className={`mono text-[15px] leading-tight ${k.위험 ? 'text-rose-600' : 'text-slate-900'}`}>
+                {k.값}
+                {k.곁 && <span className="ml-0.5 text-[10px] font-medium text-slate-400">{k.곁}</span>}
+              </div>
+            </div>
           ))}
         </div>
-      )}
 
-      {목록 === null ? (
-        <중앙>가져오는 중…</중앙>
-      ) : 목록.length === 0 ? (
-        <중앙>{갈래보기 === '내 업무' ? '내 할 일이 없습니다.' : '할 일이 없습니다.'}</중앙>
-      ) : (
-        <div className="grid gap-2.5 px-3 py-3">
-          {목록.map((t) => (
-            <Row key={t.행} t={t} 나={나} 남={갈래보기 === '전체 업무'} 끝냄={() => 빼기(t.행)} 다시={() => 고치기((n) => n + 1)} />
-          ))}
-        </div>
-      )}
-    </main>
-  );
-}
-
-function Row({ t, 나, 남, 끝냄, 다시 }: { t: 할일; 나: string; 남: boolean; 끝냄: () => void; 다시: () => void }) {
-  const [열림, 열기] = useState(false);
-  const [의견, 의견쓰기] = useState(t.담당자의견);
-  const [보냄, 시작] = useTransition();
-  const 급함 = t.순서.startsWith('1');
-  const 남의일 = 남 && t.담당 !== 나;
-
-  return (
-    <section
-      className="overflow-hidden rounded-xl border border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-900"
-      style={{ opacity: 보냄 ? 0.5 : 1 }}
-    >
-      <button onClick={() => 열기(!열림)} className="block w-full px-3.5 py-3.5 text-left">
-        <div className="mb-1 flex items-center gap-2">
-          {급함 && (
-            <span className="rounded border border-orange-600 px-1.5 text-[11px] font-bold leading-4 text-orange-600 dark:border-orange-400 dark:text-orange-400">
-              먼저
-            </span>
-          )}
-          <span className="text-[12.5px] text-neutral-500">{t.회사명}</span>
-          {남 && t.담당 && (
-            <span className="ml-auto text-[12.5px] text-neutral-500">{t.담당}</span>
-          )}
-        </div>
-        <div className="text-base font-semibold leading-tight">{t.업무분류}</div>
-        {!열림 && <div className="mt-1 truncate text-[13.5px] text-neutral-500">{t.업무내용}</div>}
-      </button>
-
-      {열림 && (
-        <div className="px-3.5 pb-3.5">
-          <p className="mb-3 text-[14.5px] leading-relaxed">{t.업무내용}</p>
-
-          <div className="mb-3 flex flex-wrap gap-2">
-            {t.업무페이지 && <A href={t.업무페이지} 강조>{t.업무페이지이름}</A>}
-            {t.백데이터 && <A href={t.백데이터}>{t.백데이터이름}</A>}
-            {!t.업무페이지 && !t.백데이터 && (
-              <span className="text-[13px] text-neutral-500">어디서 할지 아직 안 정해졌습니다</span>
-            )}
-          </div>
-
-          <textarea
-            value={의견}
-            onChange={(e) => 의견쓰기(e.target.value)}
-            placeholder="통화 결과·약속한 날짜 같은 것을 적습니다"
-            rows={2}
-            className="w-full resize-y rounded-lg border border-neutral-200 bg-neutral-50 px-3 py-2.5 text-[15px] leading-snug dark:border-neutral-700 dark:bg-neutral-800"
+        <div className="rounded-xl border border-slate-200/90 bg-white p-1.5 shadow-xxs">
+          <input
+            value={찾기}
+            onChange={(e) => 찾기쓰기(e.target.value)}
+            placeholder="업무·회사·차량번호·메모 검색"
+            className="w-full rounded-lg border border-slate-200/70 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-900 placeholder:font-medium placeholder:text-slate-400 focus:border-indigo-600 focus:bg-white focus:outline-none"
           />
+        </div>
 
-          <div className="mt-2.5 flex gap-2">
-            <button
-              onClick={() => 시작(async () => { await 업무처리(t.행, 나, { 의견 }); 다시(); })}
-              disabled={보냄 || 의견 === t.담당자의견}
-              className="flex-1 rounded-lg border border-neutral-200 bg-neutral-50 py-3 text-[15px] disabled:opacity-40 dark:border-neutral-700 dark:bg-neutral-800"
-            >
-              의견만 저장
-            </button>
-            <button
-              onClick={() => 시작(async () => { await 업무처리(t.행, 나, { 완료: true, 의견 }); 끝냄(); })}
-              disabled={보냄}
-              className="flex-1 rounded-lg bg-green-700 py-3 text-[15px] font-bold text-white disabled:opacity-40"
-            >
-              완료
-            </button>
+        <div className="scroll-x flex items-center gap-1.5 pb-0.5">
+          {탭들.map((g) => {
+            const on = 갈래 === g;
+            const c = 사람들.find((p) => p.이름 === g);
+            return (
+              <button
+                key={g}
+                onClick={() => { 갈래쓰기(g); 고르기(null); }}
+                className={`flex items-center gap-1.5 whitespace-nowrap rounded-lg px-3 py-2 text-xs font-bold transition ${
+                  on ? 'bg-indigo-600 text-white shadow-xxs' : 'border border-slate-200 bg-white text-slate-600'
+                }`}
+              >
+                <span>{g}</span>
+                {c && (
+                  <span className={`mono rounded-full px-1.5 text-[10px] ${on ? 'bg-indigo-900 text-indigo-100' : 'bg-slate-200 text-slate-700'}`}>
+                    {c.건수}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="flex items-center justify-between border-b border-slate-200/60 px-1 pb-1 text-[11px] font-bold text-slate-500">
+          <span>{갈래 === '전체' ? '전 직원 미완료 업무입니다.' : `${갈래 === '내 업무' ? 나 : 갈래} 담당 미완료 업무입니다.`}</span>
+          <span className="mono font-extrabold text-indigo-600">
+            총 {보일것.length}건{지연수 > 0 && <span className="ml-1.5 text-rose-600">지연 {지연수}</span>}
+          </span>
+        </div>
+
+        {대표 && 갈래 === '전체' && 사람들.length > 0 && (
+          <div className="scroll-x flex gap-1.5">
+            {사람들.map((p) => (
+              <button
+                key={p.이름}
+                onClick={() => 갈래쓰기(p.이름)}
+                className="flex min-w-[112px] flex-col rounded-xl border border-slate-200/90 bg-white px-2.5 py-2 text-left shadow-xxs"
+              >
+                <span className="text-[11px] font-bold text-slate-700">{p.이름}</span>
+                <span className="mono text-[13px] text-slate-900">
+                  {p.건수}
+                  <span className="ml-0.5 text-[10px] font-medium text-slate-400">건</span>
+                  {p.먼저 > 0 && <span className="ml-1.5 text-[10px] text-rose-600">지연 {p.먼저}</span>}
+                </span>
+              </button>
+            ))}
           </div>
-          <p className="mt-2 text-[11.5px] text-neutral-500">
-            {남의일
-              ? `${t.담당}님 일입니다. 대신 처리하면 그렇게 기록됩니다`
-              : '완료를 누르면 증빙을 확인한 뒤에 진짜 끝난 것으로 잡힙니다'}
-          </p>
+        )}
+
+        {목록 === null ? (
+          <중앙>가져오는 중…</중앙>
+        ) : 보일것.length === 0 ? (
+          <div className="my-4 rounded-xl border border-slate-200/80 bg-white p-8 text-center shadow-xxs">
+            <p className="text-xs font-bold text-slate-700">{q ? '찾는 업무가 없습니다.' : '처리할 미완료 업무가 없습니다.'}</p>
+          </div>
+        ) : (
+          <div className="flex-1 space-y-2">
+            {보일것.map((t) => <Card key={t.행} t={t} 남={갈래 !== '내 업무'} 열기={() => 고르기(t)} />)}
+          </div>
+        )}
+      </main>
+
+      {고른것 && (
+        <OrderDetail
+          t={고른것}
+          나={나}
+          닫기={() => 고르기(null)}
+          끝냄={() => {
+            const 행 = 고른것.행;
+            목록쓰기((p) => (p ?? []).filter((x) => x.행 !== 행));
+            고르기(null); 고치기((n) => n + 1); 알리기('완료 처리했습니다');
+          }}
+          알리기={알리기}
+        />
+      )}
+
+      {알림 && (
+        <div className="fixed bottom-5 left-1/2 z-[60] flex -translate-x-1/2 items-center gap-2 rounded-xl border border-slate-700 bg-slate-900 px-4 py-2.5 text-xs font-bold text-white shadow-2xl">
+          <span className="text-emerald-400">✓</span>{알림}
         </div>
       )}
-    </section>
+    </div>
   );
 }
 
-function A({ href, children, 강조 }: { href: string; children: React.ReactNode; 강조?: boolean }) {
+function Card({ t, 남, 열기 }: { t: 할일; 남: boolean; 열기: () => void }) {
+  const 지연 = t.순서.startsWith('1');
+  const 건수 = t.업무내용.match(/([\d,]+)건/)?.[1];
+  const 금액 = t.업무내용.match(/\(([\d,]+)원\)/)?.[1];
+
   return (
-    <a
-      href={href}
-      target="_blank"
-      rel="noreferrer"
-      className={
-        강조
-          ? 'rounded-lg bg-blue-600 px-3.5 py-2.5 text-sm font-semibold text-white'
-          : 'rounded-lg border border-neutral-200 px-3.5 py-2.5 text-sm dark:border-neutral-700'
-      }
+    <button
+      onClick={열기}
+      className="relative w-full rounded-xl border border-slate-200/90 bg-white p-3 text-left shadow-xxs transition hover:border-indigo-500/80"
     >
-      {children}
-    </a>
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className={`rounded border px-1.5 py-0.5 text-[10px] font-bold ${
+            지연 ? 'border-rose-200/80 bg-rose-50 text-rose-700' : 'border-sky-200/80 bg-sky-50 text-sky-700'
+          }`}>
+            {지연 ? '지연' : '진행'}
+          </span>
+          <span className="rounded border border-slate-200/60 bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-500">
+            {t.회사명 || '전 법인'}
+          </span>
+        </div>
+        {남 && t.담당 && <span className="text-[10px] font-bold text-slate-500">{t.담당}</span>}
+      </div>
+
+      <h4 className="mb-2 text-xs font-extrabold leading-snug text-slate-900">{t.업무분류}</h4>
+
+      <div className="mb-2 grid grid-cols-2 gap-2 rounded-lg border border-slate-200/60 bg-slate-50/80 p-2">
+        <div>
+          <span className="block text-[9px] font-bold uppercase tracking-wider text-slate-400">대상</span>
+          <span className="mono block truncate text-[11px] text-slate-800">{건수 ? `${건수}건` : '–'}</span>
+        </div>
+        <div>
+          <span className="block text-[9px] font-bold uppercase tracking-wider text-slate-400">걸린 돈</span>
+          <span className="mono block truncate text-[11px] text-slate-800">{금액 ? `${금액}원` : '–'}</span>
+        </div>
+      </div>
+
+      <p className="truncate border-t border-slate-100 pt-1.5 text-[10px] font-medium text-slate-600">
+        {t.담당자의견 || t.업무내용}
+      </p>
+    </button>
   );
 }
 
 function 중앙({ children }: { children: React.ReactNode }) {
-  return <p className="px-5 py-20 text-center text-neutral-500">{children}</p>;
+  return <p className="px-5 py-20 text-center text-xs text-slate-500">{children}</p>;
 }

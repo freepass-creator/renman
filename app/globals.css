@@ -2,9 +2,41 @@
 @tailwind components;
 @tailwind utilities;
 
-:root { color-scheme: light dark; }
-html, body { margin: 0; padding: 0; }
-body {
-  font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
-  -webkit-text-size-adjust: 100%;
+/* 렌터카매니저 — 대표가 준 ERP 톤 (2026-08-21)
+ *   어두운 헤더 · 조밀한 카드 · 작은 글씨 · 숫자는 고정폭
+ *   「ui ux 가 전혀 erp 같지 않고 허접해 보이는데」 → 목업 그대로 맞춘다
+ */
+
+:root {
+  color-scheme: light;
+  --key:   #4f46e5;   /* indigo-600 */
+  --key-d: #312e81;
+  --warn:  #e11d48;   /* rose-600 */
+  --ok:    #059669;   /* emerald-600 */
 }
+
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+
+body {
+  font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
+  letter-spacing: -0.015em;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-font-smoothing: antialiased;
+  background: #f1f5f9;          /* slate-100 */
+  color: #1e293b;               /* slate-800 */
+  min-height: 100dvh;
+}
+
+button, input, textarea, select { font: inherit; color: inherit; letter-spacing: inherit; }
+button { cursor: pointer; background: none; border: 0; padding: 0; }
+a { color: inherit; text-decoration: none; }
+
+.mono { font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace; font-weight: 600; }
+
+.scroll-x { overflow-x: auto; scrollbar-width: thin; }
+.scroll-x::-webkit-scrollbar { height: 3px; }
+.scroll-x::-webkit-scrollbar-track { background: transparent; }
+.scroll-x::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+
+.shadow-xxs { box-shadow: 0 1px 2px rgba(15, 23, 42, .05); }
