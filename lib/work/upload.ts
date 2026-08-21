@@ -17,6 +17,10 @@ const 대행 = () => process.env.GOOGLE_IMPERSONATE_USER || 'pyh@teamjpk.com';
 
 /** 데이터센터 폴더 체계 — 법인 아래 갈래가 있다 (C1_계약서 · C2_자동차등록증 …) */
 export const 갈래표 = [
+  // 대표(2026-08-21): 「그냥 거기에 올리면 자동으로 구글드라이브 미분류로 회사 선택해서 들어가게끔」
+  // → 무슨 서류인지 몰라도 «일단 들어간다». 분류는 나중에 해도 된다.
+  //   못 넣고 들고 있는 것보다 미분류로라도 들어가 있는 게 낫다.
+  { 갈래: '모르겠음', 폴더: '00_미분류자료', 설명: '나중에 분류' },
   { 갈래: '계약서', 폴더: 'C1_계약서', 설명: '렌터카 계약서' },
   { 갈래: '등록증', 폴더: 'C2_자동차등록증', 설명: '자동차등록증' },
   { 갈래: '상환스케줄', 폴더: 'C3_차량별 상환스케줄', 설명: '할부 상환표' },
@@ -58,6 +62,14 @@ export async function 갈곳찾기(법인코드: string, 갈래: 갈래이름) {
 
   const 법인폴더 = await 폴더찾기(drive, 데이터센터, 법인.폴더앞);
   if (!법인폴더?.id) return null;
+
+  // 미분류는 법인 바로 아래에 있다 (C_차량 밑이 아니다)
+  if (갈래 === '모르겠음') {
+    const 미분류 = await 폴더찾기(drive, 법인폴더.id, '00_미분류자료');
+    if (!미분류?.id) return null;
+    return { id: 미분류.id, 이름: 미분류.name ?? '00_미분류자료', 경로: `${법인.폴더앞}/00_미분류자료` };
+  }
+
   const 차량폴더 = await 폴더찾기(drive, 법인폴더.id, 'C_차량');
   if (!차량폴더?.id) return null;
   const 갈래폴더 = await 폴더찾기(drive, 차량폴더.id, 갈래정보.폴더);
@@ -69,6 +81,11 @@ export async function 갈곳찾기(법인코드: string, 갈래: 갈래이름) {
 export function 이름짓기(차량번호: string, 갈래: 갈래이름, 원래이름: string) {
   const 확장자 = (원래이름.match(/\.[a-z0-9]{2,5}$/i)?.[0] ?? '').toLowerCase();
   const 오늘 = new Date(Date.now() + 9 * 36e5).toISOString().slice(0, 10);
+  // 차량번호를 모르면 원래 이름을 살린다 — 나중에 사람이 보고 분류해야 하니 단서를 지우면 안 된다
+  if (!차량번호) {
+    const 몸통 = 원래이름.replace(/\.[a-z0-9]{2,5}$/i, '').slice(0, 60) || '무제';
+    return `${오늘} ${몸통}${확장자}`;
+  }
   return `${차량번호} ${갈래} ${오늘}${확장자}`;
 }
 
@@ -84,7 +101,8 @@ export async function 올리기(입력: {
   올린사람: string;
 }): Promise<올린결과> {
   const 차 = 입력.차량번호.replace(/\s+/g, '');
-  if (!/^\d{2,3}[가-힣]\d{4}$/.test(차)) return { ok: false, 왜: '차량번호 모양이 아닙니다 (예: 12가3456)' };
+  // 차량번호는 «있으면» 맞아야 한다. 없어도 올라간다 — 미분류로 들어가 나중에 분류한다
+  if (차 && !/^\d{2,3}[가-힣]\d{4}$/.test(차)) return { ok: false, 왜: '차량번호 모양이 아닙니다 (예: 12가3456)' };
   if (!입력.내용?.length) return { ok: false, 왜: '파일이 비었습니다' };
 
   const 갈곳 = await 갈곳찾기(입력.법인코드, 입력.갈래);
@@ -106,7 +124,7 @@ export async function 올리기(입력: {
     requestBody: {
       name: 최종이름,
       parents: [갈곳.id],
-      description: `${입력.올린사람}이 렌터카매니저에서 올림 · ${차} · ${입력.갈래}`,
+      description: `${입력.올린사람}이 렌터카매니저에서 올림 · ${차 || '차량번호 없음'} · ${입력.갈래}`,
     },
     media: { mimeType: 입력.타입 || 'application/octet-stream', body: Readable.from(입력.내용) },
     fields: 'id,name',

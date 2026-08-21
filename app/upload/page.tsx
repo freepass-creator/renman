@@ -13,7 +13,9 @@ import { 이름추정 } from '@/lib/work/people';
 import { 파일올리기 } from './actions';
 import { Login } from '@/components/Login';
 
-const 갈래들 = ['계약서', '등록증', '보험증권', '보험가입증명', '상환스케줄', '고지서', '채권서류', '매각서류'] as const;
+// 대표(2026-08-21): 「그냥 거기에 올리면 자동으로 구글드라이브 미분류로 회사 선택해서 들어가게끔」
+// → 「모르겠음」이 기본. 회사만 고르면 그 회사 00_미분류자료로 들어간다.
+const 갈래들 = ['모르겠음', '계약서', '등록증', '보험증권', '보험가입증명', '상환스케줄', '고지서', '채권서류', '매각서류'] as const;
 const 법인들 = [
   { 코드: 'SW', 이름: '스위치플랜' },
   { 코드: 'PR', 이름: '프라임구독' },
@@ -25,7 +27,7 @@ export default function Upload() {
   const [user, setUser] = useState<FbUser | undefined>(undefined);
   const [차, 차쓰기] = useState('');
   const [법인, 법인쓰기] = useState('SW');
-  const [갈래, 갈래쓰기] = useState<string>('계약서');
+  const [갈래, 갈래쓰기] = useState<string>('모르겠음');
   const [파일, 파일쓰기] = useState<File | null>(null);
   const [결과, 결과쓰기] = useState<{ ok: boolean; 글: string } | null>(null);
   const [보냄, 시작] = useTransition();
@@ -39,7 +41,8 @@ export default function Upload() {
   if (user === null) return <Login />;
 
   const 나 = 이름추정(user.email);
-  const 차정상 = /^\d{2,3}[가-힣]\d{4}$/.test(차.replace(/\s+/g, ''));
+  const 차입력 = 차.replace(/\s+/g, '');
+  const 차정상 = !차입력 || /^\d{2,3}[가-힣]\d{4}$/.test(차입력);   // 비어 있어도 된다
   const 보낼수있나 = 차정상 && !!파일 && !보냄;
 
   return (
@@ -51,11 +54,13 @@ export default function Upload() {
       </header>
 
       <p className="mb-4 text-[13.5px] leading-relaxed text-neutral-500">
-        차 번호와 무슨 서류인지만 고르면 데이터센터 제자리로 들어갑니다.
-        이름도 규칙대로 붙습니다.
+        <b>회사만 고르면 올라갑니다.</b> 차 번호와 서류 갈래를 알면 제자리로,
+        모르면 그 회사 미분류자료로 들어갑니다. 나중에 분류해도 됩니다.
       </p>
 
-      <label className="mb-1.5 block text-[13px] font-semibold">차량번호</label>
+      <label className="mb-1.5 block text-[13px] font-semibold">
+        차량번호 <span className="font-normal text-neutral-500">— 모르면 비워 두세요</span>
+      </label>
       <input
         value={차}
         onChange={(e) => { 차쓰기(e.target.value); 결과쓰기(null); }}
@@ -69,7 +74,7 @@ export default function Upload() {
         </p>
       )}
 
-      <label className="mb-1.5 mt-4 block text-[13px] font-semibold">어느 회사</label>
+      <label className="mb-1.5 mt-4 block text-[13px] font-semibold">어느 회사 <span className="text-orange-600 dark:text-orange-400">*</span></label>
       <div className="mb-4 flex flex-wrap gap-1.5">
         {법인들.map((c) => (
           <button
@@ -87,7 +92,9 @@ export default function Upload() {
         ))}
       </div>
 
-      <label className="mb-1.5 block text-[13px] font-semibold">무슨 서류</label>
+      <label className="mb-1.5 block text-[13px] font-semibold">
+        무슨 서류 <span className="font-normal text-neutral-500">— 모르면 그대로 두세요</span>
+      </label>
       <div className="mb-4 flex flex-wrap gap-1.5">
         {갈래들.map((g) => (
           <button
